@@ -9164,6 +9164,7 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 /* A dialog that asks for a name. */
 .lex-prompt-dialog .lex-dialog-field { margin:.6em 0; }
 .lex-prompt-dialog input[type="text"] { width:100%; box-sizing:border-box; }
+.lex-prompt-dialog textarea.lex-dialog-input { width:100%; box-sizing:border-box; resize:vertical; }
 
 /* A shared animation viewer: the scrub bar with its event cues overlaid on
    it, then one centered row of square transport buttons directly below it.

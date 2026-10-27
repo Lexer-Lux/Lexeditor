@@ -77,12 +77,12 @@
     {
       "Field": "compTrophySedId",
       "Name": "Achievement ID",
-      "Description": "The completion achievement this item counts toward. The exact list is not established."
+      "Description": "This item counts toward a collection achievement. Collecting every item for it grants the achievement."
     },
     {
       "Field": "trophySeqId",
       "Name": "Sequential Achievement ID",
-      "Description": "The achievement tied to this item. The exact list is not established."
+      "Description": "The game grants this achievement when the player picks up this item."
     },
     {
       "Field": "maxNum",
@@ -142,52 +142,52 @@
     {
       "Field": "vowType0",
       "Name": "Pledge Type: 0",
-      "Description": "Whether characters with no covenant can use this item."
+      "Description": "If ON, this item can be used while in no covenant."
     },
     {
       "Field": "vowType1",
       "Name": "Pledge Type: 1",
-      "Description": "Whether Way of White members can use this item."
+      "Description": "If ON, this item can be used while in the Way of White covenant."
     },
     {
       "Field": "vowType2",
       "Name": "Pledge Type: 2",
-      "Description": "Whether Princess Guard members can use this item."
+      "Description": "If ON, this item can be used while in the Princess Guard covenant."
     },
     {
       "Field": "vowType3",
       "Name": "Pledge Type: 3",
-      "Description": "Whether Warrior of Sunlight members can use this item."
+      "Description": "If ON, this item can be used while in the Warrior of Sunlight covenant."
     },
     {
       "Field": "vowType4",
       "Name": "Pledge Type: 4",
-      "Description": "Whether Darkwraith members can use this item."
+      "Description": "If ON, this item can be used while in the Darkwraith covenant."
     },
     {
       "Field": "vowType5",
       "Name": "Pledge Type: 5",
-      "Description": "Whether Path of the Dragon members can use this item."
+      "Description": "If ON, this item can be used while in the Path of the Dragon covenant."
     },
     {
       "Field": "vowType6",
       "Name": "Pledge Type: 6",
-      "Description": "Whether Gravelord Servant members can use this item."
+      "Description": "If ON, this item can be used while in the Gravelord Servant covenant."
     },
     {
       "Field": "vowType7",
       "Name": "Pledge Type: 7",
-      "Description": "Whether Forest Hunter members can use this item."
+      "Description": "If ON, this item can be used while in the Forest Hunter covenant."
     },
     {
       "Field": "vowType8",
       "Name": "Pledge Type: 8",
-      "Description": "Whether Blade of the Dark Moon members can use this item."
+      "Description": "If ON, this item can be used while in the Blade of the Dark Moon covenant."
     },
     {
       "Field": "vowType9",
       "Name": "Pledge Type: 9",
-      "Description": "Whether Chaos Servant members can use this item."
+      "Description": "If ON, this item can be used while in the Chaos Servant covenant."
     },
     {
       "Field": "vowType10",

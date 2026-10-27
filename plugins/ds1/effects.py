@@ -120,8 +120,6 @@ def presentation(key, label, description):
         label = UNITS[key]
     if "Multiplies" in description or "Multiplier" in description:
         label = label.replace(" %", " multiplier")
-        if "1 =" not in description and "1 mean" not in description and "1 is" not in description:
-            description = description.rstrip(".") + ". 1 is unchanged."
     if key in PROTECTED:
         group = "Locked"
     elif key.startswith("effectTarget"):

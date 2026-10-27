@@ -84,14 +84,9 @@ MISC_SUBTABS = (('encumbrance', 'Bands', 'NativeRules'),
 ARMOR_FIELDS = {}
 for key, kind in [('defensePhysics', 'Physical'), ('defenseMagic', 'Magic'),
                   ('defenseFire', 'Fire'), ('defenseThunder', 'Lightning')]:
-    ARMOR_FIELDS[key] = (f'{kind} defense', 'Defense',
-        f'Flat {kind.lower()} defense this piece adds. The game stores and reads it as a whole number '
-        'of 0 or more, so it cannot be negative. For negative protection, give the piece negative '
-        'absorption (Armor Rework) or an effect that raises damage taken.')
+    ARMOR_FIELDS[key] = (f'{kind} defense', 'Defense')
 for key, kind in [('defenseSlash', 'Slash'), ('defenseBlow', 'Strike'), ('defenseThrust', 'Thrust')]:
-    ARMOR_FIELDS[key] = (f'{kind} vs physical (%)', 'Defense',
-        f'Changes this piece\'s physical defense against {kind.lower()} attacks by this percentage: '
-        '-100 makes it 0, 50 makes it one and a half times. It is not a defense value of its own.')
+    ARMOR_FIELDS[key] = (f'{kind} vs physical (%)', 'Defense')
 
 # Weapon status guard, said the way the blocking panel uses it. The
 # vendor annotations carry the % inside the label ('Guard Absorption %:
@@ -100,19 +95,12 @@ for key, kind in [('defenseSlash', 'Slash'), ('defenseBlow', 'Strike'), ('defens
 WEAPON_FIELDS = {}
 for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic'),
                   ('bloodGuardResist', 'Bleed'), ('curseGuardResist', 'Curse')]:
-    WEAPON_FIELDS[key] = (f'{kind} guard (%)', 'Defense',
-        'The absorption to apply to damage of the specified type when guarding.')
+    WEAPON_FIELDS[key] = (f'{kind} guard (%)', 'Defense')
 
 # Motion sets, not single animations: each choice names a weapon family's
 # whole moveset, while the Animations tab edits individual animations.
-WEAPON_FIELDS['wepmotionCategory'] = (
-    'Weapon Animation Set', 'Use behavior',
-    'The moveset this weapon uses: its attacks, guards and motions. '
-    'The Animations tab edits single animations per character.')
-WEAPON_FIELDS['guardmotionCategory'] = (
-    'Guard Animation Set', 'Use behavior',
-    'The moveset for blocking with this weapon. '
-    'The Animations tab edits single animations per character.')
+WEAPON_FIELDS['wepmotionCategory'] = ('Weapon Animation Set', 'Use behavior')
+WEAPON_FIELDS['guardmotionCategory'] = ('Guard Animation Set', 'Use behavior')
 
 # Achievements, decoded from the shipped Remastered GameParam: every
 # upgradeable weapon carries its upgrade path here (16 standard, 17
@@ -124,9 +112,6 @@ TROPHY_SEQ_CHOICES = {'-1': 'None', '16': 'Strongest Weapon', '17': 'Crystal Wea
                       '21': 'Enchanted Weapon', '22': 'Divine Weapon', '23': 'Occult Weapon',
                       '24': 'Fire Weapon', '25': 'Chaos Weapon', '27': 'Estus Flask',
                       '31': 'Rite of Kindling', '32': 'Art of Abysswalking', '34': 'Lordvessel'}
-TROPHY_SEQ_WEAPON_HELP = ('The game grants this achievement for this weapon '
-                          'at the final step of its upgrade path.')
-TROPHY_SEQ_ITEM_HELP = 'The game grants this achievement when the player picks up this item.'
 
 # Knight's Honor checklist slots: the 47 graded weapons in the shipped
 # params are exactly the 47 rare weapons the achievement needs (15
@@ -138,17 +123,12 @@ _KNIGHT_SLOTS = (104, 212, 213, 220, 221, 230, 258, 259, 267, 268, 269, 271,
                  1544, 1545)
 TROPHY_SGRADE_CHOICES = {'-1': 'None', '0': 'None'}
 TROPHY_SGRADE_CHOICES.update({str(slot): f"Knight's Honor (#{slot})" for slot in _KNIGHT_SLOTS})
-TROPHY_SGRADE_WEAPON_HELP = ("The game counts this weapon toward Knight's Honor "
-                             'when the player picks it up.')
 
 # Collection achievements on goods: sorcery scrolls count toward
 # Wisdom of a Sage, pyromancies toward Bond of a Pyromancer, miracles
 # toward Prayer of a Maiden.
 COMP_TROPHY_CHOICES = {'-1': 'None', '4': 'Wisdom of a Sage',
                        '5': 'Bond of a Pyromancer', '6': 'Prayer of a Maiden'}
-COMP_TROPHY_HELP = ('This item counts toward a collection achievement. '
-                    'Collecting every item for it grants the achievement.')
-
 
 # Label art per field: the damage, defense, status and stat icons the
 # game's own menus use (icons.py crops them from Menu04_2). Slash,
@@ -305,11 +285,6 @@ MAGIC_FIELDS = {
     'stamina': ('Stamina Consumption', 'Properties'),
 }
 
-# What the Source ID fields mean. Every armor piece and weapon names, per
-# upgrade level, what the blacksmith treats that level as derived from;
-# armor usually names itself, which reads as if per-level records exist.
-ORIGIN_HELP = ('Names the item the blacksmith treats this level as derived from. '
-               'This item usually names itself. Upgrade levels are not separate records.')
 
 # Armor Rework gives every armor piece its own absorption effect in slot 3,
 # one per upgrade level: effect ID = 30,000,000 + armor ID + level.
@@ -628,6 +603,61 @@ def _unit_suffix(label):
     return re.sub(r' %$', ' (%)', label)
 
 
+# Help bubbles hold one paragraph: past ~3 sentences the text is
+# documentation, not help (help-text skill). 2,000 characters is eight
+# times the longest shipped bubble, so the cap only stops pastes.
+MAX_HELP_TEXT = 2000
+
+
+def _encode_annotations(document, trailing_newline):
+    """The annotation files' own bytes: indent 2, CRLF, kept newline."""
+    text = json.dumps(document, indent=2, ensure_ascii=False).replace("\n", "\r\n")
+    return (text + "\r\n" if trailing_newline else text).encode("utf-8")
+
+
+def save_description(table, key, text):
+    """Rewrite one field's help bubble: its annotation Description.
+
+    The only writer of annotation help. Schemas read the same files,
+    so the next read shows the new text; the schema cache is dropped
+    here, not by the caller. Returns the annotation file's stem.
+    """
+    if table not in TABLES:
+        raise FormatError(f'Unknown parameter table {table}.')
+    if not isinstance(text, str):
+        raise FormatError('Help text must be text.')
+    cleaned = text.strip()
+    if not cleaned:
+        raise FormatError('Help cannot be blank; an empty bubble leaves nothing to edit back.')
+    if len(cleaned) > MAX_HELP_TEXT:
+        raise FormatError(f'Help holds up to {MAX_HELP_TEXT} characters; this text is {len(cleaned)}.')
+    if '\n' in cleaned or '\r' in cleaned:
+        raise FormatError('Help is one paragraph; line breaks do not show in the bubble.')
+    if any(ord(char) < 32 for char in cleaned):
+        raise FormatError('Help holds text, not control characters.')
+    root = ET.parse(METADATA / 'defs' / (table + '.xml')).getroot()
+    filename = root.findtext('ParamType') + '.json'
+    path = METADATA / 'annotations' / filename
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        raise FormatError(f'The annotations have no {filename}.') from None
+    try:
+        document = json.loads(raw.decode('utf-8'))
+    except ValueError:
+        raise FormatError(f'{filename} is not valid JSON.') from None
+    entries = {entry['Field']: entry for entry in document.get('Fields', [])}
+    if key not in entries:
+        raise FormatError(f'{filename} has no {key}.')
+    entries[key]['Description'] = cleaned
+    trailing = raw.endswith(b'\r\n') or raw.endswith(b'\n')
+    temporary = path.with_suffix('.tmp')
+    temporary.write_bytes(_encode_annotations(document, trailing))
+    temporary.replace(path)
+    schema.cache_clear()
+    return Path(filename).stem
+
+
 @lru_cache(maxsize=None)
 def schema(table):
     if table not in TABLES:
@@ -679,25 +709,14 @@ def schema(table):
         if table == 'NpcThinkParam' and key in THINK_GROUPS:
             group = THINK_GROUPS[key]
         if table == 'EquipParamProtector' and key in ARMOR_FIELDS:
-            label, group, description = ARMOR_FIELDS[key]
-        if table == 'EquipParamProtector' and key.startswith('invisibleFlag') and not description:
-            description = ('Hides part of the worn body model. '
-                           'Which part each mask hides is not documented.')
+            label, group = ARMOR_FIELDS[key]
+        # Help comes from the annotations, never from code: every field's
+        # bubble is its annotation Description, edited in place.
         if table == 'EquipParamWeapon' and key in WEAPON_FIELDS:
-            label, group, description = WEAPON_FIELDS[key]
+            label, group = WEAPON_FIELDS[key]
         if table == 'Magic' and key in MAGIC_FIELDS:
             label, group = MAGIC_FIELDS[key]
-        if table == 'EquipParamProtector' and key.startswith('originEquipPro'):
-            description = ORIGIN_HELP
-        if table == 'EquipParamWeapon' and key.startswith('originEquipWep'):
-            description = ORIGIN_HELP
-        if key == 'trophySeqId':
-            description = (TROPHY_SEQ_WEAPON_HELP if table == 'EquipParamWeapon'
-                           else TROPHY_SEQ_ITEM_HELP)
-        if table == 'EquipParamWeapon' and key == 'trophySGradeId':
-            description = TROPHY_SGRADE_WEAPON_HELP
-        if key == 'compTrophySedId':
-            description = COMP_TROPHY_HELP
+
         slot = key[-2:] if table == MATERIAL_TABLE else ''
         if slot in ('01', '02', '03', '04', '05'):
             group = f'Material {int(slot)}'
@@ -739,10 +758,7 @@ def schema(table):
             if not covenant or covenant.isdigit():
                 padding = True
             else:
-                thing = 'spell' if table == 'Magic' else 'item'
                 label = 'Usable with no covenant' if covenant == 'None' else f'Usable in {covenant}'
-                description = (f'If ON, this {thing} can be used while in no covenant.' if covenant == 'None'
-                               else f'If ON, this {thing} can be used while in the {covenant} covenant.')
         protected = padding or count != 1 or 'Obsolete' in attrs or not annotation or (enum_name and not choices) or bool(re.search(r'unknown|unused|dummy|reserved|^unk', label, re.I))
         reason = ''
         if table == EFFECT_TABLE:
@@ -1585,6 +1601,7 @@ class ItemDocument:
             unbounded = field.dtype in ('f32', 'f64', 'angle32') and (item['min'], item['max']) in (
                 (-3.4028234663852886e38, 3.4028234663852886e38), (-1.7976931348623157e308, 1.7976931348623157e308))
             fields.append({'key': field.key, 'label': field.label, 'description': field.description,
+                           'helpKey': f'{table}/{field.key}',
                            'group': _graph_group(field.key) if table == GRAPH_TABLE else
                            field.group if table in ('NpcParam', 'AtkParam_Npc', 'AtkParam_Pc', EFFECT_TABLE,
                            MATERIAL_TABLE, CHARA_TABLE, 'Bullet', 'NpcThinkParam', 'ItemLotParam') else '',

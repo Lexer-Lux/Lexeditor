@@ -67,7 +67,7 @@
     {
       "Field": "trophySeqId",
       "Name": "Sequential Achievement ID",
-      "Description": "The sequential achievement tied to this ring. The exact list is not established."
+      "Description": "The game grants this achievement when the player picks up this item."
     },
     {
       "Field": "equipModelCategory",

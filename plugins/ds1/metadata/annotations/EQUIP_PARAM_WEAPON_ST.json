@@ -122,82 +122,82 @@
     {
       "Field": "originEquipWep",
       "Name": "Source ID: +0",
-      "Description": "Links this weapon to the one it ascends from at +0. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep1",
       "Name": "Source ID: +1",
-      "Description": "Links this weapon to the one it ascends from at +1. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep2",
       "Name": "Source ID: +2",
-      "Description": "Links this weapon to the one it ascends from at +2. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep3",
       "Name": "Source ID: +3",
-      "Description": "Links this weapon to the one it ascends from at +3. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep4",
       "Name": "Source ID: +4",
-      "Description": "Links this weapon to the one it ascends from at +4. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep5",
       "Name": "Source ID: +5",
-      "Description": "Links this weapon to the one it ascends from at +5. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep6",
       "Name": "Source ID: +6",
-      "Description": "Links this weapon to the one it ascends from at +6. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep7",
       "Name": "Source ID: +7",
-      "Description": "Links this weapon to the one it ascends from at +7. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep8",
       "Name": "Source ID: +8",
-      "Description": "Links this weapon to the one it ascends from at +8. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep9",
       "Name": "Source ID: +9",
-      "Description": "Links this weapon to the one it ascends from at +9. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep10",
       "Name": "Source ID: +10",
-      "Description": "Links this weapon to the one it ascends from at +10. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep11",
       "Name": "Source ID: +11",
-      "Description": "Links this weapon to the one it ascends from at +11. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep12",
       "Name": "Source ID: +12",
-      "Description": "Links this weapon to the one it ascends from at +12. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep13",
       "Name": "Source ID: +13",
-      "Description": "Links this weapon to the one it ascends from at +13. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep14",
       "Name": "Source ID: +14",
-      "Description": "Links this weapon to the one it ascends from at +14. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipWep15",
       "Name": "Source ID: +15",
-      "Description": "Links this weapon to the one it ascends from at +15. The blacksmith also uses it when reverting, but the details are unproven."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "antiDemonDamageRate",
@@ -317,12 +317,12 @@
     {
       "Field": "trophySGradeId",
       "Name": "Achievement ID",
-      "Description": "Unknown. It may link this weapon to an achievement. Leave it unless you test it."
+      "Description": "The game counts this weapon toward Knight's Honor when the player picks it up."
     },
     {
       "Field": "trophySeqId",
       "Name": "Sequential Achievement ID",
-      "Description": "Unknown. It may order this weapon in an achievement checklist. Leave it unless you test it."
+      "Description": "The game grants this achievement for this weapon at the final step of its upgrade path."
     },
     {
       "Field": "throwAtkRate",
@@ -352,12 +352,12 @@
     {
       "Field": "wepmotionCategory",
       "Name": "Weapon Animation Set",
-      "Description": "Which set of attack animations this weapon uses. Pick a tested set or attacks break."
+      "Description": "The moveset this weapon uses: its attacks, guards and motions. The Animations tab edits single animations per character."
     },
     {
       "Field": "guardmotionCategory",
       "Name": "Guard Animation Set",
-      "Description": "Which block animation this weapon uses. Copy a similar weapon."
+      "Description": "The moveset for blocking with this weapon. The Animations tab edits single animations per character."
     },
     {
       "Field": "atkMaterial",
@@ -472,22 +472,22 @@
     {
       "Field": "poisonGuardResist",
       "Name": "Guard Absorption %: Poison",
-      "Description": "How much poison buildup a block stops. 100 stops it all."
+      "Description": "The absorption to apply to damage of the specified type when guarding."
     },
     {
       "Field": "diseaseGuardResist",
       "Name": "Guard Absorption %: Toxic",
-      "Description": "How much toxic buildup a block stops. 100 stops it all."
+      "Description": "The absorption to apply to damage of the specified type when guarding."
     },
     {
       "Field": "bloodGuardResist",
       "Name": "Guard Absorption %: Bleed",
-      "Description": "How much bleed buildup a block stops. 100 stops it all."
+      "Description": "The absorption to apply to damage of the specified type when guarding."
     },
     {
       "Field": "curseGuardResist",
       "Name": "Guard Absorption %: Curse",
-      "Description": "How much curse buildup a block stops. 100 stops it all."
+      "Description": "The absorption to apply to damage of the specified type when guarding."
     },
     {
       "Field": "isDurabilityDivergence",

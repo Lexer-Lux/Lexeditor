@@ -82,82 +82,82 @@
     {
       "Field": "originEquipPro",
       "Name": "Source ID: +0",
-      "Description": "The piece this upgrades from at +0. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro1",
       "Name": "Source ID: +1",
-      "Description": "The piece this upgrades from at +1. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro2",
       "Name": "Source ID: +2",
-      "Description": "The piece this upgrades from at +2. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro3",
       "Name": "Source ID: +3",
-      "Description": "The piece this upgrades from at +3. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro4",
       "Name": "Source ID: +4",
-      "Description": "The piece this upgrades from at +4. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro5",
       "Name": "Source ID: +5",
-      "Description": "The piece this upgrades from at +5. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro6",
       "Name": "Source ID: +6",
-      "Description": "The piece this upgrades from at +6. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro7",
       "Name": "Source ID: +7",
-      "Description": "The piece this upgrades from at +7. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro8",
       "Name": "Source ID: +8",
-      "Description": "The piece this upgrades from at +8. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro9",
       "Name": "Source ID: +9",
-      "Description": "The piece this upgrades from at +9. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro10",
       "Name": "Source ID: +10",
-      "Description": "The piece this upgrades from at +10. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro11",
       "Name": "Source ID: +11",
-      "Description": "The piece this upgrades from at +11. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro12",
       "Name": "Source ID: +12",
-      "Description": "The piece this upgrades from at +12. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro13",
       "Name": "Source ID: +13",
-      "Description": "The piece this upgrades from at +13. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro14",
       "Name": "Source ID: +14",
-      "Description": "The piece this upgrades from at +14. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "originEquipPro15",
       "Name": "Source ID: +15",
-      "Description": "The piece this upgrades from at +15. -1 means None."
+      "Description": "Names the item the blacksmith treats this level as derived from. This item usually names itself. Upgrade levels are not separate records."
     },
     {
       "Field": "faceScaleM_ScaleX",
@@ -252,37 +252,37 @@
     {
       "Field": "defensePhysics",
       "Name": "Defense: Physical",
-      "Description": "How much physical damage this piece blocks. Slash, strike and thrust adjust this value."
+      "Description": "Flat physical defense this piece adds. The game stores and reads it as a whole number of 0 or more, so it cannot be negative. For negative protection, give the piece negative absorption (Armor Rework) or an effect that raises damage taken."
     },
     {
       "Field": "defenseMagic",
       "Name": "Defense: Magic",
-      "Description": "How much magic damage this piece blocks."
+      "Description": "Flat magic defense this piece adds. The game stores and reads it as a whole number of 0 or more, so it cannot be negative. For negative protection, give the piece negative absorption (Armor Rework) or an effect that raises damage taken."
     },
     {
       "Field": "defenseFire",
       "Name": "Defense: Fire",
-      "Description": "How much fire damage this piece blocks."
+      "Description": "Flat fire defense this piece adds. The game stores and reads it as a whole number of 0 or more, so it cannot be negative. For negative protection, give the piece negative absorption (Armor Rework) or an effect that raises damage taken."
     },
     {
       "Field": "defenseThunder",
       "Name": "Defense: Lightning",
-      "Description": "How much lightning damage this piece blocks."
+      "Description": "Flat lightning defense this piece adds. The game stores and reads it as a whole number of 0 or more, so it cannot be negative. For negative protection, give the piece negative absorption (Armor Rework) or an effect that raises damage taken."
     },
     {
       "Field": "defenseSlash",
       "Name": "Defense Correction: Slash",
-      "Description": "Adjusts physical defense against slash attacks. -50 halves it, 50 raises it by half."
+      "Description": "Changes this piece's physical defense against slash attacks by this percentage: -100 makes it 0, 50 makes it one and a half times. It is not a defense value of its own."
     },
     {
       "Field": "defenseBlow",
       "Name": "Defense Correction: Strike",
-      "Description": "Adjusts physical defense against strike attacks. -50 halves it, 50 raises it by half."
+      "Description": "Changes this piece's physical defense against strike attacks by this percentage: -100 makes it 0, 50 makes it one and a half times. It is not a defense value of its own."
     },
     {
       "Field": "defenseThrust",
       "Name": "Defense Correction: Thrust",
-      "Description": "Adjusts physical defense against thrust attacks. -50 halves it, 50 raises it by half."
+      "Description": "Changes this piece's physical defense against thrust attacks by this percentage: -100 makes it 0, 50 makes it one and a half times. It is not a defense value of its own."
     },
     {
       "Field": "resistPoison",

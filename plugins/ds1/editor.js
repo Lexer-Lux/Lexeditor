@@ -1384,7 +1384,7 @@ function fieldSections(row){
       ...((link||fieldAssetLink)?{readOnly:state.readOnly||!field.editable}:{}),
       // A flag is stored as a u8 bit but edited as a boolean; naming the
       // storage type here kept the checkbox out of the boolean field layout.
-      help:help?infoHelp(help):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),...(fieldAssetLink?{}:{min:field.minimum,max:field.maximum})}));
+      help:help?infoHelp(help,field.editable&&field.helpKey?{helpKey:field.helpKey}:{}):null,dataType:field.type==="bool"?"BOOL":field.dtype.toUpperCase(),...(fieldAssetLink?{}:{min:field.minimum,max:field.maximum})}));
   }
   if(row.effectUsage){
     const usage=row.effectUsage;

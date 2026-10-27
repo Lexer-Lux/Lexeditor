@@ -19,7 +19,7 @@ from .flver import FlverError
 from .tae import EVENT_TYPES, TaeError
 from .tae_store import TaeStore
 from .native_rules import NativeRules
-from .formats import FormatError, stats_fields, TABLES, FMG_TABLES
+from .formats import FormatError, stats_fields, TABLES, FMG_TABLES, save_description
 from .effects import TABLE as EFFECT_TABLE
 from .store import ItemStore
 from . import tweak_mods
@@ -712,7 +712,7 @@ class Handler(PluginRequestHandler):
         path = urlparse(self.path).path
         try:
             if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/tae/add', '/api/tae/remove', '/api/rows/add', '/api/rows/remove', '/api/placements/add', '/api/placements/remove', '/api/placements/create', '/api/assets/upload', '/api/assets/remove', '/api/deployment/apply', '/api/deployment/disable',
-                            '/api/tweaks/save', '/api/tweaks/restore'):
+                            '/api/tweaks/save', '/api/tweaks/restore', '/api/annotation-help'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
@@ -868,6 +868,13 @@ class Handler(PluginRequestHandler):
                     result = tweak_mods.status(STORE.game_root)
                 elif path == '/api/tweaks/restore':
                     result = tweak_mods.restore(STORE.game_root)
+                elif path == '/api/annotation-help':
+                    key = str(payload.get('key', ''))
+                    table, slash, field = key.partition('/')
+                    if not slash or not table or not field:
+                        raise ValueError('Saving help needs its table and field')
+                    result = {'saved': True,
+                              'file': save_description(table, field, payload.get('text'))}
                 elif path == '/api/deployment/apply':
                     result = RULES.apply(STORE)
                 else:

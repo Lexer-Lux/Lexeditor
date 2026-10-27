@@ -77,22 +77,22 @@
     {
       "Field": "physicsAttackRate",
       "Name": "Post-Defense Attack %: Physical",
-      "Description": "Multiplies physical damage dealt. It applies after enemy defense instead of changing the attack rating."
+      "Description": "Multiplies physical damage dealt. It applies after enemy defense instead of changing the attack rating. 1 is unchanged."
     },
     {
       "Field": "magicAttackRate",
       "Name": "Post-Defense Attack %: Magic",
-      "Description": "Multiplies magic damage dealt. It applies after enemy defense instead of changing the attack rating."
+      "Description": "Multiplies magic damage dealt. It applies after enemy defense instead of changing the attack rating. 1 is unchanged."
     },
     {
       "Field": "fireAttackRate",
       "Name": "Post-Defense Attack %: Fire",
-      "Description": "Multiplies fire damage dealt. It applies after enemy defense instead of changing the attack rating."
+      "Description": "Multiplies fire damage dealt. It applies after enemy defense instead of changing the attack rating. 1 is unchanged."
     },
     {
       "Field": "thunderAttackRate",
       "Name": "Post-Defense Attack %: Lightning",
-      "Description": "Multiplies lightning damage dealt. It applies after enemy defense instead of changing the attack rating."
+      "Description": "Multiplies lightning damage dealt. It applies after enemy defense instead of changing the attack rating. 1 is unchanged."
     },
     {
       "Field": "physicsAttackPowerRate",
@@ -292,7 +292,7 @@
     {
       "Field": "equipWeightChangeRate",
       "Name": "Equipment Weight %",
-      "Description": "Multiplies maximum Equip Load. 2 doubles it."
+      "Description": "Multiplies maximum Equip Load. 2 doubles it. 1 is unchanged."
     },
     {
       "Field": "allItemWeightChangeRate",
@@ -312,7 +312,7 @@
     {
       "Field": "haveSoulRate",
       "Name": "Soul Possession %",
-      "Description": "Multiplies souls the owner drops on death. It may only work from an enemy's own record."
+      "Description": "Multiplies souls the owner drops on death. It may only work from an enemy's own record. 1 is unchanged."
     },
     {
       "Field": "targetPriority",
@@ -337,22 +337,22 @@
     {
       "Field": "registPoizonChangeRate",
       "Name": "Resistance %: Poison",
-      "Description": "Multiplies poison resistance from stats. 2 doubles it."
+      "Description": "Multiplies poison resistance from stats. 2 doubles it. 1 is unchanged."
     },
     {
       "Field": "registIllnessChangeRate",
       "Name": "Resistance %: Toxic",
-      "Description": "Multiplies toxic resistance from stats. 2 doubles it."
+      "Description": "Multiplies toxic resistance from stats. 2 doubles it. 1 is unchanged."
     },
     {
       "Field": "registBloodChangeRate",
       "Name": "Resistance %: Bleed",
-      "Description": "Multiplies bleed resistance from stats. 2 doubles it."
+      "Description": "Multiplies bleed resistance from stats. 2 doubles it. 1 is unchanged."
     },
     {
       "Field": "registCurseChangeRate",
       "Name": "Resistance %: Curse",
-      "Description": "Multiplies curse resistance from stats. 2 doubles it."
+      "Description": "Multiplies curse resistance from stats. 2 doubles it. 1 is unchanged."
     },
     {
       "Field": "soulStealRate",
@@ -362,7 +362,7 @@
     {
       "Field": "lifeReductionRate",
       "Name": "Effect Duration Change %",
-      "Description": "Multiplies the duration of another status. Effect Duration Change Type picks which one."
+      "Description": "Multiplies the duration of another status. Effect Duration Change Type picks which one. 1 is unchanged."
     },
     {
       "Field": "hpRecoverRate",
@@ -392,7 +392,7 @@
     {
       "Field": "guardStaminaCutRate",
       "Name": "Guard Stability %",
-      "Description": "Multiplies shield stability. Requires stateInfo 158 (magic shield) or stateInfo 204 (great magic shield) to work (VFX present). Note that stability values over 100 nullify all stamina damage."
+      "Description": "Multiplies shield stability. Requires stateInfo 158 (magic shield) or stateInfo 204 (great magic shield) to work (VFX present). Note that stability values over 100 nullify all stamina damage. 1 is unchanged."
     },
     {
       "Field": "rayCastPassedTime",

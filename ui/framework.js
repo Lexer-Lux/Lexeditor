@@ -849,7 +849,7 @@
     // One store: the bubble shows exactly the text its caller passed.
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
-      onclick = null, symbol = "?", ...rest
+      onclick = null, symbol = "?", helpKey = null, ...rest
     } = attrs;
     const interactive = typeof onclick === "function";
     const popupId = `lex-help-${++infoHelpSequence}`;
@@ -858,8 +858,17 @@
       ...rest,
       class: ["lex-info-help", className].filter(Boolean).join(" "),
       "data-lex-control": "help",
+      "data-lex-help-key": helpKey || null,
       "aria-label": ariaLabel, "aria-describedby": popupId,
     }, element("span", {"aria-hidden": "true"}, symbol));
+    // The bubble's live text: an annotation edit rewrites it here and
+    // in the open popup, so the new wording shows without a rebuild.
+    marker.lexHelpText = text instanceof Node ? text.textContent : String(text ?? title ?? "");
+    marker.lexSetHelp = next => {
+      marker.lexHelpText = String(next ?? "");
+      marker.setAttribute("aria-label", marker.lexHelpText);
+      if (activeHelpPopup?.id === popupId) activeHelpPopup.textContent = marker.lexHelpText;
+    };
     let closeTimer = null;
     const cancelClose = () => { clearTimeout(closeTimer); closeTimer = null; };
     const scheduleClose = () => {
@@ -944,6 +953,35 @@
     });
     return marker;
   };
+  // Double-clicking a question mark rewords its annotation: the key on
+  // the marker names the property's definition, and the plugin's own
+  // service writes that file. A bubble with no key is interface text
+  // with no definition to write to, so it says so instead of opening.
+  document.addEventListener("dblclick", async event => {
+    const marker = event.target.closest?.(".lex-info-help");
+    if (!marker || !sharedSettingsSnapshot?.developerMode) return;
+    const key = marker.dataset.lexHelpKey;
+    if (!key) { showToast("This help is written in the interface, not an annotation file."); return; }
+    event.preventDefault();
+    event.stopPropagation();
+    const before = marker.lexHelpText ?? "";
+    const typed = await promptText({title: "Edit help", label: "Help text", value: before,
+      multiline: true, confirmLabel: "Save"});
+    if (typed === null || typed === before) return;
+    let saved = null, error = "";
+    try {
+      const response = await fetch("/api/annotation-help", {method: "POST",
+        headers: {"Content-Type": "application/json"}, body: JSON.stringify({key, text: typed})});
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok)
+        error = response.status === 404 ? "This game does not support editing help in place."
+          : payload.error || "Could not save the help text.";
+      else saved = payload;
+    } catch (_error) { error = "Could not save the help text."; }
+    if (error) { showToast(error, true); return; }
+    marker.lexSetHelp?.(typed);
+    showToast(saved?.file ? `Help saved to ${saved.file}.` : "Help saved.");
+  });
 
   let modLoadingPromise = null;
   const modLoadingPanel = pluginId => {
@@ -5938,8 +5976,11 @@
   const promptText = (options = {}) => new Promise(resolve => {
     const previousFocus = document.activeElement;
     const backdrop = element("div", {class: "lex-dialog-backdrop", "data-lex-history-control": true});
-    const input = element("input", {type: "text", class: "lex-dialog-input",
-      value: String(options.value ?? ""), "aria-label": String(options.label || options.title || "Name")});
+    const input = options.multiline
+      ? element("textarea", {class: "lex-dialog-input", rows: "5",
+        "aria-label": String(options.label || options.title || "Name")}, String(options.value ?? ""))
+      : element("input", {type: "text", class: "lex-dialog-input",
+        value: String(options.value ?? ""), "aria-label": String(options.label || options.title || "Name")});
     const cancel = element("button", {class: "lex-dialog-action", text: String(options.cancelLabel || "Cancel")});
     const confirm = element("button", {class: "lex-dialog-action primary",
       text: String(options.confirmLabel || "Create")});
@@ -5956,7 +5997,8 @@
     };
     const onKey = event => {
       if (event.key === "Escape") finish(null);
-      else if (event.key === "Enter") finish(input.value.trim() || null);
+      else if (event.key === "Enter" && (!options.multiline || (event.ctrlKey || event.metaKey)))
+        finish(input.value.trim() || null);
     };
     cancel.onclick = () => finish(null);
     confirm.onclick = () => finish(input.value.trim() || null);

@@ -142,42 +142,42 @@
     {
       "Field": "vowType0",
       "Name": "Vow Type: None",
-      "Description": "If ON, this spell works with no covenant."
+      "Description": "If ON, this spell can be used while in no covenant."
     },
     {
       "Field": "vowType1",
       "Name": "Vow Type: Way of White",
-      "Description": "If ON, this spell works in the Way of White covenant."
+      "Description": "If ON, this spell can be used while in the Way of White covenant."
     },
     {
       "Field": "vowType2",
       "Name": "Vow Type: Princess Guard",
-      "Description": "If ON, this spell works in the Princess Guard covenant."
+      "Description": "If ON, this spell can be used while in the Princess Guard covenant."
     },
     {
       "Field": "vowType3",
       "Name": "Vow Type: Warrior of Sunlight",
-      "Description": "If ON, this spell works in the Warrior of Sunlight covenant."
+      "Description": "If ON, this spell can be used while in the Warrior of Sunlight covenant."
     },
     {
       "Field": "vowType4",
       "Name": "Vow Type: Darkwraith",
-      "Description": "If ON, this spell works in the Darkwraith covenant."
+      "Description": "If ON, this spell can be used while in the Darkwraith covenant."
     },
     {
       "Field": "vowType5",
       "Name": "Vow Type: Path of the Dragon",
-      "Description": "If ON, this spell works in the Path of the Dragon covenant."
+      "Description": "If ON, this spell can be used while in the Path of the Dragon covenant."
     },
     {
       "Field": "vowType6",
       "Name": "Vow Type: Gravelord Servant",
-      "Description": "If ON, this spell works in the Gravelord Servant covenant."
+      "Description": "If ON, this spell can be used while in the Gravelord Servant covenant."
     },
     {
       "Field": "vowType7",
       "Name": "Vow Type: Forest Hunter",
-      "Description": "If ON, this spell works in the Forest Hunter covenant."
+      "Description": "If ON, this spell can be used while in the Forest Hunter covenant."
     },
     {
       "Field": "enable_multi",
@@ -237,12 +237,12 @@
     {
       "Field": "vowType8",
       "Name": "Vow Type: Blade of the Dark Moon",
-      "Description": "If ON, this spell works in the Blade of the Dark Moon covenant."
+      "Description": "If ON, this spell can be used while in the Blade of the Dark Moon covenant."
     },
     {
       "Field": "vowType9",
       "Name": "Vow Type: Chaos Servant",
-      "Description": "If ON, this spell works in the Chaos Servant covenant."
+      "Description": "If ON, this spell can be used while in the Chaos Servant covenant."
     },
     {
       "Field": "vowType10",
