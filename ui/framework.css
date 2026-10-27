@@ -7871,17 +7871,11 @@ html[data-lex-boolean-style="box"] .lex-boolean-field input[type="checkbox"]::be
 }
 /* A mod's Files and Records tabs are one list each: the list owns the tab
    below its header, with the pager pinned at its foot. */
-.lex-tabbed-panel-content:has(> .lex-mod-contents-tab) {
+.lex-tabbed-panel-content:has(> .lex-mod-contents) {
   display:flex;
   flex-direction:column;
   overflow:hidden;
   padding:0;
-}
-.lex-mod-contents-tab {
-  flex:1 1 auto;
-  min-height:0;
-  display:flex;
-  flex-direction:column;
 }
 .lex-mod-contents {
   flex:1 1 auto;

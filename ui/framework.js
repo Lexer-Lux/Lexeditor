@@ -16028,9 +16028,16 @@ ${contents.path}`});
       };
       const recordsEmptyNow = () => !!contentsResult && !contentsFailed
         && !(contentsResult.changes || []).length && !contentsResult.note;
+      // The tab's content node is the mount: paint swaps it in place, so no
+      // wrapper div stands between the tab and its table.
       const paintWraps = () => {
-        if (contentsWraps.files) contentsWraps.files.replaceChildren(contentsNode("files"));
-        if (contentsWraps.records) contentsWraps.records.replaceChildren(contentsNode("records"));
+        for (const kind of ["files", "records"]) {
+          const wrap = contentsWraps[kind];
+          if (!wrap) continue;
+          const node = contentsNode(kind);
+          if (wrap.isConnected) wrap.replaceWith(node);
+          contentsWraps[kind] = node;
+        }
         // The strip was built before the contents arrived, and only
         // the showing tab is mounted, so an emptiness change redraws
         // from cache: the Records tab grays with its reason there,
@@ -16042,8 +16049,8 @@ ${contents.path}`});
           || button?.disabled === true;
         if (button && empty !== grayed) draw();
       };
-      const filesWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("files"));
-      const recordsWrap = element("div", {class: "lex-mod-contents-tab"}, contentsNode("records"));
+      const filesWrap = contentsNode("files");
+      const recordsWrap = contentsNode("records");
       contentsWraps.files = filesWrap;
       contentsWraps.records = recordsWrap;
       // Nothing stands above the tab bar: an error and a missing name are
