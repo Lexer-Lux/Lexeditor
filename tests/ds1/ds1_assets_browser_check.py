@@ -376,6 +376,10 @@ def main():
                     page.locator('[data-tab="models"]').click()
                     page.locator('[data-tab="textures"]').click()
                     page.wait_for_function('state.sub==="files" && state.rows.length===5')
+                    # The modified marker paints after the rows land.
+                    page.wait_for_function(
+                        'document.querySelectorAll(".lex-list-row.lex-record-modified")'
+                        ".length === 1")
                     assert page.locator(
                         ".lex-list-row.lex-record-modified", has_text=TPF).count() == 1
                     nib = page.locator(".lex-list-row", has_text="new.tpf").locator(".lex-record-source")
