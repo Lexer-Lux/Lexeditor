@@ -76,9 +76,12 @@ def main():
                     # Every FMG lists its filled entries named by first line.
                     page.locator('[data-subtab="fmg-dialogue"]').click()
                     page.wait_for_function('state.sub === "fmg-dialogue" && state.rows.length === 2')
+                    # Non-empty is not enough here: the previous subtab's
+                    # rows are still rendered (and non-empty) until the
+                    # re-render lands, so wait for the new first row.
                     page.wait_for_function(
                         'document.querySelector(".lex-column-list .lex-list-row")'
-                        '.textContent.replace(/\u200b/g, "").trim() !== ""')
+                        '.textContent.replace(/\u200b/g, "").trim() === "No."')
                     spoken = page.locator('.lex-column-list .lex-list-row').evaluate_all(
                         'rows => rows.map(row => row.textContent.replace(/\\u200b/g, "").trim()).filter(Boolean)')
                     assert spoken == ['No.', 'Yes.'], spoken
@@ -90,7 +93,11 @@ def main():
                         pinned(page, 'EquipParamProtector', 100)
                         page.locator('.lex-tabbed-panel [data-subtab="defense"]').click()
                         page.wait_for_function('state.itemTab === "defense"')
-                        link = page.locator(f'.lex-hoverable[data-hover-target-id="{text_id}"]')
+                        selector = '.lex-hoverable[data-hover-target-id="%s"]' % text_id
+                        page.wait_for_function(
+                            'sel => document.querySelectorAll(sel).length === 1',
+                            arg=selector)
+                        link = page.locator(selector)
                         assert link.count() == 1, label
                         assert link.inner_text().strip() == label
                         link.click()
@@ -129,7 +136,9 @@ def main():
                     control = page.locator('input[data-field-key="label"][type="text"]')
                     control.fill('MagAbsorb')
                     control.press('Tab')
-                    page.wait_for_function('state.pending === 0 && state.dirty > 0')
+                    page.wait_for_function(
+                        'state.pending === 0 && state.row.fields.find(f=>f.key==="label").value'
+                        ' === "MagAbsorb"')
                     row = request_json(session.url + 'api/row?table=MenuText&id=102204')['row']
                     assert row['name'] == 'Magic defense label'
                     assert next(f['value'] for f in row['fields'] if f['key'] == 'label') == 'MagAbsorb'

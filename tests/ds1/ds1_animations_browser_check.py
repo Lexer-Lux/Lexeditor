@@ -78,6 +78,11 @@ def main():
                     page.wait_for_function("state.animScope.level==='events' && state.rows.length===4")
                     assert page.evaluate("state.rows.map(r=>r.values.label)") == [
                         "Attack", "Add effect", "Unknown event 999", "Unknown event 16"]
+                    # State lands before the tabstrip repaints its active
+                    # tab: wait for the class, don't assert it cold.
+                    page.wait_for_function(
+                        'sel => document.querySelectorAll(sel).length === 1',
+                        arg='[data-anim-left] [data-tabstrip-id="events"].active')
                     assert page.locator('[data-anim-left] [data-tabstrip-id="events"].active').count() == 1
                     if output:
                         page.screenshot(path=str(output / "animations-events.png"))
