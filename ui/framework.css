@@ -9186,3 +9186,148 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
 /* Mouse clicks leave no ring; keyboard focus gets the themed one. */
 .lex-anim-transport-button:focus { outline:none; }
 .lex-anim-transport-button:focus-visible { outline:2px solid var(--lex-highlight); outline-offset:1px; }
+
+/* Dark Souls Remastered components. The .ds1-* selectors match only DS1 markup; the .lex-* ones extend
+   shared components for the DS1 page. They live here because a plugin stylesheet may hold theme
+   tokens only (tools/css_audit.py). Moved verbatim from plugins/ds1/editor.css: selectors, order
+   and cascade position preserved. */
+.lex-goto-button{background:none;border:none;padding:2px;cursor:pointer;color:inherit;opacity:.75;}
+.lex-goto-button:hover{opacity:1;}
+.lex-goto-icon{width:16px;height:16px;vertical-align:middle;}
+.lex-goto-button:disabled{opacity:.3;cursor:default;}
+.lex-viewport-picker>svg{width:16px;height:16px;vertical-align:middle;}
+.lex-dir-tabs > .lex-subtab-button{flex:0 1 auto;}
+.ds1-maps-left,.ds1-maps-detail{flex:0 0 auto;}
+.ds1-anim{display:flex;gap:8px;align-items:stretch;}
+/* A model thumbnail stays unseen until its snapshot is drawn: before that the
+   icon slot keeps its placeholder, so the heading never jumps or flashes. */
+.ds1-model-thumbnail{max-width:100%;max-height:100%;object-fit:contain;}
+.ds1-item-icon{max-width:100%;max-height:100%;object-fit:contain;}
+.lex-ds1-label-art{flex:0 0 auto;width:22px;height:22px;display:block;}
+/* A record's menu picture in a list's icon column. The shared list sizes it to its row. */
+.lex-ds1-shop-icon{max-width:100%;object-fit:contain;display:block;}
+.lex-ds1-no-thumbnail{display:inline-grid;place-items:center;}
+.lex-ds1-no-thumbnail>svg{width:100%;height:100%;display:block;}
+.ds1-model-thumbnail.lex-image-pending{visibility:hidden;}
+/* The variant picker plus its stage fill the drawer like a bare stage:
+   without this the plain div breaks the drawer's flex and the stage sits
+   at its minimum height in a tall empty drawer. */
+.lex-preview-variant-wrap{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+.lex-preview-variant-wrap>button{align-self:flex-start;}
+/* The gender toggle is one sign in the view-mode bar: the mode class
+   gives the 26px box, this centers a readable glyph inside it. */
+.lex-preview-gender-toggle{display:flex;align-items:center;justify-content:center;
+  padding:0;font:400 16px/1 var(--lex-symbol-font);}
+.ds1-anim-left,.ds1-anim-detail{flex:0 0 auto;}
+.lex-viewport-host > .lex-panel-loading{height:100%;min-height:0;}
+/* A record link is a hoverable face (the linked record's name) plus a
+   finder button (pick another target). The face takes the row; the
+   dialog line beside its number does the same. */
+.ds1-reference-field{display:flex;align-items:center;gap:6px;}
+.ds1-reference-field>*:first-child{flex:1 1 auto;min-width:0;}
+.ds1-reference-face{width:100%;flex:1 1 auto;min-width:0;display:flex;}
+
+.ds1-reference-face>.lex-hoverable{flex:1 1 auto;min-width:0;}
+/* A locked face keeps its link text clear of the lock, like a locked input
+   keeps its lane. Unset faces are short labels on their own box already. */
+.ds1-reference-face.lex-has-readonly-lock>.lex-hoverable,
+.ds1-asset-face.lex-has-readonly-lock>.lex-hoverable{padding-right:16px;}
+.ds1-reference-face>.lex-readonly-field{flex:1 1 auto;min-width:0;}
+/* A linked face shares its box with the Vanilla reference like an input
+   does: without the lane the reference paints over the linked name. */
+.lex-source-control-internal>.ds1-reference-face{box-sizing:border-box;
+  padding-right:calc(var(--lex-internal-reference-width) + .95em);}
+.lex-source-control-internal>.lex-reference-values .lex-reference-text{overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+.ds1-find-reference{flex:0 0 auto;}
+/* An item/count pair gives the item lane the row and the count lane a
+   1-2 digit box. Under 120px the shared compact rule hides the count's
+   reference rail and stepper (right-click still restores vanilla), so the
+   digits keep the whole lane instead of sharing it. */
+.lex-detail-parts.ds1-item-count-pair{grid-template-columns:minmax(0,1fr) 3em;}
+.lex-detail-parts.ds1-item-count-pair>.lex-detail-part{margin-right:0;}
+/* On a narrow property row even a 3em count leaves the item no room
+   beside a side label, so the pair's label moves above its boxes the way
+   a switch row's does, and the item keeps the full width. Em units also
+   account for a larger editor font. */
+.lex-detail-field:has(.ds1-item-count-pair){
+  container:lex-pair-row / inline-size;
+}
+@container lex-pair-row (max-width:24em){
+  .lex-detail-field>.lex-detail-field-label:has(+ .lex-detail-field-control .ds1-item-count-pair){
+    grid-column:1 / -1;
+    contain:none;
+    min-height:30px;
+    height:auto;
+    justify-content:flex-start;
+    text-align:left;
+  }
+  .lex-detail-field>.lex-detail-field-control:has(.ds1-item-count-pair){
+    grid-column:1 / -1;
+  }
+}
+.ds1-dialog-row{display:flex;align-items:center;gap:6px;}
+.ds1-sound-row{display:flex;align-items:center;gap:6px;}
+/* The number keeps a short digit lane while the stream's face takes the
+   rest: an unconstrained input ate the whole narrow lane and crushed
+   the face to zero width. Long ids scroll inside the lane. */
+.ds1-sound-row>input,.ds1-sound-row>.lex-source-control{flex:0 1 80px;min-width:0;}
+.ds1-asset-face{display:flex;align-items:center;gap:6px;min-width:0;}
+.ds1-asset-face>.lex-hoverable{flex:1 1 auto;min-width:0;}
+/* An unset or unresolvable link is editable, so it must not borrow the
+   read-only slab (which would also hang a lock on the row): a plain
+   value box with the shared radius, muted only in its text. */
+.ds1-unset-face{flex:1 1 auto;min-width:0;background:var(--lex-input-bg);
+  border:var(--lex-input-border);border-color:var(--lex-input-border-color);
+  border-radius:var(--lex-input-radius);padding:2px 6px;color:var(--lex-muted);
+  font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ds1-icon-gallery{max-width:min(760px,92vw);}
+.ds1-icon-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;max-height:60vh;overflow:auto;padding:4px;}
+.ds1-icon-choice{padding:2px;border:1px solid transparent;border-radius:4px;background:transparent;cursor:pointer;}
+.ds1-icon-choice img{width:44px;height:44px;object-fit:contain;display:block;margin:auto;}
+.ds1-icon-choice.current{border-color:currentColor;}
+.ds1-icon-choice:hover{border-color:currentColor;}
+.ds1-dialog-row>.lex-readonly-field{flex:1 1 auto;min-width:0;}
+/* The message face borrows the value box it replaces: same height as the
+   number beside it, muted italic like the read-only text it was. */
+.ds1-dialog-row>.lex-hoverable{flex:1 1 auto;min-width:0;height:26px;box-sizing:border-box;
+  background:var(--lex-input-bg);border:var(--lex-input-border);border-color:var(--lex-input-border-color);
+  border-radius:var(--lex-input-radius);padding:2px 6px;font-style:italic;color:var(--lex-muted);text-align:left;}
+.ds1-dialog-preview{white-space:pre-wrap;max-width:320px;}
+/* The file tabs' texture thumbnails share one wrapping row of squares,
+   Models and Textures alike; each square is named under its picture. */
+.ds1-texture-strip{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-start;max-height:480px;overflow:auto;}
+.ds1-texture-tile{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0;max-width:160px;}
+/* A 16-pixel placeholder texture would otherwise show as a speck:
+   tiles never shrink below a glanceable size, and tiny art upscales
+   crisp instead of smearing. Big textures keep smooth scaling. */
+.ds1-texture-tile img{min-width:64px;min-height:64px;object-fit:contain;}
+.ds1-texture-tile img.ds1-texture-tiny{image-rendering:pixelated;}
+/* A blank texture carries no picture: its tile is the name with a blank
+   note and no image, never a bare white square. The class marks the tile
+   for checks; no box needs styling. */
+/* The enemy viewer fills the preview drawer: attacks on the left,
+   the stage and the viewed attack hitbox fields on the right. */
+.lex-chr-viewer{display:flex;gap:12px;flex:1 1 auto;min-height:0;min-width:0;}
+.lex-chr-viewer-list{flex:0 0 220px;min-height:0;overflow:auto;}
+.lex-chr-viewer-main{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px;}
+.lex-chr-viewer-stage{flex:1 1 auto;min-height:220px;position:relative;}
+.lex-chr-viewer-fields{flex:0 1 38%;min-height:0;overflow:auto;}
+.lex-chr-viewer-picker{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+.lex-chr-viewer-motion-label{font-weight:600;}
+.lex-chr-viewer-motion{flex:1 1 auto;min-width:0;}
+.lex-chr-viewer-timeline{flex:0 0 auto;}
+.ds1-texture-caption{display:flex;align-items:center;gap:4px;max-width:100%;font-size:12px;}
+.ds1-texture-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;}
+.ds1-texture-help{flex:0 0 auto;display:flex;}
+/* The texture drawer's full-size stack carries its own scroller: the
+   drawer itself clips, so without this only the first texture shows. */
+.ds1-texture-drawer{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;padding:8px;}
+/* The hitbox viewer's model-point chips: small pickups in a wrapping,
+   capped strip. A slot's point field lights up while one hovers it. */
+.ds1-dummy-strip{display:flex;flex-wrap:wrap;gap:4px;max-height:120px;overflow:auto;}
+.ds1-dummy-chip{background:var(--lex-input-bg);border:var(--lex-input-border);border-color:var(--lex-input-border-color);border-radius:var(--lex-input-radius);padding:2px 8px;cursor:grab;color:var(--lex-text);touch-action:none;}
+.ds1-dummy-chip:disabled{opacity:.4;cursor:default;}
+.ds1-hitbox-over{outline:2px solid var(--lex-accent);outline-offset:1px;border-radius:var(--lex-input-radius);}
+/* A message list preview clips to its cell: Blood writing runs long. */
+.ds1-message-preview{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
