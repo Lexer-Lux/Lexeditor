@@ -253,7 +253,7 @@ def test_mod_activation_deploys_the_current_script_build(monkeypatch, tmp_path):
     adapter.attach_context(library_root=tmp_path)
     monkeypatch.setattr(tweak_mods, 'ensure_game_closed', lambda: None)
     monkeypatch.setattr(tweak_mods, 'locked', lambda game: nullcontext())
-    def prepare(game, library):
+    def prepare(game, library, **kwargs):
         generated.write_bytes(b'current settings')
         return {}
     monkeypatch.setattr(tweak_mods, 'prepare', prepare)
