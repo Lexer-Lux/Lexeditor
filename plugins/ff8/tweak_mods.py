@@ -21,7 +21,7 @@ ALLOWED_ROOTS = ("hext", "direct")
 IMAGE_BASE = 0x400000
 
 
-class BuildError(ValueError):
+class BuildError(script_mods.ScriptModError):
     """An enabled tweak mod could not be built; nothing was composed."""
 
 

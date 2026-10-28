@@ -10,6 +10,8 @@ written.
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
+import json
 
 from core import memory_conflicts, mod_requires, script_mods
 from core.mod_conflicts import MAX_LISTED
@@ -46,12 +48,15 @@ class Ds1ModAdapter:
                "switching everything off puts the originals back. "
                "Close the game before switching.")
     package_types = ("folder", "zip")
-    # Steam starts the game; Play installs the enabled mods first, rebuilt.
-    deploys_on_launch = True
     context: dict[str, str] = {}
 
-    def __init__(self):
-        self._cache: tuple[tuple, dict] | None = None
+    REPORT_VERSION = 1
+    REPORT_LIMIT = 2 * 1024 * 1024
+
+    @staticmethod
+    def _report_path() -> Path:
+        from core.runtime_bootstrap import user_data_dir
+        return user_data_dir() / "cache/ds1/mod-conflicts.json"
 
     def attach_context(self, *, project_root=None, library_root=None, game_root=None) -> None:
         values = {"projectRoot": project_root, "libraryRoot": library_root, "gameRoot": game_root}
@@ -100,10 +105,23 @@ class Ds1ModAdapter:
         game_root = Path(game_root)
         library = self._library()
         tweak_mods.ensure_game_closed()
-        data = self._mods(mods)
         with tweak_mods.locked(game_root):
-            plan = tweak_mods.prepare(game_root, library)
-            composition = mod_loader.compose(mod_loader.vanilla_files(game_root), data)
+            plan = tweak_mods.prepare(game_root, library, cache_root=self._report_path().parent)
+            ordered = self._ordered_mods(mods)
+            content = self._content_signature(ordered)
+            report = self._read_report(game_root, ordered)
+            if report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered]:
+                # Native settings can change while every data input and
+                # installed data file stays the same. Keep that deployment.
+                tweak_mods.commit(game_root, plan)
+                conflicts = [mod_loader.Conflict(Path(file), part, names)
+                             for file, part, names in report["conflicts"]]
+                self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content)
+                return {"activated": [Path(path).name for path in mods],
+                        "dataMods": [name for name, _folder in ordered],
+                        "conflicts": len(conflicts)}
+            data = self._mods(mods)
+            composition = mod_loader.compose_installed(game_root, data, cache_root=self._report_path().parent)
             tweak_mods.commit(game_root, plan)
             try:
                 if composition.files:
@@ -114,7 +132,9 @@ class Ds1ModAdapter:
             except Exception:
                 tweak_mods.rollback(game_root, plan)
                 raise
-        self._cache = None
+        # The build already compared these records. Publish that report for
+        # both the host's Mods tab and selector, including after a restart.
+        self._save_report(game_root, ordered, composition.conflicts, installed=True, expected_content=content)
         return {"activated": [Path(path).name for path in mods],
                 "dataMods": [mod.name for mod in data],
                 "conflicts": len(composition.conflicts)}
@@ -122,6 +142,12 @@ class Ds1ModAdapter:
     def active_mod_ids(self, game_root: Path) -> list[str]:
         from core import mods_service
         return [Path(row["path"]).name for row in mods_service.library_rows(self._library()) if row["enabled"]]
+
+    def _ordered_mods(self, mods):
+        from core import mods_service
+        wanted = {Path(path).resolve() for path in mods}
+        return [(row["name"], Path(row["path"])) for row in mods_service.library_rows(self._library())
+                if Path(row["path"]).resolve() in wanted and (Path(row["path"]) / MARKER).is_file()]
 
     def conflicts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
         """Each switched-on mod's clashes with another one, by mod folder.
@@ -132,35 +158,96 @@ class Ds1ModAdapter:
         memory: its addresses are unknowable without running it, so its
         schema's declared conflicts still guard it at enable time.
 
-        The composition is cached by content stats, not hashes: which parts
-        clash never depends on load order, only the said winner does, so a
-        reorder re-sorts the cached names instead of re-reading every byte.
+        The build publishes its record-conflict report. Reuse it while mod
+        files and game originals have the same size and write/change times.
+        Reordering only re-sorts the reported owners; it does not re-merge.
         """
-        from core import mods_service
         game_root = str(Path(game_root).resolve())
-        library = self._library()
-        wanted = {Path(path).resolve() for path in mods}
-        ordered = [(row["name"], Path(row["path"])) for row in mods_service.library_rows(library)
-                   if Path(row["path"]).resolve() in wanted and (Path(row["path"]) / MARKER).is_file()]
+        ordered = self._ordered_mods(mods)
         if len(ordered) < 2:
             return _merge_marks({}, self._memory_conflicts(mods))
+        data_lines = self._load_report(Path(game_root), ordered)
+        if data_lines is not None:
+            return _merge_marks(data_lines, self._memory_conflicts(mods))
         try:
-            stamp = tuple(sorted((str(folder), name, self._content_stamp(folder, name))
-                                 for name, folder in ordered))
+            compared_key = self._report_key(Path(game_root), ordered)
         except OSError:
-            stamp = None
-        if stamp is not None and self._cache and self._cache[0] == (game_root, stamp):
-            data_lines = self._lines_for_order(self._cache[1], ordered)
-            if data_lines is not None:
-                return _merge_marks(data_lines, self._memory_conflicts(mods))
+            compared_key = None
         data = self._mods(mods)
-        composition = mod_loader.compose(mod_loader.vanilla_files(Path(game_root)), data)
+        composition = mod_loader.compose_installed(Path(game_root), data, conflicts_only=True)
         data_lines = composition.by_mod(data)
-        if stamp is not None:
-            self._cache = ((game_root, stamp),
-                           [(conflict.file, conflict.part, tuple(conflict.mods))
-                            for conflict in composition.conflicts])
+        if compared_key is not None:
+            self._save_report(Path(game_root), ordered, composition.conflicts, expected_key=compared_key)
         return _merge_marks(data_lines, self._memory_conflicts(mods))
+
+    @classmethod
+    def _content_signature(cls, ordered):
+        return sorted((str(folder.resolve()), name, cls._content_stamp(folder, name))
+                      for name, folder in ordered)
+
+    @classmethod
+    def _report_key(cls, game_root: Path, ordered) -> str:
+        content = cls._content_signature(ordered)
+        originals = []
+        for relative in sorted({key for _folder, _name, stamped in content for key, *_stat in stamped}):
+            path = Path(relative)
+            for source in (game_root / path, deployment._backup_path(game_root, path),
+                           deployment._marker_path(game_root, path)):
+                try:
+                    stat = source.stat()
+                    originals.append((str(source), stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns))
+                except FileNotFoundError:
+                    originals.append((str(source), None))
+        encoded = json.dumps([cls.REPORT_VERSION, str(game_root.resolve()), content, originals],
+                             sort_keys=True).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    def _read_report(self, game_root, ordered):
+        try:
+            path = self._report_path()
+            if path.stat().st_size > self.REPORT_LIMIT:
+                return None
+            report = json.loads(path.read_text(encoding="utf-8"))
+            if report.get("key") != self._report_key(game_root, ordered):
+                return None
+            cached = report["conflicts"]
+            if not isinstance(cached, list) or any(
+                    not isinstance(row, list) or len(row) != 3
+                    or not isinstance(row[0], str) or not isinstance(row[1], str)
+                    or not isinstance(row[2], list) or any(not isinstance(name, str) for name in row[2])
+                    for row in cached):
+                return None
+            return report
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return None
+
+    def _load_report(self, game_root, ordered):
+        report = self._read_report(game_root, ordered)
+        if report is None:
+            return None
+        return self._lines_for_order([(Path(file), part, names) for file, part, names in report["conflicts"]], ordered)
+
+    def _save_report(self, game_root, ordered, conflicts, *, installed=False,
+                     expected_key=None, expected_content=None):
+        from core.plugin_files import atomic_write
+        try:
+            key = self._report_key(game_root, ordered)
+            if expected_key is not None and key != expected_key:
+                return
+            if expected_content is not None and self._content_signature(ordered) != expected_content:
+                return
+            report = {"key": key,
+                      "conflicts": [[str(row.file), row.part, list(row.mods)] for row in conflicts]}
+            if installed:
+                report["installedOrder"] = [str(folder.resolve()) for _name, folder in ordered]
+            encoded = json.dumps(report).encode("utf-8")
+            if len(encoded) > self.REPORT_LIMIT:
+                return
+            path = self._report_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write(path, encoded)
+        except (OSError, ValueError):
+            pass  # A derived report must never turn a successful build into a failure.
 
     @staticmethod
     def _content_stamp(folder: Path, name: str) -> tuple:
@@ -172,7 +259,7 @@ class Ds1ModAdapter:
         stamped = []
         for key, path in mod_loader.content_files(folder, name):
             stat = path.stat()
-            stamped.append((str(key), stat.st_size, stat.st_mtime_ns))
+            stamped.append((str(key), stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns))
         return tuple(sorted(stamped))
 
     @staticmethod

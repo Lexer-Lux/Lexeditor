@@ -109,17 +109,27 @@ def bnd3_entries(plain: bytes) -> list[Entry]:
 def build_bnd3(original: bytes, entries: list[Entry]) -> bytes:
     """The original directory and names, with every member's data laid out
     again in order, each starting on a 16-byte boundary as shipped."""
-    count, names_end = struct.unpack_from('<II', original, 16)
-    if count != len(entries):
-        raise FormatError('The text archive member count changed')
-    out = bytearray(original[:names_end])
+    bnd3_entries(original)
+    if not 1 <= len(entries) <= 4096:
+        raise FormatError('Invalid rebuilt BND3 member directory')
+    names = [entry.name.encode('shift_jis') + b'\0' for entry in entries]
+    names_end = 32 + len(entries)*24 + sum(map(len, names))
+    out = bytearray(original[:32])
+    struct.pack_into('<II', out, 16, len(entries), names_end)
+    out += bytes(len(entries)*24)
+    name_offsets = []
+    for name in names:
+        name_offsets.append(len(out))
+        out += name
     for index, entry in enumerate(entries):
         while len(out) % 16:
             out.append(0)
         offset = len(out)
         out += entry.data
-        flags, _size, _offset, member_id, name_offset, _unpacked = struct.unpack_from('<6I', original, 32 + index * 24)
-        struct.pack_into('<6I', out, 32 + index * 24, flags, len(entry.data), offset, member_id, name_offset, len(entry.data))
+        if entry.flags != 0x40:
+            raise FormatError('Unsupported rebuilt BND3 member flags')
+        struct.pack_into('<6I', out, 32 + index * 24, entry.flags, len(entry.data), offset,
+                         entry.member_id, name_offsets[index], len(entry.data))
     return bytes(out)
 
 

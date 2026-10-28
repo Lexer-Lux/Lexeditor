@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import lru_cache
 import hashlib
 import json
 import os
@@ -39,7 +40,7 @@ from core.process_probe import live_processes
 
 from . import exe_patches, menu_layout, menu_scripts
 
-ALLOWED_ROOTS = ("native", "layout", "esd")
+ALLOWED_ROOTS = ("native", "layout", "esd", "script", "msg")
 BACKUP_FILE = "DarkSoulsRemastered.exe.lexeditor-original"
 MANIFEST_FILE = "DarkSoulsRemastered.exe.lexeditor-tweaks.json"
 MODS_ENV = "LEXEDITOR_DS1_MODS_ROOT"
@@ -70,7 +71,7 @@ def _exclusive(game_root: Path):
         os.close(descriptor)
 
 
-class TweakError(ValueError):
+class TweakError(script_mods.ScriptModError):
     """A tweak operation failed; the message identifies any recovery needed."""
 
 
@@ -313,36 +314,115 @@ class BuildContext:
     def __init__(self, enabled: dict[str, Path], game_root: Path | None = None,
                  library_root: Path | None = None):
         self._enabled = enabled
-        self._game_root = game_root
+        self.game_root = Path(game_root) if game_root is not None else None
         self._library_root = library_root
         self._params: bytes | None = None
         self.current = ""
+        self._inputs = {}
+        self._source_hashes = {}
+        self._building_source = None
+
+    def _remember(self, kind, name, value):
+        token = _sha(json.dumps(value, sort_keys=True, separators=(',', ':')).encode('utf-8'))
+        self._inputs.setdefault(kind, {})[name] = token
+        return value
+
+    def _originals(self, outputs):
+        from . import deployment
+        if self.game_root is None:
+            return None
+        result = {}
+        for relative in [exe_patches.EXECUTABLE, *sorted(outputs)]:
+            if Path(relative).parts[0] in ('native', 'layout', 'esd'):
+                continue
+            path = checked(deployment.vanilla_source(self.game_root, Path(relative)))
+            if path not in self._source_hashes:
+                self._source_hashes[path] = _sha(path.read_bytes()) if path.is_file() else None
+            result[relative] = self._source_hashes[path]
+        return result
+
+    def cached_build(self, root, outputs):
+        """Reuse only verified outputs made from the same source and observed inputs."""
+        try:
+            manifest = json.loads((root / script_mods.MANIFEST_FILE).read_text('utf-8'))
+            record = manifest.get('build')
+            if (not isinstance(record, dict) or record.get('compiler') != _script_compiler_revision()
+                    or record.get('source') != script_mods.source_fingerprint(root)
+                    or record.get('game') != str(self.game_root)
+                    or record.get('originals') != self._originals(outputs)):
+                return False
+            for relative, digest in outputs.items():
+                path = checked(root / relative)
+                if not path.is_file() or _sha(path.read_bytes()) != digest:
+                    return False
+            self._inputs = {}
+            for kind, requests in record['inputs'].items():
+                for name in requests:
+                    if kind == 'enabled':
+                        self.enabled(name)
+                    elif kind == 'settings':
+                        self.settings(name)
+                    elif kind == 'module':
+                        dependency = self._enabled.get(name)
+                        self._remember('module', name, script_mods.source_fingerprint(dependency) if dependency else None)
+                    elif kind == 'params':
+                        self.game_params()
+                    else:
+                        return False
+            return self._inputs == record['inputs']
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return False
+
+    def begin_build(self, root):
+        self._inputs = {}
+        self._building_source = script_mods.source_fingerprint(root)
+
+    def build_record(self, root, outputs):
+        return {'source': self._building_source, 'compiler': _script_compiler_revision(),
+                'game': str(self.game_root), 'originals': self._originals(outputs), 'inputs': self._inputs}
 
     def game_params(self) -> bytes | None:
         """The game's GameParam.parambnd.dcx as this Apply deploys it: vanilla
         with every active data mod combined over it in load order, so a tweak
         reads what the game will (another mod's curve or cost edits included).
         None outside an Apply, when no game folder is known."""
-        if self._game_root is None:
+        if self.game_root is None:
+            self._remember('params', 'game', None)
             return None
         if self._params is None:
             from . import deployment, mod_loader
-            source = checked(deployment.vanilla_source(Path(self._game_root), mod_loader.RELATIVE))
+            source = checked(deployment.vanilla_source(self.game_root, mod_loader.RELATIVE))
             if not source.is_file():
+                self._remember('params', 'game', None)
                 return None
             mods = mod_loader.active_mods(self._library_root or mods_root())
             self._params = mod_loader._compose_params(
                 source.read_bytes(),
                 [(mod.name, mod.files[mod_loader.RELATIVE]) for mod in mods
                  if mod_loader.RELATIVE in mod.files])[0]
+        self._remember('params', 'game', _sha(self._params) if self._params is not None else None)
         return self._params
 
     def enabled(self, mod_id: str) -> bool:
-        return mod_id in self._enabled
+        return self._remember('enabled', mod_id, mod_id in self._enabled)
 
     def settings(self, mod_id: str) -> dict | None:
         root = self._enabled.get(mod_id)
-        return script_mods.values(root) if root else None
+        return self._remember('settings', mod_id, script_mods.values(root) if root else None)
+
+    def module(self, mod_id: str, name: str):
+        """An enabled dependency's own module, through the shared package loader."""
+        root = self._enabled.get(mod_id)
+        if root is None:
+            raise TweakError(f"{mod_id} must be enabled before reading its build module")
+        self._remember('module', mod_id, script_mods.source_fingerprint(root))
+        return script_mods.import_module(root, name)
+
+
+@lru_cache(maxsize=1)
+def _script_compiler_revision():
+    from .mod_loader import _composition_revision
+    return _sha(_composition_revision() + Path(script_mods.__file__).read_bytes())
 
 
 def build_specs(root: Path | None = None, game_root: Path | None = None) -> list[dict]:
@@ -383,9 +463,11 @@ def _built(rows: list[dict], folder: str, check) -> list[dict]:
         if not target.is_file():
             continue  # A tweak with nothing to patch here at its current settings.
         try:
-            specs.append(check(json.loads(target.read_text(encoding="utf-8")), row["name"]))
+            spec = check(json.loads(target.read_text(encoding="utf-8")), row["name"])
+            spec["folder"] = row["path"]
+            specs.append(spec)
         except (ValueError, exe_patches.PatchError) as error:
-            raise TweakError(f"{row['name']}: {error}") from error
+            raise TweakError(f"{row['name']}: {error}", folders=[row['path']]) from error
     return specs
 
 
@@ -419,7 +501,7 @@ def native_spans(folder: Path, owner: str) -> dict[str, list[tuple[int, int]]]:
     return found
 
 
-def build_fingerprint(folder: Path) -> str:
+def build_fingerprint(folder: Path, *, produced=False) -> str:
     """What the last build of one tweak mod saw, hashed together.
 
     The switch, load order, name, settings, schema, script and built files:
@@ -430,31 +512,21 @@ def build_fingerprint(folder: Path) -> str:
     the script.
     """
     folder = Path(folder)
-    metadata = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
-    parts = {"enabled": metadata.get("enabled") is True, "order": metadata.get("order", 1000),
-             "name": str(metadata.get("name") or "")}
-    for name in (script_mods.VALUES_FILE, script_mods.SCHEMA_FILE):
-        path = folder / name
-        parts[name] = path.read_bytes().hex() if path.is_file() else None
-    scripts = {}
-    script_dir = folder / script_mods.SCRIPT_FOLDER
-    if script_dir.is_dir():
-        for path in sorted(script_dir.rglob("*")):
-            if not path.is_file() or "__pycache__" in path.parts:
-                continue
-            try:
-                digest = _sha(path.read_bytes())
-            except OSError:
-                continue
-            scripts[path.relative_to(script_dir).as_posix()] = digest
-    parts["scripts"] = scripts
+    parts = {"source": script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision()}
+    if produced:
+        manifest = script_mods._read_json(folder / script_mods.MANIFEST_FILE) or {}
+        record = manifest.get('build') or {}
+        # Record the source actually used, so an edit by another chat during
+        # the build stays stale instead of being stamped as already installed.
+        parts['source'] = record.get('source', parts['source'])
+        parts['compiler'] = record.get('compiler', parts['compiler'])
     outputs = {}
     for dirname in ALLOWED_ROOTS:
         out_dir = folder / dirname
         if not out_dir.is_dir():
             continue
         for path in sorted(out_dir.rglob("*.json")):
-            if not path.is_file():
+            if not path.is_file() or script_mods.owns(path.relative_to(folder)):
                 continue
             try:
                 digest = _sha(path.read_bytes())
@@ -462,6 +534,16 @@ def build_fingerprint(folder: Path) -> str:
                 continue
             outputs[path.relative_to(folder).as_posix()] = digest
     parts["outputs"] = outputs
+    try:
+        generated = script_mods._generated_files(folder, ALLOWED_ROOTS)
+    except script_mods.ScriptModError:
+        # Status must flag damaged ownership for the normal attributed build
+        # failure/recovery path, not silently treat it as an unchanged mod.
+        parts['invalidManifest'] = _sha((folder / script_mods.MANIFEST_FILE).read_bytes())
+        generated = {}
+    parts['generated'] = {relative: _sha((folder / relative).read_bytes())
+                          if (folder / relative).is_file() else None
+                          for relative in generated}
     return _sha(json.dumps(parts, sort_keys=True, separators=(",", ":")).encode("utf-8"))
 
 
@@ -715,7 +797,9 @@ def _layout_in_use(game_root: Path) -> bool:
 
 def _esd_in_use(game_root: Path, managed: Managed) -> bool:
     """A menu script archive is managed once a tweak changed it, until restored."""
-    return checked(managed.manifest(game_root)).is_file() or checked(managed.backup(game_root)).exists()
+    # The data-mod deployer uses the same original-copy filename. A backup
+    # proves an original was kept, not that this writer owns the live file.
+    return checked(managed.manifest(game_root)).is_file()
 
 
 def _changes(specs: list[dict]) -> list[str]:
@@ -864,8 +948,8 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     """Whether the installed tweaks differ from the library, and which mods changed.
 
     Save rebuilds only what is installed: with no loader record there is
-    nothing to rebuild (tweaks first install through the Mods tab's switches
-    and Play). Never raises for a damaged record or an unreadable library;
+    nothing to rebuild (tweaks first install through the Mods tab's switches).
+    Never raises for a damaged record or an unreadable library;
     that is status()'s problem to report, not staleness.
     """
     result: dict = {"needed": False, "stale": [], "set": False}
@@ -933,7 +1017,34 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     _put(game_root, record_path, raw)
 
 
-def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT) -> dict:
+def _menu_cache_value(value):
+    if isinstance(value, bytes):
+        return {'__bytes__': value.hex()}
+    raise TypeError(f'Unsupported menu cache value: {type(value).__name__}')
+
+
+def _compose_menu(original, specs, managed, cache_root):
+    """Reuse unchanged layout/menu-script archives with the same bounded output cache."""
+    key = None
+    if cache_root is not None:
+        from . import composition_cache
+        try:
+            key = _sha(json.dumps([_script_compiler_revision(), managed.relative, _sha(original), specs],
+                                  sort_keys=True, separators=(',', ':'), default=_menu_cache_value)
+                       .encode('utf-8')).encode('ascii')
+            cached = composition_cache.load(cache_root, key)
+            if cached is not None:
+                return cached
+        except (OSError, TypeError, ValueError):
+            key = None  # Reuse is optional; composition still works without it.
+    result = (menu_layout.compose(original, specs) if managed == LAYOUT else
+              menu_scripts.compose(original, specs, ESD_ARCHIVE[managed]))
+    if key is not None:
+        composition_cache.store(cache_root, key, result)
+    return result
+
+
+def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT, cache_root=None) -> dict:
     """Build and check every file's new contents before the caller changes anything.
 
     Hold locked(game_root) from here through commit or rollback.
@@ -961,7 +1072,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
         _refuse_without_loader(["Project native rules"], root)
     native = build_specs(root, game_root)
     # Fingerprinted after the build, so the fingerprint covers the built files too.
-    built = {row["id"]: build_fingerprint(Path(row["path"]))
+    built = {row["id"]: build_fingerprint(Path(row["path"]), produced=True)
              for row in tweak_rows(root) if row["enabled"]}
     layout = layout_specs(root)
     scripts = esd_specs(root)
@@ -970,7 +1081,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     try:
         patch = exe_patches.runtime_patch(original, specs)
     except exe_patches.PatchError as error:
-        raise TweakError(str(error)) from error
+        raise TweakError(str(error), folders=error.folders) from error
     if patch is None and loader:
         patch = b""
     files = []
@@ -982,9 +1093,9 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
         layout_current, layout_manifest = _installed(game_root, LAYOUT, "restore it before applying tweaks")
         layout_original = _original(game_root, layout_current, layout_manifest, LAYOUT)
         try:
-            layout_after = menu_layout.compose(layout_original, layout)
+            layout_after = _compose_menu(layout_original, layout, LAYOUT, cache_root)
         except ValueError as error:
-            raise TweakError(str(error)) from error
+            raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
         files.append({"managed": LAYOUT, "before": layout_current, "after": layout_after,
                       "mods": _changes(layout) if layout_after != layout_original else [], "project": None,
                       "previous": _current_manifest(layout_current, layout_manifest, LAYOUT)})
@@ -995,9 +1106,9 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
             esd_current, esd_manifest = _installed(game_root, managed, "restore it before applying tweaks")
             esd_original = _original(game_root, esd_current, esd_manifest, managed)
             try:
-                esd_after = menu_scripts.compose(esd_original, targeted, ESD_ARCHIVE[managed])
+                esd_after = _compose_menu(esd_original, targeted, managed, cache_root)
             except ValueError as error:
-                raise TweakError(str(error)) from error
+                raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
             files.append({"managed": managed, "before": esd_current, "after": esd_after,
                           "mods": _changes(targeted) if esd_after != esd_original else [], "project": None,
                           "previous": _current_manifest(esd_current, esd_manifest, managed)})

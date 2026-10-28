@@ -191,34 +191,28 @@ def _tweaks_flag() -> bool:
 def _rebuild_tweaks_on_save() -> dict:
     """Build changed tweaks into the installed game as part of Save.
 
-    The project is already saved when this runs; a tweak failure is
-    reported, never raised, so a broken tweak cannot block project saves.
+    The project is already saved when this runs. Identified mod failures
+    use the shared disable-and-retry deployment; other failures are
+    reported without blocking project saves.
     With the game open the rebuild waits: the flag stays set and the next
-    Save (or Play) finishes it.
+    Save finishes it.
     """
     if not _tweaks_flag():
         return {"tweaksNeedRebuild": False}
     if not tweak_mods.game_closed():
         return {"tweaksNeedRebuild": True, "tweaksDeferred": True}
     try:
-        status = tweak_mods.apply(STORE.game_root)
+        from core.mod_builds import activate_with_recovery
+        from .mod_support import Ds1ModAdapter
+        adapter = Ds1ModAdapter()
+        library = tweak_mods.mods_root()
+        adapter.attach_context(library_root=library, game_root=STORE.game_root)
+        mods = [library / folder for folder in adapter.active_mod_ids(STORE.game_root)]
+        result = activate_with_recovery(adapter, mods, STORE.game_root)
     except (ValueError, OSError, RuntimeError) as error:
         return {"tweaksNeedRebuild": True, "tweaksError": str(error)}
-    return {"tweaksNeedRebuild": bool(status.get("needsRebuild")), "tweaksRebuilt": True}
-
-
-def _deploy_tweaks_now() -> None:
-    """Build and install changed tweaks at once, for a session without Save.
-
-    A session with no writable project has no Save button, so its Tweaks
-    page installs straight away. With the game open the install waits for
-    the next Play.
-    """
-    if _tweaks_flag() and tweak_mods.game_closed():
-        try:
-            tweak_mods.apply(STORE.game_root)
-        except (ValueError, OSError, RuntimeError) as error:
-            raise ValueError(f"Settings saved, but the rebuild failed: {error}") from error
+    return {"tweaksNeedRebuild": _tweaks_flag(), "tweaksRebuilt": True,
+            "disabledMods": result["disabledMods"]}
 
 
 THEME_CACHE = theme.cache_root()
@@ -863,9 +857,8 @@ class Handler(PluginRequestHandler):
                 # away when the session has no writable project.
                 elif path == '/api/tweaks/save':
                     tweak_mods.save(payload.get('tweaks'))
-                    if STORE.read_only:
-                        _deploy_tweaks_now()
-                    result = tweak_mods.status(STORE.game_root)
+                    rebuilt = _rebuild_tweaks_on_save() if STORE.read_only else {}
+                    result = {**tweak_mods.status(STORE.game_root), **rebuilt}
                 elif path == '/api/tweaks/restore':
                     result = tweak_mods.restore(STORE.game_root)
                 elif path == '/api/annotation-help':

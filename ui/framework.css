@@ -332,13 +332,17 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
   animation:lex-plugin-loading-spin .7s linear infinite;
 }
 
-body.lex-save-busy :is(button,input,select,textarea,[role="button"]):not(.lex-save-icon) {
-  filter:grayscale(.72);
-  opacity:.48;
-  pointer-events:none;
+/* Dim each inactive branch once, including tables, labels and previews.
+   Keep the branch leading to the active progress button clear. */
+body.lex-save-busy > :not(:has(.lex-save-icon.saving, .lex-game-process.launching)),
+body.lex-save-busy :has(.lex-save-icon.saving, .lex-game-process.launching)
+  > :not(:has(.lex-save-icon.saving, .lex-game-process.launching)):not(.lex-save-icon.saving, .lex-game-process.launching) {
+  filter:grayscale(1) brightness(.45);
 }
 
-body.lex-save-busy .lex-save-icon.saving {
+.lex-save-icon.saving:disabled,
+.lex-game-process.launching:disabled,
+body.lex-save-busy .lex-game-process.launching {
   opacity:1;
   filter:none;
 }

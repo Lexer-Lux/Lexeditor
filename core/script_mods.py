@@ -31,6 +31,7 @@ import threading
 from typing import Any, Callable
 
 from core.plugin_files import atomic_write
+from core.mod_builds import ModBuildError
 
 SCRIPT_VERSION = 1
 SCRIPT_FOLDER = "script"
@@ -49,8 +50,15 @@ FIELD_TYPES = frozenset({"bool", "int", "number", "enum", "sound", "intList"})
 _IMPORT_LOCK = threading.Lock()
 
 
-class ScriptModError(ValueError):
+class ScriptModError(ModBuildError):
     """A tweak mod's metadata, settings or build result is not acceptable."""
+
+    def __init__(self, message: str, *, folders=()):
+        super().__init__(folders, message)
+
+
+class ScriptModRollbackError(ScriptModError):
+    """Generated files could not be restored; recovery must stop."""
 
 
 # --- discovery -------------------------------------------------------------
@@ -136,6 +144,8 @@ def _coerce(field: dict, value: Any) -> Any:
         length = field.get("length")
         if not isinstance(value, list) or (length is not None and len(value) != length):
             raise ScriptModError(f"{key} must list {length} whole numbers")
+        if len(value) < field.get("minLength", 0) or len(value) > field.get("maxLength", len(value)):
+            raise ScriptModError(f"{key} has an invalid number of entries")
         return [_bounded(field, item, integer=True) for item in value]
     return _bounded(field, value, integer=kind in ("int", "sound"))
 
@@ -201,6 +211,11 @@ def _load(root: Path):
     package_dir = Path(root) / SCRIPT_FOLDER
     name = _package_name(root)
     with _IMPORT_LOCK:
+        # Source-content checks can notice edits with unchanged size/mtime.
+        # Python's timestamp-based bytecode cache must not hide those edits.
+        for bytecode in package_dir.rglob('*.pyc'):
+            if '__pycache__' in bytecode.parts and bytecode.resolve().is_relative_to(package_dir.resolve()):
+                bytecode.unlink(missing_ok=True)
         for loaded in [key for key in sys.modules if key == name or key.startswith(name + ".")]:
             del sys.modules[loaded]
         init = package_dir / "__init__.py"
@@ -335,6 +350,26 @@ def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
         raise ScriptModError("Generated-file rollback failed: " + "; ".join(errors))
 
 
+def source_fingerprint(root: Path) -> str:
+    """Content identity of a script's source and settings, excluding its outputs."""
+    root = Path(root)
+    paths = [root / name for name in ('mod.json', SCHEMA_FILE, VALUES_FILE)]
+    paths += [path for path in (root / SCRIPT_FOLDER).rglob('*')
+              if path.is_file() and '__pycache__' not in path.parts
+              and owns(path.relative_to(root))]
+    digest = hashlib.sha256()
+    for path in sorted(paths):
+        name = path.relative_to(root).as_posix().encode('utf-8')
+        data = path.read_bytes() if path.is_file() else b''
+        if path == root / 'mod.json':
+            metadata = json.loads(data)
+            data = json.dumps({key: metadata.get(key) for key in
+                               ('id', 'name', 'enabled', 'order', 'script')}, sort_keys=True).encode('utf-8')
+        digest.update(len(name).to_bytes(8, 'little') + name)
+        digest.update(len(data).to_bytes(8, 'little') + data)
+    return digest.hexdigest()
+
+
 def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
     """Run a tweak mod's script and write what it returns into the mod.
 
@@ -342,6 +377,11 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
     removed: a file the reader put in the mod by hand is never overwritten.
     """
     root = Path(root)
+    previous = _generated_files(root, allowed_roots)
+    if hasattr(context, 'cached_build') and context.cached_build(root, previous):
+        return {'files': sorted(previous), 'written': [], 'removed': [], 'cached': True}
+    if hasattr(context, 'begin_build'):
+        context.begin_build(root)
     module = load_script(root)
     function: Callable | None = getattr(module, "build", None)
     if function is None:
@@ -351,7 +391,6 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
     if not isinstance(outputs, dict):
         raise ScriptModError("build() must return {path: contents}")
     manifest_path = root / MANIFEST_FILE
-    previous = _generated_files(root, allowed_roots)
     planned: dict[str, bytes] = {}
     for relative, contents in outputs.items():
         path = _safe_output(relative, allowed_roots)
@@ -381,12 +420,21 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
                 target.unlink()
                 removed.append(key)
         manifest = {"version": 1, "files": {key: hashlib.sha256(data).hexdigest() for key, data in planned.items()}}
+        if hasattr(context, 'build_record'):
+            try:
+                record = context.build_record(root, planned)
+                # Keep optional reuse metadata bounded; a large observation set
+                # can always rebuild through the ordinary path instead.
+                if len(json.dumps(record).encode('utf-8')) <= 65536:
+                    manifest['build'] = record
+            except (OSError, TypeError, ValueError):
+                pass  # Cache metadata must not roll back a valid mod build.
         atomic_write(manifest_path, (json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
     except Exception as error:
         try:
             restore_generated(root, snapshot, allowed_roots=allowed_roots)
         except ScriptModError as rollback_error:
-            raise ScriptModError(f"Build failed: {error}; {rollback_error}") from error
+            raise ScriptModRollbackError(f"Build failed: {error}; {rollback_error}") from error
         raise
     return {"files": sorted(planned), "written": written, "removed": removed}
 
@@ -404,19 +452,19 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
     snapshots = {}
     for row in rows:
         if row["error"]:
-            raise error(f"{row['name']}: {row['error']}")
+            raise error(f"{row['name']}: {row['error']}", folders=[row['path']])
         missing = [need for need in row["schema"]["requires"] if need not in enabled]
         if missing:
             raise error(f"{row['name']} requires {', '.join(missing)}, which is not enabled")
         if row["schema"]["blocker"]:
-            raise error(f"{row['name']}: {row['schema']['blocker']}")
+            raise error(f"{row['name']}: {row['schema']['blocker']}", folders=[row['path']])
         conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
         if conflicts:
             raise error(f"{row['name']} conflicts with {', '.join(conflicts)}")
         try:
             snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
         except Exception as failure:
-            raise error(f"{row['name']}: {failure}") from failure
+            raise error(f"{row['name']}: {failure}", folders=[row['path']]) from failure
     built = []
     try:
         for row in rows:
@@ -432,7 +480,8 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
             except Exception as rollback_error:
                 failures.append(f"{result['id']}: {rollback_error}")
         suffix = "; rollback failed: " + "; ".join(failures) if failures else ""
-        raise error(f"{context.current}: {failure}{suffix}") from failure
+        folders = [] if failures or isinstance(failure, ScriptModRollbackError) else [row['path']]
+        raise error(f"{context.current}: {failure}{suffix}", folders=folders) from failure
     return built
 
 
