@@ -16,13 +16,12 @@ import json
 from core import memory_conflicts, mod_requires, script_mods
 from core.mod_conflicts import MAX_LISTED
 
-from . import deployment, mod_loader, texts, tweak_mods
+from . import assets, deployment, mod_loader, texts, tweak_mods
 from .store import MARKER, RELATIVE
 
 MARKER_TEXT = (Path(__file__).with_name("project-template") / MARKER).read_bytes()
 DATA_FILES = {RELATIVE.as_posix().casefold(), texts.RELATIVE.as_posix().casefold(), texts.MENU_RELATIVE.as_posix().casefold()}
 MAP_PREFIX = "map/mapstudio/"
-CHR_PREFIX = "chr/"
 
 
 def _merge_marks(first: dict[str, list[str]], second: dict[str, list[str]]) -> dict[str, list[str]]:
@@ -73,7 +72,7 @@ class Ds1ModAdapter:
         for path in files:
             folded = path.as_posix().casefold()
             if (folded in DATA_FILES or (folded.startswith(MAP_PREFIX) and folded.endswith(".msb"))
-                    or (folded.startswith(CHR_PREFIX) and folded.endswith(".anibnd.dcx"))):
+                    or assets.is_character_file(path)):
                 packages.append(path.as_posix())
             else:
                 ignored.append(path.as_posix())

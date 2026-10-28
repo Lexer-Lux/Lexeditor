@@ -1,4 +1,4 @@
-"""Three-way composition of independent edits to the same talk state machine."""
+"""Three-way composition of independent edits to an ESD state machine."""
 from dataclasses import fields, is_dataclass, replace
 from difflib import SequenceMatcher
 from functools import lru_cache

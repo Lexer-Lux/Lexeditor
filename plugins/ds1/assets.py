@@ -100,18 +100,23 @@ def _checked(path):
     return checked(Path(path))
 
 
+def is_character_file(relative):
+    """Character archives and loose state machines handled by the composer."""
+    from .tae import CHR_DIR
+    return relative.parent == CHR_DIR and relative.name.casefold().endswith((".anibnd.dcx", ".esd.dcx"))
+
+
 def is_owned(relative):
     """Structured editors own parameters, item and menu text, maps and animations."""
     from .store import RELATIVE
     from . import texts
     from .msb import MAP_DIR
-    from .tae_store import CHR_DIR
     text = relative.as_posix()
     if relative in (RELATIVE, texts.RELATIVE, texts.MENU_RELATIVE):
         return True
     if text.startswith(MAP_DIR.as_posix() + "/") and relative.suffix == ".msb":
         return True
-    return text.startswith(CHR_DIR.as_posix() + "/") and relative.name.endswith(".anibnd.dcx")
+    return is_character_file(relative)
 
 
 def check_relative(value):

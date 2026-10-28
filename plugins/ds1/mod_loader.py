@@ -45,7 +45,7 @@ import zlib
 
 from plugins.ds3.formats import DS3FormatError, ParamView
 
-from . import texts
+from . import assets, texts
 from .formats import FormatError, MAX_ARCHIVE, TABLES, deflate, inflate, members, pack, schema
 from .msb import MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError
 from .store import MARKER, RELATIVE
@@ -134,7 +134,9 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
             found.append((MAP_DIR / path.name.casefold(), path))
     chars = checked(folder / CHR_DIR)
     if chars.is_dir():
-        candidates = sorted(chars.glob("*.anibnd.dcx"))
+        from . import assets
+        candidates = sorted(path for path in chars.glob("*.dcx")
+                            if assets.is_character_file(CHR_DIR / path.name))
         if len(candidates) > MAX_ANIBND_FILES:
             raise ValueError(f"{name}: too many character files")
         for path in candidates:
@@ -344,7 +346,8 @@ def _is_asset(relative: Path) -> bool:
         return False
     if relative.suffix == ".msb" and relative.parent == MAP_DIR:
         return False
-    return not (relative.suffix == ".dcx" and relative.parent == CHR_DIR)
+    from . import assets
+    return not assets.is_character_file(relative)
 
 
 def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool = False) -> Composition:
@@ -385,13 +388,14 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
     for relative in sorted({path for path in list(vanilla) + [name for mod in mods for name in mod.files]
-                            if path.suffix == ".dcx" and path.parent == CHR_DIR}):
+                            if assets.is_character_file(path)}):
         have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
         if relative not in vanilla:
             if have:
                 files[relative] = have[-1][1]
             continue
-        result = _compose_anibnd(vanilla[relative], have, relative, conflicts_only=conflicts_only)
+        result = (_compose_esd(vanilla[relative], have, relative) if relative.name.endswith('.esd.dcx')
+                  else _compose_anibnd(vanilla[relative], have, relative, conflicts_only=conflicts_only))
         conflicts += result[1]
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
@@ -889,6 +893,27 @@ def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = 
     for name in touched:
         conflict.add(name)
     return changed[-1][1], [conflict]
+
+
+def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) -> tuple[bytes, list[Conflict]]:
+    """Compose loose character states by field, just like embedded scripts."""
+    from . import esd_merge
+    changed = [(name, data) for name, data in mods if data != vanilla]
+    if not changed:
+        return vanilla, []
+    try:
+        original = inflate(vanilla)
+        variants = [(name, inflate(data)) for name, data in changed]
+        combined, collisions = esd_merge.compose(original, variants, talk_options=False)
+    except FormatError:
+        return _whole_anibnd(changed, relative, kind="character script")
+    conflicts = []
+    for part, names in collisions:
+        conflict = Conflict(relative, part)
+        for name in names:
+            conflict.add(name)
+        conflicts.append(conflict)
+    return (vanilla if combined == original else deflate(vanilla, combined)), conflicts
 
 
 def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path, kind: str = "character file", *, conflicts_only: bool = False) -> tuple[bytes, list[Conflict]]:
