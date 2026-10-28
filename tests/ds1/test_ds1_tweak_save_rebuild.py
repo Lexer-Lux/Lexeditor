@@ -830,3 +830,31 @@ def test_unserializable_build_cache_record_does_not_fail_or_disable_mod(game, li
     assert (library / 'Beta/native/beta.json').is_file()
     assert all(json.loads((library / name / 'mod.json').read_text())['enabled']
                for name in ('Alpha', 'Beta'))
+
+
+@pytest.mark.parametrize('failure', ['missing member', 'unreadable member'])
+def test_save_disables_only_the_mod_with_an_unusable_menu_target(game, library, api, monkeypatch, failure):
+    from test_ds1_menu_scripts import archive, build_script, script
+    from plugins.ds1 import menu_scripts
+    data = build_script().to_bytes() if failure == 'missing member' else b'unsupported ESD layout'
+    original = archive({'i02-00.esd': data})
+    managed = next(item for item in tweak_mods.ESD if tweak_mods.ESD_ARCHIVE[item] == 'ingame')
+    installed = game / managed.relative
+    installed.parent.mkdir(parents=True, exist_ok=True)
+    installed.write_bytes(original)
+    monkeypatch.setitem(menu_scripts.VANILLA, 'ingame', (len(original), hashlib.sha256(original).hexdigest()))
+    bad = script(member='missing.esd' if failure == 'missing member' else 'i02-00.esd')
+    (library / 'Beta/script/tweak.py').write_text('def build(settings, context):\n    return ' +
+                                               repr({'esd/beta.json': json.dumps(bad)}) + '\n')
+    tweak_mods.save({'beta': {'enabled': False}}, library)
+    tweak_mods.apply(game, library)
+    tweak_mods.save({'beta': {'enabled': True}}, library)
+    status, result = api[0]('/api/save', {})
+    assert status == 200 and result['tweaksRebuilt'] and not result['tweaksNeedRebuild']
+    assert 'tweaksError' not in result
+    assert [mod['name'] for mod in result['disabledMods']] == ['Beta']
+    assert not json.loads((library / 'Beta/mod.json').read_text())['enabled']
+    assert json.loads((library / 'Alpha/mod.json').read_text())['enabled']
+    assert installed.read_bytes() == original
+    # The saved project and subsequent Save remain usable after recovery.
+    assert api[0]('/api/save', {})[0] == 200
