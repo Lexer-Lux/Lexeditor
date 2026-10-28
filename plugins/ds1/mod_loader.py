@@ -800,8 +800,30 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
     winners: dict[str, bytes] = {}
     owners: dict[str, str] = {}
     conflicts: dict[str, Conflict] = {}
+    combined_esd = {}
+    for member, base in base_members.items():
+        if not member.lower().endswith('.esd'):
+            continue
+        original = bytes(base_plain[base.offset:base.offset + base.size])
+        variants = [(name, bytes(plain[owned[member].offset:owned[member].offset + owned[member].size]))
+                    for name, plain, owned in plains]
+        if len({data for _, data in variants if data != original}) < 2:
+            continue
+        from . import esd_merge
+        try:
+            combined, collisions = esd_merge.compose(original, variants)
+        except FormatError:
+            continue  # Unknown ESD layouts keep the existing member conflict.
+        combined_esd[member] = combined
+        for part, names in collisions:
+            key = f'{member}/{part}'
+            conflict = conflicts.setdefault(key, Conflict(relative, key))
+            for name in names:
+                conflict.add(name)
     for name, plain, owned in plains:
         for member, entry in owned.items():
+            if member in combined_esd:
+                continue
             base = base_members[member]
             theirs = bytes(plain[entry.offset:entry.offset + entry.size])
             if theirs == bytes(base_plain[base.offset:base.offset + base.size]):
@@ -812,6 +834,7 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
                 entry_conflict.add(name)
             winners[member] = theirs
             owners[member] = name
+    winners.update(combined_esd)
     items = {member: bytes(base_plain[entry.offset:entry.offset + entry.size])
              for member, entry in base_members.items()}
     items.update(winners)

@@ -39,7 +39,7 @@ from core.process_probe import live_processes
 
 from . import exe_patches, menu_layout, menu_scripts
 
-ALLOWED_ROOTS = ("native", "layout", "esd")
+ALLOWED_ROOTS = ("native", "layout", "esd", "script", "msg")
 BACKUP_FILE = "DarkSoulsRemastered.exe.lexeditor-original"
 MANIFEST_FILE = "DarkSoulsRemastered.exe.lexeditor-tweaks.json"
 MODS_ENV = "LEXEDITOR_DS1_MODS_ROOT"
@@ -313,7 +313,7 @@ class BuildContext:
     def __init__(self, enabled: dict[str, Path], game_root: Path | None = None,
                  library_root: Path | None = None):
         self._enabled = enabled
-        self._game_root = game_root
+        self.game_root = Path(game_root) if game_root is not None else None
         self._library_root = library_root
         self._params: bytes | None = None
         self.current = ""
@@ -323,11 +323,11 @@ class BuildContext:
         with every active data mod combined over it in load order, so a tweak
         reads what the game will (another mod's curve or cost edits included).
         None outside an Apply, when no game folder is known."""
-        if self._game_root is None:
+        if self.game_root is None:
             return None
         if self._params is None:
             from . import deployment, mod_loader
-            source = checked(deployment.vanilla_source(Path(self._game_root), mod_loader.RELATIVE))
+            source = checked(deployment.vanilla_source(self.game_root, mod_loader.RELATIVE))
             if not source.is_file():
                 return None
             mods = mod_loader.active_mods(self._library_root or mods_root())
@@ -343,6 +343,13 @@ class BuildContext:
     def settings(self, mod_id: str) -> dict | None:
         root = self._enabled.get(mod_id)
         return script_mods.values(root) if root else None
+
+    def module(self, mod_id: str, name: str):
+        """An enabled dependency's own module, through the shared package loader."""
+        root = self._enabled.get(mod_id)
+        if root is None:
+            raise TweakError(f"{mod_id} must be enabled before reading its build module")
+        return script_mods.import_module(root, name)
 
 
 def build_specs(root: Path | None = None, game_root: Path | None = None) -> list[dict]:
