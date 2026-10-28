@@ -67,6 +67,73 @@ def test_unchanged_and_identical_variants_preserve_bytes():
     assert esd_merge.compose(original, [('A', packed), ('B', packed)]) == (packed, [])
 
 
+def test_repeated_esd_merge_reuses_work_without_sharing_conflict_lists(monkeypatch):
+    base = fixture()
+    a, b = deepcopy(base), deepcopy(base)
+    a.state_groups[1][1].entry_commands[0].args[0] = esd.assemble('1')
+    b.state_groups[1][1].entry_commands[0].args[0] = esd.assemble('2')
+    original = base.to_bytes()
+    mods = [('A', a.to_bytes()), ('B', b.to_bytes())]
+    esd_merge._compose.cache_clear()
+    parse = esd.parse
+    calls = []
+    def counted(data):
+        calls.append(data)
+        return parse(data)
+    monkeypatch.setattr(esd, 'parse', counted)
+    result, conflicts = esd_merge.compose(original, mods)
+    conflicts[0][1].clear()
+    assert esd_merge.compose(original, mods) == (result, [(conflicts[0][0], ['A', 'B'])])
+    assert len(calls) == 3
+    reversed_result, _ = esd_merge.compose(original, list(reversed(mods)))
+    assert parse(reversed_result).state_groups[1][1] == a.state_groups[1][1]
+    assert len(calls) == 6
+
+
+def test_archive_cache_tracks_contents_order_originals_and_mode(monkeypatch, tmp_path):
+    from collections import OrderedDict
+    from pathlib import Path
+    from plugins.ds1 import mod_loader
+    monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
+    monkeypatch.setattr(mod_loader, '_compose_cache_bytes', 0)
+    relative = Path('script/talk/test.talkesdbnd.dcx')
+    calls = []
+    def composed(vanilla, mods, *, conflicts_only=False):
+        calls.append(1)
+        data = vanilla[relative] + b''.join(mod.files[relative] for mod in mods)
+        return mod_loader.Composition({} if conflicts_only else {relative: data}, [
+            mod_loader.Conflict(relative, 'choice', [mod.name for mod in mods])])
+    monkeypatch.setattr(mod_loader, 'compose', composed)
+    def mod(name, data):
+        return mod_loader.Mod(name, tmp_path / name, {relative: data})
+    mods = [mod('A', b'a'), mod('B', b'b')]
+    def run(original=b'base', selected=None, inspect=False):
+        return mod_loader._compose_file(relative, original, mods if selected is None else selected, inspect)
+    first = run()
+    first.conflicts[0].mods.clear()
+    first.files.clear()
+    assert run().files[relative] == b'baseab'
+    assert run().conflicts[0].mods == ['A', 'B']
+    assert len(calls) == 1
+    assert run(selected=list(reversed(mods))).files[relative] == b'baseba'
+    assert run(selected=[mod('A', b'changed'), mods[1]]).files[relative] == b'basechangedb'
+    assert run(original=b'new').files[relative] == b'newab'
+    assert run(inspect=True).files == {}
+    assert len(calls) == 5
+    mod_loader._compose_cache.clear()
+    monkeypatch.setattr(mod_loader, '_compose_cache_bytes', 0)
+    monkeypatch.setattr(mod_loader, '_COMPOSE_CACHE_LIMIT', 20)
+    run(original=b'evict')
+    assert run().files[relative] == b'baseab'
+    assert len(mod_loader._compose_cache) == 1
+    assert mod_loader._compose_cache_bytes <= 20
+    monkeypatch.setattr(mod_loader, '_COMPOSE_CACHE_LIMIT', 1)
+    retained = list(mod_loader._compose_cache)
+    run(original=b'oversized')
+    # Oversized results are returned but never retained.
+    assert list(mod_loader._compose_cache) == retained
+
+
 def test_asset_binder_reports_only_the_conflicting_esd_field():
     from pathlib import Path
     from ds1_fixture import pack_text_members
