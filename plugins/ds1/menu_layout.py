@@ -55,6 +55,17 @@ DYNAMIC = 2
 TEXT_ID_AT = 40  # a menu-text node's entry in the menu text archive
 FONT_AT = 20  # a text node's text style id (face, size and colour)
 MIN_FONT, MAX_FONT = 0, 12  # the style ids vanilla uses
+TEXT_COLOUR = 16  # four bytes: alpha, blue, green, red
+
+
+def _color(value, owner: str) -> bytes:
+    """Eight hex digits (alpha, blue, green, red) as four bytes."""
+    if not isinstance(value, str) or len(value) != 8:
+        raise LayoutError(f"{owner}: a colour is eight hex digits: alpha, blue, green, red")
+    try:
+        return bytes.fromhex(value)
+    except ValueError as error:
+        raise LayoutError(f"{owner}: a colour is eight hex digits: alpha, blue, green, red") from error
 TEXT_TAIL = 0x1C
 MAX_TEXT = 256
 MAX_SIZE = 4096
@@ -365,6 +376,20 @@ class Drb:
             raise LayoutError(f"{dialog}/{name} is a {kind}, not text, so it has no font")
         self.sections["SHPR"][0][start + FONT_AT] = size
 
+    def set_text_color(self, dialog: str, name: str, color: str) -> None:
+        """Set a text node's colour (shape bytes 16-19): alpha, blue, green, red, like sprites.
+
+        Vanilla's parchment text is ff9cb9ca and the invasion message's red is
+        ff0000ff. The game may still recolour text it fills at run time (the
+        stat comparison's blue and red).
+        """
+        tint = _color(color, f"{dialog}/{name}")
+        item = self.node(dialog, name)
+        kind, start, end = self._span("SHAP", "SHPR", item.shape)
+        if kind != "Text" or end - start <= TEXT_PREFIX:
+            raise LayoutError(f"{dialog}/{name} is a {kind}, not text, so it has no text colour")
+        self.sections["SHPR"][0][start + TEXT_COLOUR:start + TEXT_COLOUR + 4] = tint
+
     def _insert(self, dialog: str, name: str, shape_type: int, shape: bytes,
                 control_type: int, control: bytes, before: str | None = None) -> None:
         """One new object at the end of a dialog, or just before its node
@@ -512,12 +537,14 @@ def validate(spec: object, owner: str) -> dict:
     clean_moves = []
     for move in moves:
         keys = set(move) if isinstance(move, dict) else set()
-        if not {"dialog", "name", "rect"} <= keys or keys - {"dialog", "name", "rect", "optional", "font"}:
-            raise LayoutError(f"{owner}: a layout move names dialog, name and rect (optional: true, font)")
+        if not {"dialog", "name", "rect"} <= keys or keys - {"dialog", "name", "rect", "optional", "font", "color"}:
+            raise LayoutError(f"{owner}: a layout move names dialog, name and rect (optional: true, font, color)")
         if "optional" in move and move["optional"] is not True:
             raise LayoutError(f"{owner}: a layout move's optional is true or absent")
         if "font" in move and (type(move["font"]) is not int or not MIN_FONT <= move["font"] <= MAX_FONT):
             raise LayoutError(f"{owner}: a layout move's font is a text style id from {MIN_FONT} to {MAX_FONT}")
+        if "color" in move:
+            _color(move["color"], f"{owner}: a layout move")
         if not all(isinstance(move[key], str) and move[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout move names must be text")
         rect = move["rect"]
@@ -528,8 +555,9 @@ def validate(spec: object, owner: str) -> dict:
         entry = {"dialog": move["dialog"], "name": move["name"], "rect": list(rect)}
         if move.get("optional"):
             entry["optional"] = True
-        if "font" in move:
-            entry["font"] = move["font"]
+        for key in ("font", "color"):
+            if key in move:
+                entry[key] = move[key]
         clean_moves.append(entry)
     return {"owner": owner, "nodes": clean, "moves": clean_moves}
 
@@ -579,6 +607,8 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
             layout.move(move["dialog"], move["name"], move["rect"])
             if "font" in move:
                 layout.set_font(move["dialog"], move["name"], move["font"])
+            if "color" in move:
+                layout.set_text_color(move["dialog"], move["name"], move["color"])
         except LayoutError as error:
             raise LayoutError(f"{owner}: {error}") from error
     return formats.deflate(original, layout.to_bytes())

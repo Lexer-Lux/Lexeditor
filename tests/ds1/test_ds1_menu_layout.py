@@ -337,6 +337,22 @@ class MoveTests(unittest.TestCase):
             with self.subTest(font=font), self.assertRaises(menu_layout.LayoutError):
                 menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "font": font}]}, "Bad")
 
+    def test_a_move_can_tint_a_text_node(self):
+        original = dcx(drb())
+        spec = menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "color": "ff40a0ff"}]}, "Tint")
+        layout = menu_layout.Drb(formats.inflate(menu_layout.compose(original, [spec])))
+        node = layout.node(MOVES[0]["dialog"], MOVES[0]["name"])
+        _kind, blob = layout._blob("SHAP", "SHPR", node.shape)
+        self.assertEqual(blob[menu_layout.TEXT_COLOUR:menu_layout.TEXT_COLOUR + 4], bytes.fromhex("ff40a0ff"))
+        sprite = menu_layout.validate({"version": 1, "moves": [
+            {"dialog": "data_simple_arms", "name": "icon_receive", "rect": [0, 0, 10, 10], "color": "ffffffff"}]},
+            "Sprite")
+        with self.assertRaisesRegex(menu_layout.LayoutError, "not text"):
+            menu_layout.compose(original, [sprite])
+        for color in ("fff", "gg000000", 255):
+            with self.subTest(color=color), self.assertRaises(menu_layout.LayoutError):
+                menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "color": color}]}, "Bad")
+
     def test_optional_moves_follow_other_tweaks_nodes_or_skip(self):
         original = dcx(drb())
         added = menu_layout.validate({"version": 1, "nodes": STAMINA[:1]}, "Adder")
