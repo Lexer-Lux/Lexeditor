@@ -12774,6 +12774,12 @@ ${contents.path}`});
     const fixedRows = Math.max(0, Number(options.fixedRows) || 0);
     const fittedLists = (options.lists || [listNode]).filter(Boolean);
     let lastSize = Math.max(1, Number(options.pageSize) || 1);
+    // Apply the row contract before insertion. A nested table must never
+    // briefly inherit its master table's fitted height while being measured.
+    if (!fixedRows && Number(options.fixedRowHeight) > 0) fittedLists.forEach(node => {
+      node.style.setProperty("--lex-fitted-row-height", `${Number(options.fixedRowHeight)}px`);
+      node.dataset.lexFixedRows = String(lastSize);
+    });
     let waitingForDrag = false;
     const geometryKey = options.cacheKey ? `${options.cacheKey}:${innerWidth}:${innerHeight}:${fixedRows}:${options.minRowHeight||0}` : null;
     const cachedGeometry = geometryKey && fittedPageGeometry.get(geometryKey);
@@ -12846,9 +12852,9 @@ ${contents.path}`});
       const pageSize = fixedRows || Math.min(measuredCapacity, capacity);
       // An explicit row count squeezes rows to fit: paginated content never
       // scrolls, so a high count shrinks rows instead of adding a scrollbar.
-      const rowHeight = fixedRows ? available / pageSize : naturalRowHeight;
+      const rowHeight = fixedRows ? available / pageSize : assumedRowHeight || naturalRowHeight;
       if (!(rowHeight > 0)) return;
-      if (fixedRows) fittedLists.forEach(node => {
+      if (fixedRows || assumedRowHeight) fittedLists.forEach(node => {
         node.style.setProperty("--lex-fitted-row-height", `${rowHeight}px`);
         node.dataset.lexFixedRows = String(pageSize);
         node.style.overflowY = "";
@@ -16234,12 +16240,16 @@ ${contents.path}`});
           columns, rowClass, rowTitle, class: "lex-list-fill"});
         const box = element("div", {class: "lex-mod-contents"},
           list, pagerNode, ...foot);
-        fitListPage({list, pageSize: size, change: next => {
+        fitListPage({list, pageSize: size, fixedRowHeight: 32, change: next => {
           if (next === contentsFitted[tab]) return;
           contentsFitted[tab] = next;
           contentsPage[tab] = Math.max(0, Math.min(contentsPage[tab],
             Math.max(1, Math.ceil(filtered.length / next)) - 1));
-          draw();
+          // Capacity belongs to this table. Replacing the entire Mods page
+          // resets heading typography and changes the space being measured.
+          const replacement = contentsNode(tab);
+          if (box.isConnected) box.replaceWith(replacement);
+          contentsWraps[tab] = replacement;
         }});
         wheelPages(box, direction => {
           const target = contentsPage[tab] + direction;

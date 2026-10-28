@@ -42,6 +42,11 @@ SCHEMA = {"fields": [{"key": "step", "type": "int", "default": 1, "min": 0, "max
 @pytest.fixture(autouse=True)
 def isolated_conflict_report(tmp_path, monkeypatch):
     monkeypatch.setattr(Ds1ModAdapter, "_report_path", staticmethod(lambda: tmp_path / "conflicts.json"))
+    # These phase tests inject parsers and count imports in this process.
+    # Real child exit/timeout behavior is covered by editor_failure_boundaries.
+    from core import script_mods
+    monkeypatch.setattr(tweak_mods.BuildContext, 'run_script',
+                        lambda self, root, values: script_mods.execute_script(root, values, self))
 
 
 def make_mod(library, mod_id, name, spec, *, enabled=True, order=10, values=None):

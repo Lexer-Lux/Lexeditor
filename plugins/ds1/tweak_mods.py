@@ -159,16 +159,25 @@ def tweak_rows(root: Path | None = None) -> list[dict]:
                 continue
             checked(folder / "mod.json")
             checked(folder / script_mods.VALUES_FILE)
-            if not script_mods.is_script_mod(folder):
+            try:
+                metadata = script_mods._read_json(folder / 'mod.json')
+            except script_mods.ScriptModError:
+                # Shared library discovery already exposes unreadable metadata
+                # as an off/error row. Never let it hide the healthy catalog.
                 continue
-            metadata = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+            if not isinstance(metadata, dict) or not isinstance(metadata.get('script'), dict):
+                continue
             row = script_mods.catalog_row(folder)
+            order = metadata.get('order', 1000)
+            if not isinstance(order, int) or isinstance(order, bool):
+                row['error'] = 'Load order must be a whole number'
+                order = 1000
             row.update({"id": str(metadata.get("id") or folder.name), "name": str(metadata.get("name") or folder.name),
-                        "enabled": metadata.get("enabled") is True, "order": int(metadata.get("order", 1000))})
+                        "enabled": metadata.get("enabled") is True, "order": order})
             rows.append(row)
-    ids = [row["id"].casefold() for row in rows]
-    if len(ids) != len(set(ids)):
-        raise TweakError("Two DS1 tweak mods share an id")
+    for row in rows:
+        if sum(other['enabled'] and other['id'].casefold() == row['id'].casefold() for other in rows) > 1:
+            row['error'] = 'Multiple enabled tweak mods share this id'
     return sorted(rows, key=lambda row: (row["order"], row["name"].casefold()))
 
 
@@ -375,7 +384,15 @@ class BuildContext:
 
     def begin_build(self, root):
         self._inputs = {}
-        self._building_source = script_mods.source_fingerprint(root)
+        self._building_source = None
+        try:
+            self._building_source = script_mods.source_fingerprint(root)
+        except Exception:
+            pass  # Fingerprinting only controls reuse, never the build itself.
+
+    def run_script(self, root, settings):
+        from .script_worker import evaluate
+        return evaluate(root, settings, self)
 
     def build_record(self, root, outputs):
         return {'source': self._building_source, 'compiler': _script_compiler_revision(),
@@ -408,7 +425,11 @@ class BuildContext:
 
     def settings(self, mod_id: str) -> dict | None:
         root = self._enabled.get(mod_id)
-        return self._remember('settings', mod_id, script_mods.values(root) if root else None)
+        try:
+            value = script_mods.values(root) if root else None
+        except Exception as error:
+            raise TweakError(f'{mod_id}: {error}', folders=[root]) from error
+        return self._remember('settings', mod_id, value)
 
     def module(self, mod_id: str, name: str):
         """An enabled dependency's own module, through the shared package loader."""
@@ -416,7 +437,10 @@ class BuildContext:
         if root is None:
             raise TweakError(f"{mod_id} must be enabled before reading its build module")
         self._remember('module', mod_id, script_mods.source_fingerprint(root))
-        return script_mods.import_module(root, name)
+        try:
+            return script_mods.import_module(root, name)
+        except Exception as error:
+            raise TweakError(f'{mod_id}: {error}', folders=[root]) from error
 
 
 @lru_cache(maxsize=1)
@@ -436,7 +460,7 @@ def build_specs(root: Path | None = None, game_root: Path | None = None) -> list
     try:
         mod_requires.check_enabled(root or mods_root())
     except ValueError as error:
-        raise TweakError(str(error)) from error
+        raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
     rows = [row for row in tweak_rows(root) if row["enabled"]]
     ensure_loader_mod(root)
     context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root)
@@ -466,7 +490,7 @@ def _built(rows: list[dict], folder: str, check) -> list[dict]:
             spec = check(json.loads(target.read_text(encoding="utf-8")), row["name"])
             spec["folder"] = row["path"]
             specs.append(spec)
-        except (ValueError, exe_patches.PatchError) as error:
+        except Exception as error:
             raise TweakError(f"{row['name']}: {error}", folders=[row['path']]) from error
     return specs
 
@@ -1035,12 +1059,15 @@ def _compose_menu(original, specs, managed, cache_root):
             cached = composition_cache.load(cache_root, key)
             if cached is not None:
                 return cached
-        except (OSError, TypeError, ValueError):
+        except Exception:
             key = None  # Reuse is optional; composition still works without it.
     result = (menu_layout.compose(original, specs) if managed == LAYOUT else
               menu_scripts.compose(original, specs, ESD_ARCHIVE[managed]))
     if key is not None:
-        composition_cache.store(cache_root, key, result)
+        try:
+            composition_cache.store(cache_root, key, result)
+        except Exception:
+            pass
     return result
 
 
@@ -1126,14 +1153,25 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
 
 def _undo(game_root: Path, done: list[dict]) -> None:
     """Put files already written back, newest first. Never undo a file changed since."""
+    errors = []
     for item in reversed(done):
-        if item.get("managed") is None:
+        try:
             previous = item["previous"]
-            _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"], previous.get("built"))
-            continue
-        previous = item["previous"]
-        _write(game_root, item["after"], item["before"], previous.get("mods", []),
-               item["managed"], project=previous.get("project"))
+            if item.get("managed") is None:
+                _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"], previous.get("built"))
+            else:
+                managed = item['managed']
+                current = _read(managed.live(game_root), managed)
+                if current == item['before']:
+                    continue
+                if current != item['after']:
+                    raise TweakError(f'The {managed.label} changed during rollback')
+                _write(game_root, item["after"], item["before"], previous.get("mods", []),
+                       managed, project=previous.get("project"))
+        except Exception as error:
+            errors.append(str(error))
+    if errors:
+        raise TweakError('; '.join(errors))
 
 
 def commit(game_root: Path, plan: dict) -> None:
@@ -1145,19 +1183,19 @@ def commit(game_root: Path, plan: dict) -> None:
     done = []
     try:
         for item in plan["files"]:
+            done.append(item)
             _write(game_root, item["before"], item["after"], item["mods"], item["managed"],
                    project=item["project"])
-            done.append(item)
         runtime = plan["runtime"]
         # Counted before it starts: a failure between its files must be taken
         # back too, not only a finished install.
         done.append({"managed": None, "previous": runtime["previous"]})
         _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], runtime.get("built"))
-    except Exception:
+    except Exception as failure:
         try:
             _undo(game_root, done)
-        except Exception:
-            pass  # status() reports what each file is now
+        except Exception as rollback_error:
+            raise TweakError(f'Deployment failed: {failure}; rollback failed: {rollback_error}') from failure
         raise
 
 

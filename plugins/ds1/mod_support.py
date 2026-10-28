@@ -101,15 +101,24 @@ class Ds1ModAdapter:
                     mods.append(mod)
         return mods
 
+    def _cache_root(self):
+        try:
+            return self._report_path().parent
+        except Exception:
+            return None
+
     def activate(self, mods: list[Path], game_root: Path) -> dict:
         """Install exactly the chosen set: tweaks and data mods together."""
         game_root = Path(game_root)
         library = self._library()
         tweak_mods.ensure_game_closed()
         with tweak_mods.locked(game_root):
-            plan = tweak_mods.prepare(game_root, library, cache_root=self._report_path().parent)
+            plan = tweak_mods.prepare(game_root, library, cache_root=self._cache_root())
             ordered = self._ordered_mods(mods)
-            content = self._content_signature(ordered)
+            try:
+                content = self._content_signature(ordered)
+            except Exception:
+                content = None
             report = self._read_report(game_root, ordered)
             if report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered]:
                 # Native settings can change while every data input and
@@ -122,7 +131,7 @@ class Ds1ModAdapter:
                         "dataMods": [name for name, _folder in ordered],
                         "conflicts": len(conflicts)}
             data = self._mods(mods)
-            composition = mod_loader.compose_installed(game_root, data, cache_root=self._report_path().parent)
+            composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root())
             tweak_mods.commit(game_root, plan)
             try:
                 if composition.files:
@@ -219,7 +228,7 @@ class Ds1ModAdapter:
                     for row in cached):
                 return None
             return report
-        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        except Exception:
             return None
 
     def _load_report(self, game_root, ordered):
@@ -247,7 +256,7 @@ class Ds1ModAdapter:
             path = self._report_path()
             path.parent.mkdir(parents=True, exist_ok=True)
             atomic_write(path, encoded)
-        except (OSError, ValueError):
+        except Exception:
             pass  # A derived report must never turn a successful build into a failure.
 
     @staticmethod

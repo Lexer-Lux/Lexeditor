@@ -36,14 +36,14 @@ def load(root, key):
                 return None
             database.execute('UPDATE outputs SET touched = ? WHERE key = ?', (time.time_ns(), key))
             return data
-    except (OSError, sqlite3.Error, TypeError):
+    except (OSError, sqlite3.Error, TypeError, ValueError):
         return None
 
 
 def store(root, key, data):
-    if len(data) > LIMIT:
-        return
     try:
+        if not isinstance(data, bytes) or len(data) > LIMIT:
+            return
         with _database(root) as database:
             # Serialize eviction and insertion across host/plugin processes.
             database.execute('BEGIN IMMEDIATE')
@@ -56,5 +56,5 @@ def store(root, key, data):
                                  '(SELECT key FROM outputs ORDER BY touched LIMIT 1)')
             database.execute('INSERT INTO outputs VALUES (?, ?, ?, ?)',
                              (key, data, sha256(data).digest(), time.time_ns()))
-    except (OSError, sqlite3.Error):
+    except (OSError, sqlite3.Error, TypeError, ValueError):
         pass  # A cache failure never fails a build or deployment.

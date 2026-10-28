@@ -160,8 +160,12 @@ def read_mod(folder: Path, name: str) -> Mod | None:
     if not (folder / MARKER).is_file():
         return None
     files = {}
-    for key, path in content_files(folder, name):
-        files[key] = path.read_bytes()
+    try:
+        for key, path in content_files(folder, name):
+            files[key] = path.read_bytes()
+    except Exception as error:
+        from core.mod_builds import ModBuildError
+        raise ModBuildError([folder], f'{name}: {error}') from error
     return Mod(name, folder, files)
 
 
@@ -222,7 +226,27 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
     for relative in sorted(paths):
         selected = [Mod(mod.name, mod.folder, {relative: mod.files[relative]})
                     for mod in mods if relative in mod.files]
-        result = _compose_file(relative, originals.get(relative), selected, conflicts_only, cache_root)
+        try:
+            result = _compose_file(relative, originals.get(relative), selected, conflicts_only, cache_root)
+        except Exception as error:
+            from core.mod_builds import ModBuildError
+            if isinstance(error, ModBuildError):
+                raise
+            original = originals.get(relative)
+            # Diagnose only on failure. A broken original or composer remains
+            # an operation error; it must not switch off an innocent mod.
+            if original is not None:
+                compose({relative: original}, [Mod('Vanilla', Path(game_root), {relative: original})],
+                        conflicts_only=True)
+                failed = []
+                for mod in selected:
+                    try:
+                        compose({relative: original}, [mod], conflicts_only=True)
+                    except Exception:
+                        failed.append(mod.folder)
+                if failed:
+                    raise ModBuildError(failed, f'{relative}: {error}') from error
+            raise
         files.update(result.files)
         conflicts.extend(result.conflicts)
     return Composition(files, conflicts)
@@ -270,9 +294,18 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
             if payload is not None:
                 header, data = payload.split(b'\n', 1)
                 metadata = json.loads(header)
+                if (not isinstance(metadata, dict) or type(metadata.get('hasData')) is not bool
+                        or not isinstance(metadata.get('conflicts'), list)):
+                    raise ValueError('Invalid composition cache header')
+                for row in metadata['conflicts']:
+                    if (not isinstance(row, list) or len(row) != 3 or row[0] != str(relative)
+                            or not isinstance(row[1], str) or not isinstance(row[2], list)
+                            or any(not isinstance(name, str) or name not in {mod.name for mod in mods}
+                                   for name in row[2])):
+                        raise ValueError('Invalid composition cache conflict')
                 rows = tuple((Path(path), part, tuple(names)) for path, part, names in metadata['conflicts'])
                 cached = (data if metadata['hasData'] else None, rows, len(payload))
-        except (OSError, ValueError, KeyError, TypeError):
+        except Exception:
             pass
     if cached is None:
         result = compose({relative: original} if original is not None else {}, mods,
@@ -283,10 +316,13 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
                sum(len(name.encode('utf-8')) for name in names) for _, part, names in rows)
         cached = (data, rows, size)
         if disk_key is not None:
-            metadata = {'hasData': data is not None,
-                        'conflicts': [(str(path), part, names) for path, part, names in rows]}
-            payload = json.dumps(metadata).encode('utf-8') + b'\n' + (data or b'')
-            composition_cache.store(cache_root, disk_key, payload)
+            try:
+                metadata = {'hasData': data is not None,
+                            'conflicts': [(str(path), part, names) for path, part, names in rows]}
+                payload = json.dumps(metadata).encode('utf-8') + b'\n' + (data or b'')
+                composition_cache.store(cache_root, disk_key, payload)
+            except Exception:
+                pass
     if remember and cached[2] <= _COMPOSE_CACHE_LIMIT:
         with _compose_cache_lock:
             previous = _compose_cache.pop(key, None)
@@ -809,9 +845,11 @@ def _compose_maps(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path)
         return vanilla, []
     try:
         base = MsbDocument(vanilla, relative.name)
-        docs = [(name, MsbDocument(data, relative.name)) for name, data in changed]
     except MsbError:
         return _whole_map(vanilla, changed, relative)
+    # A known format with a malformed mod is a failed input, not a whole-file
+    # conflict that is allowed to replace the installed game data.
+    docs = [(name, MsbDocument(data, relative.name)) for name, data in changed]
     keys = [(part["type"], part["id"]) for part in base.parts]
     units = base.merge_units()
     for _name, doc in docs:
@@ -858,18 +896,18 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
     changed = [(name, data) for name, data in mods if data != vanilla]
     if not changed:
         return vanilla, []
-    if len({data for _name, data in changed}) == 1:
-        return changed[-1][1], []
     from .assets import MAX_ASSET_BYTES
     try:
         base_plain = inflate(vanilla, max_size=MAX_ASSET_BYTES)
         base_members = members(base_plain)
-        plains = []
-        for name, data in changed:
-            plain = inflate(data, max_size=MAX_ASSET_BYTES)
-            plains.append((name, plain, members(plain)))
     except FormatError:
         return _whole_anibnd(changed, relative, kind)
+    plains = []
+    for name, data in changed:
+        plain = inflate(data, max_size=MAX_ASSET_BYTES)
+        plains.append((name, plain, members(plain)))
+    if len({data for _name, data in changed}) == 1:
+        return changed[-1][1], []
     for _name, _plain, owned in plains:
         if set(owned) != set(base_members):
             return _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind, conflicts_only=conflicts_only)

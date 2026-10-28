@@ -49,7 +49,7 @@ def mod_row(folder: Path) -> dict:
         try:
             info = json.loads(marker.read_text(encoding="utf-8"))
             row["lexmod"] = {"repository": info.get("repository", ""), "version": info.get("version", "")}
-        except (OSError, ValueError):
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
     row["script"] = None
     try:

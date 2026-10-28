@@ -146,9 +146,13 @@ def check_enabled(library: Path) -> None:
     for mod, folder in folders.items():
         if not enabled.get(mod, False):
             continue
-        missing = [need for need in needs(folder) if not enabled.get(need, False)]
+        from core.mod_builds import ModBuildError
+        try:
+            missing = [need for need in needs(folder) if not enabled.get(need, False)]
+        except (OSError, ValueError) as error:
+            raise ModBuildError([folder], str(error)) from error
         if missing:
-            raise ValueError(f"{display_name(folder)} requires {_describe(missing, enabled)}")
+            raise ModBuildError([folder], f"{display_name(folder)} requires {_describe(missing, enabled)}")
 
 
 def unmet_lines(library: Path) -> dict[str, list[str]]:

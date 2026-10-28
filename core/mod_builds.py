@@ -30,8 +30,18 @@ def activate_with_recovery(adapter, mods: list[Path], game_root: Path) -> dict:
             removed = set(failed)
             while True:
                 ids = {mod_requires.mod_id(folder) for folder in removed}
-                dependents = {folder for folder in active if folder not in removed
-                              and ids.intersection(mod_requires.needs(folder))}
+                dependents = set()
+                for folder in active:
+                    if folder in removed:
+                        continue
+                    try:
+                        required = mod_requires.needs(folder)
+                    except (OSError, ValueError):
+                        # Its own invalid requirement will be attributed on the
+                        # next preparation, rather than hiding this failure.
+                        continue
+                    if ids.intersection(required):
+                        dependents.add(folder)
                 if not dependents:
                     break
                 removed.update(dependents)

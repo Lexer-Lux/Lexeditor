@@ -2518,6 +2518,12 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
   min-height:0;
 }
 
+.lex-column-list.lex-fitted-page[data-lex-fixed-rows] > .lex-column-list-row {
+  box-sizing:border-box;
+  height:var(--lex-fitted-row-height);
+  min-height:0;
+}
+
 .lex-list-row {
   color: var(--lex-text);
   border-bottom: 1px solid color-mix(in srgb, var(--lex-border) 45%, transparent);

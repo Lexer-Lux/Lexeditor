@@ -61,6 +61,10 @@ class ScriptModRollbackError(ScriptModError):
     """Generated files could not be restored; recovery must stop."""
 
 
+class ScriptModInfrastructureError(ScriptModError):
+    """The execution service is unavailable, rather than a defective mod."""
+
+
 # --- discovery -------------------------------------------------------------
 
 def _read_json(path: Path) -> Any:
@@ -378,16 +382,16 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
     """
     root = Path(root)
     previous = _generated_files(root, allowed_roots)
-    if hasattr(context, 'cached_build') and context.cached_build(root, previous):
-        return {'files': sorted(previous), 'written': [], 'removed': [], 'cached': True}
+    if hasattr(context, 'cached_build'):
+        try:
+            if context.cached_build(root, previous):
+                return {'files': sorted(previous), 'written': [], 'removed': [], 'cached': True}
+        except Exception:
+            pass  # Reuse is optional; ownership validation above is not.
     if hasattr(context, 'begin_build'):
         context.begin_build(root)
-    module = load_script(root)
-    function: Callable | None = getattr(module, "build", None)
-    if function is None:
-        raise ScriptModError("The script has no build() function")
     current = values(root)
-    outputs = function(current, context)
+    outputs = context.run_script(root, current) if hasattr(context, 'run_script') else execute_script(root, current, context)
     if not isinstance(outputs, dict):
         raise ScriptModError("build() must return {path: contents}")
     manifest_path = root / MANIFEST_FILE
@@ -427,7 +431,7 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
                 # can always rebuild through the ordinary path instead.
                 if len(json.dumps(record).encode('utf-8')) <= 65536:
                     manifest['build'] = record
-            except (OSError, TypeError, ValueError):
+            except Exception:
                 pass  # Cache metadata must not roll back a valid mod build.
         atomic_write(manifest_path, (json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
     except Exception as error:
@@ -437,6 +441,15 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
             raise ScriptModRollbackError(f"Build failed: {error}; {rollback_error}") from error
         raise
     return {"files": sorted(planned), "written": written, "removed": removed}
+
+
+def execute_script(root: Path, current: dict, context: Any) -> dict:
+    """Evaluate only; the caller validates and commits the returned files."""
+    module = load_script(root)
+    function: Callable | None = getattr(module, "build", None)
+    if not callable(function):
+        raise ScriptModError("The script has no build() function")
+    return function(current, context)
 
 
 def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...],
@@ -455,12 +468,12 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
             raise error(f"{row['name']}: {row['error']}", folders=[row['path']])
         missing = [need for need in row["schema"]["requires"] if need not in enabled]
         if missing:
-            raise error(f"{row['name']} requires {', '.join(missing)}, which is not enabled")
+            raise error(f"{row['name']} requires {', '.join(missing)}, which is not enabled", folders=[row['path']])
         if row["schema"]["blocker"]:
             raise error(f"{row['name']}: {row['schema']['blocker']}", folders=[row['path']])
         conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
         if conflicts:
-            raise error(f"{row['name']} conflicts with {', '.join(conflicts)}")
+            raise error(f"{row['name']} conflicts with {', '.join(conflicts)}", folders=[row['path']])
         try:
             snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
         except Exception as failure:
@@ -480,7 +493,8 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
             except Exception as rollback_error:
                 failures.append(f"{result['id']}: {rollback_error}")
         suffix = "; rollback failed: " + "; ".join(failures) if failures else ""
-        folders = [] if failures or isinstance(failure, ScriptModRollbackError) else [row['path']]
+        folders = [] if failures or isinstance(failure, (ScriptModRollbackError, ScriptModInfrastructureError)) else (
+            failure.folders if isinstance(failure, ModBuildError) and failure.folders else [row['path']])
         raise error(f"{context.current}: {failure}{suffix}", folders=folders) from failure
     return built
 
@@ -503,11 +517,12 @@ def clear(root: Path) -> list[str]:
 
 def catalog_row(root: Path) -> dict:
     """What the Tweaks page needs about one tweak mod, without running it."""
-    row = {"path": str(Path(root).resolve()), "error": ""}
+    row = {"path": str(Path(root).resolve()), "id": Path(root).name,
+           "name": Path(root).name, "error": ""}
     try:
         row.update(spec(root))
         row["schema"] = schema(root)
         row["values"] = values(root)
-    except ScriptModError as error:
+    except Exception as error:
         row["error"] = str(error)
     return row
