@@ -53,9 +53,10 @@ DLG_SIZE = 64
 TEXT_PREFIX = 31  # rectangle, scaling, palette, colour, font size, alignment
 DYNAMIC = 2
 TEXT_ID_AT = 40  # a menu-text node's entry in the menu text archive
-FONT_AT = 20  # a text node's text style id (face, size and colour)
-MIN_FONT, MAX_FONT = 0, 12  # the style ids vanilla uses
-TEXT_COLOUR = 16  # four bytes: alpha, blue, green, red
+FONT_AT = 28  # int16 font-size index, after the Remastered scaling header
+MIN_FONT, MAX_FONT = 0, 12
+TEXT_PALETTE = 20  # int32; zero selects the custom colour
+TEXT_COLOUR = 24  # four bytes: alpha, blue, green, red
 # Moves rewrite bytes in place and never grow the file: a menu rework that
 # re-lays several detail panels (each ~50-80 nodes) fits.
 MAX_MOVES = 1024
@@ -363,13 +364,11 @@ class Drb:
         struct.pack_into("<4h", self.sections["SHPR"][0], start, left, top, right, bottom)
 
     def set_font(self, dialog: str, name: str, size: int) -> None:
-        """Set a text node's text style id (shape byte 20) in place.
+        """Set the int16 font-size index without changing the colour palette.
 
-        The id picks an entry of the game's text style table: face, size and
-        colour together, not a size alone (style 5 draws orange at full
-        size). Vanilla mostly uses 7 for rows, 9-11 for titles and names, 4
-        and 0 for some small text. Glyphs are drawn at the style's size
-        whatever the rectangle, so smaller text means another style.
+        Remastered adds eight scaling bytes after the rectangle. Its text
+        payload starts at 16: blend flags, line spacing, palette, custom
+        colour, then the font index at 28 (SoulsFormats DRB.TextBase).
         """
         if type(size) is not int or not MIN_FONT <= size <= MAX_FONT:
             raise LayoutError(f"{dialog}/{name}: font is a text style id from {MIN_FONT} to {MAX_FONT}")
@@ -377,10 +376,10 @@ class Drb:
         kind, start, end = self._span("SHAP", "SHPR", item.shape)
         if kind != "Text" or end - start <= TEXT_PREFIX:
             raise LayoutError(f"{dialog}/{name} is a {kind}, not text, so it has no font")
-        self.sections["SHPR"][0][start + FONT_AT] = size
+        struct.pack_into("<h", self.sections["SHPR"][0], start + FONT_AT, size)
 
     def set_text_color(self, dialog: str, name: str, color: str) -> None:
-        """Set a text node's colour (shape bytes 16-19): alpha, blue, green, red, like sprites.
+        """Set a text node's custom colour at bytes 24-27, selecting palette 0.
 
         Vanilla's parchment text is ff9cb9ca and the invasion message's red is
         ff0000ff. The game may still recolour text it fills at run time (the
@@ -391,6 +390,7 @@ class Drb:
         kind, start, end = self._span("SHAP", "SHPR", item.shape)
         if kind != "Text" or end - start <= TEXT_PREFIX:
             raise LayoutError(f"{dialog}/{name} is a {kind}, not text, so it has no text colour")
+        struct.pack_into("<i", self.sections["SHPR"][0], start + TEXT_PALETTE, 0)
         self.sections["SHPR"][0][start + TEXT_COLOUR:start + TEXT_COLOUR + 4] = tint
 
     def _insert(self, dialog: str, name: str, shape_type: int, shape: bytes,

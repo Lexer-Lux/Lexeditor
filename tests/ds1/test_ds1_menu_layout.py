@@ -326,7 +326,11 @@ class MoveTests(unittest.TestCase):
         layout = menu_layout.Drb(formats.inflate(menu_layout.compose(original, [spec])))
         node = layout.node(MOVES[0]["dialog"], MOVES[0]["name"])
         _kind, blob = layout._blob("SHAP", "SHPR", node.shape)
-        self.assertEqual(blob[menu_layout.FONT_AT], 5)
+        # Fixed format offsets, independent of the writer's constants: the
+        # old implementation wrote the palette and its test repeated it.
+        self.assertEqual(struct.unpack_from('<h', blob, 28)[0], 5)
+        self.assertEqual(blob[8:28], DIALOGS['data_simple_arms'][0][2][8:28])
+        self.assertEqual(blob[30:], DIALOGS['data_simple_arms'][0][2][30:])
         sprite = menu_layout.validate({"version": 1, "moves": [
             {"dialog": "data_simple_arms", "name": "icon_receive", "rect": [0, 0, 10, 10], "font": 5}]}, "Sprite")
         with self.assertRaisesRegex(menu_layout.LayoutError, "not text"):
@@ -343,7 +347,10 @@ class MoveTests(unittest.TestCase):
         layout = menu_layout.Drb(formats.inflate(menu_layout.compose(original, [spec])))
         node = layout.node(MOVES[0]["dialog"], MOVES[0]["name"])
         _kind, blob = layout._blob("SHAP", "SHPR", node.shape)
-        self.assertEqual(blob[menu_layout.TEXT_COLOUR:menu_layout.TEXT_COLOUR + 4], bytes.fromhex("ff40a0ff"))
+        self.assertEqual(blob[24:28], bytes.fromhex("ff40a0ff"))
+        self.assertEqual(struct.unpack_from('<i', blob, 20)[0], 0)
+        self.assertEqual(blob[8:20], DIALOGS['data_simple_arms'][0][2][8:20])
+        self.assertEqual(blob[28:], DIALOGS['data_simple_arms'][0][2][28:])
         sprite = menu_layout.validate({"version": 1, "moves": [
             {"dialog": "data_simple_arms", "name": "icon_receive", "rect": [0, 0, 10, 10], "color": "ffffffff"}]},
             "Sprite")
