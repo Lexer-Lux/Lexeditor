@@ -125,6 +125,7 @@ def test_remastered_icon_catalog_preserves_pixel_rectangles(monkeypatch):
     from types import SimpleNamespace
     from plugins.ds1 import icons
     blob = bytearray(36)
+    blob[8:16] = b'\xff' * 4 + b'\0' * 4
     struct.pack_into('<4h', blob, 16, 986, 1289, 1146, 1469)
     struct.pack_into('<h', blob, 24, 0)
     class Layout:
@@ -137,3 +138,27 @@ def test_remastered_icon_catalog_preserves_pixel_rectangles(monkeypatch):
     sheet, *rectangle = icons.icon_table(b'fixture')[2222]
     assert sheet == 'Icon21'
     assert tuple(value * icons.SCALE for value in rectangle) == (986, 1289, 1146, 1469)
+
+
+def test_legacy_icon_record_with_tail_padding_stays_legacy(monkeypatch):
+    import struct
+    from types import SimpleNamespace
+    from plugins.ds1 import icons
+    blob = bytearray(36)
+    struct.pack_into('<4h', blob, 8, 1, 1, 81, 91)
+    struct.pack_into('<h', blob, 16, 0)
+    class Layout:
+        def nodes(self, name):
+            return [SimpleNamespace(name='EquIcon_0001', shape=0)]
+        def _blob(self, *args):
+            return 'Sprite', bytes(blob)
+    monkeypatch.setattr(icons, 'Drb', lambda data: Layout())
+    monkeypatch.setattr(icons, '_texi_names', lambda layout: ['Icon00'])
+    assert icons.icon_table(b'fixture')[1] == ('Icon00', 1, 1, 81, 91)
+
+
+def test_missing_icon_catalog_raises_the_domain_error(tmp_path):
+    import pytest
+    from plugins.ds1 import icons
+    with pytest.raises(icons.IconError):
+        icons.load_icon_table(tmp_path)

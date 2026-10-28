@@ -182,7 +182,9 @@ def icon_table(drb_plain):
         kind, blob = drb._blob('SHAP', 'SHPR', node.shape)
         if kind != 'Sprite' or len(blob) < 24:
             continue
-        modern = len(blob) >= 36
+        # A legacy record may include section-end padding, so length alone
+        # cannot distinguish it from the extended Remastered record.
+        modern = len(blob) >= 36 and blob[8:16] == b'\xff' * 4 + b'\0' * 4
         left, top, right, bottom = struct.unpack_from('<4h', blob, 16 if modern else 8)
         index = struct.unpack_from('<h', blob, 24 if modern else 16)[0]
         if not 0 <= index < len(sheets) or left < 0 or top < 0 or right <= left or bottom <= top:
@@ -206,7 +208,9 @@ def load_icon_table(game_root):
     if (menu / 'menu.drb.dcx').is_file():
         return icon_table(_menu(menu, 'menu.drb.dcx'))
     plain = menu / 'menu.drb'
-    return icon_table(plain.read_bytes())
+    if plain.is_file():
+        return icon_table(plain.read_bytes())
+    return icon_table(_menu(menu, 'menu.drb.dcx'))
 
 
 def icon_rect(icon_id, table):
