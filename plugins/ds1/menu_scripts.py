@@ -139,12 +139,13 @@ def compose(original_dcx: bytes, specs: list[dict], archive: str) -> bytes:
     for owner, folder, change in wanted:
         name = change["script"]
         if name not in table:
-            raise ScriptError(f"{owner}: {archive} has no script {name}")
+            raise ScriptError(f"{owner}: {archive} has no script {name}", folders=[folder] if folder else [])
         if name not in parsed:
             try:
                 parsed[name] = esd.parse(bytes(plain[table[name].offset:table[name].offset + table[name].size]))
             except ValueError as error:
-                raise ScriptError(f"{owner}: {name} is not a script the game can run: {error}") from error
+                raise ScriptError(f"{owner}: {name} is not a script the game can run: {error}",
+                                  folders=[folder] if folder else []) from error
         owners.setdefault(name, []).append(owner)
         try:
             _insert(parsed[name], change, owner)
