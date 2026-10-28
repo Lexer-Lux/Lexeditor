@@ -71,7 +71,7 @@ def _disk_maps(*roots: Path | None) -> list[Path]:
 
 
 def _disk_chars(*roots: Path | None) -> list[Path]:
-    """Every chr/*.anibnd.dcx under the given roots, canonically named."""
+    """Every supported character archive/script, canonically named."""
     found: dict[Path, None] = {}
     for root in roots:
         if root is None:
@@ -79,8 +79,10 @@ def _disk_chars(*roots: Path | None) -> list[Path]:
         chars = Path(root) / CHR_DIR
         if not chars.is_dir():
             continue
-        for path in sorted(chars.glob("*.anibnd.dcx")):
-            found.setdefault(CHR_DIR / path.name.casefold())
+        for path in sorted(chars.glob("*.dcx")):
+            relative = CHR_DIR / path.name.casefold()
+            if assets.is_character_file(relative):
+                found.setdefault(relative)
     return sorted(found)
 
 
@@ -91,6 +93,12 @@ def _check_anibnd(payload: bytes) -> None:
     for name, entry in owned.items():
         if name.endswith(".tae"):
             TaeDocument(bytes(plain[entry.offset:entry.offset + entry.size]), name)
+
+
+def _check_esd(payload: bytes) -> None:
+    """A loose state machine must parse before any installed file changes."""
+    from . import esd
+    esd.parse(inflate(payload))
 
 
 def _disk_assets(game_root: Path | None = None, project_root: Path | None = None) -> list[Path]:
@@ -524,12 +532,13 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
         map_targets += [relative for relative in composed
                         if relative.suffix == ".msb" and relative.parent == MAP_DIR and relative not in map_targets]
         char_targets += [relative for relative in composed
-                         if relative.suffix == ".dcx" and relative.parent == CHR_DIR and relative not in char_targets]
+                         if assets.is_character_file(relative) and relative not in char_targets]
         asset_targets += [relative for relative in composed
                           if relative not in dict(FILES) and relative not in map_targets and relative not in char_targets
                           and relative not in asset_targets]
     targets = (list(FILES) + [(relative, MsbDocument) for relative in map_targets]
-               + [(relative, _check_anibnd) for relative in char_targets]
+               + [(relative, _check_esd if relative.name.endswith('.esd.dcx') else _check_anibnd)
+                  for relative in char_targets]
                + [(relative, None) for relative in asset_targets])
     if composed is None and not source.is_file() and not (project_root / texts.RELATIVE).is_file() \
             and not (project_root / texts.MENU_RELATIVE).is_file() \

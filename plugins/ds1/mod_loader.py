@@ -104,6 +104,7 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
     unchanged library costs stats, not reads. Same enumeration, same limits.
     """
     from .tweak_mods import checked
+    from . import assets
     folder = checked(Path(folder))
     found = []
     for relative in FILES:
@@ -125,7 +126,8 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
             found.append((MAP_DIR / path.name.casefold(), path))
     chars = checked(folder / CHR_DIR)
     if chars.is_dir():
-        candidates = sorted(chars.glob("*.anibnd.dcx"))
+        candidates = sorted(path for path in chars.glob("*.dcx")
+                            if assets.is_character_file(CHR_DIR / path.name))
         if len(candidates) > MAX_ANIBND_FILES:
             raise ValueError(f"{name}: too many character files")
         for path in candidates:
@@ -133,7 +135,6 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
             if path.stat().st_size > MAX_BINDER:
                 raise ValueError(f"{name}: {path.name} is too large")
             found.append((CHR_DIR / path.name.casefold(), path))
-    from . import assets
     try:
         carried = assets.scan_project(folder)
     except assets.AssetError as error:
@@ -185,6 +186,7 @@ def vanilla_files(game_root: Path, extra: frozenset[Path] = frozenset()) -> dict
     once Lexeditor has applied, else the installed files. `extra` names asset
     files to load beyond the structured sets."""
     from . import deployment
+    from . import assets as _assets
     from .tweak_mods import checked
     result = {}
     for relative in FILES:
@@ -204,14 +206,14 @@ def vanilla_files(game_root: Path, extra: frozenset[Path] = frozenset()) -> dict
                 result[relative] = source.read_bytes()
     chars = Path(game_root) / CHR_DIR
     if chars.is_dir():
-        for path in sorted(chars.glob("*.anibnd.dcx")):
+        for path in sorted(path for path in chars.glob("*.dcx")
+                           if _assets.is_character_file(CHR_DIR / path.name)):
             relative = CHR_DIR / path.name.casefold()
             source = checked(deployment.vanilla_source(Path(game_root), relative))
             if source.is_file():
                 if source.stat().st_size > MAX_BINDER:
                     raise ValueError(f"The game's {relative.name} is too large")
                 result[relative] = source.read_bytes()
-    from . import assets as _assets
     for relative in sorted(extra):
         if relative in result:
             continue
@@ -235,7 +237,8 @@ def _is_asset(relative: Path) -> bool:
         return False
     if relative.suffix == ".msb" and relative.parent == MAP_DIR:
         return False
-    return not (relative.suffix == ".dcx" and relative.parent == CHR_DIR)
+    from . import assets
+    return not assets.is_character_file(relative)
 
 
 def compose(vanilla: dict[Path, bytes], mods: list[Mod]) -> Composition:
@@ -244,6 +247,7 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod]) -> Composition:
     `vanilla` holds the game's own bytes of each file; `mods` is load order,
     lowest first. Only files that end up different from vanilla are returned.
     """
+    from . import assets
     files, conflicts = {}, []
     if RELATIVE in vanilla:
         result = _compose_params(vanilla[RELATIVE], [(mod.name, mod.files[RELATIVE])
@@ -276,13 +280,14 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod]) -> Composition:
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
     for relative in sorted({path for path in list(vanilla) + [name for mod in mods for name in mod.files]
-                            if path.suffix == ".dcx" and path.parent == CHR_DIR}):
+                            if assets.is_character_file(path)}):
         have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
         if relative not in vanilla:
             if have:
                 files[relative] = have[-1][1]
             continue
-        result = _compose_anibnd(vanilla[relative], have, relative)
+        result = (_compose_esd(vanilla[relative], have, relative) if relative.name.endswith('.esd.dcx')
+                  else _compose_anibnd(vanilla[relative], have, relative))
         conflicts += result[1]
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
@@ -769,6 +774,27 @@ def _compose_maps(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path)
 
 
 # --- Characters ------------------------------------------------------------
+
+def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) -> tuple[bytes, list[Conflict]]:
+    """Compose loose character states by field, just like embedded scripts."""
+    from . import esd_merge
+    changed = [(name, data) for name, data in mods if data != vanilla]
+    if not changed:
+        return vanilla, []
+    try:
+        original = inflate(vanilla)
+        variants = [(name, inflate(data)) for name, data in changed]
+        combined, collisions = esd_merge.compose(original, variants, talk_options=False)
+    except FormatError:
+        return _whole_anibnd(changed, relative, kind="character script")
+    conflicts = []
+    for part, names in collisions:
+        conflict = Conflict(relative, part)
+        for name in names:
+            conflict.add(name)
+        conflicts.append(conflict)
+    return (vanilla if combined == original else deflate(vanilla, combined)), conflicts
+
 
 def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
     touched = [name for name, _data in changed]
