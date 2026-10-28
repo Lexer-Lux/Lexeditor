@@ -39,6 +39,11 @@ SPECS = {
 SCHEMA = {"fields": [{"key": "step", "type": "int", "default": 1, "min": 0, "max": 10}]}
 
 
+@pytest.fixture(autouse=True)
+def isolated_conflict_report(tmp_path, monkeypatch):
+    monkeypatch.setattr(Ds1ModAdapter, "_report_path", staticmethod(lambda: tmp_path / "conflicts.json"))
+
+
 def make_mod(library, mod_id, name, spec, *, enabled=True, order=10, values=None):
     root = Path(library) / name
     (root / "script").mkdir(parents=True)
@@ -266,6 +271,130 @@ def test_save_rebuilds_stale_tweaks(game, library, api):
     assert tweak_mods.needs_rebuild(game, library)["needed"] is False
 
 
+def test_data_deployment_backup_does_not_claim_tweak_ownership(game, library):
+    managed = tweak_mods.ESD_COMMON
+    managed.live(game).parent.mkdir(parents=True, exist_ok=True)
+    managed.live(game).write_bytes(b"data mod installed menu")
+    managed.backup(game).write_bytes(b"original menu")
+    tweak_mods.apply(game, library)
+    assert managed.live(game).read_bytes() == b"data mod installed menu"
+    assert not managed.manifest(game).exists()
+
+
+def test_composition_reads_only_files_the_mods_change(game, monkeypatch):
+    from plugins.ds1 import deployment, mod_loader
+    relative = Path("script/talk/bonfire.talkesdbnd.dcx")
+    live = game / relative
+    live.parent.mkdir(parents=True)
+    live.write_bytes(b"original")
+    unrelated = game / "chr/unrelated.anibnd.dcx"
+    unrelated.parent.mkdir()
+    unrelated.write_bytes(b"must not be read")
+    read = []
+    def original(game_root, path):
+        read.append(path)
+        assert path == relative
+        return game_root / path
+    monkeypatch.setattr(deployment, "vanilla_source", original)
+    result = mod_loader.compose_installed(game, [mod_loader.Mod("Talk mod", game, {relative: b"changed"})])
+    assert read == [relative]
+    assert result.files == {relative: b"changed"}
+
+
+def test_conflict_inspection_does_not_compress_deployment_files(monkeypatch):
+    from copy import deepcopy
+    from test_ds1_talk_composition import fixture, command
+    from ds1_fixture import pack_text_members
+    from plugins.ds1 import mod_loader
+    base = fixture()
+    first, second = deepcopy(base), deepcopy(base)
+    first.state_groups[1][1].entry_commands = [command(50, 1)]
+    second.state_groups[1][1].entry_commands = [command(50, 2)]
+    relative = Path("script/talk/test.talkesdbnd.dcx")
+    def archive(script):
+        return pack_text_members([(1, "bonfire.esd", script.to_bytes())])
+    vanilla = {relative: archive(base)}
+    mods = [mod_loader.Mod("First", Path("first"), {relative: archive(first)}),
+            mod_loader.Mod("Second", Path("second"), {relative: archive(second)})]
+    expected = mod_loader.compose(vanilla, mods)
+    assert expected.conflicts
+    def forbidden(*args, **kwargs):
+        pytest.fail("Conflict inspection must not compress deployment files")
+    monkeypatch.setattr(mod_loader, "deflate", forbidden)
+    actual = mod_loader.compose(vanilla, mods, conflicts_only=True)
+    assert actual.conflicts == expected.conflicts
+    assert actual.files == {}
+
+
+def test_conflict_report_survives_restart_and_tracks_files_and_originals(game, library, monkeypatch):
+    from plugins.ds1 import mod_loader, deployment
+    relative = Path("script/talk/shared.talkesdbnd.dcx")
+    paths = [library / name for name in ("Alpha", "Beta")]
+    for folder in paths:
+        Ds1ModAdapter().prepare_editable(folder)
+        (folder / relative).parent.mkdir(parents=True, exist_ok=True)
+        (folder / relative).write_bytes(folder.name.encode())
+    calls = []
+    def compare(*args, **kwargs):
+        calls.append(kwargs)
+        return mod_loader.Composition({}, [mod_loader.Conflict(relative, "command", ["Alpha", "Beta"])])
+    monkeypatch.setattr(mod_loader, "compose_installed", compare)
+    def adapter():
+        fresh = Ds1ModAdapter()
+        fresh.attach_context(library_root=library, game_root=game)
+        return fresh
+    initial = adapter().conflicts(paths, game)
+    assert len(calls) == 1
+    assert adapter().conflicts(paths, game) == initial
+    assert len(calls) == 1
+    metadata = library / "Beta/mod.json"
+    stored = json.loads(metadata.read_text())
+    metadata.write_text(json.dumps({**stored, "order": 5}))
+    reordered = adapter().conflicts(paths, game)
+    assert "overrides Beta" in reordered[str(paths[0].resolve())][0]
+    assert len(calls) == 1
+    (paths[1] / relative).write_bytes(b"external change")
+    adapter().conflicts(paths, game)
+    assert len(calls) == 2
+    original = deployment._backup_path(game, relative)
+    original.parent.mkdir(parents=True, exist_ok=True)
+    original.write_bytes(b"changed game original")
+    adapter().conflicts(paths, game)
+    assert len(calls) == 3
+    Ds1ModAdapter._report_path().write_text("broken report")
+    adapter().conflicts(paths, game)
+    assert len(calls) == 4
+    assert Ds1ModAdapter._report_path().stat().st_size <= Ds1ModAdapter.REPORT_LIMIT
+
+
+def test_successful_build_publishes_conflicts_without_another_merge(game, library, monkeypatch):
+    from plugins.ds1 import mod_loader, deployment
+    paths = [library / name for name in ("Alpha", "Beta")]
+    for folder in paths:
+        Ds1ModAdapter().prepare_editable(folder)
+    calls = []
+    def compare(*args, **kwargs):
+        calls.append(kwargs)
+        return mod_loader.Composition({}, [mod_loader.Conflict(Path("param/test"), "field", ["Alpha", "Beta"])])
+    monkeypatch.setattr(mod_loader, "compose_installed", compare)
+    monkeypatch.setattr(deployment, "status", lambda *args: {})
+    adapter = Ds1ModAdapter()
+    adapter.attach_context(library_root=library, game_root=game)
+    adapter.conflicts(paths, game)
+    assert len(calls) == 1
+    # A report from inspection is not proof that data was installed.
+    adapter.activate(paths, game)
+    assert len(calls) == 2
+    fresh = Ds1ModAdapter()
+    fresh.attach_context(library_root=library, game_root=game)
+    assert fresh.conflicts(paths, game)
+    assert len(calls) == 2
+    tweak_mods.save({"alpha": {"values": {"step": 2}}}, library)
+    fresh.activate(paths, game)
+    assert len(calls) == 2
+    assert not tweak_mods.needs_rebuild(game, library)["needed"]
+
+
 def test_save_saves_the_project_but_defers_tweaks_while_the_game_runs(game, library, api, monkeypatch):
     post, _store, saved = api
     tweak_mods.apply(game, library)
@@ -280,16 +409,96 @@ def test_save_saves_the_project_but_defers_tweaks_while_the_game_runs(game, libr
     assert (game / tweak_mods.RUNTIME_RECORD).read_bytes() == before
 
 
-def test_save_reports_a_broken_tweak_without_failing(game, library, api):
+@pytest.mark.parametrize("failure", ["script", "output", "manifest"])
+def test_save_disables_a_broken_tweak_and_rebuilds_the_others(game, library, api, failure):
     post, _store, saved = api
     tweak_mods.apply(game, library)
-    (library / "Beta" / "script" / "tweak.py").write_text(
-        "def build(settings, context):\n    raise ValueError('boom')\n", encoding="utf-8")
+    if failure == "manifest":
+        (library / "Beta" / ".lexeditor-generated.json").write_text(
+            json.dumps({"version": 1, "files": {"unsupported/boom.bin": "0" * 64}}), encoding="utf-8")
+        tweak_mods.save({"beta": {"values": {"step": 2}}}, library)
+    else:
+        source = ("def build(settings, context):\n    raise ValueError('boom')\n" if failure == "script"
+                  else "def build(settings, context):\n    return {'unsupported/boom.bin': b'bad'}\n")
+        (library / "Beta" / "script" / "tweak.py").write_text(source, encoding="utf-8")
     status, result = post("/api/save", {})
     assert status == 200
     assert saved == ["saved"]
-    assert "Beta" in result["tweaksError"]
-    assert result["tweaksNeedRebuild"] is True
+    assert "tweaksError" not in result
+    assert result["disabledMods"][0]["name"] == "Beta"
+    assert "boom" in result["disabledMods"][0]["error"]
+    assert not json.loads((library / "Beta/mod.json").read_text())["enabled"]
+    assert json.loads((library / "Alpha/mod.json").read_text())["enabled"]
+    assert result["tweaksNeedRebuild"] is False
+    assert sorted(record_of(game)["built"]) == ["alpha"]
+
+
+def test_save_disables_dependents_of_a_failed_mod(game, library, api):
+    post, _store, _saved = api
+    tweak_mods.apply(game, library)
+    _require(library, "Alpha", "beta")
+    (library / "Beta/script/tweak.py").write_text(
+        "def build(settings, context):\n    raise ValueError('boom')\n", encoding="utf-8")
+    status, result = post("/api/save", {})
+    assert status == 200 and "tweaksError" not in result
+    assert {row["name"] for row in result["disabledMods"]} == {"Alpha", "Beta"}
+    assert record_of(game)["built"] == {}
+    assert not result["tweaksNeedRebuild"]
+
+
+def test_read_only_settings_save_also_recovers_failed_mods(game, library, api):
+    post, store, _saved = api
+    store.read_only = True
+    tweak_mods.apply(game, library)
+    (library / "Beta/script/tweak.py").write_text(
+        "def build(settings, context):\n    raise ValueError('boom')\n", encoding="utf-8")
+    status, result = post("/api/tweaks/save", {"tweaks": {"alpha": {"values": {"step": 2}}}})
+    assert status == 200
+    assert result["disabledMods"][0]["name"] == "Beta"
+    assert sorted(record_of(game)["built"]) == ["alpha"]
+    assert not result["needsRebuild"]
+
+
+def test_save_does_not_disable_mods_for_an_unattributed_deployment_error(game, library, api, monkeypatch):
+    post, _store, saved = api
+    tweak_mods.apply(game, library)
+    tweak_mods.save({"alpha": {"values": {"step": 2}}}, library)
+    def fail(*args):
+        raise OSError("The installed game folder is not writable")
+    monkeypatch.setattr(Ds1ModAdapter, "activate", fail)
+    status, result = post("/api/save", {})
+    assert status == 200 and saved == ["saved"]
+    assert "not writable" in result["tweaksError"]
+    assert all(json.loads((library / name / "mod.json").read_text())["enabled"]
+               for name in ("Alpha", "Beta"))
+
+
+def test_failed_mod_notice_does_not_block_the_editor(tmp_path):
+    from playwright.sync_api import sync_playwright
+    root = Path(__file__).resolve().parents[2]
+    source = (root / "plugins/ds1/editor.js").read_text(encoding="utf-8")
+    report = source[source.index("function reportTweakRebuild("):source.index("async function save(){")]
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1200, "height": 700})
+            page.route("http://fixture/**", lambda route: route.fulfill(
+                body='<body><main><button id="edit">Edit mod</button></main></body>',
+                content_type="text/html"))
+            page.goto("http://fixture/")
+            page.add_style_tag(path=str(root / "ui/framework.css"))
+            page.add_style_tag(path=str(root / "plugins/ds1/editor.css"))
+            page.add_script_tag(path=str(root / "ui/framework.js"))
+            page.add_script_tag(content=report)
+            page.evaluate('''reportTweakRebuild({disabledMods: [{name: "Estus Rework",
+              error: "Its build returned an unsupported file."}]})''')
+            assert page.get_by_text('Changes saved. Other enabled mods rebuilt.', exact=False).is_visible()
+            assert page.locator('.lex-dialog-backdrop').count() == 0
+            assert not page.evaluate('document.body.inert')
+            page.locator('#edit').click()
+            page.screenshot(path=str(tmp_path / "disabled-mod-notice.png"))
+        finally:
+            browser.close()
 
 
 def test_a_session_without_save_installs_tweak_settings_straight_away(game, library, api):

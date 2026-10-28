@@ -1272,18 +1272,16 @@ class HostApi:
     def launch_game(self, plugin_id: str) -> dict:
         """Start the configured game without opening a command window.
 
-        A game that must start through Steam (its executable cannot be run on
-        its own) is asked of Steam instead: the Play button did nothing for
-        Dark Souls Remastered, because its plugin cannot start the executable.
+        Steam installations always go through Steam so its launch options and
+        integration are preserved. The shell tracks the wait for the process.
         """
-        if not getattr(self._plugins[plugin_id], "can_launch", True):
-            app_id = self._steam_app_id(plugin_id)
+        app_id = self._steam_app_id(plugin_id)
+        if app_id or not getattr(self._plugins[plugin_id], "can_launch", True):
             if not app_id or os.name != "nt":
                 raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
-            build_notice = self._deploy_before_launch(plugin_id)
             os.startfile(f"steam://rungameid/{app_id}")
             return {"running": False, "viaSteam": True, "alreadyRunning": False,
-                    "notice": "\n".join(filter(None, (build_notice, self._launch_notice(plugin_id))))}
+                    "notice": self._launch_notice(plugin_id)}
         adapter = self._plugins[plugin_id].mod_adapter
         if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
             root, _executable = self._game_executable(plugin_id)
@@ -1319,31 +1317,6 @@ class HostApi:
             return str(adapter.launch_notice(Path(game)) or "")
         except (OSError, ValueError, RuntimeError):
             return ""
-
-    def _deploy_before_launch(self, plugin_id: str) -> str:
-        """Install the enabled mods as they are now, for an adapter that asks.
-
-        Steam starts the game, so nothing else runs between Play and the
-        game reading its files. Without this, a mod whose files changed while
-        it stayed enabled (a rebuilt tweak, edited settings) reached the game
-        only after someone switched mods: DS1 kept loading a stale build.
-        """
-        adapter = self._plugins[plugin_id].mod_adapter
-        if adapter is None or not getattr(adapter, "deploys_on_launch", False):
-            return ""
-        game = self._installations.snapshot(plugin_id).get("root")
-        if not game or self.game_process_status(plugin_id).get("running"):
-            return ""
-        from core.mod_library import relative_path
-        status = self.mod_library_status(plugin_id)
-        library = (Path(status["root"]) / relative_path(plugin_id)).resolve()
-        with self._mod_library_lock:
-            adapter = self._mod_adapter(plugin_id)
-            enabled = [library / name for name in adapter.active_mod_ids(Path(game))]
-            from core.mod_builds import activate_for_launch
-            result = activate_for_launch(adapter, enabled, Path(game))
-        return "\n".join(f"{row['name']} was disabled: {row['error']}"
-                         for row in result["disabledMods"])
 
     def stop_game(self, plugin_id: str) -> dict:
         """Stop this game, including a copy this host did not start.

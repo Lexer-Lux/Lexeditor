@@ -1,4 +1,4 @@
-"""Isolate an identified mod failure when preparing a game launch."""
+"""Isolate identified mod failures when building and deploying mods."""
 from pathlib import Path
 
 class ModBuildError(ValueError):
@@ -10,7 +10,7 @@ class ModBuildError(ValueError):
         super().__init__(self.detail)
 
 
-def activate_for_launch(adapter, mods: list[Path], game_root: Path) -> dict:
+def activate_with_recovery(adapter, mods: list[Path], game_root: Path) -> dict:
     """Disable failed mods and their dependents, then install the remaining set.
 
     Unattributed failures still stop deployment. No exception message parsing,

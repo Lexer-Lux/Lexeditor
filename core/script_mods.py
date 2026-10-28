@@ -424,7 +424,7 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
         try:
             snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
         except Exception as failure:
-            raise error(f"{row['name']}: {failure}") from failure
+            raise error(f"{row['name']}: {failure}", folders=[row['path']]) from failure
     built = []
     try:
         for row in rows:

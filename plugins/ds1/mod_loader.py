@@ -104,6 +104,7 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
     unchanged library costs stats, not reads. Same enumeration, same limits.
     """
     from .tweak_mods import checked
+    from . import assets
     folder = checked(Path(folder))
     found = []
     for relative in FILES:
@@ -125,7 +126,8 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
             found.append((MAP_DIR / path.name.casefold(), path))
     chars = checked(folder / CHR_DIR)
     if chars.is_dir():
-        candidates = sorted(chars.glob("*.anibnd.dcx"))
+        candidates = sorted(path for path in chars.glob("*.dcx")
+                            if assets.is_character_file(CHR_DIR / path.name))
         if len(candidates) > MAX_ANIBND_FILES:
             raise ValueError(f"{name}: too many character files")
         for path in candidates:
@@ -133,7 +135,6 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
             if path.stat().st_size > MAX_BINDER:
                 raise ValueError(f"{name}: {path.name} is too large")
             found.append((CHR_DIR / path.name.casefold(), path))
-    from . import assets
     try:
         carried = assets.scan_project(folder)
     except assets.AssetError as error:
@@ -180,46 +181,23 @@ def active_mods(library_root: Path, project_root: Path | None = None) -> list[Mo
     return mods
 
 
-def vanilla_files(game_root: Path, extra: frozenset[Path] = frozenset()) -> dict[Path, bytes]:
+def vanilla_files(game_root: Path, paths: frozenset[Path]) -> dict[Path, bytes]:
     """The game's own bytes of each file mods change: the preserved originals
-    once Lexeditor has applied, else the installed files. `extra` names asset
-    files to load beyond the structured sets."""
+    once Lexeditor has applied, else the installed files. Only the files
+    participating in this composition are read."""
     from . import deployment
     from .tweak_mods import checked
     result = {}
-    for relative in FILES:
+    from . import assets as _assets
+    for relative in sorted(paths):
         path = checked(deployment.vanilla_source(Path(game_root), relative))
         if path.is_file():
-            if path.stat().st_size > MAX_ARCHIVE:
+            limit = (MAX_ARCHIVE if relative in FILES else MAX_MAP
+                     if relative.suffix == ".msb" and relative.parent == MAP_DIR else MAX_BINDER
+                     if relative.suffix == ".dcx" and relative.parent == CHR_DIR else _assets.MAX_ASSET_BYTES)
+            if path.stat().st_size > limit:
                 raise ValueError(f"The game's {relative.name} is too large")
             result[relative] = path.read_bytes()
-    maps = Path(game_root) / MAP_DIR
-    if maps.is_dir():
-        for path in sorted(maps.glob("*.msb")):
-            relative = MAP_DIR / path.name.casefold()
-            source = checked(deployment.vanilla_source(Path(game_root), relative))
-            if source.is_file():
-                if source.stat().st_size > MAX_MAP:
-                    raise ValueError(f"The game's {relative.name} is too large")
-                result[relative] = source.read_bytes()
-    chars = Path(game_root) / CHR_DIR
-    if chars.is_dir():
-        for path in sorted(chars.glob("*.anibnd.dcx")):
-            relative = CHR_DIR / path.name.casefold()
-            source = checked(deployment.vanilla_source(Path(game_root), relative))
-            if source.is_file():
-                if source.stat().st_size > MAX_BINDER:
-                    raise ValueError(f"The game's {relative.name} is too large")
-                result[relative] = source.read_bytes()
-    from . import assets as _assets
-    for relative in sorted(extra):
-        if relative in result:
-            continue
-        source = checked(deployment.vanilla_source(Path(game_root), relative))
-        if source.is_file():
-            if source.stat().st_size > _assets.MAX_ASSET_BYTES:
-                raise ValueError(f"The game's {relative.name} is too large")
-            result[relative] = source.read_bytes()
     return result
 
 
@@ -228,10 +206,10 @@ def build(game_root: Path, library_root: Path, project_root: Path | None = None)
     return compose_installed(game_root, mods), mods
 
 
-def compose_installed(game_root: Path, mods: list[Mod]) -> Composition:
+def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False) -> Composition:
     """Load every mod's original assets before composing the enabled set."""
-    extra = frozenset(name for mod in mods for name in mod.files if _is_asset(name))
-    return compose(vanilla_files(game_root, extra), mods)
+    paths = frozenset(name for mod in mods for name in mod.files)
+    return compose(vanilla_files(game_root, paths), mods, conflicts_only=conflicts_only)
 
 
 def _is_asset(relative: Path) -> bool:
@@ -240,32 +218,34 @@ def _is_asset(relative: Path) -> bool:
         return False
     if relative.suffix == ".msb" and relative.parent == MAP_DIR:
         return False
-    return not (relative.suffix == ".dcx" and relative.parent == CHR_DIR)
+    from . import assets
+    return not assets.is_character_file(relative)
 
 
-def compose(vanilla: dict[Path, bytes], mods: list[Mod]) -> Composition:
+def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool = False) -> Composition:
     """The files every mod together changes, and what could not be combined.
 
     `vanilla` holds the game's own bytes of each file; `mods` is load order,
     lowest first. Only files that end up different from vanilla are returned.
     """
+    from . import assets
     files, conflicts = {}, []
     if RELATIVE in vanilla:
         result = _compose_params(vanilla[RELATIVE], [(mod.name, mod.files[RELATIVE])
-                                                     for mod in mods if RELATIVE in mod.files])
+                                                     for mod in mods if RELATIVE in mod.files], conflicts_only=conflicts_only)
         conflicts += result[1]
         if result[0] != vanilla[RELATIVE]:
             files[RELATIVE] = result[0]
     if texts.RELATIVE in vanilla:
         result = _compose_texts(vanilla[texts.RELATIVE], [(mod.name, mod.files[texts.RELATIVE])
-                                                          for mod in mods if texts.RELATIVE in mod.files])
+                                                          for mod in mods if texts.RELATIVE in mod.files], conflicts_only=conflicts_only)
         conflicts += result[1]
         if result[0] != vanilla[texts.RELATIVE]:
             files[texts.RELATIVE] = result[0]
     if texts.MENU_RELATIVE in vanilla:
         result = _compose_texts(vanilla[texts.MENU_RELATIVE], [(mod.name, mod.files[texts.MENU_RELATIVE])
                                                               for mod in mods if texts.MENU_RELATIVE in mod.files],
-                                relative=texts.MENU_RELATIVE, document=texts.MenuDocument)
+                                relative=texts.MENU_RELATIVE, document=texts.MenuDocument, conflicts_only=conflicts_only)
         conflicts += result[1]
         if result[0] != vanilla[texts.MENU_RELATIVE]:
             files[texts.MENU_RELATIVE] = result[0]
@@ -281,13 +261,14 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod]) -> Composition:
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
     for relative in sorted({path for path in list(vanilla) + [name for mod in mods for name in mod.files]
-                            if path.suffix == ".dcx" and path.parent == CHR_DIR}):
+                            if assets.is_character_file(path)}):
         have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
         if relative not in vanilla:
             if have:
                 files[relative] = have[-1][1]
             continue
-        result = _compose_anibnd(vanilla[relative], have, relative)
+        result = (_compose_esd(vanilla[relative], have, relative) if relative.name.endswith('.esd.dcx')
+                  else _compose_anibnd(vanilla[relative], have, relative, conflicts_only=conflicts_only))
         conflicts += result[1]
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
@@ -297,11 +278,11 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod]) -> Composition:
             if have:
                 files[relative] = have[-1][1]
             continue
-        result = _compose_anibnd(vanilla[relative], have, relative, kind="file")
+        result = _compose_anibnd(vanilla[relative], have, relative, kind="file", conflicts_only=conflicts_only)
         conflicts += result[1]
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
-    return Composition(files, conflicts)
+    return Composition({} if conflicts_only else files, conflicts)
 
 
 # --- Parameters ------------------------------------------------------------
@@ -371,7 +352,7 @@ class _Units:
         return units
 
 
-def _compose_params(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list[Conflict]]:
+def _compose_params(vanilla: bytes, mods: list[tuple[str, bytes]], *, conflicts_only: bool = False) -> tuple[bytes, list[Conflict]]:
     base = inflate(vanilla)
     entries = texts.bnd3_entries(base)
     names = [entry.name.replace("\\", "/").rsplit("/", 1)[-1] for entry in entries]
@@ -391,7 +372,7 @@ def _compose_params(vanilla: bytes, mods: list[tuple[str, bytes]]) -> tuple[byte
                                                [(name, members.get(member)) for name, members in plains], units)
         conflicts += member_conflicts
         output.append(texts.Entry(entry.member_id, entry.name, entry.flags, data))
-    if all(new.data == old.data for new, old in zip(output, entries)):
+    if conflicts_only or all(new.data == old.data for new, old in zip(output, entries)):
         return vanilla, conflicts
     if all(len(new.data) == len(old.data) for new, old in zip(output, entries)):
         # Same sizes: write each member back in place, keeping the shipped layout.
@@ -634,7 +615,7 @@ def _rows_only(vanilla: bytes, data: bytes, spans: list[tuple[int, int, int]]) -
 # --- Item text ---------------------------------------------------------------
 
 def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]], *, relative=texts.RELATIVE,
-                       document=texts.TextDocument) -> tuple[bytes, list[Conflict]]:
+                       document=texts.TextDocument, conflicts_only: bool = False) -> tuple[bytes, list[Conflict]]:
     base = document(vanilla)
     merged = {position: dict(table[1]) for position, table in base.tables.items()}
     owners: dict[tuple[str, int], str] = {}
@@ -702,7 +683,7 @@ def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]], *, relative=te
             for name, _data in changes:
                 conflict.add(name)
             result.append(conflict)
-    if not changed:
+    if conflicts_only or not changed:
         return vanilla, result
     plain = texts.build_bnd3(base.plain, entries)
     compressed = zlib.compress(plain, 9)
@@ -775,6 +756,27 @@ def _compose_maps(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path)
 
 # --- Characters ------------------------------------------------------------
 
+def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) -> tuple[bytes, list[Conflict]]:
+    """Compose loose character states by field, just like embedded scripts."""
+    from . import esd_merge
+    changed = [(name, data) for name, data in mods if data != vanilla]
+    if not changed:
+        return vanilla, []
+    try:
+        original = inflate(vanilla)
+        variants = [(name, inflate(data)) for name, data in changed]
+        combined, collisions = esd_merge.compose(original, variants, talk_options=False)
+    except FormatError:
+        return _whole_anibnd(changed, relative, kind="character script")
+    conflicts = []
+    for part, names in collisions:
+        conflict = Conflict(relative, part)
+        for name in names:
+            conflict.add(name)
+        conflicts.append(conflict)
+    return (vanilla if combined == original else deflate(vanilla, combined)), conflicts
+
+
 def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
     touched = [name for name, _data in changed]
     if len(touched) < 2:
@@ -785,11 +787,13 @@ def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = 
     return changed[-1][1], [conflict]
 
 
-def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
+def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path, kind: str = "character file", *, conflicts_only: bool = False) -> tuple[bytes, list[Conflict]]:
     """Every mod's changed binder members over vanilla's, or the last whole file."""
     changed = [(name, data) for name, data in mods if data != vanilla]
     if not changed:
         return vanilla, []
+    if len({data for _name, data in changed}) == 1:
+        return changed[-1][1], []
     from .assets import MAX_ASSET_BYTES
     try:
         base_plain = inflate(vanilla, max_size=MAX_ASSET_BYTES)
@@ -802,7 +806,7 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
         return _whole_anibnd(changed, relative, kind)
     for _name, _plain, owned in plains:
         if set(owned) != set(base_members):
-            return _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind)
+            return _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind, conflicts_only=conflicts_only)
     winners: dict[str, bytes] = {}
     owners: dict[str, str] = {}
     conflicts: dict[str, Conflict] = {}
@@ -841,6 +845,8 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
             winners[member] = theirs
             owners[member] = name
     winners.update(combined_esd)
+    if conflicts_only:
+        return vanilla, list(conflicts.values())
     items = {member: bytes(base_plain[entry.offset:entry.offset + entry.size])
              for member, entry in base_members.items()}
     items.update(winners)
@@ -853,7 +859,7 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
     return deflate(vanilla, pack(base_plain, items), max_size=MAX_ASSET_BYTES), list(conflicts.values())
 
 
-def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind):
+def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind, *, conflicts_only=False):
     """Added, removed and replaced members combine as independent records."""
     from .assets import MAX_ASSET_BYTES
     key = lambda entry: entry.name.replace('\\', '/').rsplit('/', 1)[-1]
@@ -892,6 +898,8 @@ def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind
         if not member.lower().endswith('.esd') or any(member not in variant for _, variant in variants):
             continue
         edits = [(name, variant[member]) for name, variant in variants]
+        if len({entry.data for _name, entry in edits if entry.data != original.data}) < 2:
+            continue
         if any((entry.member_id, entry.name, entry.flags) !=
                (original.member_id, original.name, original.flags) for _, entry in edits):
             continue
@@ -912,6 +920,8 @@ def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind
                       key=lambda e: (e.member_id, e.name))
     if len({e.member_id for e in entries}) != len(entries):
         return _whole_anibnd(changed, relative, kind)
+    if conflicts_only:
+        return vanilla, list(conflicts.values())
     plain = texts.build_bnd3(base_plain, entries)
     return deflate(vanilla, plain, max_size=MAX_ASSET_BYTES), list(conflicts.values())
 CHANGE_LIMIT = 1000

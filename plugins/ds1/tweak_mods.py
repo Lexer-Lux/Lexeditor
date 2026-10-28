@@ -724,7 +724,9 @@ def _layout_in_use(game_root: Path) -> bool:
 
 def _esd_in_use(game_root: Path, managed: Managed) -> bool:
     """A menu script archive is managed once a tweak changed it, until restored."""
-    return checked(managed.manifest(game_root)).is_file() or checked(managed.backup(game_root)).exists()
+    # The data-mod deployer uses the same original-copy filename. A backup
+    # proves an original was kept, not that this writer owns the live file.
+    return checked(managed.manifest(game_root)).is_file()
 
 
 def _changes(specs: list[dict]) -> list[str]:
