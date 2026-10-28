@@ -1280,10 +1280,10 @@ class HostApi:
             app_id = self._steam_app_id(plugin_id)
             if not app_id or os.name != "nt":
                 raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
-            self._deploy_before_launch(plugin_id)
+            build_notice = self._deploy_before_launch(plugin_id)
             os.startfile(f"steam://rungameid/{app_id}")
             return {"running": False, "viaSteam": True, "alreadyRunning": False,
-                    "notice": self._launch_notice(plugin_id)}
+                    "notice": "\n".join(filter(None, (build_notice, self._launch_notice(plugin_id))))}
         adapter = self._plugins[plugin_id].mod_adapter
         if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
             root, _executable = self._game_executable(plugin_id)
@@ -1320,7 +1320,7 @@ class HostApi:
         except (OSError, ValueError, RuntimeError):
             return ""
 
-    def _deploy_before_launch(self, plugin_id: str) -> None:
+    def _deploy_before_launch(self, plugin_id: str) -> str:
         """Install the enabled mods as they are now, for an adapter that asks.
 
         Steam starts the game, so nothing else runs between Play and the
@@ -1330,17 +1330,20 @@ class HostApi:
         """
         adapter = self._plugins[plugin_id].mod_adapter
         if adapter is None or not getattr(adapter, "deploys_on_launch", False):
-            return
+            return ""
         game = self._installations.snapshot(plugin_id).get("root")
         if not game or self.game_process_status(plugin_id).get("running"):
-            return
+            return ""
         from core.mod_library import relative_path
         status = self.mod_library_status(plugin_id)
         library = (Path(status["root"]) / relative_path(plugin_id)).resolve()
         with self._mod_library_lock:
             adapter = self._mod_adapter(plugin_id)
             enabled = [library / name for name in adapter.active_mod_ids(Path(game))]
-            adapter.activate(enabled, Path(game))
+            from core.mod_builds import activate_for_launch
+            result = activate_for_launch(adapter, enabled, Path(game))
+        return "\n".join(f"{row['name']} was disabled: {row['error']}"
+                         for row in result["disabledMods"])
 
     def stop_game(self, plugin_id: str) -> dict:
         """Stop this game, including a copy this host did not start.
