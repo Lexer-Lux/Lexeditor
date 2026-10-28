@@ -107,7 +107,7 @@ class Ds1ModAdapter:
         library = self._library()
         tweak_mods.ensure_game_closed()
         with tweak_mods.locked(game_root):
-            plan = tweak_mods.prepare(game_root, library)
+            plan = tweak_mods.prepare(game_root, library, cache_root=self._report_path().parent)
             ordered = self._ordered_mods(mods)
             content = self._content_signature(ordered)
             report = self._read_report(game_root, ordered)

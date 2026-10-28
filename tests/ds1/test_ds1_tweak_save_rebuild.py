@@ -547,7 +547,7 @@ def test_a_session_with_a_project_defers_tweak_settings_to_save(game, library, a
     assert (game / tweak_mods.RUNTIME_RECORD).read_bytes() == before
 
 
-def test_a_layout_only_tweak_keeps_its_record_and_rebuilds(game, library, tmp_path, monkeypatch):
+def install_fixture_menu(game, monkeypatch):
     from test_ds1_menu_layout import STAMINA, dcx, drb
     from plugins.ds1 import menu_layout
     layout = game / "menu" / "menu.drb.dcx"
@@ -556,7 +556,11 @@ def test_a_layout_only_tweak_keeps_its_record_and_rebuilds(game, library, tmp_pa
     layout.write_bytes(vanilla_layout)
     monkeypatch.setattr(menu_layout, "VANILLA_SIZE", len(vanilla_layout))
     monkeypatch.setattr(menu_layout, "VANILLA_SHA256", hashlib.sha256(vanilla_layout).hexdigest())
-    nodes = {"version": 1, "nodes": STAMINA}
+    return {"version": 1, "nodes": STAMINA}
+
+
+def test_a_layout_only_tweak_keeps_its_record_and_rebuilds(game, library, tmp_path, monkeypatch):
+    nodes = install_fixture_menu(game, monkeypatch)
     root = library / "Details"
     (root / "script").mkdir(parents=True)
     (root / "script" / "__init__.py").write_text("", encoding="utf-8")
@@ -590,3 +594,194 @@ def test_an_unreadable_mod_counts_as_unchanged_not_stale(game, library, monkeypa
 
     monkeypatch.setattr(tweak_mods, "build_fingerprint", flaky)
     assert tweak_mods.needs_rebuild(game, library)["stale"] == []
+
+
+def test_save_rebuilds_only_the_changed_script_after_context_restart(game, library, api, monkeypatch):
+    from core import script_mods
+    tweak_mods.apply(game, library)
+    loads = []
+    load = script_mods.load_script
+    def counted(root):
+        loads.append(Path(root).name)
+        return load(root)
+    monkeypatch.setattr(script_mods, 'load_script', counted)
+    tweak_mods.save({'alpha': {'values': {'step': 2}}}, library)
+    post, _, saved = api
+    status, result = post('/api/save', {})
+    assert status == 200 and result['tweaksRebuilt']
+    assert loads == ['Alpha']  # Beta's expensive script was never imported/run.
+    assert not result['tweaksNeedRebuild']
+    assert saved == ['saved']
+    loads.clear()
+    # A fresh BuildContext reuses the persisted manifest, not process memory.
+    tweak_mods.apply(game, library)
+    assert loads == []
+
+
+@pytest.mark.parametrize('change', ['source', 'settings', 'output', 'missing', 'compiler'])
+def test_script_build_reuse_invalidates_changed_inputs(game, library, monkeypatch, change):
+    from core import script_mods
+    tweak_mods.apply(game, library)
+    root = library / 'Alpha'
+    if change == 'source':
+        path = root / 'script/tweak.py'
+        path.write_text(path.read_text() + '\n# source changed\n')
+    elif change == 'settings':
+        tweak_mods.save({'alpha': {'values': {'step': 3}}}, library)
+    elif change == 'output':
+        (root / 'native/alpha.json').write_bytes(b'corrupt')
+    elif change == 'missing':
+        (root / 'native/alpha.json').unlink()
+    else:
+        monkeypatch.setattr(tweak_mods, '_script_compiler_revision', lambda: 'new compiler')
+        assert tweak_mods.needs_rebuild(game, library)['needed']
+    loads = []
+    load = script_mods.load_script
+    monkeypatch.setattr(script_mods, 'load_script', lambda folder: loads.append(Path(folder).name) or load(folder))
+    tweak_mods.apply(game, library)
+    assert loads == (['Alpha', 'Beta'] if change == 'compiler' else ['Alpha'])
+    assert not tweak_mods.needs_rebuild(game, library)['needed']
+
+
+@pytest.mark.parametrize('input_kind', ['enabled', 'settings', 'module'])
+def test_script_build_rechecks_observed_mod_dependencies(game, library, monkeypatch, input_kind):
+    from core import script_mods
+    root = library / 'Beta'
+    path = root / 'script/tweak.py'
+    expression = f"context.{input_kind}('alpha'" + (", 'tweak')" if input_kind == 'module' else ')')
+    path.write_text(path.read_text().replace('    return', f'    {expression}\n    return', 1))
+    tweak_mods.apply(game, library)
+    loads = []
+    load = script_mods.load_script
+    monkeypatch.setattr(script_mods, 'load_script', lambda folder: loads.append(Path(folder).name) or load(folder))
+    tweak_mods.apply(game, library)
+    assert loads == []
+    if input_kind == 'enabled':
+        tweak_mods.save({'alpha': {'enabled': False}}, library)
+    else:
+        tweak_mods.save({'alpha': {'values': {'step': 4}}}, library)
+    tweak_mods.apply(game, library)
+    assert 'Beta' in loads
+
+
+def test_script_build_rechecks_combined_game_params(game, library, monkeypatch):
+    from core import script_mods
+    from plugins.ds1 import mod_loader
+    path = library / 'Beta/script/tweak.py'
+    path.write_text(path.read_text().replace('    return', '    context.game_params()\n    return', 1))
+    source = game / mod_loader.RELATIVE
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b'original parameter inputs')
+    monkeypatch.setattr(mod_loader, 'active_mods', lambda root: [])
+    monkeypatch.setattr(mod_loader, '_compose_params', lambda original, mods: (original, []))
+    tweak_mods.apply(game, library)
+    loads = []
+    load = script_mods.load_script
+    monkeypatch.setattr(script_mods, 'load_script', lambda folder: loads.append(Path(folder).name) or load(folder))
+    tweak_mods.apply(game, library)
+    assert loads == []
+    source.write_bytes(b'changed parameter inputs!')
+    tweak_mods.apply(game, library)
+    assert loads == ['Beta']
+
+
+def test_script_build_rechecks_original_game_files(game, library, monkeypatch):
+    from core import script_mods
+    path = library / 'Alpha/script/tweak.py'
+    path.write_text("import json\n\ndef build(settings, context):\n"
+                    "    return {'script/talk/test.dcx': b'generated talk',\n"
+                    "            'native/alpha.json': json.dumps(" + repr(SPECS['alpha']) + ")}\n")
+    # Use the normal core build path without deploying this small fixture file.
+    context = lambda: tweak_mods.BuildContext({'alpha': library / 'Alpha'}, game, library)
+    source = game / 'script/talk/test.dcx'
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b'vanilla talk')
+    root = library / 'Alpha'
+    script_mods.build(root, context(), allowed_roots=tweak_mods.ALLOWED_ROOTS)
+    assert script_mods.build(root, context(), allowed_roots=tweak_mods.ALLOWED_ROOTS)['cached']
+    source.write_bytes(b'new vanilla talk')
+    assert not script_mods.build(root, context(), allowed_roots=tweak_mods.ALLOWED_ROOTS).get('cached')
+
+
+@pytest.mark.parametrize('managed', [tweak_mods.LAYOUT, *tweak_mods.ESD])
+def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkeypatch, managed):
+    calls = []
+    def compose(original, specs, *args):
+        calls.append((original, specs))
+        return b'compiled:' + original + json.dumps(specs).encode()
+    monkeypatch.setattr(tweak_mods.menu_layout, 'compose', compose)
+    monkeypatch.setattr(tweak_mods.menu_scripts, 'compose', compose)
+    monkeypatch.setattr(tweak_mods, '_script_compiler_revision', lambda: 'compiler-one')
+    specs = [{'owner': 'example', 'changes': []}]
+    expected = tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
+    # No in-memory result cache is involved: reopen the persisted store.
+    assert tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path) == expected
+    assert len(calls) == 1
+    tweak_mods._compose_menu(b'changed original', specs, managed, tmp_path)
+    tweak_mods._compose_menu(b'vanilla', [{'owner': 'different', 'changes': []}], managed, tmp_path)
+    monkeypatch.setattr(tweak_mods, '_script_compiler_revision', lambda: 'compiler-two')
+    tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
+    assert len(calls) == 4
+
+
+def test_same_size_same_timestamp_script_edit_is_not_hidden_by_bytecode(game, library):
+    import os
+    from core import script_mods
+    root = library / 'Alpha'
+    path = root / 'script/tweak.py'
+    path.write_text("def build(settings, context):\n    return {'native/value.json': b'first'}\n")
+    context = lambda: tweak_mods.BuildContext({'alpha': root}, game, library)
+    script_mods.build(root, context(), allowed_roots=tweak_mods.ALLOWED_ROOTS)
+    before = path.stat()
+    path.write_text(path.read_text().replace("b'first'", "b'other'"))
+    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+    script_mods.build(root, context(), allowed_roots=tweak_mods.ALLOWED_ROOTS)
+    assert (root / 'native/value.json').read_bytes() == b'other'
+
+
+def test_a_source_edit_during_build_remains_stale_until_rebuilt(game, library):
+    root = library / 'Alpha'
+    path = root / 'script/tweak.py'
+    path.write_text('from pathlib import Path\n' + path.read_text().replace(
+        '    return', "    source = Path(__file__)\n"
+        "    if not source.read_text().endswith('# edited during build\\n'):\n"
+        "        source.write_text(source.read_text() + '\\n# edited during build\\n')\n    return", 1))
+    tweak_mods.apply(game, library)
+    assert tweak_mods.needs_rebuild(game, library)['stale'] == ['alpha']
+    tweak_mods.apply(game, library)
+    assert not tweak_mods.needs_rebuild(game, library)['needed']
+
+
+def test_full_save_reuses_unrelated_scripts_menu_and_data_composition(game, library, api, monkeypatch):
+    from core import script_mods
+    from plugins.ds1 import mod_loader, deployment
+    nodes = install_fixture_menu(game, monkeypatch)
+    path = library / 'Beta/script/tweak.py'
+    path.write_text('import json\n\ndef build(settings, context):\n    return ' + repr({
+        'native/beta.json': json.dumps(SPECS['beta']), 'layout/beta.json': json.dumps(nodes)}) + '\n')
+    for folder in (library / 'Alpha', library / 'Beta'):
+        Ds1ModAdapter().prepare_editable(folder)
+    counts = {'scripts': [], 'menu': 0, 'data': 0}
+    load, compose_menu = script_mods.load_script, tweak_mods.menu_layout.compose
+    def counted_script(root):
+        counts['scripts'].append(Path(root).name)
+        return load(root)
+    def counted_menu(*args):
+        counts['menu'] += 1
+        return compose_menu(*args)
+    def counted_data(*args, **kwargs):
+        counts['data'] += 1
+        return mod_loader.Composition({}, [])
+    monkeypatch.setattr(script_mods, 'load_script', counted_script)
+    monkeypatch.setattr(tweak_mods.menu_layout, 'compose', counted_menu)
+    monkeypatch.setattr(mod_loader, 'compose_installed', counted_data)
+    monkeypatch.setattr(deployment, 'status', lambda *args: {})
+    adapter = Ds1ModAdapter()
+    adapter.attach_context(library_root=library, game_root=game)
+    adapter.activate([library / 'Alpha', library / 'Beta'], game)
+    assert counts == {'scripts': ['Alpha', 'Beta'], 'menu': 1, 'data': 1}
+    counts['scripts'].clear()
+    tweak_mods.save({'alpha': {'values': {'step': 6}}}, library)
+    status, result = api[0]('/api/save', {})
+    assert status == 200 and result['tweaksRebuilt'] and not result['tweaksNeedRebuild']
+    assert counts == {'scripts': ['Alpha'], 'menu': 1, 'data': 1}
