@@ -540,8 +540,9 @@ def validate(spec: object, owner: str) -> dict:
     clean_moves = []
     for move in moves:
         keys = set(move) if isinstance(move, dict) else set()
-        if not {"dialog", "name", "rect"} <= keys or keys - {"dialog", "name", "rect", "optional", "font", "color"}:
-            raise LayoutError(f"{owner}: a layout move names dialog, name and rect (optional: true, font, color)")
+        if (not {"dialog", "name"} <= keys or not keys & {"rect", "font", "color"}
+                or keys - {"dialog", "name", "rect", "optional", "font", "color"}):
+            raise LayoutError(f"{owner}: a layout move names dialog, name and at least one of rect, font, color")
         if "optional" in move and move["optional"] is not True:
             raise LayoutError(f"{owner}: a layout move's optional is true or absent")
         if "font" in move and (type(move["font"]) is not int or not MIN_FONT <= move["font"] <= MAX_FONT):
@@ -550,12 +551,14 @@ def validate(spec: object, owner: str) -> dict:
             _color(move["color"], f"{owner}: a layout move")
         if not all(isinstance(move[key], str) and move[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout move names must be text")
-        rect = move["rect"]
-        if (not isinstance(rect, list) or len(rect) != 4 or any(type(value) is not int for value in rect)
+        rect = move.get("rect")
+        if "rect" in move and (not isinstance(rect, list) or len(rect) != 4 or any(type(value) is not int for value in rect)
                 or not all(-32768 <= value <= 32767 for value in rect)
                 or not rect[0] < rect[2] or not rect[1] < rect[3]):
             raise LayoutError(f"{owner}: a layout move rect is four whole numbers, left < right, top < bottom")
-        entry = {"dialog": move["dialog"], "name": move["name"], "rect": list(rect)}
+        entry = {"dialog": move["dialog"], "name": move["name"]}
+        if "rect" in move:
+            entry["rect"] = list(rect)
         if move.get("optional"):
             entry["optional"] = True
         for key in ("font", "color"):
@@ -603,11 +606,16 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
                 continue
         elif key not in placed:
             raise LayoutError(f"{owner} moves {move['dialog']}/{move['name']}, which is not in the original layout")
-        if key in moved:
-            raise LayoutError(f"{owner} and {moved[key]} both move {move['dialog']}/{move['name']}")
-        moved[key] = owner
+        for field in ("rect", "font", "color"):
+            if field not in move:
+                continue
+            property_key = (*key, field)
+            if property_key in moved:
+                raise LayoutError(f"{owner} and {moved[property_key]} both move {move['dialog']}/{move['name']} ({field})")
+            moved[property_key] = owner
         try:
-            layout.move(move["dialog"], move["name"], move["rect"])
+            if "rect" in move:
+                layout.move(move["dialog"], move["name"], move["rect"])
             if "font" in move:
                 layout.set_font(move["dialog"], move["name"], move["font"])
             if "color" in move:

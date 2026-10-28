@@ -350,6 +350,22 @@ class MoveTests(unittest.TestCase):
         with self.assertRaises(menu_layout.LayoutError):
             menu_layout.validate({"version": 1, "nodes": nodes * 4}, "Too many")
 
+    def test_independent_geometry_and_color_combine_without_precedence(self):
+        original = dcx(drb())
+        geometry = menu_layout.validate({"version": 1, "moves": [MOVES[0]]}, "Geometry")
+        tint_move = {key: MOVES[0][key] for key in ("dialog", "name")}
+        tint_move["color"] = "ff40a0ff"
+        tint = menu_layout.validate({"version": 1, "moves": [tint_move]}, "Color")
+        forward = menu_layout.compose(original, [geometry, tint])
+        self.assertEqual(forward, menu_layout.compose(original, [tint, geometry]))
+        layout = menu_layout.Drb(formats.inflate(forward))
+        node = layout.node(tint_move['dialog'], tint_move['name'])
+        _, blob = layout._blob('SHAP', 'SHPR', node.shape)
+        self.assertEqual(list(struct.unpack_from('<4h', blob)), MOVES[0]['rect'])
+        self.assertEqual(blob[24:28], bytes.fromhex(tint_move['color']))
+        with self.assertRaisesRegex(menu_layout.LayoutError, 'both move.*color'):
+            menu_layout.compose(original, [tint, tint])
+
     def test_a_move_can_tint_a_text_node(self):
         original = dcx(drb())
         spec = menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "color": "ff40a0ff"}]}, "Tint")
