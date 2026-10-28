@@ -115,6 +115,33 @@ def test_installed_composition_loads_talk_originals(monkeypatch, tmp_path):
     assert parsed.state_groups[1][0].entry_commands == humanity.state_groups[1][0].entry_commands
 
 
+def test_mod_activation_deploys_the_current_script_build(monkeypatch, tmp_path):
+    from contextlib import nullcontext
+    from pathlib import Path
+    from plugins.ds1 import mod_loader, mod_support, tweak_mods
+    relative = Path('script/talk/test.talkesdbnd.dcx')
+    generated = tmp_path / 'generated.dcx'
+    generated.write_bytes(b'previous build')
+    adapter = mod_support.Ds1ModAdapter()
+    adapter.attach_context(library_root=tmp_path)
+    monkeypatch.setattr(tweak_mods, 'ensure_game_closed', lambda: None)
+    monkeypatch.setattr(tweak_mods, 'locked', lambda game: nullcontext())
+    def prepare(game, library):
+        generated.write_bytes(b'current settings')
+        return {}
+    monkeypatch.setattr(tweak_mods, 'prepare', prepare)
+    monkeypatch.setattr(tweak_mods, 'commit', lambda game, plan: None)
+    monkeypatch.setattr(adapter, '_mods', lambda paths: [
+        mod_loader.Mod('Talk mod', tmp_path, {relative: generated.read_bytes()})])
+    monkeypatch.setattr(mod_loader, 'compose_installed', lambda game, mods:
+        mod_loader.Composition(mods[0].files, []))
+    deployed = []
+    monkeypatch.setattr(mod_support.deployment, 'apply',
+        lambda game, folder, composed: deployed.append(composed))
+    adapter.activate([tmp_path], tmp_path / 'game')
+    assert deployed == [{relative: b'current settings'}]
+
+
 def test_tweak_context_reads_enabled_dependency_and_builds_talk_files(tmp_path):
     import json
     from core import script_mods

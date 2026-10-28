@@ -101,9 +101,9 @@ class Ds1ModAdapter:
         game_root = Path(game_root)
         library = self._library()
         tweak_mods.ensure_game_closed()
-        data = self._mods(mods)
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library)
+            data = self._mods(mods)
             composition = mod_loader.compose_installed(game_root, data)
             tweak_mods.commit(game_root, plan)
             try:
