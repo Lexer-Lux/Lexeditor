@@ -88,6 +88,7 @@ def main():
                            Path(request['game']) if request['game'] else None,
                            Path(request['library']) if request['library'] else None)
     context.current = request['current']
+    context.begin_build(Path(request['root']))
     params_path = Path(request['params'])
     if params_path.is_file():
         context._params = params_path.read_bytes()
