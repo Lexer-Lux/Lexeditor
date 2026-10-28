@@ -144,6 +144,8 @@ def _coerce(field: dict, value: Any) -> Any:
         length = field.get("length")
         if not isinstance(value, list) or (length is not None and len(value) != length):
             raise ScriptModError(f"{key} must list {length} whole numbers")
+        if len(value) < field.get("minLength", 0) or len(value) > field.get("maxLength", len(value)):
+            raise ScriptModError(f"{key} has an invalid number of entries")
         return [_bounded(field, item, integer=True) for item in value]
     return _bounded(field, value, integer=kind in ("int", "sound"))
 

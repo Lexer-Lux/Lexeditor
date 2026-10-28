@@ -94,6 +94,20 @@ def drb(dialogs=DIALOGS):
     return bytes(out)
 
 
+def test_clone_native_scrolling_key_guide_preserves_shape_and_control():
+    source = text_shape((0, 0, 1088, 28), kind="dynamic", align=0) + b"\0" * 16
+    layout = menu_layout.Drb(drb({"guide": [
+        ("text_key-guide", "ScrollText", source, ("DmeCtrlScrollText", b"\0" * 4))],
+        "panel": []}))
+    layout.add_clone("panel", "new_guide", "text_key-guide", [18, 250, 582, 278], source_dialog="guide")
+    node = layout.node("panel", "new_guide")
+    kind, shape = layout._blob("SHAP", "SHPR", node.shape)
+    assert kind == "ScrollText" and shape[8:len(source)] == source[8:]
+    assert struct.unpack_from("<4h", shape) == (18, 250, 582, 278)
+    assert layout._blob("CTRL", "CTPR", node.control)[0] == "DmeCtrlScrollText"
+    assert not any(layout._blob("CTRL", "CTPR", node.control)[1])
+
+
 def dcx(plain):
     compressed = zlib.compress(plain, 9)
     header = (b"DCX\0" + bytes.fromhex("000100000000001800000024000000240000002c") + b"DCS\0"

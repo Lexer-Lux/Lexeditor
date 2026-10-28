@@ -352,8 +352,17 @@ class Drb:
                 raise LayoutError(f"{source_dialog}/{source} is not a menu-text node, so it has no text id")
             struct.pack_into("<i", shape, TEXT_ID_AT, text_id)
         shape_type = struct.unpack_from("<i", self.sections["SHAP"][0], node.shape)[0]
-        self._insert(dialog, name, shape_type, bytes(shape), *self._static_control(source_dialog, node),
-                     before=before)
+        control_kind, control = self._blob("CTRL", "CTPR", node.control)
+        if control_kind == "DmeCtrlScrollText":
+            # Native key guides use a ScrollTextDummy: one zero int32 and
+            # no object references. Preserve that control when cloning a guide.
+            if len(control) < 4 or any(control):
+                raise LayoutError(f"{dialog}/{name}: unsupported scrolling-text control data")
+            control_type = struct.unpack_from("<i", self.sections["CTRL"][0], node.control)[0]
+            cloned_control = (control_type, b"\0" * 4)
+        else:
+            cloned_control = self._static_control(source_dialog, node)
+        self._insert(dialog, name, shape_type, bytes(shape), *cloned_control, before=before)
 
     def move(self, dialog: str, name: str, rect) -> None:
         """Reposition and resize an existing node, rewriting its rectangle in place."""
