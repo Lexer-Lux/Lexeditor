@@ -154,14 +154,14 @@ def tweak_rows(root: Path | None = None) -> list[dict]:
     rows = []
     if root.is_dir():
         for folder in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
-            checked(folder)
-            if not folder.is_dir():
-                continue
-            checked(folder / "mod.json")
-            checked(folder / script_mods.VALUES_FILE)
             try:
+                checked(folder)
+                if not folder.is_dir():
+                    continue
+                checked(folder / "mod.json")
+                checked(folder / script_mods.VALUES_FILE)
                 metadata = script_mods._read_json(folder / 'mod.json')
-            except script_mods.ScriptModError:
+            except (OSError, ValueError):
                 # Shared library discovery already exposes unreadable metadata
                 # as an off/error row. Never let it hide the healthy catalog.
                 continue
@@ -498,10 +498,10 @@ def esd_specs(root: Path | None = None) -> list[dict]:
 def _built(rows: list[dict], folder: str, check) -> list[dict]:
     specs = []
     for row in rows:
-        target = checked(Path(row["path"]) / folder / f"{row['id']}.json")
-        if not target.is_file():
-            continue  # A tweak with nothing to patch here at its current settings.
         try:
+            target = checked(Path(row["path"]) / folder / f"{row['id']}.json")
+            if not target.is_file():
+                continue  # A tweak with nothing to patch here at its current settings.
             spec = check(json.loads(target.read_text(encoding="utf-8")), row["name"])
             spec["folder"] = row["path"]
             specs.append(spec)

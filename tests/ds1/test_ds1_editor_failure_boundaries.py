@@ -382,3 +382,10 @@ def test_records_layout_settles_without_pager_font_or_scrollbar_oscillation(page
     assert samples[-1]['rows'] > 5, samples[-1]
     assert not samples[-1]['scroll'], samples[-1]
     assert page.locator('.lex-mod-contents .lex-column-list').get_attribute('data-lex-fitted-page-size') == first_size
+    page.evaluate("""() => {
+      window.originalHeading=document.querySelector('.lex-mods-page .lex-detail-panel-name');
+      document.querySelector('.lex-mod-contents').parentElement.style.maxHeight='500px';
+    }""")
+    page.wait_for_function("Number(document.querySelector('.lex-mod-contents .lex-column-list').dataset.lexFittedPageSize) < 20")
+    page.wait_for_timeout(200)
+    assert page.evaluate("originalHeading === document.querySelector('.lex-mods-page .lex-detail-panel-name')")
