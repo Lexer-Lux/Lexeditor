@@ -331,7 +331,9 @@ class MoveTests(unittest.TestCase):
             {"dialog": "data_simple_arms", "name": "icon_receive", "rect": [0, 0, 10, 10], "font": 5}]}, "Sprite")
         with self.assertRaisesRegex(menu_layout.LayoutError, "not text"):
             menu_layout.compose(original, [sprite])
-        for font in (0, 16, "5", 5.0):
+        self.assertEqual(menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "font": 0}]}, "Zero")
+                         ["moves"][0]["font"], 0)
+        for font in (-1, 13, "5", 5.0):
             with self.subTest(font=font), self.assertRaises(menu_layout.LayoutError):
                 menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "font": font}]}, "Bad")
 

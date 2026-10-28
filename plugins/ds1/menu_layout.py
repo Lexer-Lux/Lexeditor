@@ -54,7 +54,7 @@ TEXT_PREFIX = 31  # rectangle, scaling, palette, colour, font size, alignment
 DYNAMIC = 2
 TEXT_ID_AT = 40  # a menu-text node's entry in the menu text archive
 FONT_AT = 20  # a text node's text style id (face, size and colour)
-MIN_FONT, MAX_FONT = 1, 15
+MIN_FONT, MAX_FONT = 0, 12  # the style ids vanilla uses
 TEXT_TAIL = 0x1C
 MAX_TEXT = 256
 MAX_SIZE = 4096
@@ -358,7 +358,7 @@ class Drb:
         whatever the rectangle, so smaller text means another style.
         """
         if type(size) is not int or not MIN_FONT <= size <= MAX_FONT:
-            raise LayoutError(f"{dialog}/{name}: font is a size step from {MIN_FONT} to {MAX_FONT}")
+            raise LayoutError(f"{dialog}/{name}: font is a text style id from {MIN_FONT} to {MAX_FONT}")
         item = self.node(dialog, name)
         kind, start, end = self._span("SHAP", "SHPR", item.shape)
         if kind != "Text" or end - start <= TEXT_PREFIX:
@@ -517,7 +517,7 @@ def validate(spec: object, owner: str) -> dict:
         if "optional" in move and move["optional"] is not True:
             raise LayoutError(f"{owner}: a layout move's optional is true or absent")
         if "font" in move and (type(move["font"]) is not int or not MIN_FONT <= move["font"] <= MAX_FONT):
-            raise LayoutError(f"{owner}: a layout move's font is a size step from {MIN_FONT} to {MAX_FONT}")
+            raise LayoutError(f"{owner}: a layout move's font is a text style id from {MIN_FONT} to {MAX_FONT}")
         if not all(isinstance(move[key], str) and move[key] for key in ("dialog", "name")):
             raise LayoutError(f"{owner}: layout move names must be text")
         rect = move["rect"]
