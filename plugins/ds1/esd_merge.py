@@ -1,7 +1,7 @@
 """Three-way composition of independent edits to the same talk state machine."""
-from copy import deepcopy
-from dataclasses import fields, is_dataclass
+from dataclasses import fields, is_dataclass, replace
 from difflib import SequenceMatcher
+from functools import lru_cache
 
 from . import esd
 
@@ -16,7 +16,7 @@ def _key(value):
     return value
 
 
-def compose(original: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list[tuple[str, list[str]]]]:
+def compose(original: bytes, mods: list[tuple[str, bytes]], *, talk_options=True) -> tuple[bytes, list[tuple[str, list[str]]]]:
     """Merge fields and disjoint command/condition edits, reporting true collisions.
 
     All changes are compared with the original, never with another mod's output.
@@ -28,6 +28,15 @@ def compose(original: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list
         return original, []
     if len(changed) == 1 or len({data for _, data in changed}) == 1:
         return changed[-1][1], []
+    data, conflicts = _compose(original, tuple(changed), talk_options)
+    # Cached results cannot expose mutable conflict lists to callers.
+    return data, [(path, list(owners)) for path, owners in conflicts]
+
+
+@lru_cache(maxsize=16)
+def _compose(original, changed, talk_options):
+    # The same common state machine occurs in many talk archives. Merge and
+    # serialize identical inputs once; changed bytes/order/owners miss the cache.
     base = esd.parse(original)
     variants = [(owner, esd.parse(data)) for owner, data in changed]
     conflicts = []
@@ -35,11 +44,13 @@ def compose(original: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list
     def merge(before, versions, path):
         versions = [(owner, after) for owner, after in versions if after != before]
         if not versions:
-            return deepcopy(before)
+            return before
         if all(after == versions[0][1] for _, after in versions):
-            return deepcopy(versions[0][1])
+            return versions[0][1]
         if is_dataclass(before) and all(type(after) is type(before) for _, after in versions):
-            result = deepcopy(before)
+            # Parsed trees are private to this call. Only changed containers
+            # need copying; unchanged nodes are read-only through serialization.
+            result = replace(before)
             for f in fields(before):
                 setattr(result, f.name, merge(getattr(before, f.name),
                         [(owner, getattr(after, f.name)) for owner, after in versions], f"{path}/{f.name}"))
@@ -53,12 +64,12 @@ def compose(original: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list
                 if value is absent or any(item is absent for _, item in edits):
                     edits = [(owner, item) for owner, item in edits if item != value]
                     if not edits:
-                        result[key] = deepcopy(value)
+                        result[key] = value
                         continue
                     if any(item != edits[0][1] for _, item in edits):
                         conflicts.append((f"{path}/{key}", [owner for owner, _ in edits]))
                     if edits[-1][1] is not absent:
-                        result[key] = deepcopy(edits[-1][1])
+                        result[key] = edits[-1][1]
                 else:
                     result[key] = merge(value, edits, f"{path}/{key}")
             return result
@@ -81,7 +92,7 @@ def compose(original: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list
                             old[3].append(owner)
                             continue
                         if low == high:
-                            old[2].extend(deepcopy(item) for item in payload if item not in old[2])
+                            old[2].extend(item for item in payload if item not in old[2])
                             old[3].append(owner)
                             continue
                         if high == low + 1 and len(old[2]) == len(payload) == 1:
@@ -94,17 +105,17 @@ def compose(original: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list
                             [name for p in prior for name in p[3]] + [owner]))))
                         for old in prior:
                             patches.remove(old)
-                    patches.append([low, high, deepcopy(payload), [owner]])
+                    patches.append([low, high, payload, [owner]])
             result, at = [], 0
             for low, high, payload, _ in sorted(patches, key=lambda p: (p[0], p[1])):
-                result.extend(deepcopy(before[at:low]))
+                result.extend(before[at:low])
                 result.extend(payload)
                 at = high
-            result.extend(deepcopy(before[at:]))
+            result.extend(before[at:])
             # Independent insertions still collide if they give two different
             # bonfire choices the same result ID. Byte-level disjointness is
             # insufficient: the game would dispatch either choice identically.
-            if all(isinstance(item, esd.Command) for item in result):
+            if talk_options and all(isinstance(item, esd.Command) for item in result):
                 option_ids = {item.args[0] for item in result
                               if (item.bank, item.id) == (1, 19) and item.args}
                 for option in option_ids:
@@ -121,10 +132,10 @@ def compose(original: bytes, mods: list[tuple[str, bytes]]) -> tuple[bytes, list
                     chosen = edits[-1][1]
                     first = result.index(picked[0])
                     result = [item for item in result if item not in picked]
-                    result[first:first] = deepcopy(chosen)
+                    result[first:first] = chosen
             return result
         conflicts.append((path, [owner for owner, _ in versions]))
-        return deepcopy(versions[-1][1])
+        return versions[-1][1]
 
     result = merge(base, variants, "ESD")
-    return result.to_bytes(), conflicts
+    return result.to_bytes(), tuple((path, tuple(owners)) for path, owners in conflicts)
