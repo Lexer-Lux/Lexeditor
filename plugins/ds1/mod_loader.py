@@ -33,9 +33,12 @@ mod instead.
 """
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass, field, replace
+from hashlib import sha256
 from pathlib import Path
 import struct
+from threading import Lock
 import zlib
 
 from plugins.ds3.formats import DS3FormatError, ParamView
@@ -49,6 +52,10 @@ from .tae_store import CHR_DIR, MAX_BINDER
 FILES = (RELATIVE, texts.RELATIVE, texts.MENU_RELATIVE)
 MAX_MAP_FILES = 64
 MAX_ANIBND_FILES = 64
+_COMPOSE_CACHE_LIMIT = 128 * 1024 * 1024
+_compose_cache = OrderedDict()
+_compose_cache_bytes = 0
+_compose_cache_lock = Lock()
 TABLE_NAMES = {"EquipParamGoods": "Items", "EquipParamWeapon": "Weapons",
                "EquipParamProtector": "Armor", "EquipParamAccessory": "Rings", "Magic": "Spells",
                "NpcParam": "Enemies", "AtkParam_Npc": "Attacks", "AtkParam_Pc": "Player attacks",
@@ -208,7 +215,55 @@ def build(game_root: Path, library_root: Path, project_root: Path | None = None)
 def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False) -> Composition:
     """Load every mod's original assets before composing the enabled set."""
     paths = frozenset(name for mod in mods for name in mod.files)
-    return compose(vanilla_files(game_root, paths), mods, conflicts_only=conflicts_only)
+    originals = vanilla_files(game_root, paths)
+    files, conflicts = {}, []
+    for relative in sorted(paths):
+        selected = [Mod(mod.name, mod.folder, {relative: mod.files[relative]})
+                    for mod in mods if relative in mod.files]
+        result = _compose_file(relative, originals.get(relative), selected, conflicts_only)
+        files.update(result.files)
+        conflicts.extend(result.conflicts)
+    return Composition(files, conflicts)
+
+
+def _compose_file(relative, original, mods, conflicts_only):
+    """Reuse unchanged archive outputs without retaining their input buffers.
+
+    Bytes, names and load order determine the result. Hash actual contents so
+    external edits are detected even when a file's timestamp is unchanged.
+    """
+    global _compose_cache_bytes
+    digest = sha256()
+    for blob in [bytes([original is not None]), original or b''] + [
+            blob for mod in mods for blob in (mod.name.encode('utf-8'), mod.files[relative])]:
+        digest.update(len(blob).to_bytes(8, 'little'))
+        digest.update(blob)
+    key = (relative, conflicts_only, digest.digest())
+    with _compose_cache_lock:
+        cached = _compose_cache.get(key)
+        if cached is not None:
+            _compose_cache.move_to_end(key)
+    if cached is None:
+        result = compose({relative: original} if original is not None else {}, mods,
+                         conflicts_only=conflicts_only)
+        data = result.files.get(relative)
+        rows = tuple((c.file, c.part, tuple(c.mods)) for c in result.conflicts)
+        size = len(data or b'') + sum(len(part.encode('utf-8')) +
+               sum(len(name.encode('utf-8')) for name in names) for _, part, names in rows)
+        cached = (data, rows, size)
+        if size <= _COMPOSE_CACHE_LIMIT:
+            with _compose_cache_lock:
+                previous = _compose_cache.pop(key, None)
+                if previous is not None:
+                    _compose_cache_bytes -= previous[2]
+                _compose_cache[key] = cached
+                _compose_cache_bytes += size
+                while _compose_cache_bytes > _COMPOSE_CACHE_LIMIT or len(_compose_cache) > 64:
+                    _, evicted = _compose_cache.popitem(last=False)
+                    _compose_cache_bytes -= evicted[2]
+    data, rows, _ = cached
+    return Composition({relative: data} if data is not None else {},
+                       [Conflict(path, part, list(names)) for path, part, names in rows])
 
 
 def _is_asset(relative: Path) -> bool:
