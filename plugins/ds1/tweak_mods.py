@@ -1017,16 +1017,26 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     _put(game_root, record_path, raw)
 
 
+def _menu_cache_value(value):
+    if isinstance(value, bytes):
+        return {'__bytes__': value.hex()}
+    raise TypeError(f'Unsupported menu cache value: {type(value).__name__}')
+
+
 def _compose_menu(original, specs, managed, cache_root):
     """Reuse unchanged layout/menu-script archives with the same bounded output cache."""
     key = None
     if cache_root is not None:
         from . import composition_cache
-        key = _sha(json.dumps([_script_compiler_revision(), managed.relative, _sha(original), specs],
-                              sort_keys=True, separators=(',', ':')).encode('utf-8')).encode('ascii')
-        cached = composition_cache.load(cache_root, key)
-        if cached is not None:
-            return cached
+        try:
+            key = _sha(json.dumps([_script_compiler_revision(), managed.relative, _sha(original), specs],
+                                  sort_keys=True, separators=(',', ':'), default=_menu_cache_value)
+                       .encode('utf-8')).encode('ascii')
+            cached = composition_cache.load(cache_root, key)
+            if cached is not None:
+                return cached
+        except (OSError, TypeError, ValueError):
+            key = None  # Reuse is optional; composition still works without it.
     result = (menu_layout.compose(original, specs) if managed == LAYOUT else
               menu_scripts.compose(original, specs, ESD_ARCHIVE[managed]))
     if key is not None:

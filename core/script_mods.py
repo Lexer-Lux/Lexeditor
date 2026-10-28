@@ -419,11 +419,14 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
                 removed.append(key)
         manifest = {"version": 1, "files": {key: hashlib.sha256(data).hexdigest() for key, data in planned.items()}}
         if hasattr(context, 'build_record'):
-            record = context.build_record(root, planned)
-            # Keep optional reuse metadata bounded; a large observation set
-            # can always rebuild through the ordinary path instead.
-            if len(json.dumps(record).encode('utf-8')) <= 65536:
-                manifest['build'] = record
+            try:
+                record = context.build_record(root, planned)
+                # Keep optional reuse metadata bounded; a large observation set
+                # can always rebuild through the ordinary path instead.
+                if len(json.dumps(record).encode('utf-8')) <= 65536:
+                    manifest['build'] = record
+            except (OSError, TypeError, ValueError):
+                pass  # Cache metadata must not roll back a valid mod build.
         atomic_write(manifest_path, (json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
     except Exception as error:
         try:

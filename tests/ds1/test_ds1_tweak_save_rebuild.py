@@ -785,3 +785,48 @@ def test_full_save_reuses_unrelated_scripts_menu_and_data_composition(game, libr
     status, result = api[0]('/api/save', {})
     assert status == 200 and result['tweaksRebuilt'] and not result['tweaksNeedRebuild']
     assert counts == {'scripts': ['Alpha'], 'menu': 1, 'data': 1}
+
+
+def test_save_composes_validated_binary_menu_commands_and_keeps_mods_enabled(game, library, api, monkeypatch):
+    from test_ds1_menu_scripts import archive, build_script, script, passes_of
+    from plugins.ds1 import menu_scripts
+    original = archive({'i02-00.esd': build_script().to_bytes()})
+    managed = next(item for item in tweak_mods.ESD if tweak_mods.ESD_ARCHIVE[item] == 'ingame')
+    installed = game / managed.relative
+    installed.parent.mkdir(parents=True, exist_ok=True)
+    installed.write_bytes(original)
+    monkeypatch.setitem(menu_scripts.VANILLA, 'ingame', (len(original), hashlib.sha256(original).hexdigest()))
+    path = library / 'Beta/script/tweak.py'
+    path.write_text('def build(settings, context):\n    return ' + repr({
+        'esd/beta.json': json.dumps(script())}) + '\n')
+    assert isinstance(menu_scripts.validate(script(), 'Beta')['changes'][0]['after']['arg_bytes'][0], bytes)
+    # Seed the installed runtime without running the new menu contribution.
+    tweak_mods.save({'beta': {'enabled': False}}, library)
+    tweak_mods.apply(game, library)
+    tweak_mods.save({'beta': {'enabled': True}}, library)
+    post, _, saved = api
+    status, result = post('/api/save', {})
+    assert status == 200 and result['tweaksRebuilt'] and not result['tweaksNeedRebuild']
+    assert result['disabledMods'] == []
+    assert saved == ['saved']
+    assert [command.id for command in passes_of(installed.read_bytes())] == [15, 29, 20]
+    # A later Save uses the cached validated-byte specification successfully.
+    tweak_mods.save({'alpha': {'values': {'step': 2}}}, library)
+    assert post('/api/save', {})[1]['disabledMods'] == []
+    assert all(json.loads((library / name / 'mod.json').read_text())['enabled']
+               for name in ('Alpha', 'Beta'))
+
+
+def test_unsupported_optional_menu_cache_value_falls_back_to_composition(tmp_path, monkeypatch):
+    monkeypatch.setattr(tweak_mods.menu_layout, 'compose', lambda original, specs: b'valid composed menu')
+    result = tweak_mods._compose_menu(b'original', [{'internal': object()}], tweak_mods.LAYOUT, tmp_path)
+    assert result == b'valid composed menu'
+
+
+def test_unserializable_build_cache_record_does_not_fail_or_disable_mod(game, library, monkeypatch):
+    monkeypatch.setattr(tweak_mods.BuildContext, 'build_record', lambda *args: {'unexpected': b'binary'})
+    tweak_mods.apply(game, library)
+    assert (library / 'Alpha/native/alpha.json').is_file()
+    assert (library / 'Beta/native/beta.json').is_file()
+    assert all(json.loads((library / name / 'mod.json').read_text())['enabled']
+               for name in ('Alpha', 'Beta'))
