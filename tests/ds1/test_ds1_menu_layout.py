@@ -341,6 +341,25 @@ class MoveTests(unittest.TestCase):
             with self.subTest(font=font), self.assertRaises(menu_layout.LayoutError):
                 menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "font": font}]}, "Bad")
 
+    def test_scroll_text_font_preserves_its_scroll_and_binding_fields(self):
+        # Remastered guide shape: the TextBase font is followed by the
+        # ScrollText-specific binding and timing fields. Only the font changes.
+        blob = bytes.fromhex('0000000028011900ffffffff000000000101000007000000'
+                             'ff9cb9ca060004021c000000000100000000000000000000'
+                             '64000000000000000000')
+        original = dcx(drb({'guide': [('prompt', 'ScrollText', blob)]}))
+        before = menu_layout.Drb(formats.inflate(original))
+        _, blob = before._blob('SHAP', 'SHPR', before.node('guide', 'prompt').shape)
+        spec = menu_layout.validate({'version': 1, 'moves': [
+            {'dialog': 'guide', 'name': 'prompt', 'font': 3}]}, 'Prompt')
+        result = menu_layout.Drb(formats.inflate(menu_layout.compose(original, [spec])))
+        node = result.node('guide', 'prompt')
+        kind, actual = result._blob('SHAP', 'SHPR', node.shape)
+        self.assertEqual(kind, 'ScrollText')
+        self.assertEqual(actual[:28], blob[:28])
+        self.assertEqual(actual[28:30], b'\x03\x00')
+        self.assertEqual(actual[30:], blob[30:])
+
     def test_combined_ui_can_add_more_than_one_menus_nodes(self):
         nodes = [{"dialog": "data_simple_arms", "name": f"cell_{i}",
                   "clone": "icon_receive", "rect": [0, 0, 20, 20]} for i in range(160)]
