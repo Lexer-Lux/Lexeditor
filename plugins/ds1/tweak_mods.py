@@ -408,15 +408,30 @@ class BuildContext:
             return None
         if self._params is None:
             from . import deployment, mod_loader
-            source = checked(deployment.vanilla_source(self.game_root, mod_loader.RELATIVE))
-            if not source.is_file():
-                self._remember('params', 'game', None)
-                return None
-            mods = mod_loader.active_mods(self._library_root or mods_root())
-            self._params = mod_loader._compose_params(
-                source.read_bytes(),
-                [(mod.name, mod.files[mod_loader.RELATIVE]) for mod in mods
-                 if mod_loader.RELATIVE in mod.files])[0]
+            selected = None
+            try:
+                source = checked(deployment.vanilla_source(self.game_root, mod_loader.RELATIVE))
+                if not source.is_file():
+                    self._remember('params', 'game', None)
+                    return None
+                mods = mod_loader.active_mods(self._library_root or mods_root())
+                selected = [mod_loader.Mod(mod.name, mod.folder, {mod_loader.RELATIVE: mod.files[mod_loader.RELATIVE]})
+                            for mod in mods if mod_loader.RELATIVE in mod.files]
+                self._params = mod_loader._compose_params(source.read_bytes(),
+                    [(mod.name, mod.files[mod_loader.RELATIVE]) for mod in selected])[0]
+            except script_mods.ModBuildError:
+                raise
+            except Exception as error:
+                try:
+                    if selected is not None:
+                        # Use the composer's failure attribution, only on the
+                        # exceptional path. The requesting script is innocent.
+                        mod_loader.compose_installed(self.game_root, selected, conflicts_only=True)
+                except script_mods.ModBuildError:
+                    raise
+                except Exception:
+                    pass
+                raise script_mods.ScriptModInfrastructureError(f'Could not read combined game parameters: {error}') from error
         self._remember('params', 'game', _sha(self._params) if self._params is not None else None)
         return self._params
 
@@ -436,10 +451,10 @@ class BuildContext:
         root = self._enabled.get(mod_id)
         if root is None:
             raise TweakError(f"{mod_id} must be enabled before reading its build module")
-        self._remember('module', mod_id, script_mods.source_fingerprint(root))
         try:
+            self._remember('module', mod_id, script_mods.source_fingerprint(root))
             return script_mods.import_module(root, name)
-        except Exception as error:
+        except BaseException as error:
             raise TweakError(f'{mod_id}: {error}', folders=[root]) from error
 
 

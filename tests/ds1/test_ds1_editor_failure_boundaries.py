@@ -67,6 +67,30 @@ def test_hanging_worker_is_terminated_without_writing(tmp_path, monkeypatch):
     assert not (root / script_mods.MANIFEST_FILE).exists()
 
 
+def test_dependency_import_failure_keeps_its_owner_across_worker_boundary(tmp_path):
+    dependency = make_script(tmp_path, 'Dependency')
+    (dependency / 'script/helper.py').write_text('raise SystemExit("bad dependency")', encoding='utf-8')
+    caller = make_script(tmp_path, 'Caller', 'def build(settings, context):\n    context.module("Dependency", "helper")\n    return {}')
+    context = tweak_mods.BuildContext({'Dependency': dependency, 'Caller': caller})
+    with pytest.raises(tweak_mods.TweakError) as caught:
+        script_mods.build_batch([script_mods.catalog_row(caller)], context,
+                               allowed_roots=tweak_mods.ALLOWED_ROOTS, error=tweak_mods.TweakError)
+    assert caught.value.folders == (dependency.resolve(),)
+
+
+def test_game_input_failure_does_not_blame_requesting_script(tmp_path):
+    game_root = tmp_path / 'game'
+    source = game_root / mod_loader.RELATIVE
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b'broken vanilla')
+    root = make_script(tmp_path / 'library', source='def build(settings, context):\n    context.game_params()\n    return {}')
+    context = tweak_mods.BuildContext({}, game_root, tmp_path / 'library')
+    with pytest.raises(tweak_mods.TweakError) as caught:
+        script_mods.build_batch([script_mods.catalog_row(root)], context,
+                               allowed_roots=tweak_mods.ALLOWED_ROOTS, error=tweak_mods.TweakError)
+    assert not caught.value.folders
+
+
 def test_worker_start_failure_does_not_disable_mod(tmp_path, monkeypatch):
     root = make_script(tmp_path)
     def unavailable(*args, **kwargs):

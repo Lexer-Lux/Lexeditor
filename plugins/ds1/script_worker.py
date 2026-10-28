@@ -110,6 +110,8 @@ def main():
             if len(context._params) > RESULT_LIMIT:
                 raise script_mods.ScriptModError('Build parameter snapshot exceeds the 128 MiB limit')
             params_path.write_bytes(context._params)
+    except script_mods.ScriptModInfrastructureError as error:
+        result = {'infrastructureError': str(error)[:4000]}
     except BaseException as error:
         result = {'error': f'{type(error).__name__}: {str(error)[:4000]}',
                   'folders': [str(folder) for folder in getattr(error, 'folders', ())]}
