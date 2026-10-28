@@ -225,8 +225,13 @@ def vanilla_files(game_root: Path, extra: frozenset[Path] = frozenset()) -> dict
 
 def build(game_root: Path, library_root: Path, project_root: Path | None = None) -> tuple[Composition, list[Mod]]:
     mods = active_mods(library_root, project_root)
+    return compose_installed(game_root, mods), mods
+
+
+def compose_installed(game_root: Path, mods: list[Mod]) -> Composition:
+    """Load every mod's original assets before composing the enabled set."""
     extra = frozenset(name for mod in mods for name in mod.files if _is_asset(name))
-    return compose(vanilla_files(game_root, extra), mods), mods
+    return compose(vanilla_files(game_root, extra), mods)
 
 
 def _is_asset(relative: Path) -> bool:

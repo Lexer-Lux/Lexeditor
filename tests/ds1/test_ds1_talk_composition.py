@@ -88,6 +88,33 @@ def test_asset_binder_reports_only_the_conflicting_esd_field():
     assert plain[member.offset:member.offset + member.size] == base.to_bytes()
 
 
+def test_installed_composition_loads_talk_originals(monkeypatch, tmp_path):
+    from pathlib import Path
+    from ds1_fixture import pack_text_members
+    from plugins.ds1 import formats, mod_loader
+    base = fixture()
+    humanity, estus = deepcopy(base), deepcopy(base)
+    humanity.state_groups[1][0].entry_commands.pop()
+    estus.state_groups[1][723] = esd.State(id=723, entry_commands=[command(50, 0)])
+    relative = Path('script/talk/test.talkesdbnd.dcx')
+    def archive(script):
+        return pack_text_members([(1, 'bonfire.esd', script.to_bytes())])
+    def originals(game_root, extra):
+        assert game_root == tmp_path
+        assert relative in extra
+        return {relative: archive(base)}
+    monkeypatch.setattr(mod_loader, 'vanilla_files', originals)
+    result = mod_loader.compose_installed(tmp_path, [
+        mod_loader.Mod('Estus', tmp_path / 'estus', {relative: archive(estus)}),
+        mod_loader.Mod('Humanity', tmp_path / 'humanity', {relative: archive(humanity)})])
+    assert not result.conflicts
+    plain = formats.inflate(result.files[relative])
+    member = formats.members(plain)['bonfire.esd']
+    parsed = esd.parse(plain[member.offset:member.offset + member.size])
+    assert 723 in parsed.state_groups[1]
+    assert parsed.state_groups[1][0].entry_commands == humanity.state_groups[1][0].entry_commands
+
+
 def test_tweak_context_reads_enabled_dependency_and_builds_talk_files(tmp_path):
     import json
     from core import script_mods

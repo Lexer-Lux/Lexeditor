@@ -104,7 +104,7 @@ class Ds1ModAdapter:
         data = self._mods(mods)
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library)
-            composition = mod_loader.compose(mod_loader.vanilla_files(game_root), data)
+            composition = mod_loader.compose_installed(game_root, data)
             tweak_mods.commit(game_root, plan)
             try:
                 if composition.files:
@@ -155,7 +155,7 @@ class Ds1ModAdapter:
             if data_lines is not None:
                 return _merge_marks(data_lines, self._memory_conflicts(mods))
         data = self._mods(mods)
-        composition = mod_loader.compose(mod_loader.vanilla_files(Path(game_root)), data)
+        composition = mod_loader.compose_installed(Path(game_root), data)
         data_lines = composition.by_mod(data)
         if stamp is not None:
             self._cache = ((game_root, stamp),
