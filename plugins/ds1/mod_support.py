@@ -16,12 +16,13 @@ import json
 from core import memory_conflicts, mod_requires, script_mods
 from core.mod_conflicts import MAX_LISTED
 
-from . import assets, deployment, mod_loader, texts, tweak_mods
+from . import deployment, mod_loader, texts, tweak_mods
 from .store import MARKER, RELATIVE
 
 MARKER_TEXT = (Path(__file__).with_name("project-template") / MARKER).read_bytes()
 DATA_FILES = {RELATIVE.as_posix().casefold(), texts.RELATIVE.as_posix().casefold(), texts.MENU_RELATIVE.as_posix().casefold()}
 MAP_PREFIX = "map/mapstudio/"
+CHR_PREFIX = "chr/"
 
 
 def _merge_marks(first: dict[str, list[str]], second: dict[str, list[str]]) -> dict[str, list[str]]:
@@ -72,7 +73,7 @@ class Ds1ModAdapter:
         for path in files:
             folded = path.as_posix().casefold()
             if (folded in DATA_FILES or (folded.startswith(MAP_PREFIX) and folded.endswith(".msb"))
-                    or assets.is_character_file(path)):
+                    or (folded.startswith(CHR_PREFIX) and folded.endswith(".anibnd.dcx"))):
                 packages.append(path.as_posix())
             else:
                 ignored.append(path.as_posix())
@@ -108,6 +109,7 @@ class Ds1ModAdapter:
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library)
             ordered = self._ordered_mods(mods)
+            content = self._content_signature(ordered)
             report = self._read_report(game_root, ordered)
             if report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered]:
                 # Native settings can change while every data input and
@@ -115,7 +117,7 @@ class Ds1ModAdapter:
                 tweak_mods.commit(game_root, plan)
                 conflicts = [mod_loader.Conflict(Path(file), part, names)
                              for file, part, names in report["conflicts"]]
-                self._save_report(game_root, ordered, conflicts, installed=True)
+                self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content)
                 return {"activated": [Path(path).name for path in mods],
                         "dataMods": [name for name, _folder in ordered],
                         "conflicts": len(conflicts)}
@@ -133,7 +135,7 @@ class Ds1ModAdapter:
                 raise
         # The build already compared these records. Publish that report for
         # both the host's Mods tab and selector, including after a restart.
-        self._save_report(game_root, [(mod.name, mod.folder) for mod in data], composition.conflicts, installed=True)
+        self._save_report(game_root, ordered, composition.conflicts, installed=True, expected_content=content)
         return {"activated": [Path(path).name for path in mods],
                 "dataMods": [mod.name for mod in data],
                 "conflicts": len(composition.conflicts)}
@@ -168,16 +170,25 @@ class Ds1ModAdapter:
         data_lines = self._load_report(Path(game_root), ordered)
         if data_lines is not None:
             return _merge_marks(data_lines, self._memory_conflicts(mods))
+        try:
+            compared_key = self._report_key(Path(game_root), ordered)
+        except OSError:
+            compared_key = None
         data = self._mods(mods)
         composition = mod_loader.compose_installed(Path(game_root), data, conflicts_only=True)
         data_lines = composition.by_mod(data)
-        self._save_report(Path(game_root), ordered, composition.conflicts)
+        if compared_key is not None:
+            self._save_report(Path(game_root), ordered, composition.conflicts, expected_key=compared_key)
         return _merge_marks(data_lines, self._memory_conflicts(mods))
 
     @classmethod
+    def _content_signature(cls, ordered):
+        return sorted((str(folder.resolve()), name, cls._content_stamp(folder, name))
+                      for name, folder in ordered)
+
+    @classmethod
     def _report_key(cls, game_root: Path, ordered) -> str:
-        content = sorted((str(folder.resolve()), name, cls._content_stamp(folder, name))
-                         for name, folder in ordered)
+        content = cls._content_signature(ordered)
         originals = []
         for relative in sorted({key for _folder, _name, stamped in content for key, *_stat in stamped}):
             path = Path(relative)
@@ -217,10 +228,16 @@ class Ds1ModAdapter:
             return None
         return self._lines_for_order([(Path(file), part, names) for file, part, names in report["conflicts"]], ordered)
 
-    def _save_report(self, game_root, ordered, conflicts, *, installed=False):
+    def _save_report(self, game_root, ordered, conflicts, *, installed=False,
+                     expected_key=None, expected_content=None):
         from core.plugin_files import atomic_write
         try:
-            report = {"key": self._report_key(game_root, ordered),
+            key = self._report_key(game_root, ordered)
+            if expected_key is not None and key != expected_key:
+                return
+            if expected_content is not None and self._content_signature(ordered) != expected_content:
+                return
+            report = {"key": key,
                       "conflicts": [[str(row.file), row.part, list(row.mods)] for row in conflicts]}
             if installed:
                 report["installedOrder"] = [str(folder.resolve()) for _name, folder in ordered]

@@ -395,6 +395,30 @@ def test_successful_build_publishes_conflicts_without_another_merge(game, librar
     assert not tweak_mods.needs_rebuild(game, library)["needed"]
 
 
+def test_changed_inputs_during_comparison_do_not_publish_a_stale_report(game, library, monkeypatch):
+    from plugins.ds1 import mod_loader
+    relative = Path("script/talk/shared.talkesdbnd.dcx")
+    paths = [library / name for name in ("Alpha", "Beta")]
+    for folder in paths:
+        Ds1ModAdapter().prepare_editable(folder)
+        (folder / relative).parent.mkdir(parents=True, exist_ok=True)
+        (folder / relative).write_bytes(folder.name.encode())
+    calls = []
+    def compare(*args, **kwargs):
+        calls.append(None)
+        if len(calls) == 1:
+            (paths[0] / relative).write_bytes(b"changed during comparison")
+        return mod_loader.Composition({}, [])
+    monkeypatch.setattr(mod_loader, "compose_installed", compare)
+    adapter = Ds1ModAdapter()
+    adapter.attach_context(library_root=library, game_root=game)
+    adapter.conflicts(paths, game)
+    assert not adapter._report_path().exists()
+    adapter.conflicts(paths, game)
+    adapter.conflicts(paths, game)
+    assert len(calls) == 2
+
+
 def test_save_saves_the_project_but_defers_tweaks_while_the_game_runs(game, library, api, monkeypatch):
     post, _store, saved = api
     tweak_mods.apply(game, library)

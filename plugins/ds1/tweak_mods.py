@@ -875,8 +875,8 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     """Whether the installed tweaks differ from the library, and which mods changed.
 
     Save rebuilds only what is installed: with no loader record there is
-    nothing to rebuild (tweaks first install through the Mods tab's switches
-    and Play). Never raises for a damaged record or an unreadable library;
+    nothing to rebuild (tweaks first install through the Mods tab's switches).
+    Never raises for a damaged record or an unreadable library;
     that is status()'s problem to report, not staleness.
     """
     result: dict = {"needed": False, "stale": [], "set": False}

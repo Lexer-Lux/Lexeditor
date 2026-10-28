@@ -104,7 +104,6 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
     unchanged library costs stats, not reads. Same enumeration, same limits.
     """
     from .tweak_mods import checked
-    from . import assets
     folder = checked(Path(folder))
     found = []
     for relative in FILES:
@@ -126,8 +125,7 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
             found.append((MAP_DIR / path.name.casefold(), path))
     chars = checked(folder / CHR_DIR)
     if chars.is_dir():
-        candidates = sorted(path for path in chars.glob("*.dcx")
-                            if assets.is_character_file(CHR_DIR / path.name))
+        candidates = sorted(chars.glob("*.anibnd.dcx"))
         if len(candidates) > MAX_ANIBND_FILES:
             raise ValueError(f"{name}: too many character files")
         for path in candidates:
@@ -135,6 +133,7 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
             if path.stat().st_size > MAX_BINDER:
                 raise ValueError(f"{name}: {path.name} is too large")
             found.append((CHR_DIR / path.name.casefold(), path))
+    from . import assets
     try:
         carried = assets.scan_project(folder)
     except assets.AssetError as error:
@@ -218,8 +217,7 @@ def _is_asset(relative: Path) -> bool:
         return False
     if relative.suffix == ".msb" and relative.parent == MAP_DIR:
         return False
-    from . import assets
-    return not assets.is_character_file(relative)
+    return not (relative.suffix == ".dcx" and relative.parent == CHR_DIR)
 
 
 def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool = False) -> Composition:
@@ -228,7 +226,6 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool
     `vanilla` holds the game's own bytes of each file; `mods` is load order,
     lowest first. Only files that end up different from vanilla are returned.
     """
-    from . import assets
     files, conflicts = {}, []
     if RELATIVE in vanilla:
         result = _compose_params(vanilla[RELATIVE], [(mod.name, mod.files[RELATIVE])
@@ -261,14 +258,13 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
     for relative in sorted({path for path in list(vanilla) + [name for mod in mods for name in mod.files]
-                            if assets.is_character_file(path)}):
+                            if path.suffix == ".dcx" and path.parent == CHR_DIR}):
         have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
         if relative not in vanilla:
             if have:
                 files[relative] = have[-1][1]
             continue
-        result = (_compose_esd(vanilla[relative], have, relative) if relative.name.endswith('.esd.dcx')
-                  else _compose_anibnd(vanilla[relative], have, relative, conflicts_only=conflicts_only))
+        result = _compose_anibnd(vanilla[relative], have, relative, conflicts_only=conflicts_only)
         conflicts += result[1]
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
@@ -755,27 +751,6 @@ def _compose_maps(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path)
 
 
 # --- Characters ------------------------------------------------------------
-
-def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) -> tuple[bytes, list[Conflict]]:
-    """Compose loose character states by field, just like embedded scripts."""
-    from . import esd_merge
-    changed = [(name, data) for name, data in mods if data != vanilla]
-    if not changed:
-        return vanilla, []
-    try:
-        original = inflate(vanilla)
-        variants = [(name, inflate(data)) for name, data in changed]
-        combined, collisions = esd_merge.compose(original, variants, talk_options=False)
-    except FormatError:
-        return _whole_anibnd(changed, relative, kind="character script")
-    conflicts = []
-    for part, names in collisions:
-        conflict = Conflict(relative, part)
-        for name in names:
-            conflict.add(name)
-        conflicts.append(conflict)
-    return (vanilla if combined == original else deflate(vanilla, combined)), conflicts
-
 
 def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
     touched = [name for name, _data in changed]
