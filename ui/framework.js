@@ -15820,7 +15820,26 @@ ${contents.path}`});
       const values = row.values, label = item.label || item.key;
       const set = value => { values[item.key] = value; changed(row); };
       let control;
-      if (item.type === "bool") control = element("input", {type: "checkbox", checked: values[item.key] === true,
+      if (item.type === "intList") {
+        const entries = element("div", {class: "lex-tweak-fields"});
+        const draw = () => {
+          const list = values[item.key];
+          const fields = list.map((value, index) => detailField({label: `${item.indexPrefix || ""}${index + 1}`,
+            control: number(value, item.min, item.max, 1, next => {
+              const updated = [...values[item.key]]; updated[index] = next; set(updated);
+            }, {"aria-label": `${label} ${item.indexPrefix || ""}${index + 1}`, disabled: !!options.readOnly})}));
+          if (item.length === undefined) fields.unshift(detailField({label: item.countLabel || "Entries",
+            control: number(list.length, item.minLength ?? 0, item.maxLength, 1, length => {
+              const updated = values[item.key].slice(0, length);
+              while (updated.length < length) updated.push(item.entryDefault ?? item.min ?? 0);
+              set(updated); draw();
+            }, {"aria-label": `${label} ${item.countLabel || "Entries"}`, disabled: !!options.readOnly})}));
+          entries.replaceChildren(...fields);
+        };
+        draw();
+        return detailSection({title: label, help: item.help ? infoHelp(item.help) : null, body: [entries]});
+      }
+      else if (item.type === "bool") control = element("input", {type: "checkbox", checked: values[item.key] === true,
         "aria-label": label, disabled: !!options.readOnly, onchange: event => set(event.target.checked)});
       else if (item.type === "enum") control = select(values[item.key],
         item.choices.map(choice => ({id: choice.value, name: choice.label || String(choice.value)})), set);

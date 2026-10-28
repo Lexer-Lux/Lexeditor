@@ -44,6 +44,15 @@ def make_mod(parent: Path, name: str = "Example", helper_text: str = "line = lam
 
 
 class ScriptModTests(unittest.TestCase):
+    def test_integer_tables_bound_entry_count_and_each_cost(self):
+        field = {"key": "costs", "type": "intList", "min": 1, "max": 7,
+                 "minLength": 0, "maxLength": 99}
+        self.assertEqual(script_mods._coerce(field, []), [])
+        self.assertEqual(script_mods._coerce(field, [1, 3, 7]), [1, 3, 7])
+        for invalid in ([1]*100, [0], [8], [1.5]):
+            with self.assertRaises(script_mods.ScriptModError):
+                script_mods._coerce(field, invalid)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.dir = Path(self.temp.name)
