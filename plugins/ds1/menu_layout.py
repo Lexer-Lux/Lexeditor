@@ -375,7 +375,7 @@ class Drb:
             raise LayoutError(f"{dialog}/{name}: font is a text style id from {MIN_FONT} to {MAX_FONT}")
         item = self.node(dialog, name)
         kind, start, end = self._span("SHAP", "SHPR", item.shape)
-        if kind != "Text" or end - start <= TEXT_PREFIX:
+        if kind not in ("Text", "ScrollText") or end - start <= TEXT_PREFIX:
             raise LayoutError(f"{dialog}/{name} is a {kind}, not text, so it has no font")
         struct.pack_into("<h", self.sections["SHPR"][0], start + FONT_AT, size)
 
