@@ -36,6 +36,8 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from hashlib import sha256
+from functools import lru_cache
+import json
 from pathlib import Path
 import struct
 from threading import Lock
@@ -212,7 +214,7 @@ def build(game_root: Path, library_root: Path, project_root: Path | None = None)
     return compose_installed(game_root, mods), mods
 
 
-def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False) -> Composition:
+def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False, cache_root=None) -> Composition:
     """Load every mod's original assets before composing the enabled set."""
     paths = frozenset(name for mod in mods for name in mod.files)
     originals = vanilla_files(game_root, paths)
@@ -220,13 +222,28 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
     for relative in sorted(paths):
         selected = [Mod(mod.name, mod.folder, {relative: mod.files[relative]})
                     for mod in mods if relative in mod.files]
-        result = _compose_file(relative, originals.get(relative), selected, conflicts_only)
+        result = _compose_file(relative, originals.get(relative), selected, conflicts_only, cache_root)
         files.update(result.files)
         conflicts.extend(result.conflicts)
     return Composition(files, conflicts)
 
 
-def _compose_file(relative, original, mods, conflicts_only):
+@lru_cache(maxsize=1)
+def _composition_revision():
+    # Source edits in another chat must invalidate outputs too, including
+    # uncommitted edits. Schema data also determines PARAM merge units/labels.
+    from .formats import METADATA
+    digest = sha256()
+    sources = [*Path(__file__).parent.glob('*.py'),
+               Path(__file__).parents[1] / 'ds3/formats.py',
+               *(path for path in METADATA.rglob('*') if path.suffix in ('.xml', '.json'))]
+    for path in sorted(sources):
+        digest.update(str(path).encode('utf-8'))
+        digest.update(path.read_bytes())
+    return digest.digest()
+
+
+def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
     """Reuse unchanged archive outputs without retaining their input buffers.
 
     Bytes, names and load order determine the result. Hash actual contents so
@@ -243,6 +260,20 @@ def _compose_file(relative, original, mods, conflicts_only):
         cached = _compose_cache.get(key)
         if cached is not None:
             _compose_cache.move_to_end(key)
+    remember = cached is None
+    disk_key = None
+    if cached is None and cache_root is not None and not conflicts_only:
+        from . import composition_cache
+        try:
+            disk_key = sha256(_composition_revision() + relative.as_posix().encode('utf-8') + digest.digest()).digest()
+            payload = composition_cache.load(cache_root, disk_key)
+            if payload is not None:
+                header, data = payload.split(b'\n', 1)
+                metadata = json.loads(header)
+                rows = tuple((Path(path), part, tuple(names)) for path, part, names in metadata['conflicts'])
+                cached = (data if metadata['hasData'] else None, rows, len(payload))
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
     if cached is None:
         result = compose({relative: original} if original is not None else {}, mods,
                          conflicts_only=conflicts_only)
@@ -251,16 +282,21 @@ def _compose_file(relative, original, mods, conflicts_only):
         size = len(data or b'') + sum(len(part.encode('utf-8')) +
                sum(len(name.encode('utf-8')) for name in names) for _, part, names in rows)
         cached = (data, rows, size)
-        if size <= _COMPOSE_CACHE_LIMIT:
-            with _compose_cache_lock:
-                previous = _compose_cache.pop(key, None)
-                if previous is not None:
-                    _compose_cache_bytes -= previous[2]
-                _compose_cache[key] = cached
-                _compose_cache_bytes += size
-                while _compose_cache_bytes > _COMPOSE_CACHE_LIMIT or len(_compose_cache) > 64:
-                    _, evicted = _compose_cache.popitem(last=False)
-                    _compose_cache_bytes -= evicted[2]
+        if disk_key is not None:
+            metadata = {'hasData': data is not None,
+                        'conflicts': [(str(path), part, names) for path, part, names in rows]}
+            payload = json.dumps(metadata).encode('utf-8') + b'\n' + (data or b'')
+            composition_cache.store(cache_root, disk_key, payload)
+    if remember and cached[2] <= _COMPOSE_CACHE_LIMIT:
+        with _compose_cache_lock:
+            previous = _compose_cache.pop(key, None)
+            if previous is not None:
+                _compose_cache_bytes -= previous[2]
+            _compose_cache[key] = cached
+            _compose_cache_bytes += cached[2]
+            while _compose_cache_bytes > _COMPOSE_CACHE_LIMIT or len(_compose_cache) > 64:
+                _, evicted = _compose_cache.popitem(last=False)
+                _compose_cache_bytes -= evicted[2]
     data, rows, _ = cached
     return Composition({relative: data} if data is not None else {},
                        [Conflict(path, part, list(names)) for path, part, names in rows])

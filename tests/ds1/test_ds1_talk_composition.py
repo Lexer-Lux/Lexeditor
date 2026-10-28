@@ -134,6 +134,66 @@ def test_archive_cache_tracks_contents_order_originals_and_mode(monkeypatch, tmp
     assert list(mod_loader._compose_cache) == retained
 
 
+def test_archive_outputs_survive_restart_and_only_changed_file_rebuilds(monkeypatch, tmp_path):
+    from collections import OrderedDict
+    from pathlib import Path
+    from plugins.ds1 import mod_loader
+    monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
+    monkeypatch.setattr(mod_loader, '_compose_cache_bytes', 0)
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-v1')
+    first, second = Path('script/talk/first.dcx'), Path('script/talk/second.dcx')
+    originals = {first: b'original-a', second: b'original-b'}
+    mods = [mod_loader.Mod('A', tmp_path / 'mod', {first: b'edit-a', second: b'edit-b'})]
+    monkeypatch.setattr(mod_loader, 'vanilla_files', lambda game, paths: originals)
+    calls = []
+    def composed(vanilla, selected, *, conflicts_only=False):
+        relative = next(iter(vanilla))
+        calls.append(relative)
+        return mod_loader.Composition({relative: vanilla[relative] + selected[0].files[relative]}, [
+            mod_loader.Conflict(relative, 'field', ['A', 'B'])])
+    monkeypatch.setattr(mod_loader, 'compose', composed)
+    def restart():
+        mod_loader._compose_cache.clear()
+        monkeypatch.setattr(mod_loader, '_compose_cache_bytes', 0)
+    expected = mod_loader.compose_installed(tmp_path, mods, cache_root=tmp_path / 'cache')
+    restart()
+    assert mod_loader.compose_installed(tmp_path, mods, cache_root=tmp_path / 'cache') == expected
+    assert calls == [first, second]
+    restart()
+    mods[0].files[first] = b'changed-again'
+    changed = mod_loader.compose_installed(tmp_path, mods, cache_root=tmp_path / 'cache')
+    assert changed.files[first] == b'original-achanged-again'
+    assert changed.files[second] == expected.files[second]
+    assert calls == [first, second, first]
+    restart()
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-v2')
+    mod_loader.compose_installed(tmp_path, mods, cache_root=tmp_path / 'cache')
+    assert calls[-2:] == [first, second]
+
+
+def test_disk_archive_cache_is_bounded_and_rejects_damaged_outputs(monkeypatch, tmp_path):
+    import sqlite3
+    from plugins.ds1 import composition_cache
+    monkeypatch.setattr(composition_cache, 'LIMIT', 8)
+    monkeypatch.setattr(composition_cache, 'ENTRIES', 2)
+    composition_cache.store(tmp_path, b'a', b'aaaa')
+    composition_cache.store(tmp_path, b'b', b'bbbb')
+    composition_cache.store(tmp_path, b'c', b'cccc')
+    assert composition_cache.load(tmp_path, b'a') is None
+    assert composition_cache.load(tmp_path, b'b') == b'bbbb'
+    assert composition_cache.load(tmp_path, b'c') == b'cccc'
+    composition_cache.store(tmp_path, b'oversized', b'x' * 9)
+    assert composition_cache.load(tmp_path, b'oversized') is None
+    with sqlite3.connect(tmp_path / 'composed.sqlite3') as database:
+        assert database.execute('SELECT sum(length(data)), count(*) FROM outputs').fetchone() == (8, 2)
+        database.execute('UPDATE outputs SET data = ? WHERE key = ?', (b'bad', b'b'))
+    assert composition_cache.load(tmp_path, b'b') is None
+    # Unavailable cache directories cannot block a successful composition.
+    (tmp_path / 'not-a-directory').write_bytes(b'file')
+    composition_cache.store(tmp_path / 'not-a-directory', b'key', b'data')
+    assert composition_cache.load(tmp_path / 'not-a-directory', b'key') is None
+
+
 def test_asset_binder_reports_only_the_conflicting_esd_field():
     from pathlib import Path
     from ds1_fixture import pack_text_members
@@ -200,7 +260,7 @@ def test_mod_activation_deploys_the_current_script_build(monkeypatch, tmp_path):
     monkeypatch.setattr(tweak_mods, 'commit', lambda game, plan: None)
     monkeypatch.setattr(adapter, '_mods', lambda paths: [
         mod_loader.Mod('Talk mod', tmp_path, {relative: generated.read_bytes()})])
-    monkeypatch.setattr(mod_loader, 'compose_installed', lambda game, mods:
+    monkeypatch.setattr(mod_loader, 'compose_installed', lambda game, mods, **kwargs:
         mod_loader.Composition(mods[0].files, []))
     deployed = []
     monkeypatch.setattr(mod_support.deployment, 'apply',

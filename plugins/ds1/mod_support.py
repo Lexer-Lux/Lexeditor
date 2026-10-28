@@ -122,7 +122,7 @@ class Ds1ModAdapter:
                         "dataMods": [name for name, _folder in ordered],
                         "conflicts": len(conflicts)}
             data = self._mods(mods)
-            composition = mod_loader.compose_installed(game_root, data)
+            composition = mod_loader.compose_installed(game_root, data, cache_root=self._report_path().parent)
             tweak_mods.commit(game_root, plan)
             try:
                 if composition.files:
