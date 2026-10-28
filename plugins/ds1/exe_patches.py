@@ -36,6 +36,10 @@ ISLAND_ALIGNMENT = 0x10000
 class PatchError(ValueError):
     """A patch description or the executable cannot be combined safely."""
 
+    def __init__(self, message: str, *, folders=()):
+        self.folders = tuple(folders)
+        super().__init__(message)
+
 
 def _align(value: int, alignment: int) -> int:
     return (value + alignment - 1) & -alignment
@@ -292,7 +296,8 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
             claimed.append((rva, rva + len(original), hook["owner"]))
             at = pe.offset(rva, len(original))
             if vanilla[at:at + len(original)] != original:
-                raise PatchError(f"{hook['owner']}: the instruction at {rva:X} does not match this build")
+                raise PatchError(f"{hook['owner']}: the instruction at {rva:X} does not match this build",
+                                 folders=[spec['folder']] if spec.get('folder') else [])
             kind = hook["replacement"]
             if kind[0] == "bytes":
                 replacement = kind[1]
@@ -315,14 +320,16 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
             section = next((item for item in pe.sections if item["name"] == name), None)
             following = next((item for item in pe.sections if item["rva"] > (section or {}).get("rva", -1)), None)
             if section is None or following is None or not section["vsize"] <= minimum <= following["rva"] - section["rva"]:
-                raise PatchError(f"{spec['owner']}: cannot grow {name} to {minimum:X}")
+                raise PatchError(f"{spec['owner']}: cannot grow {name} to {minimum:X}",
+                                 folders=[spec['folder']] if spec.get('folder') else [])
             growth.append((section, minimum))
             if minimum > section["vsize"]:
                 tails.append((section["rva"] + section["vsize"], section["rva"] + minimum))
         ranges = [(rva, rva + size) for rva, size in spec["state"]] or tails
         for low, high in ranges:
             if not any(start <= low and high <= end for start, end in tails):
-                raise PatchError(f"{spec['owner']}: state at {low:X} is outside the sections it grows")
+                raise PatchError(f"{spec['owner']}: state at {low:X} is outside the sections it grows",
+                                 folders=[spec['folder']] if spec.get('folder') else [])
             for other_low, other_high, owner in owned:
                 if owner != spec["owner"] and low < other_high and other_low < high:
                     raise PatchError(f"{spec['owner']} and {owner} both keep state at "

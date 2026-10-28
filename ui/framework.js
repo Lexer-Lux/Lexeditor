@@ -3883,6 +3883,7 @@
     // span computed from the data read as a second range (Lexer), so the
     // handle moves in exactly what the field accepts.
     const [sliderLow, sliderHigh] = [lowBound, highBound];
+    const boundedSlider = Number.isFinite(lowBound) && Number.isFinite(highBound);
     // Native arrows move by 1 when step is "any": without this, float
     // fields changed through whole numbers from the keyboard too.
     if (input && !readOnly && ["FLOAT", "F32", "F64", "ANGLE32"].includes(dataType)
@@ -3907,13 +3908,29 @@
     // control. A field's declared bounds, not an arbitrary span cutoff,
     // determine whether it has a range to show.
     if (input && !readOnly && numericLike && !input.dataset.lexExactInteger &&
-        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
+        (!boundedSlider || highBound > lowBound)) {
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
       fill.append(handle);
+      // Without both bounds there is no finite range to sweep across.
+      // Drag relative to the starting value instead, without adding a cap.
+      const dragStep = Number(input.step) > 0 ? Number(input.step) : input.step === "any" ? 0.1 : 1;
+      let dragStart = null;
       const ratio = () => {
         const value = readNumeric(input);
         if (!Number.isFinite(value)) return 0;
+        if (!boundedSlider) {
+          const scale = dragStep * 100;
+          if (Number.isFinite(lowBound)) {
+            const distance = Math.max(0, value - lowBound);
+            return 1 - scale / (scale + distance);
+          }
+          if (Number.isFinite(highBound)) {
+            const distance = Math.max(0, highBound - value);
+            return scale / (scale + distance);
+          }
+          return 0.5 + Math.atan(value / scale) / Math.PI;
+        }
         return Math.max(0, Math.min(1, (value - sliderLow) / (sliderHigh - sliderLow)));
       };
       const paint = () => {
@@ -3953,10 +3970,13 @@
         // it through whole numbers only. Without a usable step the
         // pointer position stands, rounded past float dust.
         const declared = Number(input.step);
-        const snap = Number.isFinite(declared) && declared > 0 ? declared : 0;
-        const raw = sliderLow + share * (sliderHigh - sliderLow);
+        const snap = Number.isFinite(declared) && declared > 0 ? declared
+          : !boundedSlider && input.step !== "any" ? dragStep : 0;
+        const raw = boundedSlider ? sliderLow + share * (sliderHigh - sliderLow)
+          : dragStart.value + (event.clientX - dragStart.x) * dragStart.rate;
         const snapped = snap > 0 ? Math.round(raw / snap) * snap : Number(raw.toPrecision(12));
-        const nextValue = Math.max(sliderLow, Math.min(sliderHigh, snapped));
+        const nextValue = Math.max(lowBound ?? -Infinity, Math.min(highBound ?? Infinity, snapped));
+        if (!Number.isFinite(nextValue)) return;
         if (readNumeric(input) === nextValue) return;
         writeNumeric(input, nextValue);
         paint();
@@ -3969,6 +3989,8 @@
       handle.addEventListener("pointerdown", event => {
         if (input.disabled || input.readOnly || refusesEdit(input)) return;
         event.preventDefault();
+        dragStart = {x: event.clientX, value: readNumeric(input) || 0,
+          rate: Math.max(dragStep, Math.abs(readNumeric(input) || 0) / 100)};
         handle.setPointerCapture(event.pointerId);
         node.classList.add("lex-value-dragging");
         input.lexValueSliderDragging = true;
@@ -11050,47 +11072,104 @@ ${contents.path}`});
       confirmDiscardChanges(options);
     };
     let gameRunning = false, gameCanLaunch = true, gameBusy = false;
+    let gameWaiting = null, gameLaunchTimer = null, gameLaunchResult = null;
+    const clearGameWait = () => {
+      clearTimeout(gameLaunchTimer);
+      gameLaunchTimer = null;
+      gameWaiting = null;
+    };
     const renderGameProcess = (running, canLaunch = gameCanLaunch) => {
       const nextRunning = !!running;
       const nextCanLaunch = canLaunch !== false;
-      if (nextRunning === gameRunning && nextCanLaunch === gameCanLaunch && game.childElementCount)
-        return;
       gameRunning = nextRunning;
       gameCanLaunch = nextCanLaunch;
-      game.replaceChildren(gameRunning ? stopIcon() : playIcon());
-      game.title = gameRunning ? "Stop game" : gameCanLaunch ? "Launch game" : "Start this game from Steam";
+      const busy = gameBusy || !!gameWaiting;
+      game.replaceChildren(busy ? element("span", {class: "lex-save-throbber", "aria-hidden": "true"})
+        : gameRunning ? stopIcon() : playIcon());
+      game.title = gameWaiting ? "Waiting for Steam to start the game…" : gameBusy
+        ? gameRunning ? "Stopping game…" : "Preparing game…"
+        : gameRunning ? "Stop game" : gameCanLaunch ? "Launch game" : "Start this game from Steam";
       game.setAttribute("aria-label", game.title);
+      game.setAttribute("aria-busy", String(busy));
       game.classList.toggle("running", gameRunning);
+      game.classList.toggle("launching", busy);
       // Play is greyed out for a game Lexeditor cannot start; Stop always works.
-      if (!gameBusy) game.disabled = !gameRunning && !gameCanLaunch;
+      game.disabled = busy || (!gameRunning && !gameCanLaunch);
     };
     const refreshGameProcess = async () => {
+      if (gameBusy) return;
       try {
         const status = await callWindow("game_process_status", options.plugin.id);
+        if (gameBusy) return;
+        game.hidden = false;
+        if (status?.running && gameLaunchResult) {
+          const result = gameLaunchResult;
+          gameLaunchResult = null;
+          clearGameWait();
+          options.afterLaunch?.({...result, ...status});
+        }
         renderGameProcess(status?.running, status?.canLaunch);
       }
-      catch (_error) { game.hidden = true; }
+      catch (_error) { if (!gameWaiting) game.hidden = true; }
     };
     game.onclick = async () => {
-      if (!gameRunning && !gameCanLaunch) return;
+      if (gameBusy || gameWaiting || (!gameRunning && !gameCanLaunch)) return;
+      const launching = !gameRunning;
+      const launchStarted = Date.now();
+      let requestTimer = null;
+      if (launching) gameLaunchResult = null;
       gameBusy = true;
-      game.disabled = true;
+      renderGameProcess(gameRunning);
+      // Finish the launch request before edits resume. Steam's subsequent
+      // wait only occupies the Play button; the editor can be used again.
+      if (launching) {
+        document.body.classList.add("lex-save-busy");
+        document.body.inert = true;
+      }
       try {
-        const launching = !gameRunning;
-        if (launching) await options.beforeLaunch?.();
-        const result = await callWindow(launching ? "launch_game" : "stop_game", options.plugin.id);
+        const request = async () => {
+          if (launching) await options.beforeLaunch?.();
+          return callWindow(launching ? "launch_game" : "stop_game", options.plugin.id);
+        };
+        const result = launching ? await Promise.race([request(), new Promise((_resolve, reject) => {
+          requestTimer = setTimeout(() => reject(new Error(
+            "The launch request did not finish within 30 seconds. Check Steam for a launch prompt or error. Lexeditor will keep checking for the game.")), 30000);
+        })]) : await request();
+        clearTimeout(requestTimer);
+        if (launching && result?.viaSteam && !result?.running) {
+          gameWaiting = result;
+          gameLaunchResult = result;
+          gameLaunchTimer = setTimeout(() => {
+            if (!gameWaiting) return;
+            clearGameWait();
+            renderGameProcess(gameRunning);
+            showAlert({title: "Game launch timed out", message:
+              "The game did not appear within 30 seconds. Check Steam for a launch prompt or error. Steam may still start it; Lexeditor will keep checking."});
+          }, Math.max(0, 30000 - (Date.now() - launchStarted)));
+        }
         renderGameProcess(result?.running);
         // The loader may start the game offline (DS1: code-changing mods, debug mode).
         if (launching && result?.notice) showToast(result.notice, {tone: "warning"});
         if (launching && result?.running) options.afterLaunch?.(result);
       } catch (error) {
         showAlert({title: gameRunning ? "Could not stop the game" : "Could not launch the game", message: error.message || String(error)});
-      } finally { gameBusy = false; game.disabled = !gameRunning && !gameCanLaunch; }
+      } finally {
+        clearTimeout(requestTimer);
+        gameBusy = false;
+        if (launching) {
+          document.body.classList.toggle("lex-save-busy", saveBusy);
+          document.body.inert = saveBusy;
+        }
+        renderGameProcess(gameRunning);
+      }
     };
     if (window.pywebview?.api) refreshGameProcess();
     else window.addEventListener("pywebviewready", refreshGameProcess, {once: true});
     const gameProcessTimer = setInterval(refreshGameProcess, 2000);
-    window.addEventListener("pagehide", () => clearInterval(gameProcessTimer), {once: true});
+    window.addEventListener("pagehide", () => {
+      clearInterval(gameProcessTimer);
+      clearGameWait();
+    }, {once: true});
 
     const applyDestination = async destination => {
       if (destination === "github") {
@@ -15820,7 +15899,26 @@ ${contents.path}`});
       const values = row.values, label = item.label || item.key;
       const set = value => { values[item.key] = value; changed(row); };
       let control;
-      if (item.type === "bool") control = element("input", {type: "checkbox", checked: values[item.key] === true,
+      if (item.type === "intList") {
+        const entries = element("div", {class: "lex-tweak-fields"});
+        const draw = () => {
+          const list = values[item.key];
+          const fields = list.map((value, index) => detailField({label: `${item.indexPrefix || ""}${index + 1}`,
+            control: number(value, item.min, item.max, 1, next => {
+              const updated = [...values[item.key]]; updated[index] = next; set(updated);
+            }, {"aria-label": `${label} ${item.indexPrefix || ""}${index + 1}`, disabled: !!options.readOnly})}));
+          if (item.length === undefined) fields.unshift(detailField({label: item.countLabel || "Entries",
+            control: number(list.length, item.minLength ?? 0, item.maxLength, 1, length => {
+              const updated = values[item.key].slice(0, length);
+              while (updated.length < length) updated.push(item.entryDefault ?? item.min ?? 0);
+              set(updated); draw();
+            }, {"aria-label": `${label} ${item.countLabel || "Entries"}`, disabled: !!options.readOnly})}));
+          entries.replaceChildren(...fields);
+        };
+        draw();
+        return detailSection({title: label, help: item.help ? infoHelp(item.help) : null, body: [entries]});
+      }
+      else if (item.type === "bool") control = element("input", {type: "checkbox", checked: values[item.key] === true,
         "aria-label": label, disabled: !!options.readOnly, onchange: event => set(event.target.checked)});
       else if (item.type === "enum") control = select(values[item.key],
         item.choices.map(choice => ({id: choice.value, name: choice.label || String(choice.value)})), set);

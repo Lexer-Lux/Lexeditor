@@ -555,15 +555,20 @@ async function deploymentAction(action){
   catch(error){notify(error);}
   finally{state.deployBusy=false;render();}
 }
+function reportTweakRebuild(result){
+  if(result.disabledMods?.length)LexeditorUI.showToast("Changes saved. Other enabled mods rebuilt. " + result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});
+  else if(result.tweaksError)LexeditorUI.showAlert({title:"Changes saved; deployment failed",message:result.tweaksError});
+  else if(result.tweaksDeferred)LexeditorUI.showToast("Changes saved. Close the game, then save again to rebuild the tweaks.");
+  else if(result.tweaksRebuilt)LexeditorUI.showToast("Changes saved and tweaks rebuilt.");
+  else return false;
+  return true;
+}
 async function save(){
   await edits;
   try{
     const result=await api("/api/save",{});attackPreviews.clear();await refreshState();
     if(state.tab==="tweaks"){await loadTweaks();render();}else shell.refresh();
-    if(result.tweaksError)LexeditorUI.showAlert({title:"Tweaks were not rebuilt",message:result.tweaksError});
-    else if(result.tweaksDeferred)LexeditorUI.showToast("Changes saved. Close the game, then save again to rebuild the tweaks.");
-    else if(result.tweaksRebuilt)LexeditorUI.showToast("Changes saved and tweaks rebuilt.");
-    else LexeditorUI.showToast("Changes saved to the mod project.");
+    if(!reportTweakRebuild(result))LexeditorUI.showToast("Changes saved to the mod project.");
   }
   catch(error){notify(error);throw error;}
 }
@@ -4602,7 +4607,7 @@ function renderInfo(){
 async function tweakRequest(path,body,failure){
   if(state.tweakBusy)return;
   state.tweakBusy=true;render();
-  try{state.tweaks=await api(path,body);state.tweaksNeedRebuild=!!state.tweaks.needsRebuild;}
+  try{state.tweaks=await api(path,body);state.tweaksNeedRebuild=!!state.tweaks.needsRebuild;reportTweakRebuild(state.tweaks);}
   catch(error){LexeditorUI.showAlert({title:failure,message:error.message||String(error)});await loadTweaks().catch(()=>{});}
   finally{state.tweakBusy=false;render();}
 }

@@ -165,8 +165,8 @@ def _texi_names(drb):
 def icon_table(drb_plain):
     """Each mapped icon ID's sheet and layout-pixel rectangle.
 
-    Reads the Icon dialog's EquIcon sprites: 28-byte shapes carry the
-    rectangle at bytes 8-15 and the texture index at bytes 16-17.
+    Original 28-byte shapes use logical rectangles. Remastered's 36-byte
+    shapes carry pixel rectangles at 16 and the texture index at 24.
     """
     drb = Drb(bytes(drb_plain))
     sheets = _texi_names(drb)
@@ -182,11 +182,17 @@ def icon_table(drb_plain):
         kind, blob = drb._blob('SHAP', 'SHPR', node.shape)
         if kind != 'Sprite' or len(blob) < 24:
             continue
-        left, top, right, bottom = struct.unpack_from('<4h', blob, 8)
-        index = struct.unpack_from('<h', blob, 16)[0]
+        # A legacy record may include section-end padding, so length alone
+        # cannot distinguish it from the extended Remastered record.
+        modern = len(blob) >= 36 and blob[8:16] == b'\xff' * 4 + b'\0' * 4
+        left, top, right, bottom = struct.unpack_from('<4h', blob, 16 if modern else 8)
+        index = struct.unpack_from('<h', blob, 24 if modern else 16)[0]
         if not 0 <= index < len(sheets) or left < 0 or top < 0 or right <= left or bottom <= top:
             continue
-        table[int(match[1])] = (sheets[index], left, top, right, bottom)
+        coordinates = (left, top, right, bottom)
+        if modern:
+            coordinates = tuple(value / SCALE for value in coordinates)
+        table[int(match[1])] = (sheets[index], *coordinates)
     if not table:
         raise IconError('The menu layout names no icons')
     return table
@@ -199,6 +205,8 @@ def load_icon_table(game_root):
     Parsed once per game: the parse costs a second and every icon needs it.
     """
     menu = Path(game_root) / 'menu'
+    if (menu / 'menu.drb.dcx').is_file():
+        return icon_table(_menu(menu, 'menu.drb.dcx'))
     plain = menu / 'menu.drb'
     if plain.is_file():
         return icon_table(plain.read_bytes())

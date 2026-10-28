@@ -449,7 +449,7 @@ def _graph_group(key):
     return 'Level-up cost'
 
 
-def inflate(source):
+def inflate(source, *, max_size=MAX_ARCHIVE):
     if len(source) < 76 or source[:4] != b'DCX\0' or source[40:44] != b'DFLT':
         raise FormatError('Expected a DS1 DFLT-compressed parameter archive')
     if (source[4:24] != bytes.fromhex('000100000000001800000024000000240000002c')
@@ -457,7 +457,7 @@ def inflate(source):
             or source[68:76] != b'DCA\0\0\0\0\x08'):
         raise FormatError('Unsupported DS1 DCX header')
     length, compressed = struct.unpack_from('>II', source, 28)
-    if not 32 <= length <= MAX_ARCHIVE or compressed != len(source) - 76:
+    if not 32 <= length <= max_size or compressed != len(source) - 76:
         raise FormatError('Invalid DCX lengths')
     decoder = zlib.decompressobj()
     try:
@@ -469,9 +469,11 @@ def inflate(source):
     return plain
 
 
-def deflate(original, plain):
+def deflate(original, plain, *, max_size=MAX_ARCHIVE):
     """Compress plain bytes into a DCX shaped like the original one."""
-    inflate(original)
+    inflate(original, max_size=max_size)
+    if len(plain) > max_size:
+        raise FormatError('Archive exceeds its size limit')
     compressed = zlib.compress(bytes(plain), 9)
     header = bytearray(original[:76])
     struct.pack_into('>II', header, 28, len(plain), len(compressed))

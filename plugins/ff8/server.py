@@ -457,7 +457,9 @@ class Handler(PluginRequestHandler):
                 )
                 self.json_response({**mods_payload(), "installed": imported})
             elif path == "/api/settings/activate":
-                self.json_response(gameplay_settings.activate())
+                self.json_response(gameplay_settings.activate(data=body))
+            elif path == "/api/settings/launch":
+                self.json_response(gameplay_settings.begin_launch())
             elif path == "/api/platform-config/save":
                 self.json_response(save_config(
                     paths.GAME_ROOT / "FFNx.toml", "FFNx", "toml",

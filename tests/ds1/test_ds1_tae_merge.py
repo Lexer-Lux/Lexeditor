@@ -1,4 +1,4 @@
-"""Character binders merge by member; restructured binders go whole.
+"""Character binders merge existing and added members independently.
 
 Two mods changing different animation files in one binder both apply.
 Two mods changing the same member conflict and the later one is used.
@@ -75,13 +75,17 @@ def test_the_same_bytes_from_two_mods_is_no_conflict():
     assert mod_loader.compose(GAME, [a, b]).conflicts == []
 
 
-def test_a_restructured_binder_is_taken_whole_from_the_last_mod():
+def test_added_members_preserve_other_mods_existing_member_edits():
     grown = build_anibnd({"a87.tae": TAE_A, "a88.tae": TAE_B, "a89.tae": TAE_A})
     b = mod("B", (BINDER, edited("a87.tae", (0, 0, "start", 0.25))))
     a = mod("A", (BINDER, grown))
     result = mod_loader.compose(GAME, [b, a])
-    assert result.files[BINDER] == grown
-    assert [(c.part, c.mods) for c in result.conflicts] == [("c1200.anibnd.dcx (whole character file)", ["B", "A"])]
+    assert result.conflicts == []
+    assert value(result.files[BINDER], "a87.tae", 0, 0, "start") == 0.25
+    assert set(members(inflate(result.files[BINDER]))) == {"a87.tae", "a88.tae", "a89.tae"}
+    plain = inflate(result.files[BINDER])
+    added = members(plain)["a89.tae"]
+    assert plain[added.offset:added.offset + added.size] == TAE_A
     foreign = mod("C", (BINDER, b"not a binder"))
     result = mod_loader.compose(GAME, [foreign])
     assert result.files[BINDER] == b"not a binder" and result.conflicts == []
@@ -106,7 +110,7 @@ def test_read_mod_and_vanilla_files_find_binders(tmp_path):
     (folder / CHR_DIR / "C1200.ANIBND.DCX").write_bytes(edited("a87.tae", (0, 0, "start", 0.25)))
     found = mod_loader.read_mod(folder, "chars")
     assert list(found.files) == [BINDER]
-    assert mod_loader.vanilla_files(game) == {BINDER: VANILLA}
+    assert mod_loader.vanilla_files(game, frozenset({BINDER})) == {BINDER: VANILLA}
     for index in range(64):
         (folder / CHR_DIR / f"c99{index:02d}.anibnd.dcx").write_bytes(VANILLA)
     try:

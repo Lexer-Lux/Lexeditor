@@ -14,7 +14,8 @@
     "UTF-8 BOM removed; UTF-16 XML metadata converted to UTF-8.",
     "The definition retains ParamType, Unk06, endianness, Unicode, version, ordered Def declarations, Minimum, Maximum and Enum. Unused display text is omitted; English display text stays in annotations.",
     "JSON and XML whitespace compacted. Semantic digests cover the exact fields the editor consumes, independent of whitespace and unused top-level display labels.",
-    "semanticSha256 is SHA-256 of the projection in tests/ds1/test_ds1_effect_metadata.py, serialized with sorted keys, ASCII escapes and compact separators."
+    "semanticSha256 is SHA-256 of the projection in tests/ds1/test_ds1_effect_metadata.py, serialized with sorted keys, ASCII escapes and compact separators.",
+    "Local changeMpPoint help explains negative MP restoration for the Mana System. The annotations entry retains its original upstream semantic digest separately."
   ],
   "files": {
     "defs/SpEffectParam.xml": {
@@ -30,7 +31,8 @@
     "annotations/SP_EFFECT_PARAM_ST.json": {
       "path": "Param Annotations/English/SP_EFFECT_PARAM_ST.json",
       "sha256": "03ab5e4d6bb043e97f6a889661d606ae4b8906b9cc1ac48a2cb4f0e311ec9d00",
-      "semanticSha256": "71b0ccd08d573d0dcb04aa277ce3266c24fb551a14cef8454f5ec832e14c1455"
+      "upstreamSemanticSha256": "71b0ccd08d573d0dcb04aa277ce3266c24fb551a14cef8454f5ec832e14c1455",
+      "semanticSha256": "4f2b4e15348c10a635650c5d30d6380d620131e4603818bc1b4c2e47804d0123"
     },
     "row_names/SpEffectParam.json": {
       "path": "Param Row Names/English/SpEffectParam.json",

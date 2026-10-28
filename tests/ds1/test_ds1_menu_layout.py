@@ -9,6 +9,8 @@ from __future__ import annotations
 import struct
 import unittest
 import zlib
+from pathlib import Path
+import tempfile
 
 from plugins.ds1 import formats, menu_layout
 
@@ -90,6 +92,20 @@ def drb(dialogs=DIALOGS):
         data = pad(data)
         out += tag.encode("ascii").ljust(4, b"\0") + struct.pack("<iii", len(data), count, 0) + data
     return bytes(out)
+
+
+def test_clone_native_scrolling_key_guide_preserves_shape_and_control():
+    source = text_shape((0, 0, 1088, 28), kind="dynamic", align=0) + b"\0" * 16
+    layout = menu_layout.Drb(drb({"guide": [
+        ("text_key-guide", "ScrollText", source, ("DmeCtrlScrollText", b"\0" * 4))],
+        "panel": []}))
+    layout.add_clone("panel", "new_guide", "text_key-guide", [18, 250, 582, 278], source_dialog="guide")
+    node = layout.node("panel", "new_guide")
+    kind, shape = layout._blob("SHAP", "SHPR", node.shape)
+    assert kind == "ScrollText" and shape[8:len(source)] == source[8:]
+    assert struct.unpack_from("<4h", shape) == (18, 250, 582, 278)
+    assert layout._blob("CTRL", "CTPR", node.control)[0] == "DmeCtrlScrollText"
+    assert not any(layout._blob("CTRL", "CTPR", node.control)[1])
 
 
 def dcx(plain):
@@ -333,8 +349,11 @@ class MoveTests(unittest.TestCase):
         self.assertEqual(blob[30:], DIALOGS['data_simple_arms'][0][2][30:])
         sprite = menu_layout.validate({"version": 1, "moves": [
             {"dialog": "data_simple_arms", "name": "icon_receive", "rect": [0, 0, 10, 10], "font": 5}]}, "Sprite")
-        with self.assertRaisesRegex(menu_layout.LayoutError, "not text"):
+        folder = Path(tempfile.gettempdir())/'layout-invalid-font-mod'
+        sprite['folder'] = str(folder)
+        with self.assertRaisesRegex(menu_layout.LayoutError, "not text") as failure:
             menu_layout.compose(original, [sprite])
+        self.assertEqual(failure.exception.folders, (folder.resolve(),))
         self.assertEqual(menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "font": 0}]}, "Zero")
                          ["moves"][0]["font"], 0)
         for font in (-1, 13, "5", 5.0):

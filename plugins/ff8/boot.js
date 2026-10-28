@@ -319,9 +319,9 @@
       if(enemyBattleTextEdits.length)results.push(await api("/api/enemy-battle-text/save",post({edits:enemyBattleTextEdits})));
       for(const request of kernelEdits)results.push(await api("/api/kernel/save",post(request)));
       if(textEdits.length)results.push(await api("/api/text/save",post({edits:textEdits})));
-      if(settingsDirty)results.push(await api("/api/settings/save",post(settingsPayload())));
       const platformEdits=platformChanges();
       if(Object.keys(platformEdits).length){state.platformConfig=await api("/api/platform-config/save",post({sha256:state.savedPlatformConfig.sha256,changes:platformEdits}));state.savedPlatformConfig=clone(state.platformConfig);results.push({saved:Object.keys(platformEdits).length})}
+      results.push(await api("/api/settings/activate",post(settingsDirty?settingsPayload():{})));
       await reloadEditable();
       shell.history.clear();
       setStatus(results.length
@@ -430,7 +430,7 @@
   // names its dataset (abilityJunction) and lands on that subtab.
   async function navigate(tab){if(!(await enemyAiBeforeLeave()))return false;if(tab==="models"||tab==="textures"){state.tab=tab;render();await ensureHeavy();if(state.tab===tab)render();return}if(tab==="formulae"){state.settingsTab="formulae";tab="settings"}if(/^ability[A-Z]/.test(tab)){const row=state.data[tab]?.rows.find(row=>row.id===state.selected[tab]);if(row)state.selected.gfAbilities=row.abilityId;state.abilityTab="gfAbilities";tab="abilities"}if(tab==="magic"||tab==="enemyAbilities"){state.abilityTab=tab;tab="abilities"}if(tab==="names"){state.textTab="names";tab="text"}state.tab=tab;render()}
   function render(){document.querySelectorAll("nav button[data-tab]").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting||state.bootFailed)return;const toolbar=$("#toolbar");toolbar.hidden=false;toolbar.classList.toggle("portrait-toolbar",state.tab==="gfs"||state.tab==="characters");views[state.tab]();shell.refresh()}
-  async function prepareGameplayLaunch(){if(dirtyCount())await saveAll();const result=await api("/api/settings/activate",post({}));if(!result.ready)throw new Error("The FFNx gameplay patch did not pass its launch check.");setStatus("Gameplay patch ready")}
+  async function prepareGameplayLaunch(){await api("/api/settings/launch",post({})).catch(()=>{});}
   async function confirmGameplayPatch(){
     // FFNx starts with the game, not with its launcher, so the 20 seconds
     // count from the game starting. Before that the player may sit in the
