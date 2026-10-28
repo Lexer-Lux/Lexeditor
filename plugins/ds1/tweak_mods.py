@@ -1176,6 +1176,10 @@ def _undo(game_root: Path, done: list[dict]) -> None:
                 _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"], previous.get("built"))
             else:
                 managed = item['managed']
+                if managed == EXECUTABLE:
+                    # Restoring a legacy patched executable is a forward
+                    # repair. Never put the patched image back on disk.
+                    continue
                 current = _read(managed.live(game_root), managed)
                 if current == item['before']:
                     continue

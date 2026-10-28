@@ -162,6 +162,35 @@ def test_cache_write_failure_does_not_fail_composition(tmp_path, monkeypatch):
     assert result.files[relative] == b'new'
 
 
+def test_valid_cached_conflict_report_keeps_peer_names(tmp_path, monkeypatch):
+    from collections import OrderedDict
+    relative = Path('opaque.bin')
+    monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
+    payload = json.dumps({'hasData': True, 'conflicts': [[str(relative), 'field', ['A', 'B']]]}).encode() + b'\nnew'
+    monkeypatch.setattr(composition_cache, 'load', lambda *args: payload)
+    result = mod_loader._compose_file(relative, None,
+        [mod_loader.Mod('A', tmp_path, {relative: b'input'})], False, tmp_path)
+    assert result.files[relative] == b'new'
+    assert result.conflicts[0].mods == ['A', 'B']
+
+
+def test_linked_library_entry_is_off_without_hiding_healthy_mod(tmp_path):
+    from core import mods_service
+    library = tmp_path / 'library'
+    healthy = make_script(library)
+    outside = make_script(tmp_path / 'outside')
+    linked = library / 'linked'
+    try:
+        linked.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip('Creating directory links is not available')
+    rows = {row['folder']: row for row in mods_service.library_rows(library)}
+    assert rows[healthy.name]['enabled']
+    assert not rows['linked']['enabled'] and 'symlink' in rows['linked']['error']
+    assert [row['name'] for row in tweak_mods.tweak_rows(library)] == ['Healthy']
+    mod_requires.check_enabled(library)
+
+
 def test_report_location_failure_is_optional(tmp_path, monkeypatch):
     def fail():
         raise TypeError('bad cache location')
@@ -322,6 +351,14 @@ def test_commit_reports_both_failure_and_failed_rollback(tmp_path, monkeypatch):
         tweak_mods.commit(tmp_path, {'executableSha256': tweak_mods._sha(b'executable'), 'files': [],
                                    'runtime': {'previous': {}, 'patch': None, 'mods': [], 'project': None}})
     assert not caught.value.folders
+
+
+def test_rollback_never_puts_a_legacy_patched_executable_back(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail('A rollback must not write a patched executable')
+    monkeypatch.setattr(tweak_mods, '_write', forbidden)
+    tweak_mods._undo(tmp_path, [{'managed': tweak_mods.EXECUTABLE, 'before': b'patched',
+                               'after': b'vanilla', 'previous': {}}])
 
 
 def test_deployment_warning_does_not_lock_editor(page):

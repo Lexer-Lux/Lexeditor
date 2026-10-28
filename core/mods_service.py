@@ -43,6 +43,8 @@ def mod_row(folder: Path) -> dict:
     except (ValueError, OSError) as error:
         row.update({"name": folder.name, "author": "", "description": "", "credits": "", "version": "",
                     "missing": ["name"], "enabled": False, "order": 1000, "error": str(error)})
+        row.update({'lexmod': None, 'script': None, 'components': None})
+        return row
     marker = folder / lexmods.MARKER
     row["lexmod"] = None
     if marker.is_file():

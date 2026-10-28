@@ -6,6 +6,7 @@ Synthetic binders only.
 """
 from pathlib import Path
 import sys
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -87,8 +88,8 @@ def test_added_members_preserve_other_mods_existing_member_edits():
     added = members(plain)["a89.tae"]
     assert plain[added.offset:added.offset + added.size] == TAE_A
     foreign = mod("C", (BINDER, b"not a binder"))
-    result = mod_loader.compose(GAME, [foreign])
-    assert result.files[BINDER] == b"not a binder" and result.conflicts == []
+    with pytest.raises(mod_loader.FormatError):
+        mod_loader.compose(GAME, [foreign])
 
 
 def test_a_binder_missing_from_vanilla_is_taken_whole():

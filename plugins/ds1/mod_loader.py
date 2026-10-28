@@ -302,8 +302,7 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
                 for row in metadata['conflicts']:
                     if (not isinstance(row, list) or len(row) != 3 or row[0] != str(relative)
                             or not isinstance(row[1], str) or not isinstance(row[2], list)
-                            or any(not isinstance(name, str) or name not in {mod.name for mod in mods}
-                                   for name in row[2])):
+                            or any(not isinstance(name, str) for name in row[2])):
                         raise ValueError('Invalid composition cache conflict')
                 rows = tuple((Path(path), part, tuple(names)) for path, part, names in metadata['conflicts'])
                 cached = (data if metadata['hasData'] else None, rows, len(payload))

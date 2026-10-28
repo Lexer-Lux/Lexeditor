@@ -240,9 +240,12 @@ def test_linked_paths_are_refused_before_read_or_write(project, monkeypatch, tmp
         with pytest.raises(ValueError, match="symlink"):
             tweak_mods.tweak_rows(linked)
     else:
-        (tmp_path / "library" / "foreign").symlink_to(mod, target_is_directory=True)
-        with pytest.raises(ValueError, match="symlink"):
-            tweak_mods.tweak_rows()
+        foreign = tmp_path / 'library' / 'foreign'
+        foreign.symlink_to(mod, target_is_directory=True)
+        assert all(Path(row['path']) != foreign for row in tweak_mods.tweak_rows())
+        from core import mods_service
+        row = mods_service.mod_row(foreign)
+        assert row['enabled'] is False and 'symlink' in row['error']
     assert image(game) == original
 
 
