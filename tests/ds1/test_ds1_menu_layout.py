@@ -9,6 +9,8 @@ from __future__ import annotations
 import struct
 import unittest
 import zlib
+from pathlib import Path
+import tempfile
 
 from plugins.ds1 import formats, menu_layout
 
@@ -333,8 +335,11 @@ class MoveTests(unittest.TestCase):
         self.assertEqual(blob[30:], DIALOGS['data_simple_arms'][0][2][30:])
         sprite = menu_layout.validate({"version": 1, "moves": [
             {"dialog": "data_simple_arms", "name": "icon_receive", "rect": [0, 0, 10, 10], "font": 5}]}, "Sprite")
-        with self.assertRaisesRegex(menu_layout.LayoutError, "not text"):
+        folder = Path(tempfile.gettempdir())/'layout-invalid-font-mod'
+        sprite['folder'] = str(folder)
+        with self.assertRaisesRegex(menu_layout.LayoutError, "not text") as failure:
             menu_layout.compose(original, [sprite])
+        self.assertEqual(failure.exception.folders, (folder.resolve(),))
         self.assertEqual(menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "font": 0}]}, "Zero")
                          ["moves"][0]["font"], 0)
         for font in (-1, 13, "5", 5.0):

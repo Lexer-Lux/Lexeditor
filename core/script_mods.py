@@ -31,6 +31,7 @@ import threading
 from typing import Any, Callable
 
 from core.plugin_files import atomic_write
+from core.mod_builds import ModBuildError
 
 SCRIPT_VERSION = 1
 SCRIPT_FOLDER = "script"
@@ -49,8 +50,15 @@ FIELD_TYPES = frozenset({"bool", "int", "number", "enum", "sound", "intList"})
 _IMPORT_LOCK = threading.Lock()
 
 
-class ScriptModError(ValueError):
+class ScriptModError(ModBuildError):
     """A tweak mod's metadata, settings or build result is not acceptable."""
+
+    def __init__(self, message: str, *, folders=()):
+        super().__init__(folders, message)
+
+
+class ScriptModRollbackError(ScriptModError):
+    """Generated files could not be restored; recovery must stop."""
 
 
 # --- discovery -------------------------------------------------------------
@@ -386,7 +394,7 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
         try:
             restore_generated(root, snapshot, allowed_roots=allowed_roots)
         except ScriptModError as rollback_error:
-            raise ScriptModError(f"Build failed: {error}; {rollback_error}") from error
+            raise ScriptModRollbackError(f"Build failed: {error}; {rollback_error}") from error
         raise
     return {"files": sorted(planned), "written": written, "removed": removed}
 
@@ -404,12 +412,12 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
     snapshots = {}
     for row in rows:
         if row["error"]:
-            raise error(f"{row['name']}: {row['error']}")
+            raise error(f"{row['name']}: {row['error']}", folders=[row['path']])
         missing = [need for need in row["schema"]["requires"] if need not in enabled]
         if missing:
             raise error(f"{row['name']} requires {', '.join(missing)}, which is not enabled")
         if row["schema"]["blocker"]:
-            raise error(f"{row['name']}: {row['schema']['blocker']}")
+            raise error(f"{row['name']}: {row['schema']['blocker']}", folders=[row['path']])
         conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
         if conflicts:
             raise error(f"{row['name']} conflicts with {', '.join(conflicts)}")
@@ -432,7 +440,8 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
             except Exception as rollback_error:
                 failures.append(f"{result['id']}: {rollback_error}")
         suffix = "; rollback failed: " + "; ".join(failures) if failures else ""
-        raise error(f"{context.current}: {failure}{suffix}") from failure
+        folders = [] if failures or isinstance(failure, ScriptModRollbackError) else [row['path']]
+        raise error(f"{context.current}: {failure}{suffix}", folders=folders) from failure
     return built
 
 

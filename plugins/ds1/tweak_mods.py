@@ -70,7 +70,7 @@ def _exclusive(game_root: Path):
         os.close(descriptor)
 
 
-class TweakError(ValueError):
+class TweakError(script_mods.ScriptModError):
     """A tweak operation failed; the message identifies any recovery needed."""
 
 
@@ -383,9 +383,11 @@ def _built(rows: list[dict], folder: str, check) -> list[dict]:
         if not target.is_file():
             continue  # A tweak with nothing to patch here at its current settings.
         try:
-            specs.append(check(json.loads(target.read_text(encoding="utf-8")), row["name"]))
+            spec = check(json.loads(target.read_text(encoding="utf-8")), row["name"])
+            spec["folder"] = row["path"]
+            specs.append(spec)
         except (ValueError, exe_patches.PatchError) as error:
-            raise TweakError(f"{row['name']}: {error}") from error
+            raise TweakError(f"{row['name']}: {error}", folders=[row['path']]) from error
     return specs
 
 
@@ -970,7 +972,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
     try:
         patch = exe_patches.runtime_patch(original, specs)
     except exe_patches.PatchError as error:
-        raise TweakError(str(error)) from error
+        raise TweakError(str(error), folders=error.folders) from error
     if patch is None and loader:
         patch = b""
     files = []
@@ -984,7 +986,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
         try:
             layout_after = menu_layout.compose(layout_original, layout)
         except ValueError as error:
-            raise TweakError(str(error)) from error
+            raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
         files.append({"managed": LAYOUT, "before": layout_current, "after": layout_after,
                       "mods": _changes(layout) if layout_after != layout_original else [], "project": None,
                       "previous": _current_manifest(layout_current, layout_manifest, LAYOUT)})
@@ -997,7 +999,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT)
             try:
                 esd_after = menu_scripts.compose(esd_original, targeted, ESD_ARCHIVE[managed])
             except ValueError as error:
-                raise TweakError(str(error)) from error
+                raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
             files.append({"managed": managed, "before": esd_current, "after": esd_after,
                           "mods": _changes(targeted) if esd_after != esd_original else [], "project": None,
                           "previous": _current_manifest(esd_current, esd_manifest, managed)})
