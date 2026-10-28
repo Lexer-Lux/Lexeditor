@@ -16019,6 +16019,12 @@ ${contents.path}`});
     const contentsFitted = {records: 10, files: 10};
     const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
     const load = async () => { data = await callWindow("mods_overview", pluginId); };
+    const switchMod = async (row, enabled) => {
+      const result = await callWindow("set_mod_enabled", pluginId, row.path, enabled);
+      await load(); draw();
+      if (result?.disabledMods?.length) showToast(result.disabledMods.map(mod =>
+        `${mod.name} was switched off: ${mod.error}`).join("\n"), {tone:"warning"});
+    };
     const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.folder}`}))];
     const keyOf = row => row.path;
     const replaceRow = fresh => { data.rows = data.rows.map(row => row.path === fresh.path ? fresh : row); };
@@ -16115,7 +16121,7 @@ ${contents.path}`});
       const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": `${row.name} enabled`,
         onchange: async event => {
           if (event.target.checked && !(await confirmFirstModEnable(row.path))) { event.target.checked = false; return; }
-          try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
+          try { await switchMod(row, event.target.checked); }
           catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
         }});
       const copyMod = async () => {
@@ -16399,7 +16405,7 @@ ${contents.path}`});
                   onclick: event => event.stopPropagation(),
                   onchange: async event => {
                     if (event.target.checked && !(await confirmFirstModEnable(row.path))) { event.target.checked = false; return; }
-                    try { await callWindow("set_mod_enabled", pluginId, row.path, event.target.checked); await load(); draw(); }
+                    try { await switchMod(row, event.target.checked); }
                     catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
                   }})}]}),
         detail, emptyDetail: () => detail()});

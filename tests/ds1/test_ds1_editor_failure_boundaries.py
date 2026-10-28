@@ -172,6 +172,70 @@ def test_report_location_failure_is_optional(tmp_path, monkeypatch):
     adapter._save_report(tmp_path, [], [], installed=True)
 
 
+@pytest.mark.parametrize('report', [None, {'folder': b'bad'}, {'folder': [b'bad']}, {'folder': ['okay']}])
+def test_bad_optional_host_reports_cannot_break_mods_overview(tmp_path, report):
+    from core.desktop_host import HostApi
+    from types import SimpleNamespace
+    result = {'rows': [{'path': str(tmp_path), 'enabled': True}]}
+    HostApi._attach_report(result, SimpleNamespace(conflicts=lambda *args: report),
+                           [tmp_path], str(tmp_path), 'conflicts', 'conflictError', True)
+    if report != {'folder': ['okay']}:
+        assert result['conflictError']
+
+
+def test_host_activation_uses_the_same_recovery_as_save(tmp_path):
+    import threading
+    from types import SimpleNamespace
+    from core.desktop_host import HostApi
+    from core.mod_library import relative_path
+    library = tmp_path / relative_path('ds1')
+    healthy = make_script(library)
+    broken = make_script(library, 'Broken')
+    seen = []
+    class Adapter:
+        def activate(self, active, game):
+            seen.append(active)
+            if broken.resolve() in active:
+                raise mod_builds.ModBuildError([broken], 'broken fixture')
+            return {}
+    host = SimpleNamespace(mod_library_status=lambda _: {'canManage': True, 'root': str(tmp_path)},
+        _installations=SimpleNamespace(snapshot=lambda _: {'root': str(tmp_path / 'game')}),
+        game_process_status=lambda _: {'running': False}, _mod_adapter=lambda _: Adapter(),
+        _mod_library_lock=threading.Lock())
+    result = HostApi._activate_mods(host, 'ds1', [str(healthy), str(broken)])
+    assert [row['folder'] for row in result['disabledMods']] == ['Broken']
+    assert seen[-1] == [healthy.resolve()]
+
+
+@pytest.mark.parametrize('report', [{'changes': [{'after': b'bad cache'}]}, {'changes': [None]}, None])
+def test_bad_record_report_keeps_files_accessible(tmp_path, report):
+    from core.desktop_host import HostApi
+    from types import SimpleNamespace
+    root = make_script(tmp_path)
+    host = SimpleNamespace(_game_mods=lambda _: tmp_path,
+        _mod_adapter=lambda _: SimpleNamespace(describe_changes=lambda *args: report),
+        _installations=SimpleNamespace(snapshot=lambda _: {}))
+    result = HostApi.mod_contents(host, 'ds1', str(root))
+    assert result['changes'] == [] and result['note']
+    assert any(row['relative'] == 'mod.json' for row in result['files'])
+    json.dumps(result)
+
+
+def test_script_corrupting_its_metadata_cannot_stop_healthy_build(tmp_path):
+    healthy = make_script(tmp_path)
+    bad = make_script(tmp_path, 'Broken')
+    class Adapter:
+        def activate(self, active, game):
+            if bad.resolve() in active:
+                (bad / 'mod.json').write_text('{corrupted', encoding='utf-8')
+                raise mod_builds.ModBuildError([bad], 'bad script')
+            return {'activated': [path.name for path in active]}
+    result = mod_builds.activate_with_recovery(Adapter(), [healthy, bad], tmp_path)
+    assert result['activated'] == ['Healthy']
+    assert result['disabledMods'][0]['name'] == 'Broken'
+    assert (bad / 'mod.json').read_text() == '{corrupted'
+
+
 def test_saved_project_survives_unexpected_deployment_error(tmp_path, monkeypatch):
     from plugins.ds1 import server
     monkeypatch.setattr(server, '_tweaks_flag', lambda: True)

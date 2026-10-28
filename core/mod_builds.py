@@ -18,18 +18,24 @@ def activate_with_recovery(adapter, mods: list[Path], game_root: Path) -> dict:
     """
     from core import mod_requires, mods_service
     active = [Path(folder).resolve() for folder in mods]
+    identities = {}
+    for folder in active:
+        try:
+            identities[folder] = (mod_requires.mod_id(folder), mod_requires.display_name(folder))
+        except (OSError, ValueError):
+            identities[folder] = (folder.name, folder.name)
     disabled = []
     while True:
         try:
             result = adapter.activate(active, game_root)
-            return {**result, "disabledMods": disabled}
+            return {**(result or {}), "disabledMods": disabled}
         except ModBuildError as error:
             failed = set(error.folders)
             if not failed or not failed <= set(active):
                 raise
             removed = set(failed)
             while True:
-                ids = {mod_requires.mod_id(folder) for folder in removed}
+                ids = {identities[folder][0] for folder in removed}
                 dependents = set()
                 for folder in active:
                     if folder in removed:
@@ -47,9 +53,16 @@ def activate_with_recovery(adapter, mods: list[Path], game_root: Path) -> dict:
                 removed.update(dependents)
             for folder in active:
                 if folder in removed:
-                    mods_service.set_enabled(folder, False)
+                    try:
+                        mods_service.set_enabled(folder, False)
+                    except ValueError:
+                        # Unreadable metadata is already an off/error library
+                        # row. Preserve it for repair instead of overwriting it.
+                        row = mods_service.mod_row(folder)
+                        if row.get('enabled') or not row.get('error'):
+                            raise
                     disabled.append({"folder": folder.name,
-                                     "name": mod_requires.display_name(folder),
+                                     "name": identities[folder][1],
                                      "error": error.detail if folder in failed else
                                      "A required mod could not be built."})
             active = [folder for folder in active if folder not in removed]

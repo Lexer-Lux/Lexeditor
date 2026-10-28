@@ -1694,7 +1694,7 @@ class HostApi:
         self._managed_mod_results[plugin_id] = result
         return result
 
-    def _activate_mods(self, plugin_id: str, paths: list[str]) -> None:
+    def _activate_mods(self, plugin_id: str, paths: list[str]) -> dict:
         """Deploy exactly these library mods, bundles expanded to their ticks."""
         from core import bundled_mods
         from core.mod_library import relative_path
@@ -1713,7 +1713,8 @@ class HostApi:
             raise ValueError("Choose each mod once from this game's library")
         adapter = self._mod_adapter(plugin_id)
         with self._mod_library_lock:
-            adapter.activate(bundled_mods.expand_roots(roots, adapter), Path(game))
+            from core.mod_builds import activate_with_recovery
+            return activate_with_recovery(adapter, bundled_mods.expand_roots(roots, adapter), Path(game))
 
     def _choose_folder(self, directory: str = "") -> str:
         import webview
@@ -1803,10 +1804,13 @@ class HostApi:
             return
         try:
             found = getattr(adapter, method)(mods, Path(game)) if mods else {}
-        except (OSError, ValueError, RuntimeError) as error:
+            if not isinstance(found, dict) or any(not isinstance(lines, list)
+                    or any(not isinstance(line, str) for line in lines) for lines in found.values()):
+                raise ValueError('The mod report has invalid entries')
+            found = {str(Path(key).resolve()): lines for key, lines in found.items()}
+        except Exception as error:
             result[error_key] = str(error)
             return
-        found = {str(Path(key).resolve()): lines for key, lines in found.items()}
         for row in result["rows"]:
             if only_enabled and not row.get("enabled"):
                 continue
@@ -1836,15 +1840,24 @@ class HostApi:
         game = self._installations.snapshot(plugin_id).get('root') or None
         try:
             reported = describe(folder, Path(game) if game else None)
-        except (OSError, ValueError, RuntimeError) as error:
+            if not isinstance(reported, dict) or not isinstance(reported.get('changes', []), list):
+                raise ValueError('The record report is invalid')
+            # A derived description is never allowed to fail serialization of
+            # the host response, including the Files tab beside these records.
+            json.dumps(reported, allow_nan=False)
+            changes = reported.get('changes', [])
+            if any(not isinstance(row, dict) for row in changes):
+                raise ValueError('The record report has invalid rows')
+            total = int(reported.get('total', len(changes)))
+            loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}
+        except Exception as error:
             result['note'] = str(error)
             return result
-        result['changes'] = reported.get('changes', [])
+        result['changes'] = changes
         result['changesTruncated'] = bool(reported.get('truncated', False))
-        result['totalChanges'] = int(reported.get('total', len(result['changes'])))
+        result['totalChanges'] = total
         if reported.get('note'):
             result['note'] = reported['note']
-        loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}
         for entry in result['files']:
             entry['loaded'] = entry['relative'].casefold() in loaded
         return result
@@ -1863,17 +1876,18 @@ class HostApi:
         mod_requires.check_changes(root, {mod_requires.mod_id(folder): enabled})
         was = bool(mods_service.mod_row(folder).get("enabled"))
         mods_service.set_enabled(folder, enabled)
+        activation = {}
         if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
             enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
             try:
-                self._activate_mods(plugin_id, enabled_paths)
+                activation = self._activate_mods(plugin_id, enabled_paths) or {}
             except Exception:
                 # The switch failed, so the mod keeps its old state. Left
                 # saved, a mod that cannot build stayed on behind an
                 # unticked box and failed every later switch of any mod.
                 mods_service.set_enabled(folder, was)
                 raise
-        return mods_service.mod_row(folder)
+        return {**mods_service.mod_row(folder), 'disabledMods': activation.get('disabledMods', [])}
 
     def move_mod(self, plugin_id: str, path: str, delta: int) -> dict:
         """Move one mod within the library's load order, which the Mods tab shows.
@@ -1910,8 +1924,8 @@ class HostApi:
         if self._mod_adapter(plugin_id) is None or not self.mod_library_status(plugin_id).get("canManage"):
             return {"activated": False}
         enabled = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
-        self._activate_mods(plugin_id, enabled)
-        return {"activated": True, "mods": len(enabled)}
+        result = self._activate_mods(plugin_id, enabled) or {}
+        return {"activated": True, "mods": len(enabled), 'disabledMods': result.get('disabledMods', [])}
 
     def open_lexmod(self, plugin_id: str) -> dict:
         """Open only the repository this game's own manifest names."""
