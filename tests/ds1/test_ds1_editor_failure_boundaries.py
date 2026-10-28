@@ -138,6 +138,29 @@ def test_missing_requirement_is_attributed_before_build(tmp_path):
     assert caught.value.folders == (root.resolve(),)
 
 
+def test_disabled_alias_cannot_block_healthy_enabled_mod_with_same_id(tmp_path):
+    make_script(tmp_path, 'A_disabled', id='shared', enabled=False, requires=['missing'])
+    make_script(tmp_path, 'Healthy', id='shared')
+    make_script(tmp_path, 'Dependent', requires=['shared'])
+    mod_requires.check_enabled(tmp_path)
+    rows = tweak_mods.tweak_rows(tmp_path)
+    assert not any(row['error'] for row in rows)
+
+
+def test_recovery_keeps_dependents_when_a_healthy_alias_provides_the_requirement(tmp_path):
+    bad = make_script(tmp_path, 'Broken', id='shared')
+    healthy = make_script(tmp_path, 'Healthy', id='shared')
+    dependent = make_script(tmp_path, 'Dependent', requires=['shared'])
+    class Adapter:
+        def activate(self, active, game):
+            if bad.resolve() in active:
+                raise mod_builds.ModBuildError([bad], 'bad alias')
+            return {'activated': [root.name for root in active]}
+    result = mod_builds.activate_with_recovery(Adapter(), [bad, healthy, dependent], tmp_path)
+    assert result['activated'] == ['Healthy', 'Dependent']
+    assert [row['folder'] for row in result['disabledMods']] == ['Broken']
+
+
 @pytest.mark.parametrize('payload', [b'[]\nwrong', b'{"hasData":true,"conflicts":null}\nwrong',
                                        b'{"hasData":"yes","conflicts":[]}\nwrong',
                                        b'{"hasData":true,"conflicts":[["wrong","part",[1]]]}\nwrong'])

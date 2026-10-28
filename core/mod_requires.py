@@ -70,6 +70,21 @@ def needs(folder: Path, schema: dict | None = None) -> list[str]:
     return wanted
 
 
+def _stored_mods(library: Path):
+    """Readable mod declarations; discovery never runs component or script code."""
+    root = Path(library)
+    if not root.is_dir():
+        return
+    for folder in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
+        if not folder.is_dir() or folder.name.startswith("."):
+            continue
+        try:
+            stored = mod_metadata._stored(folder)
+        except (OSError, ValueError):
+            continue
+        yield folder, stored
+
+
 def _states(library: Path) -> tuple[dict[str, bool], dict[str, str], dict[str, Path]]:
     """The library's mods by id: whether each is on, its name, its folder.
 
@@ -79,16 +94,7 @@ def _states(library: Path) -> tuple[dict[str, bool], dict[str, str], dict[str, P
     enabled: dict[str, bool] = {}
     names: dict[str, str] = {}
     folders: dict[str, Path] = {}
-    root = Path(library)
-    if not root.is_dir():
-        return enabled, names, folders
-    for folder in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
-        if not folder.is_dir() or folder.name.startswith("."):
-            continue
-        try:
-            stored = mod_metadata._stored(folder)
-        except (OSError, ValueError):
-            continue
+    for folder, stored in _stored_mods(library):
         mod = str(stored.get("id") or folder.name)
         enabled[mod] = enabled.get(mod, False) or stored.get("enabled") is True
         names.setdefault(mod, display_name(folder))
@@ -142,9 +148,9 @@ def check_changes(library: Path, changes: dict[str, bool]) -> None:
 
 def check_enabled(library: Path) -> None:
     """Refuse to build while any switched-on mod's needs are unmet."""
-    enabled, _, folders = _states(library)
-    for mod, folder in folders.items():
-        if not enabled.get(mod, False):
+    enabled, _, _ = _states(library)
+    for folder, stored in _stored_mods(library):
+        if stored.get('enabled') is not True:
             continue
         from core.mod_builds import ModBuildError
         try:

@@ -35,7 +35,8 @@ def activate_with_recovery(adapter, mods: list[Path], game_root: Path) -> dict:
                 raise
             removed = set(failed)
             while True:
-                ids = {identities[folder][0] for folder in removed}
+                ids = {identities[folder][0] for folder in removed} - {
+                    identities[folder][0] for folder in active if folder not in removed}
                 dependents = set()
                 for folder in active:
                     if folder in removed:
