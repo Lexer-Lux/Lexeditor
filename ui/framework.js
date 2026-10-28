@@ -3883,6 +3883,7 @@
     // span computed from the data read as a second range (Lexer), so the
     // handle moves in exactly what the field accepts.
     const [sliderLow, sliderHigh] = [lowBound, highBound];
+    const boundedSlider = Number.isFinite(lowBound) && Number.isFinite(highBound);
     // Native arrows move by 1 when step is "any": without this, float
     // fields changed through whole numbers from the keyboard too.
     if (input && !readOnly && ["FLOAT", "F32", "F64", "ANGLE32"].includes(dataType)
@@ -3907,13 +3908,29 @@
     // control. A field's declared bounds, not an arbitrary span cutoff,
     // determine whether it has a range to show.
     if (input && !readOnly && numericLike && !input.dataset.lexExactInteger &&
-        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
+        (!boundedSlider || highBound > lowBound)) {
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
       fill.append(handle);
+      // Without both bounds there is no finite range to sweep across.
+      // Drag relative to the starting value instead, without adding a cap.
+      const dragStep = Number(input.step) > 0 ? Number(input.step) : input.step === "any" ? 0.1 : 1;
+      let dragStart = null;
       const ratio = () => {
         const value = readNumeric(input);
         if (!Number.isFinite(value)) return 0;
+        if (!boundedSlider) {
+          const scale = dragStep * 100;
+          if (Number.isFinite(lowBound)) {
+            const distance = Math.max(0, value - lowBound);
+            return 1 - scale / (scale + distance);
+          }
+          if (Number.isFinite(highBound)) {
+            const distance = Math.max(0, highBound - value);
+            return scale / (scale + distance);
+          }
+          return 0.5 + Math.atan(value / scale) / Math.PI;
+        }
         return Math.max(0, Math.min(1, (value - sliderLow) / (sliderHigh - sliderLow)));
       };
       const paint = () => {
@@ -3953,10 +3970,13 @@
         // it through whole numbers only. Without a usable step the
         // pointer position stands, rounded past float dust.
         const declared = Number(input.step);
-        const snap = Number.isFinite(declared) && declared > 0 ? declared : 0;
-        const raw = sliderLow + share * (sliderHigh - sliderLow);
+        const snap = Number.isFinite(declared) && declared > 0 ? declared
+          : !boundedSlider && input.step !== "any" ? dragStep : 0;
+        const raw = boundedSlider ? sliderLow + share * (sliderHigh - sliderLow)
+          : dragStart.value + (event.clientX - dragStart.x) * dragStart.rate;
         const snapped = snap > 0 ? Math.round(raw / snap) * snap : Number(raw.toPrecision(12));
-        const nextValue = Math.max(sliderLow, Math.min(sliderHigh, snapped));
+        const nextValue = Math.max(lowBound ?? -Infinity, Math.min(highBound ?? Infinity, snapped));
+        if (!Number.isFinite(nextValue)) return;
         if (readNumeric(input) === nextValue) return;
         writeNumeric(input, nextValue);
         paint();
@@ -3969,6 +3989,8 @@
       handle.addEventListener("pointerdown", event => {
         if (input.disabled || input.readOnly || refusesEdit(input)) return;
         event.preventDefault();
+        dragStart = {x: event.clientX, value: readNumeric(input) || 0,
+          rate: Math.max(dragStep, Math.abs(readNumeric(input) || 0) / 100)};
         handle.setPointerCapture(event.pointerId);
         node.classList.add("lex-value-dragging");
         input.lexValueSliderDragging = true;
