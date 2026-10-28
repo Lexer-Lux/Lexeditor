@@ -441,14 +441,13 @@ def materialized_tweak_patches(runtime_root: Path, tweak_ids: set[str]) -> list[
 
 def activate(game_root: Path | None = None,
              project_root: Path | None = None,
-             runtime_root: Path | None = None) -> dict:
-    """Build, compose and verify exactly the patches FFNx will read before launch."""
+             runtime_root: Path | None = None, *, data: dict | None = None) -> dict:
+    """Save, build and deploy exactly the patches FFNx will read."""
     global _last_activation_ns, _last_patches
     game = (game_root or paths.GAME_ROOT).resolve()
     project = (project_root or paths.PROJECT_ROOT).resolve()
     active_root = _runtime_root(runtime_root, project)
-    keep_previous_log(game)
-    result = ensure(game, project, install_runtime=True, runtime_root=active_root)
+    result = save(data or {}, game, project, install_runtime=True, runtime_root=active_root)
     _validate_shared_magic_launch(project, game, active_root)
     config = game / "FFNx.toml"
     if not config.is_file():
@@ -478,6 +477,24 @@ def activate(game_root: Path | None = None,
         "hextBase": str(configured_root),
         "hextRoot": str(effective_root),
     }
+
+
+def begin_launch(game_root: Path | None = None,
+                 project_root: Path | None = None,
+                 runtime_root: Path | None = None) -> dict:
+    """Start observing the installed runtime without saving or rebuilding it."""
+    global _last_activation_ns, _last_patches
+    game = (game_root or paths.GAME_ROOT).resolve()
+    project = (project_root or paths.PROJECT_ROOT).resolve()
+    active_root = _runtime_root(runtime_root, project)
+    keep_previous_log(game)
+    _last_activation_ns = time.time_ns()
+    try:
+        files = runtime_layout.read(active_root).get("files", [])
+        _last_patches = materialized_tweak_patches(active_root, {str(row.get("winner")) for row in files})
+    except (OSError, ValueError, RuntimeError):
+        _last_patches = []
+    return {"observing": True}
 
 
 def _log_has_loaded_patch(text: str, target: Path) -> bool:

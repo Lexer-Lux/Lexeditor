@@ -110,7 +110,7 @@ def test_read_mod_and_vanilla_files_find_binders(tmp_path):
     (folder / CHR_DIR / "C1200.ANIBND.DCX").write_bytes(edited("a87.tae", (0, 0, "start", 0.25)))
     found = mod_loader.read_mod(folder, "chars")
     assert list(found.files) == [BINDER]
-    assert mod_loader.vanilla_files(game) == {BINDER: VANILLA}
+    assert mod_loader.vanilla_files(game, frozenset({BINDER})) == {BINDER: VANILLA}
     for index in range(64):
         (folder / CHR_DIR / f"c99{index:02d}.anibnd.dcx").write_bytes(VANILLA)
     try:

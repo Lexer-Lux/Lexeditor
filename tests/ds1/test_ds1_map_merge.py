@@ -100,7 +100,7 @@ def test_read_mod_and_vanilla_files_find_maps(tmp_path):
     (folder / MAP_DIR / "M10_00_00_00.MSB").write_bytes(edited((ENEMY, "posX", 5.5)))
     found = mod_loader.read_mod(folder, "maps")
     assert list(found.files) == [MAP]
-    assert mod_loader.vanilla_files(game) == {MAP: VANILLA}
+    assert mod_loader.vanilla_files(game, frozenset({MAP})) == {MAP: VANILLA}
     for index in range(64):
         (folder / MAP_DIR / f"m98_00_{index:02d}_00.msb").write_bytes(VANILLA)
     try:

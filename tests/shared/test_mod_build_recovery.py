@@ -1,4 +1,4 @@
-"""Recovery when preparing a game launch (core/mod_builds.py).
+"""Recovery when building and deploying mods (core/mod_builds.py).
 
 An identified mod failure disables that mod and its dependents, then the
 remaining set installs fresh: no stale payload from the faulty mod is used.
@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core.mod_builds import ModBuildError, activate_for_launch
+from core.mod_builds import ModBuildError, activate_with_recovery
 
 
 def write_mod(parent: Path, folder: str, name: str | None = None, **extra) -> Path:
@@ -74,7 +74,7 @@ class ActivateForLaunchTest(unittest.TestCase):
             return deploy_from_active(active, game_root)
 
         adapter = ScriptedAdapter(behavior)
-        result = activate_for_launch(adapter, [good, bad], self.game_root)
+        result = activate_with_recovery(adapter, [good, bad], self.game_root)
 
         self.assertFalse(enabled_of(bad))
         self.assertTrue(enabled_of(good))
@@ -102,7 +102,7 @@ class ActivateForLaunchTest(unittest.TestCase):
             script_mods.build_batch(rows, SimpleNamespace(current=''), allowed_roots=('native',))
             return {'payload': [(folder/'native/good.json').read_text() for folder in active]}
         adapter = ScriptedAdapter(behavior)
-        result = activate_for_launch(adapter, [good, bad], self.game_root)
+        result = activate_with_recovery(adapter, [good, bad], self.game_root)
         self.assertEqual(result['payload'], ['fresh'])
         self.assertFalse(enabled_of(bad))
         self.assertIn('broken source', result['disabledMods'][0]['error'])
@@ -117,7 +117,6 @@ class ActivateForLaunchTest(unittest.TestCase):
                 raise ModBuildError([bad], 'broken layout')
             return deploy_from_active(active, game_root)
         adapter = ScriptedAdapter(behavior)
-        adapter.deploys_on_launch = True
         adapter.active_mod_ids = lambda game: ['good', 'bad']
         host = SimpleNamespace(
             _plugins={'ds1': SimpleNamespace(can_launch=False, name='Dark Souls', mod_adapter=adapter)},
@@ -128,12 +127,12 @@ class ActivateForLaunchTest(unittest.TestCase):
             mod_library_status=lambda plugin: {'root': str(library.parent)},
             _mod_library_lock=threading.RLock(),
             _launch_notice=lambda plugin: 'Offline mode')
-        host._deploy_before_launch = lambda plugin: HostApi._deploy_before_launch(host, plugin)
+        recovered = activate_with_recovery(adapter, [good, bad], self.game_root)
         with patch('core.desktop_host.os.startfile') as start:
             result = HostApi.launch_game(host, 'ds1')
         start.assert_called_once_with('steam://rungameid/570940')
         self.assertEqual(adapter.calls[-1], [good.resolve()])
-        self.assertIn('Bad Mod was disabled: broken layout', result['notice'])
+        self.assertEqual(recovered['disabledMods'][0]['name'], 'Bad Mod')
         self.assertIn('Offline mode', result['notice'])
 
     def test_failed_generated_file_rollback_does_not_disable_mods_or_retry(self):
@@ -153,7 +152,7 @@ class ActivateForLaunchTest(unittest.TestCase):
         with patch.object(script_mods, 'build', side_effect=[{'files': []}, ValueError('broken')]), \
                 patch.object(script_mods, 'restore_generated', side_effect=OSError('cannot restore')):
             with self.assertRaisesRegex(ModBuildError, 'rollback failed'):
-                activate_for_launch(adapter, [good, bad], self.game_root)
+                activate_with_recovery(adapter, [good, bad], self.game_root)
         self.assertEqual(len(adapter.calls), 1)
         self.assertTrue(enabled_of(good))
         self.assertTrue(enabled_of(bad))
@@ -170,7 +169,7 @@ class ActivateForLaunchTest(unittest.TestCase):
             return deploy_from_active(active, game_root)
 
         adapter = ScriptedAdapter(behavior)
-        result = activate_for_launch(adapter, [base, mid, top, solo], self.game_root)
+        result = activate_with_recovery(adapter, [base, mid, top, solo], self.game_root)
 
         self.assertFalse(enabled_of(base))
         self.assertFalse(enabled_of(mid))
@@ -196,7 +195,7 @@ class ActivateForLaunchTest(unittest.TestCase):
             return deploy_from_active(active, game_root)
 
         adapter = ScriptedAdapter(behavior)
-        result = activate_for_launch(adapter, [base, tweak, solo], self.game_root)
+        result = activate_with_recovery(adapter, [base, tweak, solo], self.game_root)
 
         self.assertFalse(enabled_of(base))
         self.assertFalse(enabled_of(tweak))
@@ -220,7 +219,7 @@ class ActivateForLaunchTest(unittest.TestCase):
             return deploy_from_active(active, game_root)
 
         adapter = ScriptedAdapter(behavior)
-        result = activate_for_launch(adapter, [bad1, bad2, good], self.game_root)
+        result = activate_with_recovery(adapter, [bad1, bad2, good], self.game_root)
 
         self.assertFalse(enabled_of(bad1))
         self.assertFalse(enabled_of(bad2))
@@ -240,7 +239,7 @@ class ActivateForLaunchTest(unittest.TestCase):
 
         adapter = ScriptedAdapter(behavior)
         with self.assertRaises(RuntimeError):
-            activate_for_launch(adapter, [first, second], self.game_root)
+            activate_with_recovery(adapter, [first, second], self.game_root)
 
         self.assertTrue(enabled_of(first))
         self.assertTrue(enabled_of(second))
@@ -259,7 +258,7 @@ class ActivateForLaunchTest(unittest.TestCase):
 
                 adapter = ScriptedAdapter(behavior)
                 with self.assertRaises(ModBuildError):
-                    activate_for_launch(adapter, [first, second], self.game_root)
+                    activate_with_recovery(adapter, [first, second], self.game_root)
 
                 self.assertTrue(enabled_of(first))
                 self.assertTrue(enabled_of(second))
@@ -274,7 +273,7 @@ class ActivateForLaunchTest(unittest.TestCase):
 
         adapter = ScriptedAdapter(behavior)
         with self.assertRaises(ModBuildError):
-            activate_for_launch(adapter, [first], self.game_root)
+            activate_with_recovery(adapter, [first], self.game_root)
 
         self.assertTrue(enabled_of(first))
 

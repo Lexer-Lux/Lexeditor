@@ -724,7 +724,9 @@ def _layout_in_use(game_root: Path) -> bool:
 
 def _esd_in_use(game_root: Path, managed: Managed) -> bool:
     """A menu script archive is managed once a tweak changed it, until restored."""
-    return checked(managed.manifest(game_root)).is_file() or checked(managed.backup(game_root)).exists()
+    # The data-mod deployer uses the same original-copy filename. A backup
+    # proves an original was kept, not that this writer owns the live file.
+    return checked(managed.manifest(game_root)).is_file()
 
 
 def _changes(specs: list[dict]) -> list[str]:
@@ -873,8 +875,8 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     """Whether the installed tweaks differ from the library, and which mods changed.
 
     Save rebuilds only what is installed: with no loader record there is
-    nothing to rebuild (tweaks first install through the Mods tab's switches
-    and Play). Never raises for a damaged record or an unreadable library;
+    nothing to rebuild (tweaks first install through the Mods tab's switches).
+    Never raises for a damaged record or an unreadable library;
     that is status()'s problem to report, not staleness.
     """
     result: dict = {"needed": False, "stale": [], "set": False}
