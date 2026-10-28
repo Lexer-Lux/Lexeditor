@@ -40,6 +40,10 @@ MAX_COMMANDS = 64
 class ScriptError(ValueError):
     """A menu script patch is not acceptable; nothing changed."""
 
+    def __init__(self, message: str, *, folders=()):
+        self.folders = tuple(folders)
+        super().__init__(message)
+
 
 def _check_command(value: object, owner: str, what: str) -> dict:
     """One validated command: bank, id and assembled args, with text kept."""
@@ -124,7 +128,7 @@ def compose(original_dcx: bytes, specs: list[dict], archive: str) -> bytes:
     """Every spec's changes for one archive applied in order to its scripts."""
     if archive not in RELATIVE:
         raise ScriptError(f"unknown menu script archive {archive!r}")
-    wanted = [(spec["owner"], change) for spec in specs for change in spec["changes"]
+    wanted = [(spec["owner"], spec.get("folder"), change) for spec in specs for change in spec["changes"]
               if change["archive"] == archive]
     if not wanted:
         return original_dcx
@@ -132,7 +136,7 @@ def compose(original_dcx: bytes, specs: list[dict], archive: str) -> bytes:
     table = formats.members(plain)
     parsed: dict[str, esd.Esd] = {}
     owners: dict[str, list[str]] = {}
-    for owner, change in wanted:
+    for owner, folder, change in wanted:
         name = change["script"]
         if name not in table:
             raise ScriptError(f"{owner}: {archive} has no script {name}")
@@ -142,7 +146,10 @@ def compose(original_dcx: bytes, specs: list[dict], archive: str) -> bytes:
             except ValueError as error:
                 raise ScriptError(f"{owner}: {name} is not a script the game can run: {error}") from error
         owners.setdefault(name, []).append(owner)
-        _insert(parsed[name], change, owner)
+        try:
+            _insert(parsed[name], change, owner)
+        except ScriptError as error:
+            raise ScriptError(str(error), folders=[folder] if folder else []) from error
     items = {name: bytes(plain[entry.offset:entry.offset + entry.size]) for name, entry in table.items()}
     for name, script in parsed.items():
         try:

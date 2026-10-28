@@ -217,7 +217,7 @@
     {
       "Field": "changeMpPoint",
       "Name": "Damage MP by Point",
-      "Description": "Probably does nothing. The game has no magic point pool."
+      "Description": "Removes this much MP each application. Negative values restore MP. Vanilla has no usable MP pool."
     },
     {
       "Field": "mpRecoverChangeSpeed",

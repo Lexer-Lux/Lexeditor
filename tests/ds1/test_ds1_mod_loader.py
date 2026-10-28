@@ -20,6 +20,73 @@ NAMES = make_text_archive()
 GAME = {RELATIVE: VANILLA, texts.RELATIVE: NAMES}
 
 
+def test_asset_binder_additions_compose_with_existing_member_edits():
+    from dataclasses import replace
+    relative = Path('sfx/common.ffxbnd.dcx')
+    plain = inflate(VANILLA)
+    base = texts.bnd3_entries(plain)
+    a = texts.build_bnd3(plain, base + [texts.Entry(90001, 'model/new.flver', 0x40, b'model')])
+    b = texts.build_bnd3(plain, [replace(e, data=b'changed') if e.name.endswith('Untouched.bin') else e
+                               for e in base] + [texts.Entry(90002, 'tex/new.tpf', 0x40, b'texture')])
+    result = mod_loader.compose({relative: VANILLA}, [
+        mod_loader.Mod('A', Path('a'), {relative: deflate(VANILLA, a)}),
+        mod_loader.Mod('B', Path('b'), {relative: deflate(VANILLA, b)})])
+    assert not result.conflicts
+    entries = {e.name.replace('\\', '/').rsplit('/', 1)[-1]: e.data
+               for e in texts.bnd3_entries(inflate(result.files[relative]))}
+    assert entries['new.flver'] == b'model' and entries['new.tpf'] == b'texture'
+    assert entries['Untouched.bin'] == b'changed'
+
+
+def test_asset_binder_member_removal_conflicts_with_an_edit():
+    from dataclasses import replace
+    relative = Path('sfx/common.ffxbnd.dcx')
+    plain = inflate(VANILLA)
+    base = texts.bnd3_entries(plain)
+    a = texts.build_bnd3(plain, [e for e in base if not e.name.endswith('Untouched.bin')])
+    b = texts.build_bnd3(plain, [replace(e, data=b'changed') if e.name.endswith('Untouched.bin') else e for e in base])
+    result = mod_loader.compose({relative: VANILLA}, [
+        mod_loader.Mod('A', Path('a'), {relative: deflate(VANILLA, a)}),
+        mod_loader.Mod('B', Path('b'), {relative: deflate(VANILLA, b)})])
+    assert [(c.part, c.mods) for c in result.conflicts] == [('Untouched.bin', ['A', 'B'])]
+
+
+def test_dcx_callers_can_set_a_bounded_asset_size_limit():
+    size = len(inflate(VANILLA))
+    with pytest.raises(FormatError, match='length'):
+        inflate(VANILLA, max_size=size-1)
+    assert len(inflate(VANILLA, max_size=size)) == size
+
+
+@pytest.mark.parametrize('conflicting', [False, True])
+def test_added_asset_members_preserve_esd_state_composition(conflicting):
+    from copy import deepcopy
+    from plugins.ds1 import esd
+    relative = Path('script/talk/example.talkesdbnd.dcx')
+    def option(text):
+        return esd.Command(1, 19, [esd.assemble(str(value)) for value in (1, text, -1)])
+    base_script = esd.Esd(state_groups={1: {0: esd.State(id=0, entry_commands=[option(1500)])}})
+    a, b = deepcopy(base_script), deepcopy(base_script)
+    a.state_groups[1][1] = esd.State(id=1)
+    if conflicting:
+        a.state_groups[1][0].entry_commands = [option(1501)]
+    b.state_groups[1][0].entry_commands = [option(1502)]
+    template = inflate(VANILLA)
+    base_entries = [texts.Entry(1, 'talk.esd', 0x40, base_script.to_bytes())]
+    vanilla = deflate(VANILLA, texts.build_bnd3(template, base_entries))
+    variant_a = deflate(VANILLA, texts.build_bnd3(template, [
+        texts.Entry(1, 'talk.esd', 0x40, a.to_bytes()), texts.Entry(2, 'new.bin', 0x40, b'new')]))
+    variant_b = deflate(VANILLA, texts.build_bnd3(template, [texts.Entry(1, 'talk.esd', 0x40, b.to_bytes())]))
+    merged = mod_loader.compose({relative: vanilla}, [
+        mod_loader.Mod('A', Path('a'), {relative: variant_a}),
+        mod_loader.Mod('B', Path('b'), {relative: variant_b})])
+    assert bool(merged.conflicts) == conflicting
+    entries = texts.bnd3_entries(inflate(merged.files[relative]))
+    script = esd.parse(next(e.data for e in entries if e.name == 'talk.esd'))
+    assert 1 in script.state_groups[1]
+    assert script.state_groups[1][0].entry_commands == b.state_groups[1][0].entry_commands
+
+
 def edited(*edits):
     document = ItemDocument(VANILLA)
     for table, row, key, value in edits:

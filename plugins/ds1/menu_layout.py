@@ -41,6 +41,7 @@ from pathlib import Path
 import struct
 
 from . import formats
+from core.mod_builds import ModBuildError
 
 RELATIVE = Path("menu/menu.drb.dcx")
 # The Steam Remastered build that exe_patches supports; measured from the install.
@@ -78,8 +79,11 @@ SPRITE_SIZE = 36
 SPRITE_COLOUR = 32  # four bytes: alpha, blue, green, red
 
 
-class LayoutError(ValueError):
+class LayoutError(ModBuildError):
     """The layout or a requested change is not acceptable; nothing changed."""
+
+    def __init__(self, message: str, *, folders=()):
+        super().__init__(folders, message)
 
 
 @dataclass
@@ -570,18 +574,20 @@ def validate(spec: object, owner: str) -> dict:
 
 def compose(original: bytes, specs: list[dict]) -> bytes:
     """Every enabled tweak's nodes and moves applied to the original layout."""
-    nodes = [(spec["owner"], node) for spec in specs for node in spec["nodes"]]
-    moves = [(spec["owner"], move) for spec in specs for move in spec["moves"]]
+    nodes = [(spec["owner"], spec.get("folder"), node) for spec in specs for node in spec["nodes"]]
+    moves = [(spec["owner"], spec.get("folder"), move) for spec in specs for move in spec["moves"]]
     if not nodes and not moves:
         return original
     layout = Drb(formats.inflate(original))
     placed = {(dialog, node.name) for dialog in layout.dialogs() for node in layout.nodes(dialog)}
     seen = {}
-    for owner, node in nodes:
+    for owner, folder, node in nodes:
         key = (node["dialog"], node["name"])
         if key in seen:
-            raise LayoutError(f"{owner} and {seen[key]} both add {node['dialog']}/{node['name']}")
-        seen[key] = owner
+            previous, previous_folder = seen[key]
+            folders = [folder, previous_folder] if folder and previous_folder else []
+            raise LayoutError(f"{owner} and {previous} both add {node['dialog']}/{node['name']}", folders=folders)
+        seen[key] = (owner, folder)
         try:
             if "clone" in node:
                 layout.add_clone(node["dialog"], node["name"], node["clone"], node["rect"],
@@ -594,9 +600,9 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
                 layout.add_text(node["dialog"], node["name"], node["lookLike"], node["dy"], node["length"],
                                 node.get("left"), node.get("dx", 0), node.get("from"), node.get("before"))
         except LayoutError as error:
-            raise LayoutError(f"{owner}: {error}") from error
+            raise LayoutError(f"{owner}: {error}", folders=[folder] if folder else []) from error
     moved = {}
-    for owner, move in moves:
+    for owner, folder, move in moves:
         key = (move["dialog"], move["name"])
         if move.get("optional"):
             # An optional move may re-place a node another tweak added (a
@@ -605,14 +611,18 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
             if key not in placed and key not in seen:
                 continue
         elif key not in placed:
-            raise LayoutError(f"{owner} moves {move['dialog']}/{move['name']}, which is not in the original layout")
+            raise LayoutError(f"{owner} moves {move['dialog']}/{move['name']}, which is not in the original layout",
+                              folders=[folder] if folder else [])
         for field in ("rect", "font", "color"):
             if field not in move:
                 continue
             property_key = (*key, field)
             if property_key in moved:
-                raise LayoutError(f"{owner} and {moved[property_key]} both move {move['dialog']}/{move['name']} ({field})")
-            moved[property_key] = owner
+                previous, previous_folder = moved[property_key]
+                folders = [folder, previous_folder] if folder and previous_folder else []
+                raise LayoutError(f"{owner} and {previous} both move {move['dialog']}/{move['name']} ({field})",
+                                  folders=folders)
+            moved[property_key] = (owner, folder)
         try:
             if "rect" in move:
                 layout.move(move["dialog"], move["name"], move["rect"])
@@ -621,7 +631,7 @@ def compose(original: bytes, specs: list[dict]) -> bytes:
             if "color" in move:
                 layout.set_text_color(move["dialog"], move["name"], move["color"])
         except LayoutError as error:
-            raise LayoutError(f"{owner}: {error}") from error
+            raise LayoutError(f"{owner}: {error}", folders=[folder] if folder else []) from error
     return formats.deflate(original, layout.to_bytes())
 
 
