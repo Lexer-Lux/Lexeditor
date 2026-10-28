@@ -56,6 +56,9 @@ TEXT_ID_AT = 40  # a menu-text node's entry in the menu text archive
 FONT_AT = 20  # a text node's text style id (face, size and colour)
 MIN_FONT, MAX_FONT = 0, 12  # the style ids vanilla uses
 TEXT_COLOUR = 16  # four bytes: alpha, blue, green, red
+# Moves rewrite bytes in place and never grow the file: a menu rework that
+# re-lays several detail panels (each ~50-80 nodes) fits.
+MAX_MOVES = 1024
 
 
 def _color(value, owner: str) -> bytes:
@@ -486,8 +489,8 @@ def validate(spec: object, owner: str) -> dict:
     # Moves rewrite eight bytes each and never grow the file, so a grid
     # rework touching every row of several lists fits; added nodes stay
     # at 128, room for a 40-cell icon grid at three nodes per cell.
-    if not isinstance(moves, list) or len(moves) > 256:
-        raise LayoutError(f"{owner}: list between 0 and 256 layout moves")
+    if not isinstance(moves, list) or len(moves) > MAX_MOVES:
+        raise LayoutError(f"{owner}: list between 0 and {MAX_MOVES} layout moves")
     if not nodes and not moves:
         raise LayoutError(f"{owner}: a layout patch needs nodes or moves")
     text = {"dialog", "name", "lookLike", "dy", "length"}
