@@ -341,6 +341,15 @@ class MoveTests(unittest.TestCase):
             with self.subTest(font=font), self.assertRaises(menu_layout.LayoutError):
                 menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "font": font}]}, "Bad")
 
+    def test_combined_ui_can_add_more_than_one_menus_nodes(self):
+        nodes = [{"dialog": "data_simple_arms", "name": f"cell_{i}",
+                  "clone": "icon_receive", "rect": [0, 0, 20, 20]} for i in range(160)]
+        spec = menu_layout.validate({"version": 1, "nodes": nodes}, "Combined UI")
+        layout = menu_layout.Drb(formats.inflate(menu_layout.compose(dcx(drb()), [spec])))
+        self.assertEqual(len(layout.nodes("data_simple_arms")), 163)
+        with self.assertRaises(menu_layout.LayoutError):
+            menu_layout.validate({"version": 1, "nodes": nodes * 4}, "Too many")
+
     def test_a_move_can_tint_a_text_node(self):
         original = dcx(drb())
         spec = menu_layout.validate({"version": 1, "moves": [{**MOVES[0], "color": "ff40a0ff"}]}, "Tint")

@@ -60,6 +60,7 @@ TEXT_COLOUR = 24  # four bytes: alpha, blue, green, red
 # Moves rewrite bytes in place and never grow the file: a menu rework that
 # re-lays several detail panels (each ~50-80 nodes) fits.
 MAX_MOVES = 1024
+MAX_NODES = 512  # one combined UI mod can extend several menus
 
 
 def _color(value, owner: str) -> bytes:
@@ -483,12 +484,11 @@ def validate(spec: object, owner: str) -> dict:
     if not isinstance(spec, dict) or spec.get("version") != 1 or set(spec) - {"version", "nodes", "moves"}:
         raise LayoutError(f"{owner}: a layout patch needs version 1 with nodes and moves")
     nodes = spec.get("nodes", [])
-    if not isinstance(nodes, list) or len(nodes) > 128:
-        raise LayoutError(f"{owner}: list between 0 and 128 layout nodes")
+    if not isinstance(nodes, list) or len(nodes) > MAX_NODES:
+        raise LayoutError(f"{owner}: list between 0 and {MAX_NODES} layout nodes")
     moves = spec.get("moves", [])
     # Moves rewrite eight bytes each and never grow the file, so a grid
-    # rework touching every row of several lists fits; added nodes stay
-    # at 128, room for a 40-cell icon grid at three nodes per cell.
+    # rework touching every row of several lists fits.
     if not isinstance(moves, list) or len(moves) > MAX_MOVES:
         raise LayoutError(f"{owner}: list between 0 and {MAX_MOVES} layout moves")
     if not nodes and not moves:
