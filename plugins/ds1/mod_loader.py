@@ -33,7 +33,7 @@ mod instead.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 import struct
 import zlib
@@ -790,18 +790,19 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
     changed = [(name, data) for name, data in mods if data != vanilla]
     if not changed:
         return vanilla, []
+    from .assets import MAX_ASSET_BYTES
     try:
-        base_plain = inflate(vanilla)
+        base_plain = inflate(vanilla, max_size=MAX_ASSET_BYTES)
         base_members = members(base_plain)
         plains = []
         for name, data in changed:
-            plain = inflate(data)
+            plain = inflate(data, max_size=MAX_ASSET_BYTES)
             plains.append((name, plain, members(plain)))
     except FormatError:
         return _whole_anibnd(changed, relative, kind)
     for _name, _plain, owned in plains:
         if set(owned) != set(base_members):
-            return _whole_anibnd(changed, relative, kind)
+            return _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind)
     winners: dict[str, bytes] = {}
     owners: dict[str, str] = {}
     conflicts: dict[str, Conflict] = {}
@@ -848,8 +849,71 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
         for member, data in winners.items():
             base = base_members[member]
             merged[base.offset:base.offset + base.size] = data
-        return deflate(vanilla, bytes(merged)), list(conflicts.values())
-    return deflate(vanilla, pack(base_plain, items)), list(conflicts.values())
+        return deflate(vanilla, bytes(merged), max_size=MAX_ASSET_BYTES), list(conflicts.values())
+    return deflate(vanilla, pack(base_plain, items), max_size=MAX_ASSET_BYTES), list(conflicts.values())
+
+
+def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind):
+    """Added, removed and replaced members combine as independent records."""
+    from .assets import MAX_ASSET_BYTES
+    key = lambda entry: entry.name.replace('\\', '/').rsplit('/', 1)[-1]
+    try:
+        base_entries = texts.bnd3_entries(base_plain)
+        base = {key(e): e for e in base_entries}
+        variants = []
+        for name, plain, _members in plains:
+            if plain[:16] != base_plain[:16] or plain[24:32] != base_plain[24:32]:
+                return _whole_anibnd(changed, relative, kind)
+            entries = texts.bnd3_entries(plain)
+            variant = {key(e): e for e in entries}
+            if len(variant) != len(entries):
+                return _whole_anibnd(changed, relative, kind)
+            variants.append((name, variant))
+    except FormatError:
+        return _whole_anibnd(changed, relative, kind)
+    result, owners, conflicts = dict(base), {}, {}
+    for name, variant in variants:
+        for member in base.keys() | variant.keys():
+            theirs = variant.get(member)
+            if theirs == base.get(member):
+                continue
+            if member in owners and result.get(member) != theirs:
+                collision = conflicts.setdefault(member, Conflict(relative, member))
+                collision.add(owners[member])
+                collision.add(name)
+            owners[member] = name
+            if theirs is None:
+                result.pop(member, None)
+            else:
+                result[member] = theirs
+    # Directory additions do not prevent the existing ESD composer from
+    # combining independent state-machine edits to a retained member.
+    for member, original in base.items():
+        if not member.lower().endswith('.esd') or any(member not in variant for _, variant in variants):
+            continue
+        edits = [(name, variant[member]) for name, variant in variants]
+        if any((entry.member_id, entry.name, entry.flags) !=
+               (original.member_id, original.name, original.flags) for _, entry in edits):
+            continue
+        from . import esd_merge
+        try:
+            combined, collisions = esd_merge.compose(original.data, [(name, entry.data) for name, entry in edits])
+        except FormatError:
+            continue
+        result[member] = replace(original, data=combined)
+        conflicts.pop(member, None)
+        for part, names in collisions:
+            part_key = f'{member}/{part}'
+            collision = conflicts.setdefault(part_key, Conflict(relative, part_key))
+            for name in names:
+                collision.add(name)
+    entries = [result[key(e)] for e in base_entries if key(e) in result]
+    entries += sorted((e for name, e in result.items() if name not in base),
+                      key=lambda e: (e.member_id, e.name))
+    if len({e.member_id for e in entries}) != len(entries):
+        return _whole_anibnd(changed, relative, kind)
+    plain = texts.build_bnd3(base_plain, entries)
+    return deflate(vanilla, plain, max_size=MAX_ASSET_BYTES), list(conflicts.values())
 CHANGE_LIMIT = 1000
 FIELD_LIMIT = 25
 
