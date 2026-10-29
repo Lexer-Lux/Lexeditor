@@ -115,7 +115,7 @@ def test_native_save_routing_restart_uninstall_and_cloud_restored_copy(saves_har
     original = tmp_path / 'DRAKS0005.lexeditor.original.bak'
     latest = tmp_path / 'DRAKS0005.lexeditor.latest.bak'
     vanilla.write_bytes(b'vanilla-progress')
-    result = run_save(saves_harness, vanilla, 'write')
+    result = run_save(saves_harness, vanilla, 'thread-write')
     assert result.returncode == 0 and result.stdout.strip() == 'read=vanilla-progress', result
     assert vanilla.read_bytes() == original.read_bytes() == latest.read_bytes() == b'vanilla-progress'
     assert modded.read_bytes() == b'modded-progress'

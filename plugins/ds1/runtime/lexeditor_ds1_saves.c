@@ -66,7 +66,12 @@ int lx_save_path(const wchar_t *input, wchar_t *output, size_t capacity)
         return 0; /* The game supplies a full account path, never a bare name. */
     wmemcpy(output, input, prefix);
     wcscpy(output + prefix, L"DRAKS0005.lexeditor.sl2");
-    wchar_t original[SAVE_PATH], latest[SAVE_PATH], pending[SAVE_PATH];
+    /* Game file-worker threads may have small stacks. Allocate only the path
+     * lengths needed, never four Windows maximum-length buffers on a stack. */
+    size_t path_chars = prefix + 64;
+    wchar_t *storage = HeapAlloc(GetProcessHeap(), 0, path_chars * 3 * sizeof(wchar_t));
+    if (!storage) return 0;
+    wchar_t *original = storage, *latest = storage + path_chars, *pending = storage + path_chars * 2;
     wcscpy(original, output); wcscpy(original + prefix, L"DRAKS0005.lexeditor.original.bak");
     wcscpy(latest, output); wcscpy(latest + prefix, L"DRAKS0005.lexeditor.latest.bak");
     wcscpy(pending, output); wcscpy(pending + prefix, L"DRAKS0005.lexeditor.pending.bak");
@@ -93,6 +98,7 @@ int lx_save_path(const wchar_t *input, wchar_t *output, size_t capacity)
     if (!regular(output, 1)) ok = 0;
 done:
     ReleaseSRWLockExclusive(&save_lock);
+    HeapFree(GetProcessHeap(), 0, storage);
     return ok ? 2 : 0;
 }
 
@@ -100,15 +106,22 @@ static HANDLE WINAPI save_create_file(LPCWSTR name, DWORD access, DWORD sharing,
                                       LPSECURITY_ATTRIBUTES security, DWORD disposition,
                                       DWORD flags, HANDLE template_file)
 {
-    wchar_t path[SAVE_PATH];
-    int result = lx_save_path(name, path, SAVE_PATH);
+    size_t capacity = name ? wcslen(name) + 64 : 0;
+    if (capacity > SAVE_PATH) capacity = SAVE_PATH;
+    wchar_t *path = capacity ? HeapAlloc(GetProcessHeap(), 0, capacity * sizeof(wchar_t)) : NULL;
+    int result = path ? lx_save_path(name, path, capacity) : 0;
     if (!result) {
+        if (path) HeapFree(GetProcessHeap(), 0, path);
         lx_debug_log("Modded save could not be prepared; stopped before opening the vanilla save");
         TerminateProcess(GetCurrentProcess(), 0x4c58);
         SetLastError(ERROR_ACCESS_DENIED);
         return INVALID_HANDLE_VALUE;
     }
-    return real_create_file(result == 2 ? path : name, access, sharing, security, disposition, flags, template_file);
+    HANDLE file = real_create_file(result == 2 ? path : name, access, sharing, security, disposition, flags, template_file);
+    DWORD error = GetLastError();
+    HeapFree(GetProcessHeap(), 0, path);
+    SetLastError(error);
+    return file;
 }
 
 int lx_save_install(unsigned char *image)
