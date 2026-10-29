@@ -1,7 +1,7 @@
 """PC TPF textures merged by name, preserving metadata and DDS payload bytes.
 
 The PC header is 16 bytes, with 20-byte texture records. Layout reference:
-SoulsFormats/Formats/TPF/TPF.cs (MIT), Read and Texture.WriteHeader.
+SoulsFormats/Formats/TPF/TPF.cs (GPL-3.0), Read and Texture.WriteHeader.
 Console headers, optional float records and per-texture compression are
 intentionally refused rather than guessed or reconstructed as PC data.
 """
