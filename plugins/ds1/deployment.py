@@ -36,7 +36,7 @@ from pathlib import Path
 import stat
 
 from core.plugin_files import atomic_write
-from . import assets
+from . import assets, emevd
 from .assets import MAX_ASSET_BYTES as MAX_ASSET
 from .formats import FormatError, ItemDocument, MAX_ARCHIVE, inflate, members
 from .msb import MAP_DIR, MsbDocument
@@ -133,6 +133,9 @@ def _check_asset_like(game_root: Path, relative: Path, payload: bytes) -> None:
     live = Path(game_root) / relative
     if not live.is_file():
         raise FileNotFoundError(f"The installed game has no {relative.as_posix()}; cannot safely preserve its original data.")
+    if emevd.is_event_file(relative):
+        emevd.read(inflate(payload) if payload.startswith(b'DCX\0') else payload)
+        return
     try:
         members(inflate(live.read_bytes()))
     except FormatError:

@@ -28,6 +28,14 @@ terms, with license files riding the per-plugin credits automation.
 (An earlier agent note claimed GPL excluded; that was never Lexer's
 decision.)
 
+## Event-script composition (emevd.py)
+
+DS1 EMEVD layout facts were checked against TKGP / JKAnderson's SoulsFormats,
+`SoulsFormats/Formats/EMEVD/{EMEVD,Event,Instruction,Parameter,Layer}.cs`.
+Its repository license is GPL-3.0. This bounded DS1 reader, writer and event-ID
+composer are an original implementation; no upstream code is redistributed.
+https://github.com/JKAnderson/SoulsFormats
+
 ## Named texture composition (texture_packs.py)
 
 PC TPF directory and encoding facts were checked against TKGP / JKAnderson's

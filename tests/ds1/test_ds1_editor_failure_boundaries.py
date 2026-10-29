@@ -277,6 +277,162 @@ def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path,
     assert len(calls) == 2
 
 
+def event_fixture():
+    import struct
+    from plugins.ds1 import emevd
+    call = lambda slot, identity, value=0: emevd.Instruction(2000, 0, struct.pack('<III', slot, identity, value))
+    body = emevd.Instruction(100, 1, b'\0' * 8, layer=0x80000001)
+    parameter = emevd.Parameter(0, 4, 0, 4)
+    document = emevd.Document((emevd.Event(0, (call(0, 100),)),
+                               emevd.Event(100, (body,), (parameter,), rest=1)), (0,), b'common\0')
+    return emevd, document, call
+
+
+def test_event_records_round_trip_layers_parameters_and_strings():
+    emevd, document, _ = event_fixture()
+    assert emevd.read(emevd.write(document)) == document
+
+
+@pytest.mark.parametrize('wrapped', [False, True])
+@pytest.mark.parametrize('has_original', [False, True])
+def test_event_mods_add_independent_events_and_constructor_calls(tmp_path, wrapped, has_original):
+    from dataclasses import replace
+    from ds1_fixture import make_archive
+    from plugins.ds1 import formats
+    emevd, original, call = event_fixture()
+    first = replace(original, events=(replace(original.events[0], instructions=original.events[0].instructions + (call(1, 1001),)),
+                                     original.events[1], emevd.Event(1001, (emevd.Instruction(2003, 1, b'first'),))))
+    second = replace(original, events=(replace(original.events[0], instructions=original.events[0].instructions + (call(2, 1002),)),
+                                      original.events[1], emevd.Event(1002, (emevd.Instruction(2003, 1, b'second'),))))
+    wrap = lambda document: formats.deflate(make_archive(), emevd.write(document)) if wrapped else emevd.write(document)
+    relative = Path('event/common.emevd' + ('.dcx' if wrapped else ''))
+    vanilla = {relative: wrap(original)} if has_original else {}
+    mods = [mod_loader.Mod(name, tmp_path / name, {relative: wrap(document)})
+            for name, document in [('First', first), ('Second', second)]]
+    result = mod_loader.compose(vanilla, mods)
+    # A new file has no known constructor to extend: different event 0
+    # definitions remain a truthful record conflict, while added IDs survive.
+    assert [c.part for c in result.conflicts] == ([] if has_original else ['event 0'])
+    raw = result.files[relative]
+    output = emevd.read(formats.inflate(raw) if wrapped else raw)
+    by_id = {event.id: event for event in output.events}
+    assert set(by_id) == {0, 100, 1001, 1002}
+    assert by_id[100] == original.events[1]
+    if has_original:
+        assert by_id[0].instructions == original.events[0].instructions + (call(1, 1001), call(2, 1002))
+    assert output.strings == original.strings and output.linked == original.linked
+    assert not mod_loader.compose(vanilla, mods, conflicts_only=True).files
+
+
+def test_event_conflicts_keep_event_and_run_event_identity():
+    from dataclasses import replace
+    emevd, original, call = event_fixture()
+    constructor = original.events[0]
+    first = replace(original, events=(replace(constructor, instructions=constructor.instructions + (call(1, 1001, 7),)),))
+    second = replace(original, events=(replace(constructor, instructions=constructor.instructions + (call(1, 1001, 9),)),
+                                      replace(original.events[1], rest=2)))
+    combined, conflicts = emevd.merge(original, [('First', first), ('Second', second)])
+    assert conflicts == {'event 0 / RunEvent 1001 slot 1': ['First', 'Second'], 'event 100': ['First', 'Second']}
+    assert combined.events[0].instructions[-1] == call(1, 1001, 9)
+    assert combined.events[1].rest == 2
+
+
+def test_non_append_constructor_changes_are_not_guessed():
+    from dataclasses import replace
+    emevd, original, call = event_fixture()
+    changed = replace(original, events=(replace(original.events[0], instructions=(call(3, 1003),)), original.events[1]))
+    added = replace(original, events=(replace(original.events[0], instructions=original.events[0].instructions + (call(4, 1004),)), original.events[1]))
+    _, conflicts = emevd.merge(original, [('Changed', changed), ('Added', added)])
+    assert conflicts == {'event 0': ['Changed', 'Added']}
+
+
+@pytest.mark.parametrize('damage', ['header', 'count', 'event', 'argument', 'parameter'])
+def test_malformed_event_mod_is_attributed_without_disabling_other_mods(tmp_path, damage):
+    import struct
+    emevd, original, _ = event_fixture()
+    good = emevd.write(original)
+    bad = bytearray(good)
+    if damage == 'header':
+        bad[5] = 255  # Unsupported 64-bit format.
+    elif damage == 'count':
+        struct.pack_into('<i', bad, 16, 1000000)
+    elif damage == 'event':
+        struct.pack_into('<i', bad, 84 + 28, 0)
+    elif damage == 'argument':
+        instruction_offset = struct.unpack_from('<i', bad, 28)[0]
+        struct.pack_into('<i', bad, instruction_offset + 12, len(bad))
+    else:
+        parameter_offset = struct.unpack_from('<i', bad, 52)[0]
+        struct.pack_into('<i', bad, parameter_offset, 1000000)
+    relative = Path('event/common.emevd')
+    game = tmp_path / 'game'
+    path = game / relative
+    path.parent.mkdir(parents=True)
+    path.write_bytes(good)
+    broken = tmp_path / 'broken'
+    mods = [mod_loader.Mod('Healthy', tmp_path / 'healthy', {relative: good}),
+            mod_loader.Mod('Broken', broken, {relative: bytes(bad)})]
+    with pytest.raises(mod_builds.ModBuildError) as caught:
+        mod_loader.compose_installed(game, mods)
+    assert caught.value.folders == (broken.resolve(),)
+
+
+def test_corrupt_original_event_is_an_operation_error(tmp_path):
+    from plugins.ds1.formats import FormatError
+    emevd, original, _ = event_fixture()
+    relative = Path('event/common.emevd')
+    game = tmp_path / 'game'
+    path = game / relative
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b'broken original')
+    with pytest.raises(FormatError):
+        mod_loader.compose_installed(game, [mod_loader.Mod('Healthy', tmp_path / 'healthy', {relative: emevd.write(original)})])
+
+
+def test_script_event_outputs_are_enumerated_and_deployed(game, tmp_path):
+    from dataclasses import replace
+    from plugins.ds1 import deployment
+    emevd, document, _ = event_fixture()
+    original = emevd.write(document)
+    document = replace(document, events=document.events + (emevd.Event(1001, (emevd.Instruction(2003, 1, b'new'),)),))
+    raw = emevd.write(document)
+    relative = Path('event/common.emevd')
+    installed = game / relative
+    installed.parent.mkdir(parents=True)
+    installed.write_bytes(original)
+    library = tmp_path / 'mods'
+    root = make_script(library, source='def build(settings, context):\n    return {"event/common.emevd": ' + repr(raw) + '}\n')
+    from plugins.ds1.store import MARKER
+    (root / MARKER).touch()
+    result = script_mods.build(root, tweak_mods.BuildContext({}, game_root=game), allowed_roots=tweak_mods.ALLOWED_ROOTS)
+    assert result['written'] == ['event/common.emevd']
+    mod = mod_loader.read_mod(root, 'Healthy')
+    assert mod.files[relative] == raw
+    composition = mod_loader.compose_installed(game, [mod])
+    deployment.apply(game, root, composed=composition.files)
+    assert (game / relative).read_bytes() == raw
+    deployment.disable(game)
+    assert (game / relative).read_bytes() == original
+
+
+def test_event_only_mod_import_and_deployment_validation(game, tmp_path):
+    from plugins.ds1 import deployment
+    relative = Path('event/common.emevd.dcx')
+    result = Ds1ModAdapter().inspect(tmp_path, [relative])
+    assert result['valid'] and result['packages'] == [relative.as_posix()]
+    assert not result['notDeployed']
+    emevd, document, _ = event_fixture()
+    from ds1_fixture import make_archive
+    from plugins.ds1 import formats
+    path = game / relative
+    path.parent.mkdir(parents=True)
+    original = formats.deflate(make_archive(), emevd.write(document))
+    path.write_bytes(original)
+    with pytest.raises(formats.FormatError):
+        deployment._check_asset_like(game, relative, b'broken event output')
+    assert path.read_bytes() == original
+
+
 @pytest.mark.parametrize('wrapped', [False, True])
 def test_texture_additions_edits_and_removals_combine_by_name(tmp_path, wrapped):
     from test_ds1_assets import make_tpf, make_dds

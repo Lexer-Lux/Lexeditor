@@ -17,7 +17,7 @@ from time import perf_counter
 from core import memory_conflicts, mod_requires, script_mods
 from core.mod_conflicts import MAX_LISTED
 
-from . import assets, deployment, mod_loader, texts, tweak_mods
+from . import assets, deployment, emevd, mod_loader, texts, tweak_mods
 from .store import MARKER, RELATIVE
 
 MARKER_TEXT = (Path(__file__).with_name("project-template") / MARKER).read_bytes()
@@ -73,14 +73,14 @@ class Ds1ModAdapter:
         for path in files:
             folded = path.as_posix().casefold()
             if (folded in DATA_FILES or (folded.startswith(MAP_PREFIX) and folded.endswith(".msb"))
-                    or assets.is_character_file(path)):
+                    or assets.is_character_file(path) or emevd.is_event_file(path)):
                 packages.append(path.as_posix())
             else:
                 ignored.append(path.as_posix())
         problems = [] if packages or tweak else [
             f"This folder has no Dark Souls Remastered mod files. A data mod keeps "
             f"{RELATIVE.as_posix()}, {texts.RELATIVE.as_posix()}, {texts.MENU_RELATIVE.as_posix()} "
-            f"and/or map and character files; a tweak mod has a script."]
+            f"and/or map, character and event files; a tweak mod has a script."]
         return {"valid": not problems, "problems": problems, "packages": sorted(packages),
                 "assets": {}, "notDeployed": sorted(ignored)}
 

@@ -45,7 +45,7 @@ import zlib
 
 from plugins.ds3.formats import DS3FormatError, ParamView
 
-from . import assets, texts
+from . import assets, texts, emevd
 from .formats import FormatError, MAX_ARCHIVE, TABLES, deflate, inflate, members, pack, schema
 from .msb import MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError
 from .store import MARKER, RELATIVE
@@ -244,14 +244,14 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
             if original is not None:
                 compose({relative: original}, [Mod('Vanilla', Path(game_root), {relative: original})],
                         conflicts_only=True)
-                failed = []
-                for mod in selected:
-                    try:
-                        compose({relative: original}, [mod], conflicts_only=True)
-                    except Exception:
-                        failed.append(mod.folder)
-                if failed:
-                    raise ModBuildError(failed, f'{relative}: {error}') from error
+            failed = []
+            for mod in selected:
+                try:
+                    compose({relative: original} if original is not None else {}, [mod], conflicts_only=True)
+                except Exception:
+                    failed.append(mod.folder)
+            if failed:
+                raise ModBuildError(failed, f'{relative}: {error}') from error
             raise
         files.update(result.files)
         conflicts.extend(result.conflicts)
@@ -408,6 +408,13 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool
             files[relative] = result[0]
     for relative in sorted({name for mod in mods for name in mod.files if _is_asset(name)}):
         have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
+        if emevd.is_event_file(relative):
+            original = vanilla.get(relative)
+            result = _compose_emevd(original, have, relative, conflicts_only=conflicts_only)
+            conflicts += result[1]
+            if result[0] != original:
+                files[relative] = result[0]
+            continue
         if relative not in vanilla:
             if have:
                 files[relative] = have[-1][1]
@@ -923,6 +930,36 @@ def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) 
             conflict.add(name)
         conflicts.append(conflict)
     return (vanilla if combined == original else deflate(vanilla, combined)), conflicts
+
+
+def _compose_emevd(vanilla, mods, relative, *, conflicts_only=False):
+    changed = [(name, data) for name, data in mods if data != vanilla]
+    if vanilla is None and not changed:
+        return None, []
+    template = vanilla if vanilla is not None else changed[0][1]
+    wrapped = template.startswith(b'DCX\0')
+    def parse(data):
+        if data.startswith(b'DCX\0') != wrapped:
+            raise FormatError('EMEVD container compression differs between inputs')
+        return emevd.read(inflate(data) if wrapped else data)
+    original = parse(vanilla) if vanilla is not None else None
+    if not changed:
+        return vanilla, []
+    variants = [(name, parse(data)) for name, data in changed]
+    if original is None:
+        original = emevd.Document((), variants[0][1].linked, variants[0][1].strings)
+    if any((doc.linked, doc.strings) != (original.linked, original.strings) for _, doc in variants):
+        return _whole_anibnd(changed, relative, 'event archive with changed string data')
+    combined, collisions = emevd.merge(original, variants, conflicts_only=conflicts_only)
+    conflicts = [Conflict(relative, part, owners) for part, owners in sorted(collisions.items())]
+    if conflicts_only:
+        return vanilla, conflicts
+    if len(changed) == 1:
+        return changed[0][1], conflicts
+    if combined == original:
+        return vanilla, conflicts
+    plain = emevd.write(combined)
+    return (deflate(template, plain) if wrapped else plain), conflicts
 
 
 def _compose_tpf(vanilla, mods, relative, *, conflicts_only=False):

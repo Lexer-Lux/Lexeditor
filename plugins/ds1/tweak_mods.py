@@ -41,7 +41,7 @@ from core.process_probe import live_processes
 
 from . import exe_patches, menu_dim, menu_layout, menu_scripts
 
-ALLOWED_ROOTS = ("native", "layout", "esd", "menu-dim", "script", "msg")
+ALLOWED_ROOTS = ("native", "layout", "esd", "menu-dim", "script", "msg", "event")
 BACKUP_FILE = "DarkSoulsRemastered.exe.lexeditor-original"
 MANIFEST_FILE = "DarkSoulsRemastered.exe.lexeditor-tweaks.json"
 MODS_ENV = "LEXEDITOR_DS1_MODS_ROOT"
