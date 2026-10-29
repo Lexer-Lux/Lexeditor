@@ -197,6 +197,86 @@ def test_valid_cached_conflict_report_keeps_peer_names(tmp_path, monkeypatch):
     assert result.conflicts[0].mods == ['A', 'B']
 
 
+def test_combined_parameter_reads_reuse_archive_cache_and_skip_other_assets(tmp_path, monkeypatch):
+    from collections import OrderedDict
+    from ds1_fixture import make_archive
+    from plugins.ds1.formats import ItemDocument
+    game_root, library = tmp_path / 'game', tmp_path / 'library'
+    source = make_archive()
+    live = game_root / mod_loader.RELATIVE
+    live.parent.mkdir(parents=True)
+    live.write_bytes(source)
+    data = library / 'Data'
+    (data / mod_loader.RELATIVE).parent.mkdir(parents=True)
+    (data / mod_loader.MARKER).touch()
+    (data / 'mod.json').write_text(json.dumps({'name':'Parameter cache fixture', 'enabled':True}), encoding='utf-8')
+    output = data / mod_loader.RELATIVE
+    output.write_bytes(source)
+    unrelated = data / 'script/talk/unused.talkesdbnd.dcx'
+    unrelated.parent.mkdir(parents=True)
+    unrelated.write_bytes(b'not needed for a parameter lookup')
+    read = Path.read_bytes
+    def checked_read(path):
+        assert path != unrelated, 'Parameter lookup read an unrelated archive'
+        return read(path)
+    monkeypatch.setattr(Path, 'read_bytes', checked_read)
+    monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
+    monkeypatch.setattr(mod_loader, '_compose_cache_bytes', 0)
+    compose = mod_loader._compose_params
+    calls = []
+    def counted(*args, **kwargs):
+        calls.append(True)
+        return compose(*args, **kwargs)
+    monkeypatch.setattr(mod_loader, '_compose_params', counted)
+    def context():
+        return tweak_mods.BuildContext({}, game_root, library, cache_root=tmp_path / 'cache')
+    assert context().game_params() == source
+    assert context().game_params() == source
+    assert len(calls) == 1
+    mod_loader._compose_cache.clear()
+    monkeypatch.setattr(mod_loader, '_compose_cache_bytes', 0)
+    assert context().game_params() == source
+    assert len(calls) == 1
+    output.write_bytes(make_archive(field_values={'EquipParamGoods': {100: {'basicPrice': 17}}}))
+    assert ItemDocument(context().game_params()).value('EquipParamGoods', 100, 'basicPrice') == 17
+    assert len(calls) == 2
+
+
+def test_editor_only_source_changes_do_not_invalidate_archive_outputs(monkeypatch):
+    mod_loader._composition_revision.cache_clear()
+    baseline = mod_loader._composition_revision()
+    read = Path.read_bytes
+    changed = {'name': 'server.py'}
+    def edited(path):
+        contents = read(path)
+        return contents + b'\n# source edit' if path.parent == Path(mod_loader.__file__).parent and path.name == changed['name'] else contents
+    monkeypatch.setattr(Path, 'read_bytes', edited)
+    try:
+        mod_loader._composition_revision.cache_clear()
+        assert mod_loader._composition_revision() == baseline
+        changed['name'] = 'mod_loader.py'
+        mod_loader._composition_revision.cache_clear()
+        assert mod_loader._composition_revision() != baseline
+    finally:
+        mod_loader._composition_revision.cache_clear()
+
+
+def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path, monkeypatch):
+    calls = []
+    def compose(*args):
+        calls.append(True)
+        return b'compiled fixture'
+    monkeypatch.setattr(tweak_mods.menu_layout, 'compose', compose)
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'composer-one')
+    first = tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path)
+    monkeypatch.setattr(tweak_mods, '_script_compiler_revision', lambda: 'unrelated script change')
+    assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
+    assert len(calls) == 1
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'composer-two')
+    assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
+    assert len(calls) == 2
+
+
 def test_linked_library_entry_is_off_without_hiding_healthy_mod(tmp_path):
     from core import mods_service
     library = tmp_path / 'library'
@@ -339,6 +419,9 @@ def test_full_activation_recovers_broken_script_and_corrupt_caches(game, tmp_pat
     assert json.loads((broken / 'mod.json').read_text())['enabled'] is False
     assert json.loads((dependent / 'mod.json').read_text())['enabled'] is False
     assert (healthy / 'native/result.txt').read_bytes() == b'valid'
+    assert result['timings']['scripts'][0]['mod'] == 'Healthy'
+    report = json.loads((cache / 'conflicts.json').read_text('utf-8'))
+    assert report['timings'] == result['timings']
     # A fresh adapter can still inspect the library and perform another Save.
     adapter = Ds1ModAdapter()
     adapter.attach_context(library_root=library, game_root=game)

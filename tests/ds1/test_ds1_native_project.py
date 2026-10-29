@@ -75,7 +75,7 @@ def test_new_projects_have_no_baked_balance_preset(project):
 def test_project_and_library_tweaks_share_one_composed_image(project, monkeypatch):
     game, mod, store, rules, original = project
     other = other_spec(original)
-    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None: [other])
+    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None, **kwargs: [other])
     edit_rules(rules)
     status = rules.apply(store)
     spec = exe_patches.validate(rules._contribution(original)["spec"], "Project native rules")
@@ -92,14 +92,14 @@ def test_library_apply_preserves_last_applied_project_rules(project, monkeypatch
     game, mod, store, rules, original = project
     edit_rules(rules)
     rules.apply(store)
-    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None: [other_spec(original)])
+    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None, **kwargs: [other_spec(original)])
     tweak_mods.apply(game)
     contribution = rules._contribution(original)
     expected = exe_patches.runtime_patch(original, [other_spec(original),
         exe_patches.validate(contribution["spec"], "Project native rules")])
     assert runtime(game) == expected and image(game) == original
     # Removing the library mod does not remove native rules.
-    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None: [])
+    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None, **kwargs: [])
     tweak_mods.apply(game)
     assert runtime(game) == exe_patches.runtime_patch(original, [
         exe_patches.validate(contribution["spec"], "Project native rules")])
@@ -108,7 +108,7 @@ def test_library_apply_preserves_last_applied_project_rules(project, monkeypatch
 def test_reset_project_rules_preserves_library_mod_and_full_restore_is_exact(project, monkeypatch):
     game, mod, store, rules, original = project
     other = other_spec(original)
-    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None: [other])
+    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None, **kwargs: [other])
     edit_rules(rules); rules.apply(store)
     rules.value = deepcopy(DEFAULTS); rules.save(); rules.apply(store)
     assert runtime(game) == exe_patches.runtime_patch(original, [other])
@@ -127,7 +127,7 @@ def test_hook_conflict_changes_neither_installed_file(project, monkeypatch):
         "rva": load_bands_patch.CLASS_RVA,
         "original": original[load_bands_patch.CLASS_OFFSET:load_bands_patch.CLASS_OFFSET+5].hex(),
         "bytes": "90" * 5}]}, "Conflicting mod")
-    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None: [conflict])
+    monkeypatch.setattr(tweak_mods, "build_specs", lambda root=None, game_root=None, **kwargs: [conflict])
     with pytest.raises(ValueError, match="both patch"):
         rules.apply(store)
     assert image(game) == original and (game / RELATIVE).read_bytes() == before_param

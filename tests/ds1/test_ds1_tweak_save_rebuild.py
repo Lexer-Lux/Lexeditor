@@ -677,7 +677,7 @@ def test_script_build_rechecks_combined_game_params(game, library, monkeypatch):
     source = game / mod_loader.RELATIVE
     source.parent.mkdir(parents=True)
     source.write_bytes(b'original parameter inputs')
-    monkeypatch.setattr(mod_loader, 'active_mods', lambda root: [])
+    monkeypatch.setattr(mod_loader, 'active_mods', lambda root, **kwargs: [])
     monkeypatch.setattr(mod_loader, '_compose_params', lambda original, mods: (original, []))
     tweak_mods.apply(game, library)
     loads = []
@@ -710,13 +710,14 @@ def test_script_build_rechecks_original_game_files(game, library, monkeypatch):
 
 @pytest.mark.parametrize('managed', [tweak_mods.LAYOUT, *tweak_mods.ESD])
 def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkeypatch, managed):
+    from plugins.ds1 import mod_loader
     calls = []
     def compose(original, specs, *args):
         calls.append((original, specs))
         return b'compiled:' + original + json.dumps(specs).encode()
     monkeypatch.setattr(tweak_mods.menu_layout, 'compose', compose)
     monkeypatch.setattr(tweak_mods.menu_scripts, 'compose', compose)
-    monkeypatch.setattr(tweak_mods, '_script_compiler_revision', lambda: 'compiler-one')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-one')
     specs = [{'owner': 'example', 'changes': []}]
     expected = tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
     # No in-memory result cache is involved: reopen the persisted store.
@@ -724,7 +725,7 @@ def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkey
     assert len(calls) == 1
     tweak_mods._compose_menu(b'changed original', specs, managed, tmp_path)
     tweak_mods._compose_menu(b'vanilla', [{'owner': 'different', 'changes': []}], managed, tmp_path)
-    monkeypatch.setattr(tweak_mods, '_script_compiler_revision', lambda: 'compiler-two')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-two')
     tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
     assert len(calls) == 4
 

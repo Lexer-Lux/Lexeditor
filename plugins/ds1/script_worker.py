@@ -29,6 +29,7 @@ def _evaluate(root, settings, context):
     request = {'root': str(root), 'settings': settings, 'current': context.current,
                'enabled': {name: str(path) for name, path in context._enabled.items()},
                'game': str(context.game_root) if context.game_root else None,
+               'cache': str(context._cache_root) if getattr(context, '_cache_root', None) else None,
                'library': str(context._library_root) if context._library_root else None}
     environment = os.environ.copy()
     environment.pop('LEXEDITOR_SERVICE_PIPE', None)
@@ -86,7 +87,8 @@ def main():
     from .tweak_mods import BuildContext
     context = BuildContext({name: Path(path) for name, path in request['enabled'].items()},
                            Path(request['game']) if request['game'] else None,
-                           Path(request['library']) if request['library'] else None)
+                           Path(request['library']) if request['library'] else None,
+                           cache_root=Path(request['cache']) if request.get('cache') else None)
     context.current = request['current']
     context.begin_build(Path(request['root']))
     params_path = Path(request['params'])

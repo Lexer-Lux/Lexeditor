@@ -28,6 +28,7 @@ import os
 from pathlib import Path, PurePosixPath
 import sys
 import threading
+from time import perf_counter
 from typing import Any, Callable
 
 from core.plugin_files import atomic_write
@@ -453,7 +454,7 @@ def execute_script(root: Path, current: dict, context: Any) -> dict:
 
 
 def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...],
-                error: type[Exception] = ScriptModError) -> list[dict]:
+                error: type[Exception] = ScriptModError, timings: list | None = None) -> list[dict]:
     """Build every row (enabled tweak mods, in load order), or none of them.
 
     Each row carries id, name, path, schema and error, as catalog_row
@@ -482,7 +483,11 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
     try:
         for row in rows:
             context.current = row["name"]
+            started = perf_counter()
             result = build(Path(row["path"]), context, allowed_roots=allowed_roots)
+            if timings is not None:
+                timings.append({'mod': row['name'], 'seconds': perf_counter() - started,
+                                'cached': result.get('cached', False)})
             built.append({"id": row["id"], "files": result["files"]})
     except Exception as failure:
         failures = []

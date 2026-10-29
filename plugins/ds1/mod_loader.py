@@ -106,7 +106,7 @@ class Composition:
                             {mod.name: str(mod.folder) for mod in mods})
 
 
-def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
+def content_files(folder: Path, name: str, *, only=None) -> list[tuple[Path, Path]]:
     """(key, disk path) of every file read_mod would read, without reading.
 
     The conflict cache stamps these instead of hashing their bytes, so an
@@ -116,12 +116,16 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
     folder = checked(Path(folder))
     found = []
     for relative in FILES:
+        if only is not None and relative not in only:
+            continue
         path = checked(folder / relative)
         if not path.is_file():
             continue
         if path.stat().st_size > MAX_ARCHIVE:
             raise ValueError(f"{name}: {path.name} is too large")
         found.append((relative, path))
+    if only is not None and only <= frozenset(FILES):
+        return found
     maps = checked(folder / MAP_DIR)
     if maps.is_dir():
         candidates = sorted(maps.glob("*.msb"))
@@ -155,7 +159,7 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
     return found
 
 
-def read_mod(folder: Path, name: str) -> Mod | None:
+def read_mod(folder: Path, name: str, *, only=None) -> Mod | None:
     """A DS1 data mod's saved files, or None for a folder that is not one."""
     from .tweak_mods import checked
     folder = checked(Path(folder))
@@ -163,7 +167,7 @@ def read_mod(folder: Path, name: str) -> Mod | None:
         return None
     files = {}
     try:
-        for key, path in content_files(folder, name):
+        for key, path in content_files(folder, name, only=only):
             files[key] = path.read_bytes()
     except Exception as error:
         from core.mod_builds import ModBuildError
@@ -171,7 +175,7 @@ def read_mod(folder: Path, name: str) -> Mod | None:
     return Mod(name, folder, files)
 
 
-def active_mods(library_root: Path, project_root: Path | None = None) -> list[Mod]:
+def active_mods(library_root: Path, project_root: Path | None = None, *, only=None) -> list[Mod]:
     """The data mods to combine, in the Mods tab's load order.
 
     Every enabled mod in the library, and the open project too: applying a
@@ -184,12 +188,12 @@ def active_mods(library_root: Path, project_root: Path | None = None) -> list[Mo
         folder = Path(row["path"]).resolve()
         if not row["enabled"] and folder != (Path(project_root).resolve() if project_root else None):
             continue
-        mod = read_mod(folder, row["name"])
+        mod = read_mod(folder, row["name"], only=only)
         if mod is not None:
             mods.append(mod)
             seen.add(folder)
     if project_root is not None and Path(project_root).resolve() not in seen:
-        mod = read_mod(Path(project_root), Path(project_root).name)
+        mod = read_mod(Path(project_root), Path(project_root).name, only=only)
         if mod is not None:
             mods.append(mod)
     return mods
@@ -260,7 +264,11 @@ def _composition_revision():
     # uncommitted edits. Schema data also determines PARAM merge units/labels.
     from .formats import METADATA
     digest = sha256()
-    sources = [*Path(__file__).parent.glob('*.py'),
+    # Request handling, script transport, cache I/O and native tweak planning
+    # cannot change an archive composed from these already-built input bytes.
+    unrelated = {'server.py', 'script_worker.py', 'plugin.py', 'mod_support.py',
+                 'tweak_mods.py', 'composition_cache.py'}
+    sources = [*(path for path in Path(__file__).parent.glob('*.py') if path.name not in unrelated),
                Path(__file__).parents[1] / 'ds3/formats.py',
                *(path for path in METADATA.rglob('*') if path.suffix in ('.xml', '.json'))]
     for path in sorted(sources):

@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 import hashlib
 import json
+from time import perf_counter
 
 from core import memory_conflicts, mod_requires, script_mods
 from core.mod_conflicts import MAX_LISTED
@@ -111,42 +112,47 @@ class Ds1ModAdapter:
         game_root = Path(game_root)
         library = self._library()
         tweak_mods.ensure_game_closed()
+        started = perf_counter()
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library, cache_root=self._cache_root())
+            prepared = perf_counter()
             ordered = self._ordered_mods(mods)
             try:
                 content = self._content_signature(ordered)
             except Exception:
                 content = None
             report = self._read_report(game_root, ordered)
-            if report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered]:
+            reused = bool(report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered])
+            if reused:
                 # Native settings can change while every data input and
                 # installed data file stays the same. Keep that deployment.
-                tweak_mods.commit(game_root, plan)
                 conflicts = [mod_loader.Conflict(Path(file), part, names)
                              for file, part, names in report["conflicts"]]
-                self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content)
-                return {"activated": [Path(path).name for path in mods],
-                        "dataMods": [name for name, _folder in ordered],
-                        "conflicts": len(conflicts)}
-            data = self._mods(mods)
-            composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root())
+                names = [name for name, _folder in ordered]
+            else:
+                data = self._mods(mods)
+                composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root())
+                conflicts, names = composition.conflicts, [mod.name for mod in data]
+            composed = perf_counter()
             tweak_mods.commit(game_root, plan)
             try:
-                if composition.files:
+                if not reused and composition.files:
                     # The last data mod in load order owns the deployment record.
                     deployment.apply(game_root, data[-1].folder, composed=composition.files)
-                elif any(deployment.status(game_root, None).get(key) for key in ("enabled", "everApplied")):
+                elif not reused and any(deployment.status(game_root, None).get(key) for key in ("enabled", "everApplied")):
                     deployment.disable(game_root)
             except Exception:
                 tweak_mods.rollback(game_root, plan)
                 raise
         # The build already compared these records. Publish that report for
         # both the host's Mods tab and selector, including after a restart.
-        self._save_report(game_root, ordered, composition.conflicts, installed=True, expected_content=content)
+        finished = perf_counter()
+        timings = {'prepareSeconds': prepared - started, 'compositionSeconds': composed - prepared,
+                   'deploymentSeconds': finished - composed, 'activationSeconds': finished - started,
+                   'reusedInstalledData': reused, 'scripts': plan.get('scripts', [])}
+        self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content, timings=timings)
         return {"activated": [Path(path).name for path in mods],
-                "dataMods": [mod.name for mod in data],
-                "conflicts": len(composition.conflicts)}
+                "dataMods": names, "conflicts": len(conflicts), 'timings': timings}
 
     def active_mod_ids(self, game_root: Path) -> list[str]:
         from core import mods_service
@@ -207,7 +213,8 @@ class Ds1ModAdapter:
                     originals.append((str(source), stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns))
                 except FileNotFoundError:
                     originals.append((str(source), None))
-        encoded = json.dumps([cls.REPORT_VERSION, str(game_root.resolve()), content, originals],
+        encoded = json.dumps([cls.REPORT_VERSION, mod_loader._composition_revision().hex(),
+                              str(game_root.resolve()), content, originals],
                              sort_keys=True).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
@@ -237,7 +244,7 @@ class Ds1ModAdapter:
         return self._lines_for_order([(Path(file), part, names) for file, part, names in report["conflicts"]], ordered)
 
     def _save_report(self, game_root, ordered, conflicts, *, installed=False,
-                     expected_key=None, expected_content=None):
+                     expected_key=None, expected_content=None, timings=None):
         from core.plugin_files import atomic_write
         try:
             key = self._report_key(game_root, ordered)
@@ -249,6 +256,8 @@ class Ds1ModAdapter:
                       "conflicts": [[str(row.file), row.part, list(row.mods)] for row in conflicts]}
             if installed:
                 report["installedOrder"] = [str(folder.resolve()) for _name, folder in ordered]
+            if timings is not None:
+                report['timings'] = timings
             encoded = json.dumps(report).encode("utf-8")
             if len(encoded) > self.REPORT_LIMIT:
                 return

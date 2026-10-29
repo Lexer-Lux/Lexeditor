@@ -321,10 +321,11 @@ class BuildContext:
     """What a DS1 tweak script gets from Lexeditor."""
 
     def __init__(self, enabled: dict[str, Path], game_root: Path | None = None,
-                 library_root: Path | None = None):
+                 library_root: Path | None = None, *, cache_root=None):
         self._enabled = enabled
         self.game_root = Path(game_root) if game_root is not None else None
         self._library_root = library_root
+        self._cache_root = cache_root
         self._params: bytes | None = None
         self.current = ""
         self._inputs = {}
@@ -414,11 +415,12 @@ class BuildContext:
                 if not source.is_file():
                     self._remember('params', 'game', None)
                     return None
-                mods = mod_loader.active_mods(self._library_root or mods_root())
+                mods = mod_loader.active_mods(self._library_root or mods_root(), only=frozenset({mod_loader.RELATIVE}))
                 selected = [mod_loader.Mod(mod.name, mod.folder, {mod_loader.RELATIVE: mod.files[mod_loader.RELATIVE]})
                             for mod in mods if mod_loader.RELATIVE in mod.files]
-                self._params = mod_loader._compose_params(source.read_bytes(),
-                    [(mod.name, mod.files[mod_loader.RELATIVE]) for mod in selected])[0]
+                original = source.read_bytes()
+                combined = mod_loader._compose_file(mod_loader.RELATIVE, original, selected, False, self._cache_root)
+                self._params = combined.files.get(mod_loader.RELATIVE, original)
             except script_mods.ModBuildError:
                 raise
             except Exception as error:
@@ -461,10 +463,10 @@ class BuildContext:
 @lru_cache(maxsize=1)
 def _script_compiler_revision():
     from .mod_loader import _composition_revision
-    return _sha(_composition_revision() + Path(script_mods.__file__).read_bytes())
+    return _sha(_composition_revision() + Path(script_mods.__file__).read_bytes() + Path(__file__).read_bytes())
 
 
-def build_specs(root: Path | None = None, game_root: Path | None = None) -> list[dict]:
+def build_specs(root: Path | None = None, game_root: Path | None = None, *, cache_root=None, timings=None) -> list[dict]:
     """Build every enabled tweak mod and read back its executable patches.
 
     Mods whose build patches the executable need the loader mod switched
@@ -478,8 +480,8 @@ def build_specs(root: Path | None = None, game_root: Path | None = None) -> list
         raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
     rows = [row for row in tweak_rows(root) if row["enabled"]]
     ensure_loader_mod(root)
-    context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root)
-    script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError)
+    context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root, cache_root=cache_root)
+    script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError, timings=timings)
     specs = _built(rows, "native", exe_patches.validate)
     _refuse_without_loader([spec["owner"] for spec in specs if _needs_loader(spec)], root)
     return specs
@@ -1068,7 +1070,9 @@ def _compose_menu(original, specs, managed, cache_root):
     if cache_root is not None:
         from . import composition_cache
         try:
-            key = _sha(json.dumps([_script_compiler_revision(), managed.relative, _sha(original), specs],
+            from .mod_loader import _composition_revision
+            kind = 'layout' if managed == LAYOUT else ESD_ARCHIVE[managed]
+            key = _sha(json.dumps([_composition_revision().hex(), kind, managed.relative, _sha(original), specs],
                                   sort_keys=True, separators=(',', ':'), default=_menu_cache_value)
                        .encode('utf-8')).encode('ascii')
             cached = composition_cache.load(cache_root, key)
@@ -1112,7 +1116,8 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
     chosen = _project(chosen)
     if chosen is not None and _needs_loader(chosen["spec"]):
         _refuse_without_loader(["Project native rules"], root)
-    native = build_specs(root, game_root)
+    script_timings = []
+    native = build_specs(root, game_root, cache_root=cache_root, timings=script_timings)
     # Fingerprinted after the build, so the fingerprint covers the built files too.
     built = {row["id"]: build_fingerprint(Path(row["path"]), produced=True)
              for row in tweak_rows(root) if row["enabled"]}
@@ -1160,7 +1165,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
         # No native patches, but a menu file stays managed: keep an empty
         # patch and its record, so later changes still ask for a rebuild.
         patch = b""
-    return {"files": files, "executableSha256": _sha(current),
+    return {"files": files, "executableSha256": _sha(current), 'scripts': script_timings,
             "runtime": {"patch": patch, "mods": _changes(native) if patch else [],
                         "project": chosen if patch else None, "previous": previous,
                         "built": built}}
