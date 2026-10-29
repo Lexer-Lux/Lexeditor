@@ -38,9 +38,9 @@ from core import mod_requires, script_mods
 from core.plugin_files import atomic_write
 from core.process_probe import live_processes
 
-from . import exe_patches, menu_layout, menu_scripts
+from . import exe_patches, menu_dim, menu_layout, menu_scripts
 
-ALLOWED_ROOTS = ("native", "layout", "esd", "script", "msg")
+ALLOWED_ROOTS = ("native", "layout", "esd", "menu-dim", "script", "msg")
 BACKUP_FILE = "DarkSoulsRemastered.exe.lexeditor-original"
 MANIFEST_FILE = "DarkSoulsRemastered.exe.lexeditor-tweaks.json"
 MODS_ENV = "LEXEDITOR_DS1_MODS_ROOT"
@@ -432,6 +432,8 @@ def build_specs(root: Path | None = None, game_root: Path | None = None) -> list
     on; anything else builds without it.
 
     The same build writes any layout/<id>.json or esd/<id>.json; layout_specs and esd_specs read those.
+    Every mod's menu-dim/<id>.json joins into one loader-owned description
+    at the end (menu_dim.py).
     """
     try:
         mod_requires.check_enabled(root or mods_root())
@@ -442,8 +444,14 @@ def build_specs(root: Path | None = None, game_root: Path | None = None) -> list
     context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root)
     script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError)
     specs = _built(rows, "native", exe_patches.validate)
-    _refuse_without_loader([spec["owner"] for spec in specs if _needs_loader(spec)], root)
-    return specs
+    dims = _built(rows, menu_dim.FOLDER, menu_dim.validate)
+    _refuse_without_loader([spec["owner"] for spec in specs if _needs_loader(spec)]
+                           + [spec["owner"] for spec in dims if spec["textIds"]], root)
+    try:
+        dim = menu_dim.patch_spec(dims)
+    except ValueError as error:
+        raise TweakError(str(error), folders=[spec["folder"] for spec in dims]) from error
+    return specs + ([exe_patches.validate(dim, menu_dim.OWNER)] if dim else [])
 
 
 def layout_specs(root: Path | None = None) -> list[dict]:
