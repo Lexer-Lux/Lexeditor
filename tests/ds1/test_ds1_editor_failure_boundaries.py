@@ -315,11 +315,14 @@ def test_bad_archive_is_attributed_but_bad_vanilla_is_not(tmp_path, monkeypatch)
     assert not isinstance(caught.value, mod_builds.ModBuildError)
 
 
-def test_full_activation_recovers_broken_script_and_corrupt_caches(game, tmp_path, monkeypatch):
+@pytest.mark.parametrize('failure', ['script', 'schema'])
+def test_full_activation_recovers_broken_script_and_corrupt_caches(game, tmp_path, monkeypatch, failure):
     from test_ds1_tweak_save_rebuild import enable_loader
     library = tmp_path / 'library'
     healthy = make_script(library)
     broken = make_script(library, 'Broken', 'raise TypeError("fixture failure")')
+    if failure == 'schema':
+        (broken / 'settings.schema.json').write_text(json.dumps({'fields': [{'key': 'bad', 'type': []}]}), encoding='utf-8')
     dependent = make_script(library, 'Dependent', requires=['Broken'])
     enable_loader(library)
     cache = tmp_path / 'cache'

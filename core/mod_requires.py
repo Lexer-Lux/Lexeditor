@@ -62,7 +62,7 @@ def needs(folder: Path, schema: dict | None = None) -> list[str]:
         try:
             from core import script_mods
             schema = script_mods.schema(folder)
-        except (OSError, ValueError):
+        except Exception:
             schema = {}
     for need in (schema or {}).get("requires", []):
         if isinstance(need, str) and need and need != mod_id(folder) and need not in wanted:
