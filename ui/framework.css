@@ -334,10 +334,21 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
 
 /* Dim each inactive branch once, including tables, labels and previews.
    Keep the branch leading to the active progress button clear. */
-body.lex-save-busy > :not(:has(.lex-save-icon.saving, .lex-game-process.launching)),
+body.lex-save-busy > :not(.lex-editor-activity):not(:has(.lex-save-icon.saving, .lex-game-process.launching)),
 body.lex-save-busy :has(.lex-save-icon.saving, .lex-game-process.launching)
-  > :not(:has(.lex-save-icon.saving, .lex-game-process.launching)):not(.lex-save-icon.saving, .lex-game-process.launching) {
+  > :not(.lex-editor-activity):not(:has(.lex-save-icon.saving, .lex-game-process.launching)):not(.lex-save-icon.saving, .lex-game-process.launching) {
   filter:grayscale(1) brightness(.45);
+}
+.lex-editor-activity {
+  position:fixed;
+  inset:50% auto auto 50%;
+  transform:translate(-50%,-50%);
+  z-index:100010;
+  padding:1em 1.4em;
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius,4px);
+  background:var(--lex-panel);
+  box-shadow:0 4px 24px #0008;
 }
 
 .lex-save-icon.saving:disabled,

@@ -400,6 +400,92 @@ def test_deployment_warning_does_not_lock_editor(page):
     page.get_by_role('textbox', name='Author').fill('Still editable')
 
 
+@pytest.mark.parametrize('outcome', ['success', 'failure', 'disabled'])
+def test_pending_mod_switch_cannot_be_overtaken_by_play(page, tmp_path, outcome):
+    mount(page)
+    page.evaluate("""() => {
+      window.launches=0;
+      pywebview.api.lexeditor_settings=async()=>({trustWarning:false});
+      pywebview.api.game_process_status=async()=>({running:false,canLaunch:true});
+      pywebview.api.launch_game=async()=>{launches++;return {running:true};};
+      const original=pywebview.api.set_mod_enabled;
+      pywebview.api.set_mod_enabled=(...args)=>new Promise((resolve,reject)=>{
+        window.completeSwitch=async()=>resolve(await original(...args));
+        window.failSwitch=()=>reject(new Error('Fixture activation failed'));
+        window.disableSwitch=()=>resolve({enabled:false,disabledMods:[{name:'Combat',error:'Fixture broken mod'}]});
+      });
+    }""")
+    page.locator('#global-game-process').wait_for(state='visible')
+    page.locator('[data-tab="mods"]').click()
+    toggle = page.get_by_role('checkbox', name='Switch Combat')
+    toggle.click()
+    page.wait_for_function('document.body.inert && !!window.completeSwitch')
+    assert toggle.evaluate('(node)=>node.indeterminate')
+    assert page.get_by_text('Building and applying mods', exact=True).is_visible()
+    page.locator('#global-game-process').evaluate('(node)=>node.onclick()')
+    assert page.evaluate('launches') == 0
+    page.screenshot(path=str(tmp_path / 'applying-mod.png'))
+    if outcome == 'success':
+        page.evaluate('completeSwitch()')
+        page.wait_for_function('!document.body.inert')
+        assert page.get_by_role('checkbox', name='Switch Combat').is_checked()
+        page.locator('#global-game-process').evaluate('(node)=>node.onclick()')
+        page.wait_for_function('launches===1')
+    else:
+        page.evaluate('failSwitch()' if outcome == 'failure' else 'disableSwitch()')
+        page.wait_for_function('!document.body.inert')
+        page.locator('.lex-dialog').wait_for()
+        page.locator('#global-game-process').evaluate('(node)=>node.onclick()')
+        assert page.evaluate('launches') == 0
+        assert not page.get_by_role('checkbox', name='Switch Combat').is_checked()
+
+
+def test_steam_request_waits_until_pending_mod_transaction_finishes(tmp_path, monkeypatch):
+    import os
+    import threading
+    from core import desktop_host
+    from core.desktop_host import HostApi
+    from plugins.ds1.plugin import PLUGIN
+    if os.name != 'nt':
+        pytest.skip('Steam dispatch is Windows-only')
+    root = make_script(tmp_path, enabled=False)
+    api = HostApi.__new__(HostApi)
+    api._mod_library_lock = threading.RLock()
+    api._plugins = {'ds1': PLUGIN}
+    api._launch_notice = lambda _: ''
+    api._game_mods = lambda _: tmp_path
+    api._mod_adapter = lambda _: object()
+    api.mod_library_status = lambda _: {'canManage': True}
+    applying, finish, launched = threading.Event(), threading.Event(), threading.Event()
+    failures = []
+    def activate(*args):
+        applying.set()
+        assert finish.wait(3)
+        return {}
+    api._activate_mods = activate
+    monkeypatch.setattr(desktop_host.os, 'startfile', lambda _: launched.set())
+    def run(function):
+        try:
+            function()
+        except Exception as error:
+            failures.append(error)
+    change = threading.Thread(target=lambda: run(lambda: api.set_mod_enabled('ds1', str(root), True)))
+    launch = threading.Thread(target=lambda: run(lambda: api.launch_game('ds1')))
+    change.start()
+    try:
+        assert applying.wait(3)
+        launch.start()
+        assert not launched.wait(.1)
+    finally:
+        finish.set()
+        change.join(3)
+        if launch.ident:
+            launch.join(3)
+    assert not failures, failures
+    assert launched.is_set()
+    assert json.loads((root / 'mod.json').read_text())['enabled']
+
+
 def test_records_layout_settles_without_pager_font_or_scrollbar_oscillation(page, tmp_path):
     page.set_viewport_size({'width': 2560, 'height': 1352})
     page.add_style_tag(path=str(ROOT / 'plugins/ds1/editor.css'))

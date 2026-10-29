@@ -1275,33 +1275,35 @@ class HostApi:
         Steam installations always go through Steam so its launch options and
         integration are preserved. The shell tracks the wait for the process.
         """
-        app_id = self._steam_app_id(plugin_id)
-        if app_id or not getattr(self._plugins[plugin_id], "can_launch", True):
-            if not app_id or os.name != "nt":
-                raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
-            os.startfile(f"steam://rungameid/{app_id}")
-            return {"running": False, "viaSteam": True, "alreadyRunning": False,
-                    "notice": self._launch_notice(plugin_id)}
-        adapter = self._plugins[plugin_id].mod_adapter
-        if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
-            root, _executable = self._game_executable(plugin_id)
-            with self._mod_library_lock:
+        # An enable/disable operation owns this lock through commit or rollback.
+        # Steam must not start while that operation is still changing files.
+        with self._mod_library_lock:
+            app_id = self._steam_app_id(plugin_id)
+            if app_id or not getattr(self._plugins[plugin_id], "can_launch", True):
+                if not app_id or os.name != "nt":
+                    raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
+                os.startfile(f"steam://rungameid/{app_id}")
+                return {"running": False, "viaSteam": True, "alreadyRunning": False,
+                        "notice": self._launch_notice(plugin_id)}
+            adapter = self._plugins[plugin_id].mod_adapter
+            if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
+                root, _executable = self._game_executable(plugin_id)
                 adapter.recover(root)
-        controller = self._game_controller(plugin_id)
-        if controller is not None:
-            root, _executable = self._game_executable(plugin_id)
-            project = Path(self._projects.snapshot(plugin_id)["current"])
-            return controller.launch(root, project)
-        with self._lock:
-            current = self._game_processes.get(plugin_id)
-            if current is not None and current.poll() is None:
-                return {"running": True, "pid": current.pid, "alreadyRunning": True}
-            root, executable = self._game_executable(plugin_id)
-            flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-            process = subprocess.Popen([str(executable)], cwd=str(root), creationflags=flags)
-            self._game_processes[plugin_id] = process
-            return {"running": True, "pid": process.pid, "alreadyRunning": False,
-                    "notice": self._launch_notice(plugin_id)}
+            controller = self._game_controller(plugin_id)
+            if controller is not None:
+                root, _executable = self._game_executable(plugin_id)
+                project = Path(self._projects.snapshot(plugin_id)["current"])
+                return controller.launch(root, project)
+            with self._lock:
+                current = self._game_processes.get(plugin_id)
+                if current is not None and current.poll() is None:
+                    return {"running": True, "pid": current.pid, "alreadyRunning": True}
+                root, executable = self._game_executable(plugin_id)
+                flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                process = subprocess.Popen([str(executable)], cwd=str(root), creationflags=flags)
+                self._game_processes[plugin_id] = process
+                return {"running": True, "pid": process.pid, "alreadyRunning": False,
+                        "notice": self._launch_notice(plugin_id)}
 
     def _launch_notice(self, plugin_id: str) -> str:
         """What Play tells the reader about the game it started, or "".
@@ -1704,15 +1706,14 @@ class HostApi:
         game = self._installations.snapshot(plugin_id).get("root")
         if not game:
             raise ValueError("Locate the game first")
-        current = self.game_process_status(plugin_id)
-        if current.get("running"):
-            raise ValueError("Close the game before changing active mods")
         library = (Path(status["root"]) / relative_path(plugin_id)).resolve()
         roots = [Path(path).resolve() for path in paths]
         if len(set(roots)) != len(roots) or any(path.parent != library for path in roots):
             raise ValueError("Choose each mod once from this game's library")
         adapter = self._mod_adapter(plugin_id)
         with self._mod_library_lock:
+            if self.game_process_status(plugin_id).get("running"):
+                raise ValueError("Close the game before changing active mods")
             from core.mod_builds import activate_with_recovery
             return activate_with_recovery(adapter, bundled_mods.expand_roots(roots, adapter), Path(game))
 
@@ -1871,23 +1872,21 @@ class HostApi:
     def set_mod_enabled(self, plugin_id: str, path: str, enabled: bool) -> dict:
         """Switch one mod, then let the game's loader take the new set."""
         from core import mod_requires, mods_service
-        root = self._game_mods(plugin_id)
-        folder = mods_service.checked_mod(root, path)
-        mod_requires.check_changes(root, {mod_requires.mod_id(folder): enabled})
-        was = bool(mods_service.mod_row(folder).get("enabled"))
-        mods_service.set_enabled(folder, enabled)
-        activation = {}
-        if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
-            enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
-            try:
-                activation = self._activate_mods(plugin_id, enabled_paths) or {}
-            except Exception:
-                # The switch failed, so the mod keeps its old state. Left
-                # saved, a mod that cannot build stayed on behind an
-                # unticked box and failed every later switch of any mod.
-                mods_service.set_enabled(folder, was)
-                raise
-        return {**mods_service.mod_row(folder), 'disabledMods': activation.get('disabledMods', [])}
+        with self._mod_library_lock:
+            root = self._game_mods(plugin_id)
+            folder = mods_service.checked_mod(root, path)
+            mod_requires.check_changes(root, {mod_requires.mod_id(folder): enabled})
+            was = bool(mods_service.mod_row(folder).get("enabled"))
+            mods_service.set_enabled(folder, enabled)
+            activation = {}
+            if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
+                enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
+                try:
+                    activation = self._activate_mods(plugin_id, enabled_paths) or {}
+                except Exception:
+                    mods_service.set_enabled(folder, was)
+                    raise
+            return {**mods_service.mod_row(folder), 'disabledMods': activation.get('disabledMods', [])}
 
     def move_mod(self, plugin_id: str, path: str, delta: int) -> dict:
         """Move one mod within the library's load order, which the Mods tab shows.

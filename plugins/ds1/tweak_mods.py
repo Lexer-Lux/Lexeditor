@@ -593,7 +593,7 @@ def ensure_game_closed() -> None:
     if os.name != "nt":
         raise TweakError("Executable tweaks can only be applied on Windows")
     if live_processes([exe_patches.EXECUTABLE]):
-        raise TweakError("Close Dark Souls Remastered before changing its executable")
+        raise TweakError("Close Dark Souls Remastered before applying mods")
 
 
 def game_closed() -> bool:

@@ -3454,6 +3454,21 @@
     class: "lex-loading-status", role: "status", "aria-busy": "true",
   }, element("span", {class: "lex-plugin-loading-pulse", "aria-hidden": "true"}),
   element("span", {class: "lex-loading-status-label"}, label));
+  const editorBusyOwners = new Map();
+  let editorActivity = null;
+  const setEditorBusy = (owner, label) => {
+    if (label) editorBusyOwners.set(owner, label);
+    else editorBusyOwners.delete(owner);
+    const busy = editorBusyOwners.size > 0;
+    document.body.classList.toggle("lex-save-busy", busy);
+    document.body.inert = busy;
+    if (!busy) { editorActivity?.remove(); editorActivity = null; return; }
+    if (!editorActivity) {
+      editorActivity = element("div", {class:"lex-editor-activity"});
+      document.body.append(editorActivity);
+    }
+    editorActivity.replaceChildren(loadingStatus([...editorBusyOwners.values()].at(-1)));
+  };
   const detailText = text => element("p", {class: "lex-detail-text"}, text);
 
   // A word or two that classifies a record - Project or Vanilla - in a
@@ -7741,15 +7756,14 @@
     };
     const setBusy = value => {
       busy = !!value;
-      document.body.classList.toggle("lex-save-busy", busy);
-      document.body.inert = busy;
+      setEditorBusy(button, busy ? "Saving settings" : null);
       button.classList.toggle("saving", busy);
       button.setAttribute("aria-busy", String(busy));
       renderContents();
       refresh();
     };
     button.onclick = async () => {
-      if (busy || button.disabled) return;
+      if (busy || button.disabled || document.body.inert) return;
       setBusy(true);
       let failure = null;
       try { await options.save?.(); playThemeSound("save"); }
@@ -11049,15 +11063,14 @@ ${contents.path}`});
     };
     const setSaveBusy = busy => {
       saveBusy = !!busy;
-      document.body.classList.toggle("lex-save-busy", saveBusy);
-      document.body.inert = saveBusy;
+      setEditorBusy(save, saveBusy ? "Saving changes" : null);
       save.classList.toggle("saving", saveBusy);
       save.setAttribute("aria-busy", String(saveBusy));
       renderSaveContents();
       refresh();
     };
     save.onclick = async () => {
-      if (saveBusy || save.disabled) return;
+      if (saveBusy || save.disabled || document.body.inert) return;
       setSaveBusy(true);
       // Saving rebuilds the installed tweaks, which is what the Mods tab
       // alert marks describe: re-read them so a rebuilt mod clears its
@@ -11113,7 +11126,7 @@ ${contents.path}`});
       catch (_error) { if (!gameWaiting) game.hidden = true; }
     };
     game.onclick = async () => {
-      if (gameBusy || gameWaiting || (!gameRunning && !gameCanLaunch)) return;
+      if (gameBusy || gameWaiting || document.body.inert || document.querySelector('.lex-dialog-backdrop') || (!gameRunning && !gameCanLaunch)) return;
       const launching = !gameRunning;
       const launchStarted = Date.now();
       let requestTimer = null;
@@ -11123,8 +11136,7 @@ ${contents.path}`});
       // Finish the launch request before edits resume. Steam's subsequent
       // wait only occupies the Play button; the editor can be used again.
       if (launching) {
-        document.body.classList.add("lex-save-busy");
-        document.body.inert = true;
+        setEditorBusy(game, "Requesting game launch");
       }
       try {
         const request = async () => {
@@ -11157,8 +11169,7 @@ ${contents.path}`});
         clearTimeout(requestTimer);
         gameBusy = false;
         if (launching) {
-          document.body.classList.toggle("lex-save-busy", saveBusy);
-          document.body.inert = saveBusy;
+          setEditorBusy(game, null);
         }
         renderGameProcess(gameRunning);
       }
@@ -16019,11 +16030,31 @@ ${contents.path}`});
     const contentsFitted = {records: 10, files: 10};
     const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
     const load = async () => { data = await callWindow("mods_overview", pluginId); };
-    const switchMod = async (row, enabled) => {
-      const result = await callWindow("set_mod_enabled", pluginId, row.path, enabled);
-      await load(); draw();
-      if (result?.disabledMods?.length) showToast(result.disabledMods.map(mod =>
-        `${mod.name} was switched off: ${mod.error}`).join("\n"), {tone:"warning"});
+    const switchMod = async (row, event) => {
+      const control = event.target, enabled = control.checked;
+      let confirmed = !!(row.enabled ?? row.on);
+      control.checked = confirmed;
+      if (document.body.inert) return;
+      try {
+        if (enabled && !(await confirmFirstModEnable(row.path))) return;
+        control.checked = enabled;
+        control.indeterminate = true;
+        control.setAttribute("aria-busy", "true");
+        setEditorBusy(control, "Building and applying mods");
+        const result = await callWindow("set_mod_enabled", pluginId, row.path, enabled);
+        confirmed = typeof result?.enabled === "boolean" ? result.enabled : enabled;
+        await load(); draw();
+        if (result?.disabledMods?.length) showAlert({title:"Some mods could not be enabled",
+          message:result.disabledMods.map(mod => `${mod.name} was switched off: ${mod.error}`).join("\n")});
+      } catch (error) {
+        try { await load(); draw(); } catch (_refreshError) {}
+        failure("Could not switch the mod", error);
+      } finally {
+        control.indeterminate = false;
+        control.checked = confirmed;
+        control.removeAttribute("aria-busy");
+        setEditorBusy(control, null);
+      }
     };
     const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.folder}`}))];
     const keyOf = row => row.path;
@@ -16119,11 +16150,7 @@ ${contents.path}`});
             actionRow(button), note]});
       }
       const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": `${row.name} enabled`,
-        onchange: async event => {
-          if (event.target.checked && !(await confirmFirstModEnable(row.path))) { event.target.checked = false; return; }
-          try { await switchMod(row, event.target.checked); }
-          catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
-        }});
+        onchange: event => switchMod(row, event)});
       const copyMod = async () => {
         const agreed = await confirmAction({title: "Create an editable copy?",
           message: "Managed mods update automatically. Your named copy will be independent, so updates cannot replace your edits. You have my blessing.", confirmLabel: "Make a copy"});
@@ -16403,11 +16430,7 @@ ${contents.path}`});
                     button?.click(); }}, "Download")
               : element("input", {type: "checkbox", checked: row.on, "aria-label": `Switch ${row.name}`,
                   onclick: event => event.stopPropagation(),
-                  onchange: async event => {
-                    if (event.target.checked && !(await confirmFirstModEnable(row.path))) { event.target.checked = false; return; }
-                    try { await switchMod(row, event.target.checked); }
-                    catch (error) { event.target.checked = !event.target.checked; failure("Could not switch the mod", error); }
-                  }})}]}),
+                  onchange: event => switchMod(row, event)})}]}),
         detail, emptyDetail: () => detail()});
       main.replaceChildren(view);
     };
