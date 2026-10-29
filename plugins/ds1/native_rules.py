@@ -282,7 +282,7 @@ class NativeRules:
         return {"path": str(self.project.resolve()), "settingsHash": digest(encoded), "spec": spec}
 
     def changes_code(self):
-        """True when the saved rules patch the game's code (and so take it offline)."""
+        """True when the saved rules patch the game's code."""
         return (load_bands.native_projection(self.saved) != load_bands.native_projection(DEFAULTS)
                 or levelup_gains.validate(self.saved["levelupGains"]) != levelup_gains.project_defaults())
 
