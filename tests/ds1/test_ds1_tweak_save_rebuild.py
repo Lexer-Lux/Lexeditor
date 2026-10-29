@@ -42,6 +42,11 @@ SCHEMA = {"fields": [{"key": "step", "type": "int", "default": 1, "min": 0, "max
 @pytest.fixture(autouse=True)
 def isolated_conflict_report(tmp_path, monkeypatch):
     monkeypatch.setattr(Ds1ModAdapter, "_report_path", staticmethod(lambda: tmp_path / "conflicts.json"))
+    # These phase tests inject parsers and count imports in this process.
+    # Real child exit/timeout behavior is covered by editor_failure_boundaries.
+    from core import script_mods
+    monkeypatch.setattr(tweak_mods.BuildContext, 'run_script',
+                        lambda self, root, values: script_mods.execute_script(root, values, self))
 
 
 def make_mod(library, mod_id, name, spec, *, enabled=True, order=10, values=None):
@@ -672,8 +677,8 @@ def test_script_build_rechecks_combined_game_params(game, library, monkeypatch):
     source = game / mod_loader.RELATIVE
     source.parent.mkdir(parents=True)
     source.write_bytes(b'original parameter inputs')
-    monkeypatch.setattr(mod_loader, 'active_mods', lambda root: [])
-    monkeypatch.setattr(mod_loader, '_compose_params', lambda original, mods: (original, []))
+    monkeypatch.setattr(mod_loader, 'active_mods', lambda root, **kwargs: [])
+    monkeypatch.setattr(mod_loader, '_compose_params', lambda original, mods, **kwargs: (original, []))
     tweak_mods.apply(game, library)
     loads = []
     load = script_mods.load_script
@@ -705,13 +710,14 @@ def test_script_build_rechecks_original_game_files(game, library, monkeypatch):
 
 @pytest.mark.parametrize('managed', [tweak_mods.LAYOUT, *tweak_mods.ESD])
 def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkeypatch, managed):
+    from plugins.ds1 import mod_loader
     calls = []
     def compose(original, specs, *args):
         calls.append((original, specs))
         return b'compiled:' + original + json.dumps(specs).encode()
     monkeypatch.setattr(tweak_mods.menu_layout, 'compose', compose)
     monkeypatch.setattr(tweak_mods.menu_scripts, 'compose', compose)
-    monkeypatch.setattr(tweak_mods, '_script_compiler_revision', lambda: 'compiler-one')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-one')
     specs = [{'owner': 'example', 'changes': []}]
     expected = tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
     # No in-memory result cache is involved: reopen the persisted store.
@@ -719,7 +725,7 @@ def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkey
     assert len(calls) == 1
     tweak_mods._compose_menu(b'changed original', specs, managed, tmp_path)
     tweak_mods._compose_menu(b'vanilla', [{'owner': 'different', 'changes': []}], managed, tmp_path)
-    monkeypatch.setattr(tweak_mods, '_script_compiler_revision', lambda: 'compiler-two')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-two')
     tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
     assert len(calls) == 4
 

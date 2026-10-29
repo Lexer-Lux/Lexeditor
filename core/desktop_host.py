@@ -1275,33 +1275,35 @@ class HostApi:
         Steam installations always go through Steam so its launch options and
         integration are preserved. The shell tracks the wait for the process.
         """
-        app_id = self._steam_app_id(plugin_id)
-        if app_id or not getattr(self._plugins[plugin_id], "can_launch", True):
-            if not app_id or os.name != "nt":
-                raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
-            os.startfile(f"steam://rungameid/{app_id}")
-            return {"running": False, "viaSteam": True, "alreadyRunning": False,
-                    "notice": self._launch_notice(plugin_id)}
-        adapter = self._plugins[plugin_id].mod_adapter
-        if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
-            root, _executable = self._game_executable(plugin_id)
-            with self._mod_library_lock:
+        # An enable/disable operation owns this lock through commit or rollback.
+        # Steam must not start while that operation is still changing files.
+        with self._mod_library_lock:
+            app_id = self._steam_app_id(plugin_id)
+            if app_id or not getattr(self._plugins[plugin_id], "can_launch", True):
+                if not app_id or os.name != "nt":
+                    raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
+                os.startfile(f"steam://rungameid/{app_id}")
+                return {"running": False, "viaSteam": True, "alreadyRunning": False,
+                        "notice": self._launch_notice(plugin_id)}
+            adapter = self._plugins[plugin_id].mod_adapter
+            if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
+                root, _executable = self._game_executable(plugin_id)
                 adapter.recover(root)
-        controller = self._game_controller(plugin_id)
-        if controller is not None:
-            root, _executable = self._game_executable(plugin_id)
-            project = Path(self._projects.snapshot(plugin_id)["current"])
-            return controller.launch(root, project)
-        with self._lock:
-            current = self._game_processes.get(plugin_id)
-            if current is not None and current.poll() is None:
-                return {"running": True, "pid": current.pid, "alreadyRunning": True}
-            root, executable = self._game_executable(plugin_id)
-            flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-            process = subprocess.Popen([str(executable)], cwd=str(root), creationflags=flags)
-            self._game_processes[plugin_id] = process
-            return {"running": True, "pid": process.pid, "alreadyRunning": False,
-                    "notice": self._launch_notice(plugin_id)}
+            controller = self._game_controller(plugin_id)
+            if controller is not None:
+                root, _executable = self._game_executable(plugin_id)
+                project = Path(self._projects.snapshot(plugin_id)["current"])
+                return controller.launch(root, project)
+            with self._lock:
+                current = self._game_processes.get(plugin_id)
+                if current is not None and current.poll() is None:
+                    return {"running": True, "pid": current.pid, "alreadyRunning": True}
+                root, executable = self._game_executable(plugin_id)
+                flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                process = subprocess.Popen([str(executable)], cwd=str(root), creationflags=flags)
+                self._game_processes[plugin_id] = process
+                return {"running": True, "pid": process.pid, "alreadyRunning": False,
+                        "notice": self._launch_notice(plugin_id)}
 
     def _launch_notice(self, plugin_id: str) -> str:
         """What Play tells the reader about the game it started, or "".
@@ -1694,7 +1696,7 @@ class HostApi:
         self._managed_mod_results[plugin_id] = result
         return result
 
-    def _activate_mods(self, plugin_id: str, paths: list[str]) -> None:
+    def _activate_mods(self, plugin_id: str, paths: list[str]) -> dict:
         """Deploy exactly these library mods, bundles expanded to their ticks."""
         from core import bundled_mods
         from core.mod_library import relative_path
@@ -1704,16 +1706,16 @@ class HostApi:
         game = self._installations.snapshot(plugin_id).get("root")
         if not game:
             raise ValueError("Locate the game first")
-        current = self.game_process_status(plugin_id)
-        if current.get("running"):
-            raise ValueError("Close the game before changing active mods")
         library = (Path(status["root"]) / relative_path(plugin_id)).resolve()
         roots = [Path(path).resolve() for path in paths]
         if len(set(roots)) != len(roots) or any(path.parent != library for path in roots):
             raise ValueError("Choose each mod once from this game's library")
         adapter = self._mod_adapter(plugin_id)
         with self._mod_library_lock:
-            adapter.activate(bundled_mods.expand_roots(roots, adapter), Path(game))
+            if self.game_process_status(plugin_id).get("running"):
+                raise ValueError("Close the game before changing active mods")
+            from core.mod_builds import activate_with_recovery
+            return activate_with_recovery(adapter, bundled_mods.expand_roots(roots, adapter), Path(game))
 
     def _choose_folder(self, directory: str = "") -> str:
         import webview
@@ -1803,10 +1805,13 @@ class HostApi:
             return
         try:
             found = getattr(adapter, method)(mods, Path(game)) if mods else {}
-        except (OSError, ValueError, RuntimeError) as error:
+            if not isinstance(found, dict) or any(not isinstance(lines, list)
+                    or any(not isinstance(line, str) for line in lines) for lines in found.values()):
+                raise ValueError('The mod report has invalid entries')
+            found = {str(Path(key).resolve()): lines for key, lines in found.items()}
+        except Exception as error:
             result[error_key] = str(error)
             return
-        found = {str(Path(key).resolve()): lines for key, lines in found.items()}
         for row in result["rows"]:
             if only_enabled and not row.get("enabled"):
                 continue
@@ -1836,15 +1841,24 @@ class HostApi:
         game = self._installations.snapshot(plugin_id).get('root') or None
         try:
             reported = describe(folder, Path(game) if game else None)
-        except (OSError, ValueError, RuntimeError) as error:
+            if not isinstance(reported, dict) or not isinstance(reported.get('changes', []), list):
+                raise ValueError('The record report is invalid')
+            # A derived description is never allowed to fail serialization of
+            # the host response, including the Files tab beside these records.
+            json.dumps(reported, allow_nan=False)
+            changes = reported.get('changes', [])
+            if any(not isinstance(row, dict) for row in changes):
+                raise ValueError('The record report has invalid rows')
+            total = int(reported.get('total', len(changes)))
+            loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}
+        except Exception as error:
             result['note'] = str(error)
             return result
-        result['changes'] = reported.get('changes', [])
+        result['changes'] = changes
         result['changesTruncated'] = bool(reported.get('truncated', False))
-        result['totalChanges'] = int(reported.get('total', len(result['changes'])))
+        result['totalChanges'] = total
         if reported.get('note'):
             result['note'] = reported['note']
-        loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}
         for entry in result['files']:
             entry['loaded'] = entry['relative'].casefold() in loaded
         return result
@@ -1858,22 +1872,21 @@ class HostApi:
     def set_mod_enabled(self, plugin_id: str, path: str, enabled: bool) -> dict:
         """Switch one mod, then let the game's loader take the new set."""
         from core import mod_requires, mods_service
-        root = self._game_mods(plugin_id)
-        folder = mods_service.checked_mod(root, path)
-        mod_requires.check_changes(root, {mod_requires.mod_id(folder): enabled})
-        was = bool(mods_service.mod_row(folder).get("enabled"))
-        mods_service.set_enabled(folder, enabled)
-        if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
-            enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
-            try:
-                self._activate_mods(plugin_id, enabled_paths)
-            except Exception:
-                # The switch failed, so the mod keeps its old state. Left
-                # saved, a mod that cannot build stayed on behind an
-                # unticked box and failed every later switch of any mod.
-                mods_service.set_enabled(folder, was)
-                raise
-        return mods_service.mod_row(folder)
+        with self._mod_library_lock:
+            root = self._game_mods(plugin_id)
+            folder = mods_service.checked_mod(root, path)
+            mod_requires.check_changes(root, {mod_requires.mod_id(folder): enabled})
+            was = bool(mods_service.mod_row(folder).get("enabled"))
+            mods_service.set_enabled(folder, enabled)
+            activation = {}
+            if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
+                enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
+                try:
+                    activation = self._activate_mods(plugin_id, enabled_paths) or {}
+                except Exception:
+                    mods_service.set_enabled(folder, was)
+                    raise
+            return {**mods_service.mod_row(folder), 'disabledMods': activation.get('disabledMods', [])}
 
     def move_mod(self, plugin_id: str, path: str, delta: int) -> dict:
         """Move one mod within the library's load order, which the Mods tab shows.
@@ -1910,8 +1923,8 @@ class HostApi:
         if self._mod_adapter(plugin_id) is None or not self.mod_library_status(plugin_id).get("canManage"):
             return {"activated": False}
         enabled = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
-        self._activate_mods(plugin_id, enabled)
-        return {"activated": True, "mods": len(enabled)}
+        result = self._activate_mods(plugin_id, enabled) or {}
+        return {"activated": True, "mods": len(enabled), 'disabledMods': result.get('disabledMods', [])}
 
     def open_lexmod(self, plugin_id: str) -> dict:
         """Open only the repository this game's own manifest names."""

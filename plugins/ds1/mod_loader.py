@@ -45,7 +45,7 @@ import zlib
 
 from plugins.ds3.formats import DS3FormatError, ParamView
 
-from . import assets, texts
+from . import assets, texts, emevd
 from .formats import FormatError, MAX_ARCHIVE, TABLES, deflate, inflate, members, pack, schema
 from .msb import MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError
 from .store import MARKER, RELATIVE
@@ -106,7 +106,7 @@ class Composition:
                             {mod.name: str(mod.folder) for mod in mods})
 
 
-def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
+def content_files(folder: Path, name: str, *, only=None) -> list[tuple[Path, Path]]:
     """(key, disk path) of every file read_mod would read, without reading.
 
     The conflict cache stamps these instead of hashing their bytes, so an
@@ -116,12 +116,16 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
     folder = checked(Path(folder))
     found = []
     for relative in FILES:
+        if only is not None and relative not in only:
+            continue
         path = checked(folder / relative)
         if not path.is_file():
             continue
         if path.stat().st_size > MAX_ARCHIVE:
             raise ValueError(f"{name}: {path.name} is too large")
         found.append((relative, path))
+    if only is not None and only <= frozenset(FILES):
+        return found
     maps = checked(folder / MAP_DIR)
     if maps.is_dir():
         candidates = sorted(maps.glob("*.msb"))
@@ -155,19 +159,23 @@ def content_files(folder: Path, name: str) -> list[tuple[Path, Path]]:
     return found
 
 
-def read_mod(folder: Path, name: str) -> Mod | None:
+def read_mod(folder: Path, name: str, *, only=None) -> Mod | None:
     """A DS1 data mod's saved files, or None for a folder that is not one."""
     from .tweak_mods import checked
     folder = checked(Path(folder))
     if not (folder / MARKER).is_file():
         return None
     files = {}
-    for key, path in content_files(folder, name):
-        files[key] = path.read_bytes()
+    try:
+        for key, path in content_files(folder, name, only=only):
+            files[key] = path.read_bytes()
+    except Exception as error:
+        from core.mod_builds import ModBuildError
+        raise ModBuildError([folder], f'{name}: {error}') from error
     return Mod(name, folder, files)
 
 
-def active_mods(library_root: Path, project_root: Path | None = None) -> list[Mod]:
+def active_mods(library_root: Path, project_root: Path | None = None, *, only=None) -> list[Mod]:
     """The data mods to combine, in the Mods tab's load order.
 
     Every enabled mod in the library, and the open project too: applying a
@@ -180,12 +188,12 @@ def active_mods(library_root: Path, project_root: Path | None = None) -> list[Mo
         folder = Path(row["path"]).resolve()
         if not row["enabled"] and folder != (Path(project_root).resolve() if project_root else None):
             continue
-        mod = read_mod(folder, row["name"])
+        mod = read_mod(folder, row["name"], only=only)
         if mod is not None:
             mods.append(mod)
             seen.add(folder)
     if project_root is not None and Path(project_root).resolve() not in seen:
-        mod = read_mod(Path(project_root), Path(project_root).name)
+        mod = read_mod(Path(project_root), Path(project_root).name, only=only)
         if mod is not None:
             mods.append(mod)
     return mods
@@ -224,7 +232,27 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
     for relative in sorted(paths):
         selected = [Mod(mod.name, mod.folder, {relative: mod.files[relative]})
                     for mod in mods if relative in mod.files]
-        result = _compose_file(relative, originals.get(relative), selected, conflicts_only, cache_root)
+        try:
+            result = _compose_file(relative, originals.get(relative), selected, conflicts_only, cache_root)
+        except Exception as error:
+            from core.mod_builds import ModBuildError
+            if isinstance(error, ModBuildError):
+                raise
+            original = originals.get(relative)
+            # Diagnose only on failure. A broken original or composer remains
+            # an operation error; it must not switch off an innocent mod.
+            if original is not None:
+                compose({relative: original}, [Mod('Vanilla', Path(game_root), {relative: original})],
+                        conflicts_only=True)
+            failed = []
+            for mod in selected:
+                try:
+                    compose({relative: original} if original is not None else {}, [mod], conflicts_only=True)
+                except Exception:
+                    failed.append(mod.folder)
+            if failed:
+                raise ModBuildError(failed, f'{relative}: {error}') from error
+            raise
         files.update(result.files)
         conflicts.extend(result.conflicts)
     return Composition(files, conflicts)
@@ -236,7 +264,11 @@ def _composition_revision():
     # uncommitted edits. Schema data also determines PARAM merge units/labels.
     from .formats import METADATA
     digest = sha256()
-    sources = [*Path(__file__).parent.glob('*.py'),
+    # Request handling, script transport, cache I/O and native tweak planning
+    # cannot change an archive composed from these already-built input bytes.
+    unrelated = {'server.py', 'script_worker.py', 'plugin.py', 'mod_support.py',
+                 'tweak_mods.py', 'composition_cache.py'}
+    sources = [*(path for path in Path(__file__).parent.glob('*.py') if path.name not in unrelated),
                Path(__file__).parents[1] / 'ds3/formats.py',
                *(path for path in METADATA.rglob('*') if path.suffix in ('.xml', '.json'))]
     for path in sorted(sources):
@@ -272,9 +304,17 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
             if payload is not None:
                 header, data = payload.split(b'\n', 1)
                 metadata = json.loads(header)
+                if (not isinstance(metadata, dict) or type(metadata.get('hasData')) is not bool
+                        or not isinstance(metadata.get('conflicts'), list)):
+                    raise ValueError('Invalid composition cache header')
+                for row in metadata['conflicts']:
+                    if (not isinstance(row, list) or len(row) != 3 or row[0] != str(relative)
+                            or not isinstance(row[1], str) or not isinstance(row[2], list)
+                            or any(not isinstance(name, str) for name in row[2])):
+                        raise ValueError('Invalid composition cache conflict')
                 rows = tuple((Path(path), part, tuple(names)) for path, part, names in metadata['conflicts'])
                 cached = (data if metadata['hasData'] else None, rows, len(payload))
-        except (OSError, ValueError, KeyError, TypeError):
+        except Exception:
             pass
     if cached is None:
         result = compose({relative: original} if original is not None else {}, mods,
@@ -285,10 +325,13 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
                sum(len(name.encode('utf-8')) for name in names) for _, part, names in rows)
         cached = (data, rows, size)
         if disk_key is not None:
-            metadata = {'hasData': data is not None,
-                        'conflicts': [(str(path), part, names) for path, part, names in rows]}
-            payload = json.dumps(metadata).encode('utf-8') + b'\n' + (data or b'')
-            composition_cache.store(cache_root, disk_key, payload)
+            try:
+                metadata = {'hasData': data is not None,
+                            'conflicts': [(str(path), part, names) for path, part, names in rows]}
+                payload = json.dumps(metadata).encode('utf-8') + b'\n' + (data or b'')
+                composition_cache.store(cache_root, disk_key, payload)
+            except Exception:
+                pass
     if remember and cached[2] <= _COMPOSE_CACHE_LIMIT:
         with _compose_cache_lock:
             previous = _compose_cache.pop(key, None)
@@ -365,11 +408,20 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool
             files[relative] = result[0]
     for relative in sorted({name for mod in mods for name in mod.files if _is_asset(name)}):
         have = [(mod.name, mod.files[relative]) for mod in mods if relative in mod.files]
+        if emevd.is_event_file(relative):
+            original = vanilla.get(relative)
+            result = _compose_emevd(original, have, relative, conflicts_only=conflicts_only)
+            conflicts += result[1]
+            if result[0] != original:
+                files[relative] = result[0]
+            continue
         if relative not in vanilla:
             if have:
                 files[relative] = have[-1][1]
             continue
-        result = _compose_anibnd(vanilla[relative], have, relative, kind="file", conflicts_only=conflicts_only)
+        result = (_compose_tpf(vanilla[relative], have, relative, conflicts_only=conflicts_only)
+                  if relative.name.lower().removesuffix('.dcx').endswith('.tpf') else
+                  _compose_anibnd(vanilla[relative], have, relative, kind="file", conflicts_only=conflicts_only))
         conflicts += result[1]
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
@@ -813,9 +865,11 @@ def _compose_maps(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path)
         return vanilla, []
     try:
         base = MsbDocument(vanilla, relative.name)
-        docs = [(name, MsbDocument(data, relative.name)) for name, data in changed]
     except MsbError:
         return _whole_map(vanilla, changed, relative)
+    # A known format with a malformed mod is a failed input, not a whole-file
+    # conflict that is allowed to replace the installed game data.
+    docs = [(name, MsbDocument(data, relative.name)) for name, data in changed]
     keys = [(part["type"], part["id"]) for part in base.parts]
     units = base.merge_units()
     for _name, doc in docs:
@@ -878,23 +932,83 @@ def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) 
     return (vanilla if combined == original else deflate(vanilla, combined)), conflicts
 
 
+def _compose_emevd(vanilla, mods, relative, *, conflicts_only=False):
+    changed = [(name, data) for name, data in mods if data != vanilla]
+    if vanilla is None and not changed:
+        return None, []
+    template = vanilla if vanilla is not None else changed[0][1]
+    wrapped = template.startswith(b'DCX\0')
+    def parse(data):
+        if data.startswith(b'DCX\0') != wrapped:
+            raise FormatError('EMEVD container compression differs between inputs')
+        return emevd.read(inflate(data) if wrapped else data)
+    original = parse(vanilla) if vanilla is not None else None
+    if not changed:
+        return vanilla, []
+    variants = [(name, parse(data)) for name, data in changed]
+    if original is None:
+        original = emevd.Document((), variants[0][1].linked, variants[0][1].strings)
+    if any((doc.linked, doc.strings) != (original.linked, original.strings) for _, doc in variants):
+        return _whole_anibnd(changed, relative, 'event archive with changed string data')
+    combined, collisions = emevd.merge(original, variants, conflicts_only=conflicts_only)
+    conflicts = [Conflict(relative, part, owners) for part, owners in sorted(collisions.items())]
+    if conflicts_only:
+        return vanilla, conflicts
+    if len(changed) == 1:
+        return changed[0][1], conflicts
+    if combined == original:
+        return vanilla, conflicts
+    plain = emevd.write(combined)
+    return (deflate(template, plain) if wrapped else plain), conflicts
+
+
+def _compose_tpf(vanilla, mods, relative, *, conflicts_only=False):
+    from . import texture_packs
+    from .assets import MAX_ASSET_BYTES
+    changed = [(name, data) for name, data in mods if data != vanilla]
+    if not changed:
+        return vanilla, []
+    wrapped = vanilla.startswith(b'DCX\0')
+    original = inflate(vanilla, max_size=MAX_ASSET_BYTES) if wrapped else vanilla
+    # Unknown originals keep the existing whole-file conflict boundary.
+    try:
+        texture_packs.read(original)
+    except FormatError:
+        return _whole_anibnd(changed, relative, 'texture pack')
+    variants = []
+    for name, data in changed:
+        if data.startswith(b'DCX\0') != wrapped:
+            raise FormatError(f'{name}: TPF container compression differs from vanilla')
+        variants.append((name, inflate(data, max_size=MAX_ASSET_BYTES) if wrapped else data))
+    merged, collisions = texture_packs.merge(original, variants, conflicts_only=conflicts_only)
+    conflicts = [Conflict(relative, name, owners) for name, owners in sorted(collisions.items())]
+    if conflicts_only:
+        return vanilla, conflicts
+    # Preserve a single already-compiled payload exactly when it represents
+    # the merged records; otherwise serialize one combined directory.
+    if len(changed) == 1:
+        return changed[0][1], conflicts
+    return (deflate(vanilla, merged, max_size=MAX_ASSET_BYTES) if wrapped and merged != original
+            else vanilla if merged == original else merged), conflicts
+
+
 def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path, kind: str = "character file", *, conflicts_only: bool = False) -> tuple[bytes, list[Conflict]]:
     """Every mod's changed binder members over vanilla's, or the last whole file."""
     changed = [(name, data) for name, data in mods if data != vanilla]
     if not changed:
         return vanilla, []
-    if len({data for _name, data in changed}) == 1:
-        return changed[-1][1], []
     from .assets import MAX_ASSET_BYTES
     try:
         base_plain = inflate(vanilla, max_size=MAX_ASSET_BYTES)
         base_members = members(base_plain)
-        plains = []
-        for name, data in changed:
-            plain = inflate(data, max_size=MAX_ASSET_BYTES)
-            plains.append((name, plain, members(plain)))
     except FormatError:
         return _whole_anibnd(changed, relative, kind)
+    plains = []
+    for name, data in changed:
+        plain = inflate(data, max_size=MAX_ASSET_BYTES)
+        plains.append((name, plain, members(plain)))
+    if len({data for _name, data in changed}) == 1:
+        return changed[-1][1], []
     for _name, _plain, owned in plains:
         if set(owned) != set(base_members):
             return _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind, conflicts_only=conflicts_only)

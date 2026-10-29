@@ -81,9 +81,10 @@ def main():
                     # re-render lands, so wait for the new first row.
                     page.wait_for_function(
                         'document.querySelector(".lex-column-list .lex-list-row")'
-                        '.textContent.replace(/\u200b/g, "").trim() === "No."')
+                        '?.querySelector("[data-column-key=name] .lex-column-cell-text")'
+                        '?.textContent.trim() === "No."')
                     spoken = page.locator('.lex-column-list .lex-list-row').evaluate_all(
-                        'rows => rows.map(row => row.textContent.replace(/\\u200b/g, "").trim()).filter(Boolean)')
+                        'rows => rows.map(row => row.querySelector("[data-column-key=name] .lex-column-cell-text")?.textContent.trim()).filter(Boolean)')
                     assert spoken == ['No.', 'Yes.'], spoken
                     # Every armor defense label links to its menu label.
                     for label, text_id, _text in LINKS:

@@ -954,6 +954,12 @@ class ItemDocument:
             return ('EquipParamProtector', (row_id - ABSORPTION_BASE) // 100 * 100, 'absorption:' + key)
         return (table, row_id, key)
 
+    def row_created(self, table, row_id):
+        """Added identities stay added after Save, reload or an external build."""
+        return ((table, row_id) in self._added_rows or
+                (self.vanilla_document is not None and
+                 row_id not in self.vanilla_document._rows_by_id.get(table, {})))
+
     def row_modified(self, table, row_id):
         """Whether the row differs from the game's own file: an edited
         field, name or description, changed this session or loaded from a mod."""
@@ -1393,7 +1399,7 @@ class ItemDocument:
             result.append({'id': row.row_id, 'name': name, 'table': table,
                            'values': values, 'display': display,
                            'modified': self.row_modified(table, row.row_id),
-                           'created': (table, row.row_id) in self._added_rows,
+                           'created': self.row_created(table, row.row_id),
                            'shippedName': self.shipped_name(table, row.row_id)})
         if tab == 'spells':
             table = 'EquipParamGoods'
@@ -1403,7 +1409,7 @@ class ItemDocument:
                     result.append({'id': row.row_id, 'name': 'Spell item: ' + self.display_name(table, row.row_id, row), 'table': table,
                                    'values': values, 'display': display,
                                    'modified': self.row_modified(table, row.row_id),
-                                   'created': (table, row.row_id) in self._added_rows,
+                                   'created': self.row_created(table, row.row_id),
                                    'shippedName': self.shipped_name(table, row.row_id)})
         return result
 
@@ -1430,7 +1436,7 @@ class ItemDocument:
             result.append({'id': row.row_id, 'name': self.display_name(table, row.row_id, row),
                            'table': table, 'values': values, 'display': display,
                            'modified': self.row_modified(table, row.row_id),
-                           'created': (table, row.row_id) in self._added_rows,
+                           'created': self.row_created(table, row.row_id),
                            'shippedName': self.shipped_name(table, row.row_id)})
         return result
 

@@ -197,11 +197,11 @@ def _rebuild_tweaks_on_save() -> dict:
     With the game open the rebuild waits: the flag stays set and the next
     Save finishes it.
     """
-    if not _tweaks_flag():
-        return {"tweaksNeedRebuild": False}
-    if not tweak_mods.game_closed():
-        return {"tweaksNeedRebuild": True, "tweaksDeferred": True}
     try:
+        if not _tweaks_flag():
+            return {"tweaksNeedRebuild": False}
+        if not tweak_mods.game_closed():
+            return {"tweaksNeedRebuild": True, "tweaksDeferred": True}
         from core.mod_builds import activate_with_recovery
         from .mod_support import Ds1ModAdapter
         adapter = Ds1ModAdapter()
@@ -209,9 +209,10 @@ def _rebuild_tweaks_on_save() -> dict:
         adapter.attach_context(library_root=library, game_root=STORE.game_root)
         mods = [library / folder for folder in adapter.active_mod_ids(STORE.game_root)]
         result = activate_with_recovery(adapter, mods, STORE.game_root)
-    except (ValueError, OSError, RuntimeError) as error:
+        pending = _tweaks_flag()
+    except Exception as error:
         return {"tweaksNeedRebuild": True, "tweaksError": str(error)}
-    return {"tweaksNeedRebuild": _tweaks_flag(), "tweaksRebuilt": True,
+    return {"tweaksNeedRebuild": pending, "tweaksRebuilt": True,
             "disabledMods": result["disabledMods"]}
 
 

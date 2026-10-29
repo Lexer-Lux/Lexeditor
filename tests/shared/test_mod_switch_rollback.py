@@ -8,6 +8,7 @@ stayed on unseen and every later switch of any mod failed on it.
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -29,6 +30,7 @@ def host(root: Path, refuse: bool):
         if refuse and any(Path(path).name == "Broken" for path in paths):
             raise ValueError("Broken: refuses to build")
     return SimpleNamespace(_game_mods=lambda _plugin: root, _mod_adapter=lambda _plugin: object(),
+                           _mod_library_lock=threading.RLock(),
                            mod_library_status=lambda _plugin: {"canManage": True},
                            _activate_mods=activate)
 

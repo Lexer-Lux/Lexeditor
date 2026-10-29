@@ -556,8 +556,8 @@ async function deploymentAction(action){
   finally{state.deployBusy=false;render();}
 }
 function reportTweakRebuild(result){
-  if(result.disabledMods?.length)LexeditorUI.showToast("Changes saved. Other enabled mods rebuilt. " + result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});
-  else if(result.tweaksError)LexeditorUI.showAlert({title:"Changes saved; deployment failed",message:result.tweaksError});
+  if(result.tweaksError)LexeditorUI.showToast("Changes saved; deployment failed. " + result.tweaksError,{tone:"warning"});
+  else if(result.disabledMods?.length)LexeditorUI.showToast("Changes saved. Other enabled mods rebuilt. " + result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});
   else if(result.tweaksDeferred)LexeditorUI.showToast("Changes saved. Close the game, then save again to rebuild the tweaks.");
   else if(result.tweaksRebuilt)LexeditorUI.showToast("Changes saved and tweaks rebuilt.");
   else return false;

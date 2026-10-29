@@ -28,7 +28,10 @@ class MetadataError(ValueError):
 
 
 def _stored(root: Path) -> dict:
-    path = Path(root) / FILE
+    root = Path(root)
+    if root.is_symlink() or (root.exists() and getattr(root.lstat(), 'st_file_attributes', 0) & 0x400):
+        raise MetadataError('A mod folder must not be a symlink or junction')
+    path = root / FILE
     if not path.is_file():
         return {}
     try:

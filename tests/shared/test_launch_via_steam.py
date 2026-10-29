@@ -5,6 +5,7 @@ executable, so the button stayed greyed out. Such a game is now asked of
 Steam (steam://rungameid/<app id>) whenever its installation names an app.
 """
 import dataclasses
+import threading
 from pathlib import Path
 from unittest import mock
 
@@ -18,6 +19,7 @@ from plugins.ds1.plugin import PLUGIN
 def host():
     api = HostApi.__new__(HostApi)
     api._plugins = {PLUGIN.plugin_id: PLUGIN}
+    api._mod_library_lock = threading.RLock()
     api._launch_notice = mock.Mock(return_value="")
     return api
 

@@ -43,13 +43,15 @@ def mod_row(folder: Path) -> dict:
     except (ValueError, OSError) as error:
         row.update({"name": folder.name, "author": "", "description": "", "credits": "", "version": "",
                     "missing": ["name"], "enabled": False, "order": 1000, "error": str(error)})
+        row.update({'lexmod': None, 'script': None, 'components': None})
+        return row
     marker = folder / lexmods.MARKER
     row["lexmod"] = None
     if marker.is_file():
         try:
             info = json.loads(marker.read_text(encoding="utf-8"))
             row["lexmod"] = {"repository": info.get("repository", ""), "version": info.get("version", "")}
-        except (OSError, ValueError):
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
     row["script"] = None
     try:
