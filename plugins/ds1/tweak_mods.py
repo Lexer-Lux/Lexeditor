@@ -31,6 +31,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from time import perf_counter
 import stat
 from typing import Callable
 
@@ -1132,11 +1133,13 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
     if patch is None and loader:
         patch = b""
     files = []
+    menu_timings = []
     if not is_vanilla(current) or manifest:
         # Put an executable patched by an earlier Lexeditor back, once.
         files.append({"managed": EXECUTABLE, "before": current, "after": original, "mods": [], "project": None,
                       "previous": _current_manifest(current, manifest)})
     if layout or _layout_in_use(game_root):
+        menu_started = perf_counter()
         layout_current, layout_manifest = _installed(game_root, LAYOUT, "restore it before applying tweaks")
         layout_original = _original(game_root, layout_current, layout_manifest, LAYOUT)
         try:
@@ -1146,10 +1149,12 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
         files.append({"managed": LAYOUT, "before": layout_current, "after": layout_after,
                       "mods": _changes(layout) if layout_after != layout_original else [], "project": None,
                       "previous": _current_manifest(layout_current, layout_manifest, LAYOUT)})
+        menu_timings.append({'file': LAYOUT.relative, 'seconds': perf_counter() - menu_started})
     for managed in ESD:
         targeted = [spec for spec in scripts
                     if any(change["archive"] == ESD_ARCHIVE[managed] for change in spec["changes"])]
         if targeted or _esd_in_use(game_root, managed):
+            menu_started = perf_counter()
             esd_current, esd_manifest = _installed(game_root, managed, "restore it before applying tweaks")
             esd_original = _original(game_root, esd_current, esd_manifest, managed)
             try:
@@ -1159,13 +1164,14 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
             files.append({"managed": managed, "before": esd_current, "after": esd_after,
                           "mods": _changes(targeted) if esd_after != esd_original else [], "project": None,
                           "previous": _current_manifest(esd_current, esd_manifest, managed)})
+            menu_timings.append({'file': managed.relative, 'seconds': perf_counter() - menu_started})
     if patch is None and not loader and any(
             item.get("managed") in (LAYOUT, *ESD) and not item["managed"].vanilla(item["after"])
             for item in files):
         # No native patches, but a menu file stays managed: keep an empty
         # patch and its record, so later changes still ask for a rebuild.
         patch = b""
-    return {"files": files, "executableSha256": _sha(current), 'scripts': script_timings,
+    return {"files": files, "executableSha256": _sha(current), 'scripts': script_timings, 'menus': menu_timings,
             "runtime": {"patch": patch, "mods": _changes(native) if patch else [],
                         "project": chosen if patch else None, "previous": previous,
                         "built": built}}

@@ -149,7 +149,7 @@ class Ds1ModAdapter:
         finished = perf_counter()
         timings = {'prepareSeconds': prepared - started, 'compositionSeconds': composed - prepared,
                    'deploymentSeconds': finished - composed, 'activationSeconds': finished - started,
-                   'reusedInstalledData': reused, 'scripts': plan.get('scripts', [])}
+                   'reusedInstalledData': reused, 'scripts': plan.get('scripts', []), 'menus': plan.get('menus', [])}
         self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content, timings=timings)
         return {"activated": [Path(path).name for path in mods],
                 "dataMods": names, "conflicts": len(conflicts), 'timings': timings}

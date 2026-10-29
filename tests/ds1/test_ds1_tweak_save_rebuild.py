@@ -678,7 +678,7 @@ def test_script_build_rechecks_combined_game_params(game, library, monkeypatch):
     source.parent.mkdir(parents=True)
     source.write_bytes(b'original parameter inputs')
     monkeypatch.setattr(mod_loader, 'active_mods', lambda root, **kwargs: [])
-    monkeypatch.setattr(mod_loader, '_compose_params', lambda original, mods: (original, []))
+    monkeypatch.setattr(mod_loader, '_compose_params', lambda original, mods, **kwargs: (original, []))
     tweak_mods.apply(game, library)
     loads = []
     load = script_mods.load_script

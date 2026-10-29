@@ -571,9 +571,10 @@ class BuildContextTests(unittest.TestCase):
             game = Path(folder)
             source = game / "param.dcx"
             source.write_bytes(b"vanilla")
-            mod = mock.Mock(files={"rel": b"mod"})
+            relative = Path('rel')
+            mod = mock.Mock(files={relative: b"mod"})
             mod.name = "A mod"
-            with mock.patch("plugins.ds1.mod_loader.RELATIVE", "rel"), \
+            with mock.patch("plugins.ds1.mod_loader.RELATIVE", relative), \
                  mock.patch("plugins.ds1.deployment.vanilla_source", return_value=source), \
                  mock.patch("plugins.ds1.mod_loader.active_mods", return_value=[mod]) as active, \
                  mock.patch("plugins.ds1.mod_loader._compose_params",
@@ -581,5 +582,5 @@ class BuildContextTests(unittest.TestCase):
                 context = tweak_mods.BuildContext({}, game, game)
                 self.assertEqual(context.game_params(), b"merged")
                 self.assertEqual(context.game_params(), b"merged")
-            compose.assert_called_once_with(b"vanilla", [("A mod", b"mod")])
-            active.assert_called_once_with(game)
+            compose.assert_called_once_with(b"vanilla", [("A mod", b"mod")], conflicts_only=False)
+            active.assert_called_once_with(game, only=frozenset({relative}))

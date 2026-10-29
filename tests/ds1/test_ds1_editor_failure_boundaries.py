@@ -277,6 +277,29 @@ def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path,
     assert len(calls) == 2
 
 
+def test_layout_lookups_remain_correct_after_insertions_and_moves():
+    from plugins.ds1 import menu_layout
+    from test_ds1_menu_layout import drb, DIALOGS, snapshot, shape_order
+    layout = menu_layout.Drb(drb())
+    unchanged = snapshot(layout)
+    # Warm every lookup before shifting entries in the first dialog.
+    for dialog in layout.dialogs():
+        for node in layout.nodes(dialog):
+            layout._blob('SHAP', 'SHPR', node.shape)
+            layout._blob('CTRL', 'CTPR', node.control)
+    for index in range(12):
+        layout.add_text('data_simple_arms', f'added_{index}', 'text_param_receive', index, 16,
+                        before='text_receive_name')
+        layout.move('data_simple_arms', f'added_{index}', [10, 20, 110, 50])
+        layout.set_font('data_simple_arms', f'added_{index}', 4)
+    again = menu_layout.Drb(layout.to_bytes())
+    assert snapshot(again)['list_armor'] == unchanged['list_armor']
+    for index in range(12):
+        assert again.text('data_simple_arms', f'added_{index}')['rect'] == [10, 20, 110, 50]
+    assert shape_order(again) == list(range(0, again.sections['SHAP'][1] * 8, 8))
+    assert len(again.nodes('data_simple_arms')) == len(DIALOGS['data_simple_arms']) + 12
+
+
 def test_linked_library_entry_is_off_without_hiding_healthy_mod(tmp_path):
     from core import mods_service
     library = tmp_path / 'library'
