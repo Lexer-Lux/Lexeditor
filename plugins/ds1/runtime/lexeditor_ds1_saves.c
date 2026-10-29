@@ -82,7 +82,8 @@ int lx_save_path(const wchar_t *input, wchar_t *output, size_t capacity)
             if (!snapshot(input, output, pending, 0)) { ok = 0; goto done; }
         }
         if (GetFileAttributesW(output) != INVALID_FILE_ATTRIBUTES) {
-            if ((GetFileAttributesW(original) == INVALID_FILE_ATTRIBUTES &&
+            if (!regular(original, 1) ||
+                (GetFileAttributesW(original) == INVALID_FILE_ATTRIBUTES &&
                  !snapshot(output, original, pending, 0)) ||
                 !snapshot(output, latest, pending, 1)) { ok = 0; goto done; }
         }

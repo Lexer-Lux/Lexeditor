@@ -49,6 +49,8 @@ The loader must be enabled for isolation and protection. Removing it makes the
 game use its original filename; modded progress stays available for reinstalling.
 Any other gameplay files still installed must also be restored before vanilla play.
 Changing mod sets can leave references to removed content in the modded save.
+Isolation starts with this installation. If the normal save was already changed
+by earlier mods, it remains changed; this feature does not clean or certify it.
 
 The native tests open synthetic saves through the real import-table hook. They
 cover first copy, fresh characters, restart, bounded backups, uninstall behavior,

@@ -7,6 +7,7 @@
 #include "overhaul/SP/memory/injection/asm/x64.h"
 #include <bcrypt.h>
 #include <cstdarg>
+#include "lexeditor_ds1_build.h" /* generated from exe_patches.VANILLA_SHA256 */
 
 static void report(const char *format, va_list args)
 {
@@ -69,9 +70,6 @@ extern "C" void lx_online_preflight(void)
     BCRYPT_ALG_HANDLE algorithm = NULL;
     BCRYPT_HASH_HANDLE hash = NULL;
     unsigned char digest[32], buffer[65536];
-    static const unsigned char expected[32] = {
-        0xa4,0x5a,0xaa,0x36,0xdd,0x2f,0x6c,0xc1,0x51,0x67,0x0a,0x63,0x9e,0xa5,0x54,0x70,
-        0x43,0xcf,0x38,0xea,0x79,0xff,0x41,0x78,0xb9,0x63,0xc6,0xed,0x71,0xf9,0x8d,0x7b};
     bool ok = file != INVALID_HANDLE_VALUE &&
         BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, NULL, 0) >= 0 &&
         BCryptCreateHash(algorithm, &hash, NULL, 0, NULL, 0, 0) >= 0;
@@ -81,8 +79,13 @@ extern "C" void lx_online_preflight(void)
         if (!read) break;
         ok = BCryptHashData(hash, buffer, read, 0) >= 0;
     }
-    if (ok) ok = BCryptFinishHash(hash, digest, sizeof digest, 0) >= 0 &&
-                 memcmp(digest, expected, sizeof digest) == 0;
+    if (ok) {
+        ok = BCryptFinishHash(hash, digest, sizeof digest, 0) >= 0;
+        char actual[65];
+        for (size_t i = 0; i < sizeof digest; ++i)
+            snprintf(actual + i * 2, 3, "%02x", digest[i]);
+        ok = ok && strcmp(actual, LX_GAME_SHA256) == 0;
+    }
     if (hash) BCryptDestroyHash(hash);
     if (algorithm) BCryptCloseAlgorithmProvider(algorithm, 0);
     if (file != INVALID_HANDLE_VALUE) CloseHandle(file);

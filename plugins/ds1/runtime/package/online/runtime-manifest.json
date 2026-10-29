@@ -1,10 +1,11 @@
 {
   "file": "dinput8.dll",
-  "sha256": "e0cc56507c5c6cfcda6a43de5fead7e29e7b736b5a9d47084a21f8bd0a87ed48",
+  "sha256": "e55711abd23a8435b3aed980250f3514d499e63e141aa1656728dc7025eb3fba",
   "size": 1484800,
-  "sourceSha256": "dd90eb95a5bf6058370beb97f02852980966a013cd2cd0acdad2dda62beff6e4",
+  "sourceSha256": "ba920b9011a4278e262604ade87bd6f47e235d2ab394e98c5d94740c86bdd664",
   "compiler": "msvc (Build Tools 2022)",
   "dearxan": "0.5.6",
   "overhaulRevision": "2a3d8cbe2acee663bef03c7be4f968dbb68f951f",
-  "license": "AGPL-3.0-only"
+  "license": "AGPL-3.0-only",
+  "gameSha256": "a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b"
 }

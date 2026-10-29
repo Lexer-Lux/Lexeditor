@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -48,10 +49,20 @@ ONLINE_SOURCES = DEBUG_SOURCES + (
 DEARXAN = "0.5.6"
 
 
+def supported_game_sha256() -> str:
+    """The editor's executable validator owns the supported build identity."""
+    spec = importlib.util.spec_from_file_location("ds1_build_identity", HERE.parent / "exe_patches.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.VANILLA_SHA256
+
+
 def source_hash(names=SOURCES) -> str:
     digest = hashlib.sha256()
     for name in names:
         digest.update(name.encode() + b"\0" + (HERE / name).read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    if names == ONLINE_SOURCES:
+        digest.update(b"supported-game\0" + supported_game_sha256().encode() + b"\0")
     return digest.hexdigest()
 
 
@@ -108,6 +119,9 @@ def build_debug(dearxan: Path, output: Path, *, online: bool = False) -> None:
             (work / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(HERE / name, work / name)
         shutil.copy2(include / "dearxan.h", work / "dearxan.h")
+        if online:
+            (work / "lexeditor_ds1_build.h").write_text(
+                f'#define LX_GAME_SHA256 "{supported_game_sha256()}"\n', encoding="ascii")
         assembly = ('ml64 /nologo /c /FoAntiAntiCheatASM.obj overhaul/AntiAntiCheatASM.asm && ' if online else '')
         extra = ('/DLX_ONLINE_BUILD /std:c++17 /EHsc /Ioverhaul lexeditor_ds1_saves.c '
                  'lexeditor_ds1_online.cpp overhaul/AntiAntiCheat.cpp AntiAntiCheatASM.obj ' if online else '')
@@ -152,6 +166,7 @@ def main() -> int:
         if args.online:
             manifest["overhaulRevision"] = OVERHAUL_REVISION
             manifest["license"] = "AGPL-3.0-only"
+            manifest["gameSha256"] = supported_game_sha256()
         (package / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
         print(json.dumps(manifest, indent=2))
         return 0

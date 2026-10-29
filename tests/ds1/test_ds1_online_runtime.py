@@ -38,6 +38,7 @@ def test_shipped_sources_and_online_dll_match():
         assert manifest['sha256'] == hashlib.sha256((RUNTIME / 'package' / folder / 'dinput8.dll').read_bytes()).hexdigest()
     assert manifest['overhaulRevision'] == build.OVERHAUL_REVISION
     assert manifest['license'] == 'AGPL-3.0-only'
+    assert manifest['gameSha256'] == build.supported_game_sha256()
     source = json.loads((RUNTIME / 'overhaul/SOURCE.json').read_text())
     assert source['revision'] == build.OVERHAUL_REVISION
     for name, upstream in [('AntiAntiCheat.h', 'OverhaulDLL/include/AntiAntiCheat.h'),
@@ -145,13 +146,15 @@ def test_new_player_creates_only_a_modded_save(saves_harness, tmp_path):
     assert not vanilla.exists()
 
 
-@pytest.mark.parametrize('problem', ['backup-directory', 'hardlink', 'oversize', 'staging-directory'])
+@pytest.mark.parametrize('problem', ['backup-directory', 'original-directory', 'hardlink', 'oversize', 'staging-directory'])
 def test_save_failure_never_falls_back_to_writing_vanilla(saves_harness, tmp_path, problem):
     vanilla = tmp_path / 'DRAKS0005.sl2'
     modded = tmp_path / 'DRAKS0005.lexeditor.sl2'
     vanilla.write_bytes(b'untouched')
     if problem == 'backup-directory':
         (tmp_path / 'DRAKS0005.lexeditor.latest.bak').mkdir()
+    elif problem == 'original-directory':
+        (tmp_path / 'DRAKS0005.lexeditor.original.bak').mkdir()
     elif problem == 'staging-directory':
         (tmp_path / 'DRAKS0005.lexeditor.pending.bak').mkdir()
     elif problem == 'hardlink':
