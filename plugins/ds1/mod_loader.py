@@ -412,7 +412,9 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool
             if have:
                 files[relative] = have[-1][1]
             continue
-        result = _compose_anibnd(vanilla[relative], have, relative, kind="file", conflicts_only=conflicts_only)
+        result = (_compose_tpf(vanilla[relative], have, relative, conflicts_only=conflicts_only)
+                  if relative.name.lower().removesuffix('.dcx').endswith('.tpf') else
+                  _compose_anibnd(vanilla[relative], have, relative, kind="file", conflicts_only=conflicts_only))
         conflicts += result[1]
         if result[0] != vanilla[relative]:
             files[relative] = result[0]
@@ -921,6 +923,36 @@ def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) 
             conflict.add(name)
         conflicts.append(conflict)
     return (vanilla if combined == original else deflate(vanilla, combined)), conflicts
+
+
+def _compose_tpf(vanilla, mods, relative, *, conflicts_only=False):
+    from . import texture_packs
+    from .assets import MAX_ASSET_BYTES
+    changed = [(name, data) for name, data in mods if data != vanilla]
+    if not changed:
+        return vanilla, []
+    wrapped = vanilla.startswith(b'DCX\0')
+    original = inflate(vanilla, max_size=MAX_ASSET_BYTES) if wrapped else vanilla
+    # Unknown originals keep the existing whole-file conflict boundary.
+    try:
+        texture_packs.read(original)
+    except FormatError:
+        return _whole_anibnd(changed, relative, 'texture pack')
+    variants = []
+    for name, data in changed:
+        if data.startswith(b'DCX\0') != wrapped:
+            raise FormatError(f'{name}: TPF container compression differs from vanilla')
+        variants.append((name, inflate(data, max_size=MAX_ASSET_BYTES) if wrapped else data))
+    merged, collisions = texture_packs.merge(original, variants, conflicts_only=conflicts_only)
+    conflicts = [Conflict(relative, name, owners) for name, owners in sorted(collisions.items())]
+    if conflicts_only:
+        return vanilla, conflicts
+    # Preserve a single already-compiled payload exactly when it represents
+    # the merged records; otherwise serialize one combined directory.
+    if len(changed) == 1:
+        return changed[0][1], conflicts
+    return (deflate(vanilla, merged, max_size=MAX_ASSET_BYTES) if wrapped and merged != original
+            else vanilla if merged == original else merged), conflicts
 
 
 def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path, kind: str = "character file", *, conflicts_only: bool = False) -> tuple[bytes, list[Conflict]]:

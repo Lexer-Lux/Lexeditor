@@ -277,6 +277,120 @@ def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path,
     assert len(calls) == 2
 
 
+@pytest.mark.parametrize('wrapped', [False, True])
+def test_texture_additions_edits_and_removals_combine_by_name(tmp_path, wrapped):
+    from test_ds1_assets import make_tpf, make_dds
+    from ds1_fixture import make_archive
+    from plugins.ds1 import formats, texture_packs, assets
+    a, b, c = make_dds(4, 4), make_dds(8, 4), make_dds(4, 8)
+    vanilla = make_tpf([('untouched', a), ('edit', a), ('remove', a)])
+    first = make_tpf([('untouched', a), ('edit', b), ('remove', a), ('added_a', b)])
+    second = make_tpf([('untouched', a), ('edit', a), ('added_b', c)])
+    wrap = lambda data: formats.deflate(make_archive(), data) if wrapped else data
+    relative = Path('menu/sheets.tpf' + ('.dcx' if wrapped else ''))
+    result = mod_loader.compose({relative: wrap(vanilla)}, [
+        mod_loader.Mod('First', tmp_path / 'first', {relative: wrap(first)}),
+        mod_loader.Mod('Second', tmp_path / 'second', {relative: wrap(second)})])
+    assert result.conflicts == []
+    plain = formats.inflate(result.files[relative]) if wrapped else result.files[relative]
+    rows = {row.name: row for row in texture_packs.read(plain)[1]}
+    assert set(rows) == {'untouched', 'edit', 'added_a', 'added_b'}
+    assert rows['untouched'].data == a
+    assert rows['edit'].data == b and rows['added_a'].data == b and rows['added_b'].data == c
+    assert [row['name'] for row in assets.parse_tpf(plain)] == ['untouched', 'edit', 'added_a', 'added_b']
+
+
+@pytest.mark.parametrize('operation', ['edit', 'add', 'delete'])
+def test_texture_conflicts_name_the_record_and_both_owners(tmp_path, operation):
+    from test_ds1_assets import make_tpf, make_dds
+    from plugins.ds1 import texture_packs
+    a, b, c = make_dds(4, 4), make_dds(8, 4), make_dds(4, 8)
+    base = [('same', a)] if operation != 'add' else []
+    first = [] if operation == 'delete' else [('same', b)]
+    second = [('same', c)]
+    relative = Path('menu/sheets.tpf')
+    mods = [mod_loader.Mod(name, tmp_path / name, {relative: make_tpf(rows)})
+            for name, rows in [('First', first), ('Second', second)]]
+    result = mod_loader.compose({relative: make_tpf(base)}, mods)
+    assert [(row.part, row.mods) for row in result.conflicts] == [('same', ['First', 'Second'])]
+    assert texture_packs.read(result.files[relative])[1][0].data == c
+    reported = mod_loader.compose({relative: make_tpf(base)}, mods, conflicts_only=True)
+    assert not reported.files and reported.conflicts == result.conflicts
+
+
+def test_identical_texture_additions_and_reordering_do_not_conflict(tmp_path):
+    from test_ds1_assets import make_tpf, make_dds
+    from plugins.ds1 import texture_packs
+    dds = make_dds(4, 4)
+    original = make_tpf([('first', dds), ('second', dds)])
+    first = make_tpf([('new', dds), ('second', dds), ('first', dds)])
+    second = make_tpf([('first', dds), ('second', dds), ('new', dds)])
+    merged, conflicts = texture_packs.merge(original, [('First', first), ('Second', second)])
+    assert not conflicts
+    assert [row.name for row in texture_packs.read(merged)[1]] == ['first', 'second', 'new']
+
+
+@pytest.mark.parametrize('damage', ['duplicate', 'platform', 'metadata', 'pointer', 'encoding'])
+def test_invalid_or_unsupported_texture_changes_are_attributed(tmp_path, damage):
+    import struct
+    from test_ds1_assets import make_tpf, make_dds
+    original = make_tpf([('same', make_dds(4, 4))])
+    broken = bytearray(make_tpf([('same', make_dds(8, 4))]))
+    if damage == 'duplicate':
+        broken = make_tpf([('same', make_dds(4, 4)), ('same', make_dds(8, 4))])
+    elif damage == 'platform':
+        broken[12] = 2
+    elif damage == 'metadata':
+        struct.pack_into('<I', broken, 32, 1)
+    elif damage == 'pointer':
+        struct.pack_into('<I', broken, 16, 0)
+    else:
+        broken[36] = 0x81  # A lone Shift-JIS lead byte before the terminator.
+        broken[37] = 0
+    relative = Path('menu/sheets.tpf')
+    game = tmp_path / 'game'
+    source = game / relative
+    source.parent.mkdir(parents=True)
+    source.write_bytes(original)
+    broken_mod = tmp_path / 'Broken'
+    with pytest.raises(mod_builds.ModBuildError) as caught:
+        mod_loader.compose_installed(game, [mod_loader.Mod('Broken', broken_mod, {relative: bytes(broken)})])
+    assert caught.value.folders == (broken_mod.resolve(),)
+
+
+def test_unicode_texture_names_and_unchanged_metadata_survive_merge():
+    from plugins.ds1 import texture_packs
+    from test_ds1_assets import make_dds
+    texture = lambda name, metadata: texture_packs.Texture(name, name.encode('utf-16-le'), metadata, make_dds(4, 4))
+    original_rows = [texture('元の画像', b'\x09\0\x03\0'), texture('keep', b'\x0a\0\x02\x01')]
+    header = b'\0\x03\x01\0'
+    original = texture_packs.write(header, original_rows)
+    changed = texture('元の画像', b'\x0b\0\x03\0')
+    added = texture('追加の画像', b'\x09\0\x01\0')
+    first = texture_packs.write(header, [changed, original_rows[1]])
+    second = texture_packs.write(header, original_rows + [added])
+    combined, conflicts = texture_packs.merge(original, [('First', first), ('Second', second)])
+    assert not conflicts
+    metadata, rows = texture_packs.read(combined)
+    assert metadata == header and rows == [changed, original_rows[1], added]
+
+
+def test_texture_report_does_not_serialize_and_combined_output_stays_bounded(monkeypatch):
+    from plugins.ds1 import texture_packs
+    from test_ds1_assets import make_tpf, make_dds
+    original = make_tpf([('keep', make_dds(4, 4))])
+    added = make_tpf([('keep', make_dds(4, 4)), ('new', make_dds(4, 4))])
+    def forbidden(*args):
+        pytest.fail('Conflict inspection must not serialize a texture pack')
+    monkeypatch.setattr(texture_packs, 'write', forbidden)
+    assert texture_packs.merge(original, [('First', added)], conflicts_only=True) == (original, {})
+    monkeypatch.undo()
+    rows = texture_packs.read(original)[1]
+    monkeypatch.setattr(texture_packs, 'MAX_ASSET_BYTES', 32)
+    with pytest.raises(texture_packs.FormatError, match='size limit'):
+        texture_packs.write(b'\0' * 4, rows)
+
+
 def test_saved_and_externally_added_rows_keep_created_origin():
     from ds1_fixture import make_archive
     from plugins.ds1.formats import ItemDocument
