@@ -277,6 +277,44 @@ def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path,
     assert len(calls) == 2
 
 
+def test_saved_and_externally_added_rows_keep_created_origin():
+    from ds1_fixture import make_archive
+    from plugins.ds1.formats import ItemDocument
+    original = make_archive()
+    document = ItemDocument(original)
+    document.add_rows('EquipParamGoods', [(100, 72350)])
+    loaded = ItemDocument(document.export())
+    loaded.vanilla_document = ItemDocument(original)
+    assert not loaded._added_rows and not loaded.dirty
+    rows = {row['id']: row for row in loaded.list_rows('consumables')}
+    assert rows[72350]['created'] and rows[72350]['modified']
+    assert not rows[100]['created'] and not rows[100]['modified']
+    loaded.edit('EquipParamGoods', 100, 'basicPrice', 123)
+    assert loaded.row_modified('EquipParamGoods', 100)
+    assert not loaded.row_created('EquipParamGoods', 100)
+
+
+def test_shared_added_and_edited_record_emoji(page, tmp_path):
+    from test_shared_ui_feedback import framework
+    framework(page)
+    page.evaluate('''() => {
+      const U=LexeditorUI;
+      document.querySelector('main').append(U.columnList({
+        columns:[{key:'name',label:'Name'}],
+        rows:[{id:1,name:'Titanite Shard'},
+              {id:2,name:'Edited Titanite Shard',modified:true},
+              {id:3,name:'Estus Shard',created:true,modified:true}],
+        key:row=>row.id,selected:null,select:()=>{}}));
+    }''')
+    created = page.get_by_role('img', name='Created in this mod', exact=True)
+    edited = page.get_by_role('img', name='Changed from vanilla', exact=True)
+    assert created.inner_text() == '✒️'
+    assert edited.inner_text() == '📝'
+    assert 'Segoe UI Emoji' in created.evaluate('(node)=>getComputedStyle(node).fontFamily')
+    assert created.count() == edited.count() == 1
+    page.screenshot(path=str(tmp_path / 'record-provenance.png'))
+
+
 def test_layout_lookups_remain_correct_after_insertions_and_moves():
     from plugins.ds1 import menu_layout
     from test_ds1_menu_layout import drb, DIALOGS, snapshot, shape_order

@@ -225,6 +225,8 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
   font-family: var(--lex-symbol-font);
 }
 
+.lex-record-source { font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",var(--lex-symbol-font); }
+
 .lex-command-primary {
   box-sizing:border-box;
   /* One control size for the whole command row. Save and Play were 38px

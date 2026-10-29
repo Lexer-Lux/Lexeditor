@@ -2904,10 +2904,9 @@
     if (options.vanilla) return null;
     if (options.created) return element("span", {class:"lex-ui-symbol lex-record-source",
       role:"img", title:"Created in this mod", "aria-label":"Created in this mod"}, "✒️");
-    // A changed record is not a new one: the delta says its values differ
-    // from the game's own, while the pen stays reserved for added rows.
+    // Keep edited vanilla records visually distinct from added records.
     if (options.modified) return element("span", {class:"lex-ui-symbol lex-record-source",
-      role:"img", title:"Changed from vanilla", "aria-label":"Changed from vanilla"}, "Δ");
+      role:"img", title:"Changed from vanilla", "aria-label":"Changed from vanilla"}, "📝");
     if (!options.icon || !options.label) return null;
     return element("span", {class:"lex-record-source", role:"img",
       title:options.label, "aria-label":options.label}, options.icon);

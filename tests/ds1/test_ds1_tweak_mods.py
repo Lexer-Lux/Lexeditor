@@ -571,11 +571,10 @@ class BuildContextTests(unittest.TestCase):
             game = Path(folder)
             source = game / "param.dcx"
             source.write_bytes(b"vanilla")
-            relative = Path('rel')
+            from plugins.ds1.mod_loader import RELATIVE as relative
             mod = mock.Mock(files={relative: b"mod"})
             mod.name = "A mod"
-            with mock.patch("plugins.ds1.mod_loader.RELATIVE", relative), \
-                 mock.patch("plugins.ds1.deployment.vanilla_source", return_value=source), \
+            with mock.patch("plugins.ds1.deployment.vanilla_source", return_value=source), \
                  mock.patch("plugins.ds1.mod_loader.active_mods", return_value=[mod]) as active, \
                  mock.patch("plugins.ds1.mod_loader._compose_params",
                             return_value=(b"merged", [])) as compose:
