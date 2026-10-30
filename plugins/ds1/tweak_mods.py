@@ -176,6 +176,9 @@ def claim_menu_files(game_root):
     """Transfer legacy data journals to the sole menu writer, keeping game bytes intact."""
     from . import deployment
     from core.file_lock import exclusive
+    if not any(checked(deployment._marker_path(game_root, Path(managed.relative))).is_file()
+               for managed in (LAYOUT, *ESD)):
+        return
     with exclusive(checked(Path(game_root) / deployment.DATA_LOCK)):
         transfers = []
         for managed in (LAYOUT, *ESD):

@@ -317,7 +317,18 @@ class NativeRules:
 
     def _apply_locked(self, store):
         source = self._preflight_params(store)
-        plan = tweak_mods.prepare(self.game_root, project=self._contribution)
+        from . import mod_loader
+        needs_plan = self._needs_native()
+        if not needs_plan:
+            from core import mods_service
+            ordered = [(row['name'], Path(row['path'])) for row in mods_service.library_rows(tweak_mods.mods_root())
+                       if row['enabled']]
+            if self.project is not None and not any(folder.resolve() == self.project.resolve() for _,folder in ordered):
+                ordered.append((self.project.name,self.project))
+            needs_plan = mod_loader.has_menu_contributions(ordered) or any(
+                tweak_mods.checked(path).is_file() for managed in (tweak_mods.LAYOUT, *tweak_mods.ESD)
+                for path in (managed.manifest(self.game_root), deployment._marker_path(self.game_root,Path(managed.relative))))
+        plan = tweak_mods.prepare(self.game_root, project=self._contribution) if needs_plan else None
 
         def checked_source(current):
             self.validate_save()
@@ -328,12 +339,12 @@ class NativeRules:
 
         # Every enabled mod is combined with this one over the game's own
         # files, before anything installed is touched.
-        from . import mod_loader
         composition, _mods = mod_loader.build(self.game_root, tweak_mods.mods_root(), self.project,
-                                             menu_files=plan['files'])
+                                             menu_files=plan['files'] if plan is not None else None)
         # Preflight again after building scripts, before touching installed data.
         checked_source(_read_optional(self.project / RELATIVE, MAX_ARCHIVE))
-        tweak_mods.commit(self.game_root, plan)
+        if plan is not None:
+            tweak_mods.commit(self.game_root, plan)
 
         # The project's saved archive is checked once more just before writing.
         def unchanged(current):
@@ -342,11 +353,12 @@ class NativeRules:
         try:
             deployment.apply(self.game_root, self.project, transform=unchanged, composed=composition.files)
         except Exception as error:
-            try:
-                tweak_mods.rollback(self.game_root, plan)
-            except Exception as rollback_error:
-                raise RuntimeError("Apply stopped with incomplete changes. Retry Apply or Restore original. "
-                                   f"{error}; native rollback: {rollback_error}") from error
+            if plan is not None:
+                try:
+                    tweak_mods.rollback(self.game_root, plan)
+                except Exception as rollback_error:
+                    raise RuntimeError("Apply stopped with incomplete changes. Retry Apply or Restore original. "
+                                       f"{error}; native rollback: {rollback_error}") from error
             raise
         return self.deployment_status()
 

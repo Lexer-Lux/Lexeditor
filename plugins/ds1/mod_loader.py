@@ -311,10 +311,14 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
 def has_menu_contributions(ordered):
     from . import record_edits, tweak_mods
     for name, folder in ordered:
-        for relative, disk in content_files(folder, name):
-            targets = record_edits.targets(disk) if relative == record_edits.FILENAME else (relative,)
-            if any(tweak_mods.managed_menu(target) is not None for target in targets):
-                return True
+        try:
+            for relative, disk in content_files(folder, name):
+                targets = record_edits.targets(disk) if relative == record_edits.FILENAME else (relative,)
+                if any(tweak_mods.managed_menu(target) is not None for target in targets):
+                    return True
+        except (OSError, ValueError) as error:
+            from core.mod_builds import ModBuildError
+            raise ModBuildError([folder], f'{name}: {error}') from error
     return False
 
 
