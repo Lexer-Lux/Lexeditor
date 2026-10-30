@@ -2,6 +2,39 @@
 import struct
 
 
+def append_items(base, blobs):
+    """Append typed fixture items and their reference slots to a TAG0 file."""
+    from plugins.ds1 import hkx
+    root,_=hkx._section(base,0)
+    data_part=next(part for part in root['subs'] if part['sig']=='DATA')
+    data=bytearray(base[data_part['pos']:data_part['pos']+data_part['length']])
+    records,refs=bytearray(),[]
+    for kind,count,blob,slots in blobs:
+        data+=bytes((-len(data))%16)
+        at=len(data)
+        records+=struct.pack('<3I',TIDS[kind],at,count)
+        refs.extend(at+slot for slot in slots)
+        data+=blob
+    patch=struct.pack('<2I',TIDS['T*'],len(refs))+struct.pack('<'+str(len(refs))+'I',*refs) if refs else b''
+    sections=[]
+    for section in root['subs']:
+        payload=base[section['pos']:section['pos']+section['length']]
+        if section['sig']=='DATA':
+            payload=bytes(data)
+        elif section['sig']=='INDX':
+            children=[]
+            had_patch=False
+            for child in section['subs']:
+                raw=base[child['pos']:child['pos']+child['length']]
+                if child['sig']=='ITEM':raw+=records
+                if child['sig']=='PTCH':raw+=patch;had_patch=True
+                children.append(_section(child['sig'].encode(),raw,False))
+            if patch and not had_patch:children.append(_section(b'PTCH',patch,False))
+            payload=b''.join(children)
+        sections.append(_section(section['sig'].encode(),payload,bool(section['subs'])))
+    return _section(b'TAG0',b''.join(sections),True)
+
+
 def _pack(value):
     if value < 0x80:
         return bytes([value])

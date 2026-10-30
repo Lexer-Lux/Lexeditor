@@ -30,7 +30,7 @@ def _validate_mesh(mesh):
             raise FormatError('Invalid portable collision element count')
         for row in rows:
             if (type(row) is not list or (name != 'flags' and len(row) != 4)
-                    or (name == 'flags' and not 1 <= len(row) <= 256)):
+                    or (name == 'flags' and not 0 <= len(row) <= 256)):
                 raise FormatError('Invalid portable collision element')
             if name == 'vertices':
                 if any(type(v) not in (float, int) or not math.isfinite(v) for v in row):

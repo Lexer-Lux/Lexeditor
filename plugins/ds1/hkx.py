@@ -20,9 +20,10 @@ from .formats import FormatError
 MAX_FILE = 64 * 1024 * 1024
 MAX_COUNT = 65536
 # One item's byte extent is a different quantity: a long motion packs its
-# whole spline curve set into a single hkUint8 blob, and the game ships
-# blobs near 500 KiB, so the flat object count cannot gate them.
-MAX_ITEM_BYTES = 1024 * 1024
+# whole spline curve set into a single hkUint8 blob. Collision vertex arrays
+# also exceed 2.5 MiB. Bound their bytes separately from the object count,
+# retaining the independent DATA-section and complete-file bounds.
+MAX_ITEM_BYTES = 16 * 1024 * 1024
 # The sampler only blends curves up to this degree.
 MAX_SPLINE_DEGREE = 4
 SDK_VERSIONS = frozenset({'20150100', '20160100', '20160200', '20180100', '20190100'})

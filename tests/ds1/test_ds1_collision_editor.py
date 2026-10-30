@@ -11,11 +11,13 @@ from ds1_fixture import make_archive
 from msb_fixture import build_msb
 from test_ds1_collision_store import setup,MAP
 from test_ds1_collision_write import collision_source
+from test_ds1_legacy_collision import legacy_source
 from test_ds1_portable_collisions import HEADER,BODY
 
 
-@pytest.mark.parametrize('loose',[False,True])
-def test_collision_editor_fields_structure_history_and_preview(collision_source,tmp_path,loose):
+@pytest.mark.parametrize('source_name,loose',[('collision_source',False),('collision_source',True),('legacy_source',False)])
+def test_collision_editor_fields_structure_history_and_preview(request,tmp_path,source_name,loose):
+    collision_source=request.getfixturevalue(source_name)
     game,project,store,pair=setup(tmp_path,collision_source)
     for relative,payload in zip((HEADER,BODY),pair):
         low=relative.with_name('l'+relative.name[1:])

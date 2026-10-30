@@ -225,6 +225,8 @@ class CollisionStore:
         fields,links = [],[]
         bits = {'indices8':8,'indices16':16,'indices32':32}[state['document'].meshes[index]['index_field']]
         for key,value in listed['values'].items():
+            if key == 'metadata' and not state['document'].meshes[index]['face_metadata']:
+                continue
             field = {'key':key,'value':value,'editable':True,'section':'Properties','type':'number',
                      'step':1,'dtype':'u32','description':''}
             if key.startswith('pos'):
@@ -338,6 +340,8 @@ class CollisionStore:
         else:
             maximum = 255
             if kind == 'faces':
+                if component == 3 and not state['document'].meshes[index]['face_metadata']:
+                    raise FormatError('This collision has no stored face metadata')
                 bits = {'indices8':8,'indices16':16,'indices32':32}[state['document'].meshes[index]['index_field']]
                 maximum = min(len(mesh['vertices'])-1,(1 << bits)-1) if component < 3 else (1 << bits)-1
             if type(value) is not int or not 0 <= value <= maximum:
@@ -363,6 +367,8 @@ class CollisionStore:
         if len(value['flags'][0]) != len(before['flags'][0]):
             raise FormatError('Collision vertex metadata has an invalid stride')
         bits = {'indices8':8,'indices16':16,'indices32':32}[state['document'].meshes[index]['index_field']]
+        if not state['document'].meshes[index]['face_metadata'] and any(face[3] for face in value['faces']):
+            raise FormatError('This collision has no stored face metadata')
         if any(v >= 1 << bits for face in value['faces'] for v in face):
             raise FormatError('Collision indices exceed this mesh storage width')
         collision_merge._update(before,value)

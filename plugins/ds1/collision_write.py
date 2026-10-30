@@ -2,7 +2,7 @@
 import math
 import struct
 
-from . import collision_mopp, hkx, hkx_write, map_collision
+from . import collision_mopp, hkx, hkx_write
 from .formats import FormatError, deflate, inflate
 
 
@@ -16,37 +16,48 @@ class CollisionDocument:
         self.reader = hkx._TagReader(self.data, 0, [], self.entries)
         self.patches, self.replacements = [], {}
         shapes = [entry for entry in self.entries if entry['type'] is not None
-                  and entry['type'].name == 'CustomParamStorageExtendedMeshShape']
+                  and entry['type'].name in ('CustomParamStorageExtendedMeshShape','CustomParamStorageMeshShape')]
         codes = [entry for entry in self.entries if entry['type'] is not None
                  and entry['type'].name == 'hkpMoppCode']
         if len(shapes) != 1 or len(codes) != 1:
-            raise FormatError('Collision editing needs one extended mesh and its spatial index')
+            raise FormatError('Collision editing needs one supported mesh and its spatial index')
         self.shape = (shapes[0]['type'], shapes[0]['pos'])
+        self.kind = 'extended' if self.shape[0].name == 'CustomParamStorageExtendedMeshShape' else 'mesh'
         self.code = (codes[0]['type'], codes[0]['pos'])
-        self.storage = self._objects(self.shape, 'meshstorage')
-        self.parts = self._objects(self.shape, 'trianglesSubparts')
+        self.storage = self._objects(self.shape, 'meshstorage' if self.kind == 'extended' else 'storage')
+        self.parts = self._objects(self.shape, 'trianglesSubparts' if self.kind == 'extended' else 'subparts')
         self.materials = self._objects(self.shape, 'materialArray')
         if not self.storage or len(self.storage) != len(self.parts) or len(self.materials) != len(self.parts):
             raise FormatError('Collision mesh subparts do not match their physics metadata')
         if any(owner is None for owners in (self.storage, self.parts, self.materials) for owner in owners):
             raise FormatError('Collision metadata contains a missing mesh subpart')
         self.meshes = []
-        for storage in self.storage:
+        for storage,part in zip(self.storage,self.parts):
             values = self._value(storage)
             index_field = next((key for key in ('indices8', 'indices16', 'indices32') if values.get(key)), None)
             if index_field is None:
                 raise FormatError('Collision mesh has no triangle indices')
             indices = values[index_field]
             vertices = values.get('vertices') or []
+            stride = 4 if self.kind == 'extended' else 3
+            if self.kind == 'mesh':
+                if len(vertices) % 3:
+                    raise FormatError('Collision mesh has invalid packed coordinates')
+                vertices = [vertices[i:i+3]+[0.] for i in range(0,len(vertices),3)]
+                descriptor = self._value(part)
+                width = {'indices8':1,'indices16':2,'indices32':4}[index_field]
+                if (descriptor['vertexStriding'] != 12 or descriptor['indexStriding'] != 3*width
+                        or descriptor['flipAlternateTriangles'] != 0):
+                    raise FormatError('Collision mesh has an unsupported triangle stride')
             if (not vertices or any(len(vertex) != 4 or any(type(value) not in (int,float)
-                    or not math.isfinite(value) for value in vertex) for vertex in vertices) or len(indices) % 4):
+                    or not math.isfinite(value) for value in vertex) for vertex in vertices) or len(indices) % stride):
                 raise FormatError('Collision mesh has invalid triangle storage')
             if any(type(value) is not int or not 0 <= value < len(vertices)
-                   for at in range(0,len(indices),4) for value in indices[at:at+3]):
+                   for at in range(0,len(indices),stride) for value in indices[at:at+3]):
                 raise FormatError('Collision face points outside its vertices')
             self.meshes.append({'vertices': vertices,
-                                'faces': [indices[i:i+4] for i in range(0, len(indices), 4)],
-                                'index_field': index_field})
+                                'faces': [indices[i:i+stride]+([] if stride == 4 else [0]) for i in range(0,len(indices),stride)],
+                                'index_field': index_field,'face_metadata':stride == 4})
 
     def _field(self, owner, name):
         field = hkx._peek_field(owner[0], name)
@@ -141,24 +152,28 @@ class CollisionDocument:
             if len(tags) != len(new_faces) or any(type(value) is not int or not 0 <= value <= maximum for value in tags):
                 raise FormatError('Collision face metadata is invalid')
             for face, tag in zip(new_faces, tags):
+                if self.kind == 'mesh' and tag != 0:
+                    raise FormatError('This collision has no stored face metadata')
                 face[3] = tag
-            vertex_payload = b''.join(struct.pack('<4f', *vertex) for vertex in new_vertices)
-            index_payload = b''.join(struct.pack('<4' + {1: 'B', 2: 'H', 4: 'I'}[width], *face)
+            stride = 4 if self.kind == 'extended' else 3
+            vertex_payload = b''.join(struct.pack('<'+str(stride)+'f', *vertex[:stride]) for vertex in new_vertices)
+            index_payload = b''.join(struct.pack('<'+str(stride) + {1: 'B', 2: 'H', 4: 'I'}[width], *face[:stride])
                                      for face in new_faces)
-            self._array(storage, 'vertices', vertex_payload, len(new_vertices))
-            self._array(storage, old['index_field'], index_payload, len(new_faces)*4)
+            self._array(storage, 'vertices', vertex_payload, len(new_vertices)*(3 if self.kind == 'mesh' else 1))
+            self._array(storage, old['index_field'], index_payload, len(new_faces)*stride)
             parameter = self._value(material)
             stride = parameter['vertexDataStride']
-            flags = parameter['vertexDataBuffer']
-            if type(stride) is not int or not 1 <= stride <= 256 or len(flags) != len(old['vertices'])*stride:
+            flags = parameter['vertexDataBuffer'] or []
+            if type(stride) is not int or not 0 <= stride <= 256 or len(flags) != len(old['vertices'])*stride:
                 raise FormatError('Collision vertex metadata has an unsupported stride')
             flag_rows = update.get('vertex_flags', [flags[source*stride:(source+1)*stride]
                                                     for source in vertex_sources])
             if (len(flag_rows) != len(new_vertices) or any(len(row) != stride or any(
                     type(value) is not int or not 0 <= value <= 255 for value in row) for row in flag_rows)):
                 raise FormatError('Collision vertex metadata is invalid')
-            self._array(material, 'vertexDataBuffer', bytes(value for row in flag_rows for value in row),
-                        len(vertex_sources)*stride)
+            if stride:
+                self._array(material, 'vertexDataBuffer', bytes(value for row in flag_rows for value in row),
+                            len(vertex_sources)*stride)
             if parameter.get('primitiveDataBuffer') and len(new_faces) != len(old['faces']):
                 raise FormatError('This collision has primitive metadata that cannot yet be resized')
             values = self._value(storage)
@@ -170,8 +185,8 @@ class CollisionDocument:
                                           *(values[name][source] for source in face_sources))
                     self._array(storage, name, payload, len(face_sources))
             self._patch(part, 'numVertices', len(new_vertices))
-            self._patch(part, 'numTriangleShapes', len(new_faces))
-            if index == 0:
+            self._patch(part, 'numTriangleShapes' if self.kind == 'extended' else 'numTriangles', len(new_faces))
+            if index == 0 and self.kind == 'extended':
                 embedded = self._field(self.shape, 'embeddedTrianglesSubpart')
                 self._patch(embedded, 'numVertices', len(new_vertices))
                 self._patch(embedded, 'numTriangleShapes', len(new_faces))
@@ -184,25 +199,31 @@ class CollisionDocument:
             if any(values.get('extrusion', ())):
                 raise FormatError('This collision uses extruded triangles that need regenerated bounds')
             world.append((self.transformed_vertices(index,vertices), faces))
-        radius = self._value(self._field(self.shape, 'triangleRadius'))
+        radius = self._value(self._field(self.shape, 'triangleRadius' if self.kind == 'extended' else 'radius'))
         bits = self._value(self._field(self.shape, 'numBitsForSubpartIndex'))
         code, offset = collision_mopp.build(world, radius=radius, subpart_bits=bits)
         self._array(self.code, 'data', code, len(code))
         self._patch(self._field(self.code, 'info'), 'offset', offset)
-        for name, vector in (('aabbCenter', [0]*4), ('aabbHalfExtents', [0]*4)):
+        for name, vector in ((('aabbCenter', [0]*4), ('aabbHalfExtents', [0]*4)) if self.kind == 'extended' else ()):
             for axis in range(3):
                 low = min(point[axis] for vertices, _ in world for point in vertices)
                 high = max(point[axis] for vertices, _ in world for point in vertices)
                 vector[axis] = (high+low)/2 if name == 'aabbCenter' else (high-low)/2+radius
             self._patch(self.shape, name, vector)
-        self._patch(self.shape, 'cachedNumChildShapes', sum(len(faces) for _, faces in final))
+        if self.kind == 'extended':
+            self._patch(self.shape, 'cachedNumChildShapes', sum(len(faces) for _, faces in final))
         result = hkx_write.replace_items(self.data, self.replacements, self.patches)
         # Read the edited geometry before handing it to any project writer.
-        map_collision.meshes(result)
+        CollisionDocument(result)
         return deflate(self.source, result) if self.source[:4] == b'DCX\0' else result
 
     def transformed_vertices(self, index, vertices):
         """The same subpart transform for drawing and collision compilation."""
+        if self.kind == 'mesh':
+            scale = self._value(self._field(self.shape,'scaling'))
+            if len(scale) != 4 or any(not math.isfinite(value) for value in scale):
+                raise FormatError('Collision has an invalid scale')
+            return [tuple(vertex[i]*scale[i] for i in range(3)) for vertex in vertices]
         transform = self._value(self.parts[index])['transform']
         translation, scale, rotation = (transform[key] for key in ('translation','scale','rotation'))
         if any(not math.isfinite(value) for vector in (translation,scale,rotation) for value in vector):

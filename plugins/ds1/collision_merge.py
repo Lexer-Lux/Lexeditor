@@ -11,6 +11,8 @@ def _metadata(document):
         'CustomParamStorageExtendedMeshShape': {'aabbHalfExtents', 'aabbCenter', 'cachedNumChildShapes'},
         'hkpExtendedMeshShape::TrianglesSubpart': {'numVertices', 'numTriangleShapes'},
         'hkpStorageExtendedMeshShape::MeshSubpartStorage': {'vertices', 'indices8', 'indices16', 'indices32'},
+        'hkpMeshShape::Subpart': {'numVertices','numTriangles'},
+        'hkpStorageMeshShape::SubpartStorage': {'vertices','indices16','indices32'},
         'CustomMeshParameter': {'vertexDataBuffer'},
     }
 
@@ -29,11 +31,11 @@ def _metadata(document):
 def _mesh(document, index):
     mesh = document.meshes[index]
     material = document._value(document.materials[index])
-    stride, flags = material['vertexDataStride'], material['vertexDataBuffer']
-    if type(stride) is not int or not 1 <= stride <= 256 or len(flags) != len(mesh['vertices'])*stride:
+    stride, flags = material['vertexDataStride'], material['vertexDataBuffer'] or []
+    if type(stride) is not int or not 0 <= stride <= 256 or len(flags) != len(mesh['vertices'])*stride:
         raise FormatError('Collision vertex metadata has an unsupported stride')
     return {'vertices': mesh['vertices'], 'faces': mesh['faces'],
-            'flags': [flags[i:i+stride] for i in range(0, len(flags), stride)]}
+            'flags': [flags[i*stride:(i+1)*stride] for i in range(len(mesh['vertices']))]}
 
 
 def _update(old, new):
