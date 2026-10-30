@@ -365,9 +365,12 @@ def test_conflict_report_survives_restart_and_tracks_files_and_originals(game, l
 
 def test_successful_build_publishes_conflicts_without_another_merge(game, library, monkeypatch):
     from plugins.ds1 import mod_loader, deployment
+    from plugins.ds1.store import RELATIVE
     paths = [library / name for name in ("Alpha", "Beta")]
     for folder in paths:
         Ds1ModAdapter().prepare_editable(folder)
+        (folder/RELATIVE).parent.mkdir(parents=True, exist_ok=True)
+        (folder/RELATIVE).write_bytes(b'data input for the mocked composer')
     calls = []
     def compare(*args, **kwargs):
         calls.append(kwargs)

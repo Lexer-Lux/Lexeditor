@@ -78,4 +78,9 @@ def test_menu_reuses_verified_install_even_after_cache_eviction(tmp_path, monkey
     assert tweak_mods._compose_menu(original, specs, managed, None, current=b'external edit',
                                    manifest=manifest) == b'new menu'
     assert len(calls) == 6
+    # An unsupported optional cache representation must never become a build
+    # failure, nor count as a matching recipe when both identities are absent.
+    assert tweak_mods._compose_menu(original, [{'internal':object()}], managed, tmp_path,
+                                   current=installed, manifest={**manifest,'inputs':None}) == b'new menu'
+    assert len(calls) == 7
 
