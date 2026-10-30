@@ -138,6 +138,15 @@ def test_event_duplicate_does_not_share_entity_identity():
     assert len(MsbDocument(after.export()).events) == 1
 
 
+def test_existing_message_creation_keeps_its_new_region_browsable():
+    doc = MsbDocument(build_msb(events=(('Activation', 7, 0, 0, (-1,-1,-1,0), bytes(16)),)))
+    doc.create_message(10, (1.,2.,3.))
+    region = next(row for row in doc.placements() if row['kind'] == 'Region')
+    detail = doc.read_placement(('region', region['partId']))
+    assert all(field['vanilla'] is None for field in detail['fields'])
+    MsbDocument(doc.export()).read_placement(('region', region['partId']))
+
+
 def test_create_all_supported_event_kinds_and_light_lifecycle():
     from plugins.ds1 import msb_events
     doc = document()

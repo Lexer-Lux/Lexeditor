@@ -640,7 +640,8 @@ class MsbDocument:
                    'dtype': 's32', 'value': point['shape'], 'type': 'enum',
                    'enum': {str(k): v[0] for k, v in REGION_SHAPES.items()}, 'editable': True,
                    'minimum': 0, 'maximum': 5,
-                   'vanilla': None if tuple(key) in self.added else struct.unpack_from('<i', self.original, point['base']+12)[0]}]
+                   'vanilla': None if tuple(key) in self.added or point['base']+16 > len(self.original)
+                              else struct.unpack_from('<i', self.original, point['base']+12)[0]}]
         for field, address, dtype, label in self._region_fields(point):
             value = struct.unpack_from('<' + dtype, self.plain, address)[0]
             original = None if tuple(key) in self.added or address+4 > len(self.original) else struct.unpack_from('<' + dtype, self.original, address)[0]
@@ -1119,6 +1120,7 @@ class MsbDocument:
         point = _point(self.plain, base)
         self.points.append(point)
         self._strings.append((base + 60, base + 60 + len(name_bytes)))
+        self.added.add(('region', point['index']))
         return len(self.points) - 1
 
     def _insert_message_event(self, hint, part, area, point, flag, stored, unknown):
