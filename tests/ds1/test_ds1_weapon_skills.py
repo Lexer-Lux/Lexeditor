@@ -36,12 +36,16 @@ class SkillCatalogTests(unittest.TestCase):
             self.assertEqual(loaded.value,s.value);self.assertEqual(loaded.dirty_count,0)
             loaded.assign(200000,0,{200000});loaded.remove(a['id']);loaded.discard()
             self.assertEqual(loaded.assignment(200000),a['id'])
+            loaded.edit(a['id'],'name','\U0001f525'*40)
+            copied=loaded.add(a['id'])
+            self.assertLessEqual(len(copied['name'].encode('utf-16-le')),160)
+            validate(loaded.value)
 
     def test_reject_malformed_links_duplicates_and_ranges(self):
         entry={'id':1,'name':'Test','description':'','iconId':None,'fpCost':0,'staminaCost':0}
         good={'version':1,'skills':[entry],'assignments':[{'weaponId':200000,'skillId':1}]}
         validate(good,{200000})
-        for key,value in [('fpCost',-1),('staminaCost',65536),('id',True),('iconId',65536),('name','')]:
+        for key,value in [('fpCost',-1),('staminaCost',65536),('id',True),('iconId',65536),('name',''),('name','\U0001f525'*41)]:
             bad=deepcopy(good);bad['skills'][0][key]=value
             with self.subTest(key=key),self.assertRaises(ValueError):validate(bad)
         for assignments in ([{'weaponId':200000,'skillId':2}],good['assignments']*2):

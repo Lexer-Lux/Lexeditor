@@ -12,6 +12,8 @@ RELATIVE = Path('script/weapon_skills.json')
 TABLE = 'WeaponSkill'
 TAB = 'ashes-of-war'
 LIMIT = 1024 * 1024
+MAX_SKILLS = 4096
+MAX_ASSIGNMENTS = 32768
 EMPTY = {'version': 1, 'skills': [], 'assignments': []}
 KEYS = {'id', 'name', 'description', 'iconId', 'fpCost', 'staminaCost'}
 
@@ -25,7 +27,7 @@ def integer(value, lower, upper, label):
 def validate(value, weapon_ids=None):
     if not isinstance(value, dict) or set(value) != set(EMPTY) or type(value['version']) is not int or value['version'] != 1:
         raise ValueError('Unsupported weapon-skill catalog')
-    if not isinstance(value['skills'], list) or len(value['skills']) > 4096:
+    if not isinstance(value['skills'], list) or len(value['skills']) > MAX_SKILLS:
         raise ValueError('A weapon-skill catalog supports at most 4096 skills')
     skills, ids = [], set()
     for entry in value['skills']:
@@ -36,7 +38,7 @@ def validate(value, weapon_ids=None):
             raise ValueError('Weapon skill IDs must be unique')
         ids.add(identity)
         name, description = entry['name'], entry['description']
-        if not isinstance(name, str) or not name.strip() or len(name) > 80 or any(ord(c) < 32 for c in name):
+        if not isinstance(name, str) or not name.strip() or len(name.encode('utf-16-le')) > 160 or any(ord(c) < 32 for c in name):
             raise ValueError('A skill needs a name of at most 80 characters')
         if not isinstance(description, str) or len(description) > 2000 or '\0' in description:
             raise ValueError('A skill description supports at most 2000 characters')
@@ -45,7 +47,7 @@ def validate(value, weapon_ids=None):
         for key in ('fpCost', 'staminaCost'):
             integer(entry[key], 0, 65535, key)
         skills.append(deepcopy(entry))
-    if not isinstance(value['assignments'], list) or len(value['assignments']) > 32768:
+    if not isinstance(value['assignments'], list) or len(value['assignments']) > MAX_ASSIGNMENTS:
         raise ValueError('A catalog supports at most 32768 weapon assignments')
     assignments, assigned = [], set()
     for entry in value['assignments']:
@@ -157,7 +159,7 @@ class WeaponSkills:
 
     def add(self, source=None):
         self.editable()
-        if len(self.value['skills']) >= 4096:
+        if len(self.value['skills']) >= MAX_SKILLS:
             raise ValueError('The skill catalog is full')
         identity = max((s['id'] for s in self.value['skills']), default=0) + 1
         integer(identity, 1, 2147483647, 'Skill ID')
@@ -167,7 +169,7 @@ class WeaponSkills:
         skill = skill or {'name': 'New Ash of War', 'description': '', 'iconId': None, 'fpCost': 0, 'staminaCost': 0}
         skill['id'] = identity
         if source is not None:
-            skill['name'] = skill['name'][:73] + ' (copy)'
+            skill['name'] = skill['name'].encode('utf-16-le')[:146].decode('utf-16-le', errors='ignore') + ' (copy)'
         self.value['skills'].append(skill)
         return self.read_row(identity)
 
