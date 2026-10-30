@@ -1106,10 +1106,13 @@ def _menu_cache_value(value):
 
 
 def _menu_identity(original, specs, managed):
-    from .mod_loader import _composition_revision
-    kind = 'layout' if managed == LAYOUT else ESD_ARCHIVE[managed]
-    return _sha(json.dumps([_composition_revision().hex(), kind, managed.relative, _sha(original), specs],
-                          sort_keys=True, separators=(',', ':'), default=_menu_cache_value).encode('utf-8'))
+    try:
+        from .mod_loader import _composition_revision
+        kind = 'layout' if managed == LAYOUT else ESD_ARCHIVE[managed]
+        return _sha(json.dumps([_composition_revision().hex(), kind, managed.relative, _sha(original), specs],
+                              sort_keys=True, separators=(',', ':'), default=_menu_cache_value).encode('utf-8'))
+    except (OSError, TypeError, ValueError):
+        return None  # Optional recipe metadata cannot prevent composition.
 
 
 def _compose_menu(original, specs, managed, cache_root, *, current=None, manifest=None):
@@ -1118,11 +1121,11 @@ def _compose_menu(original, specs, managed, cache_root, *, current=None, manifes
     # The journal already verifies which bytes are installed. Remember their
     # recipe there, so eviction from the disposable archive cache cannot force
     # an unchanged menu through decompression, composition and compression.
-    if current is not None and manifest is not None and _owned(current, manifest, managed):
+    if identity is not None and current is not None and manifest is not None and _owned(current, manifest, managed):
         if _current_manifest(current, manifest, managed).get('inputs') == identity:
             return current
     key = None
-    if cache_root is not None:
+    if cache_root is not None and identity is not None:
         from . import composition_cache
         try:
             key = identity.encode('ascii')

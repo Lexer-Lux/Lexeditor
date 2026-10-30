@@ -102,7 +102,7 @@ def test_finalization_failure_is_recoverable_without_rewriting_executable(game, 
     root, library, _built = game
     real = tweak_mods._finish_manifest
     monkeypatch.setattr(tweak_mods, "_finish_manifest",
-                        lambda *_: (_ for _ in ()).throw(OSError("finalize failed")))
+                        lambda *_, **kwargs: (_ for _ in ()).throw(OSError("finalize failed")))
     with pytest.raises(OSError, match="finalize"):
         tweak_mods.restore(root, library)
     assert image(game) == VANILLA
