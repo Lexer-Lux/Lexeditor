@@ -106,6 +106,12 @@ Declarative layout and menu-command edits can start from another author's
 structurally valid installed menu. Its exact bytes become the preserved
 baseline, verified by the ownership journal; disabling these edits restores
 that baseline. Missing anchors identify the affected mod before deployment.
+Raw/portable menu archives and declarative edits compose over that same
+baseline before a single menu writer deploys them. The generic data writer
+cannot overwrite or restore those destinations. Legacy data ownership records
+transfer to the menu journal after both original and installed hashes verify;
+the transfer never changes game bytes. Restoring also handles these old records
+when no native runtime was installed.
 Later edits to a file already managed by the loader are kept and reported,
 never overwritten. An unowned backup that disagrees with the installed file
 also needs reconciliation before either copy can be replaced.

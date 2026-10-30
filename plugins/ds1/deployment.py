@@ -114,10 +114,13 @@ def _disk_assets(game_root: Path | None = None, project_root: Path | None = None
     The game side contributes only marked files, so status checks never hash
     the whole installed game.
     """
+    from .tweak_mods import managed_menu
     found: dict[Path, None] = {}
     if project_root is not None and Path(project_root).is_dir():
         for row in assets.scan_project(Path(project_root), strict=False):
-            found.setdefault(Path(row["relative"]))
+            relative = Path(row['relative'])
+            if managed_menu(relative) is None:
+                found.setdefault(relative)
     if game_root is not None:
         root = Path(game_root)
         for top in assets.ASSET_ROOTS:
@@ -128,6 +131,8 @@ def _disk_assets(game_root: Path | None = None, project_root: Path | None = None
                 if path.is_dir() or path.name.startswith(".lexeditor-") or path.name.endswith(".lexeditor-original"):
                     continue
                 relative = path.relative_to(root)
+                if managed_menu(relative) is not None:
+                    continue
                 if assets.is_owned(relative):
                     continue
                 if _marker_path(root, relative).is_file():
@@ -378,6 +383,14 @@ def vanilla_source(game_root: Path, relative: Path = RELATIVE) -> Path:
     deployed mod's bytes, so an unverifiable backup must refuse rather than fall
     back to live and silently label modded data as Vanilla."""
     game_root = Path(game_root).resolve()
+    from . import tweak_mods
+    managed = tweak_mods.managed_menu(relative)
+    if managed is not None:
+        _current, original, _manifest = tweak_mods.menu_baseline(game_root, managed)
+        path = managed.backup(game_root) if managed.backup(game_root).is_file() else managed.live(game_root)
+        if _hash_file(path) != hashlib.sha256(original).hexdigest():
+            raise RuntimeError('The preserved menu baseline changed while it was being read')
+        return path
     backup = _backup_path(game_root, relative)
     marker = _read_marker(_marker_path(game_root, relative))
     if marker is None:
@@ -633,6 +646,9 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
     """
     if project_root is None:
         raise ValueError("Select or create a mod project before applying it to the installed game.")
+    from .tweak_mods import managed_menu
+    if composed is not None and any(managed_menu(relative) is not None for relative in composed):
+        raise ValueError('Menu files must be combined into the shared menu deployment plan before applying')
     # Check the raw roots themselves, and everything above them, before any
     # .resolve() call: resolving first would silently follow a reparse point
     # at the root or on a parent and erase the evidence we need to reject it.
@@ -642,6 +658,10 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
     _assert_no_reparse_points(project_marker, project_root)
     if not project_marker.is_file() and not (composed is not None and (project_root/'mod.json').is_file()):
         raise ValueError("Select a valid Dark Souls mod project before applying it.")
+    if composed is None:
+        from . import tweak_mods
+        if any((project_root/item.relative).is_file() for item in (tweak_mods.LAYOUT, *tweak_mods.ESD)):
+            raise ValueError('Menu files must be combined into the shared menu deployment plan before applying')
     source = project_root / RELATIVE
     map_targets = _disk_maps(game_root, project_root)
     char_targets = _disk_chars(game_root, project_root)
@@ -713,6 +733,9 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
 
 def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Path, new_bytes: bytes,
                 source_hash: str) -> None:
+    from .tweak_mods import managed_menu
+    if managed_menu(relative) is not None:
+        raise ValueError('The shared menu deployment plan owns this file')
     live = game_root / relative
     backup = _backup_path(game_root, relative)
     marker_path = _marker_path(game_root, relative)

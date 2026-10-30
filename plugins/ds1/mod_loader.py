@@ -224,6 +224,11 @@ def vanilla_files(game_root: Path, paths: frozenset[Path]) -> dict[Path, bytes]:
     result = {}
     from . import assets as _assets
     for relative in sorted(paths):
+        from . import tweak_mods
+        managed = tweak_mods.managed_menu(relative)
+        if managed is not None:
+            result[relative] = tweak_mods.menu_baseline(game_root, managed)[1]
+            continue
         path = checked(deployment.vanilla_source(Path(game_root), relative))
         if path.is_file():
             limit = (MAX_ARCHIVE if relative in FILES else MAX_MAP
@@ -235,13 +240,16 @@ def vanilla_files(game_root: Path, paths: frozenset[Path]) -> dict[Path, bytes]:
     return result
 
 
-def build(game_root: Path, library_root: Path, project_root: Path | None = None) -> tuple[Composition, list[Mod]]:
+def build(game_root: Path, library_root: Path, project_root: Path | None = None, *, menu_files=None) -> tuple[Composition, list[Mod]]:
     mods = active_mods(library_root, project_root)
-    return compose_installed(game_root, mods), mods
+    return compose_installed(game_root, mods, menu_files=menu_files), mods
 
 
-def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False, cache_root=None) -> Composition:
+def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False, cache_root=None,
+                      menu_files=None) -> Composition:
     """Load every mod's original assets before composing the enabled set."""
+    if menu_files is not None and conflicts_only:
+        raise ValueError('Conflict-only composition cannot mutate a deployment plan')
     paths = frozenset(name for mod in mods for name in (mod.files.keys()|mod.edits.keys()))
     originals = vanilla_files(game_root, paths)
     files, conflicts = {}, []
@@ -250,6 +258,14 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
                         {relative:mod.files[relative]} if relative in mod.files else {},
                         {relative:mod.edits[relative]} if relative in mod.edits else {})
                     for mod in mods if relative in mod.files or relative in mod.edits]
+        from . import tweak_mods
+        managed = tweak_mods.managed_menu(relative) if menu_files is not None else None
+        planned = next((item for item in menu_files if item['managed'] == managed), None) if managed else None
+        declaration_names = list(planned['mods']) if planned is not None else []
+        declaration_label = ', '.join(declaration_names) or 'Menu edits'
+        if planned is not None and planned['after'] != originals[relative]:
+            selected.insert(0, Mod(declaration_label, Path(game_root),
+                                   {relative: planned['after']}))
         try:
             result = _compose_file(relative, originals.get(relative), selected, conflicts_only, cache_root)
         except Exception as error:
@@ -271,9 +287,35 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
             if failed:
                 raise ModBuildError(failed, f'{relative}: {error}') from error
             raise
-        files.update(result.files)
+        if managed is not None:
+            for conflict in result.conflicts:
+                conflict.mods = list(dict.fromkeys(name for owner in conflict.mods
+                    for name in (declaration_names if owner == declaration_label else [owner])))
+            if planned is None:
+                current, _original, manifest = tweak_mods.menu_baseline(game_root, managed)
+                planned = {'managed': managed, 'before': current, 'project': None,
+                           'previous': tweak_mods._current_manifest(current, manifest, managed)}
+                menu_files.append(planned)
+            planned['after'] = result.files.get(relative, originals[relative])
+            # A combined data/declaration recipe must never masquerade as the
+            # declaration-only recipe used by _compose_menu's installed reuse.
+            planned['inputs'] = None
+            planned['mods'] = list(dict.fromkeys([*declaration_names, *[mod.name for mod in mods
+                if relative in mod.files or relative in mod.edits]])) if planned['after'] != originals[relative] else []
+        else:
+            files.update(result.files)
         conflicts.extend(result.conflicts)
     return Composition(files, conflicts)
+
+
+def has_menu_contributions(ordered):
+    from . import record_edits, tweak_mods
+    for name, folder in ordered:
+        for relative, disk in content_files(folder, name):
+            targets = record_edits.targets(disk) if relative == record_edits.FILENAME else (relative,)
+            if any(tweak_mods.managed_menu(target) is not None for target in targets):
+                return True
+    return False
 
 
 def materialize_mod(mod: Mod, originals: dict) -> Mod:
@@ -372,6 +414,14 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
     if cached is None:
         originals = {relative:original} if original is not None else {}
         prepared = [materialize_mod(mod,originals) if mod.edits else mod for mod in mods]
+        from . import tweak_mods
+        managed = tweak_mods.managed_menu(relative)
+        if managed is not None:
+            from core.mod_builds import ModBuildError
+            for mod in prepared:
+                payload = mod.files[relative]
+                if len(payload) > managed.limit or not tweak_mods._menu_baseline(payload, managed):
+                    raise ModBuildError([mod.folder], f'{mod.name}: invalid {managed.label}')
         result = compose(originals, prepared,
                          conflicts_only=conflicts_only)
         data = result.files.get(relative)

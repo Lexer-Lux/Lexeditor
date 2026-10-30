@@ -143,6 +143,59 @@ ESD_ARCHIVE = {ESD_INGAME: "ingame", ESD_COMMON: "common"}
 assert EXECUTABLE.backup(Path()).name == BACKUP_FILE and EXECUTABLE.manifest(Path()).name == MANIFEST_FILE
 
 
+def managed_menu(relative):
+    return next((item for item in (LAYOUT, *ESD) if Path(item.relative) == relative), None)
+
+
+def menu_baseline(game_root, managed):
+    """Resolve old dual-writer records without treating either output as vanilla."""
+    from . import deployment
+    marker_path = checked(deployment._marker_path(game_root, Path(managed.relative)))
+    data = deployment._read_marker(marker_path)
+    if data is None:
+        current, manifest = _installed(game_root, managed, 'restore it before applying mods')
+        return current, _original(game_root, current, manifest, managed), manifest
+    current = _read(managed.live(game_root), managed)
+    original = _read(managed.backup(game_root), managed)
+    manifest = _manifest(game_root, managed)
+    if _sha(original) != data['originalHash'] or (manifest and not _original_matches(original, manifest, managed)):
+        raise TweakError(f'The preserved original {managed.label} differs between ownership records; both were kept')
+    known = {data['originalHash'], data.get('activeHash'), data.get('pendingHash')}
+    if manifest:
+        known.update((manifest['sha256'], (manifest.get('pending') or {}).get('sha256')))
+    if _sha(current) not in known or not _menu_baseline(original, managed):
+        raise TweakError(f'The installed {managed.label} changed outside its recorded writers; all copies were kept')
+    names = list(dict.fromkeys([*manifest.get('mods', []),
+                               *(['Installed data mods']
+                                 if _sha(current) != _sha(original) else [])]))
+    return current, original, {'version': 2, 'sha256': _sha(current), 'originalHash': _sha(original),
+                               'mods': names, 'project': None, 'inputs': None, 'pending': None}
+
+
+def claim_menu_files(game_root):
+    """Transfer legacy data journals to the sole menu writer, keeping game bytes intact."""
+    from . import deployment
+    from core.file_lock import exclusive
+    with exclusive(checked(Path(game_root) / deployment.DATA_LOCK)):
+        transfers = []
+        for managed in (LAYOUT, *ESD):
+            path = checked(deployment._marker_path(game_root, Path(managed.relative)))
+            if not path.is_file():
+                continue
+            with path.open('rb') as stream:
+                before = stream.read(deployment.MAX_MARKER + 1)
+            current, original, manifest = menu_baseline(game_root, managed)
+            transfers.append((managed, path, before, current, original, manifest, _manifest(game_root, managed)))
+        for managed, path, before, current, original, manifest, previous in transfers:
+            with path.open('rb') as stream:
+                unchanged = stream.read(deployment.MAX_MARKER + 1) == before
+            if (not unchanged or _manifest(game_root, managed) != previous or _read(managed.live(game_root), managed) != current
+                    or _read(managed.backup(game_root), managed) != original):
+                raise TweakError('Menu ownership changed during migration; all copies were kept')
+            _save_manifest(game_root, manifest, managed)
+            path.unlink()
+
+
 def tweak_rows(root: Path | None = None) -> list[dict]:
     """Every tweak mod in the DS1 library, in load order."""
     root = checked(Path(root or mods_root()))
@@ -879,6 +932,9 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
     if not _owned(before, old, managed) or _read(live, managed) != before:
         raise TweakError(f"The {managed.label} changed while the tweaks were being prepared")
     original = _original(game_root, before, old, managed)
+    if (managed in (LAYOUT, *ESD) and after != before
+            and (len(after) > managed.limit or not _menu_baseline(after, managed))):
+        raise TweakError(f'The composed {managed.label} is invalid; nothing was written')
     project = _project(project)
     desired = {"sha256": _sha(after), "mods": list(mods), "project": project}
     if inputs is not None:
@@ -931,8 +987,7 @@ def _layout_in_use(game_root: Path) -> bool:
 
 def _esd_in_use(game_root: Path, managed: Managed) -> bool:
     """A menu script archive is managed once a tweak changed it, until restored."""
-    # The data-mod deployer uses the same original-copy filename. A backup
-    # proves an original was kept, not that this writer owns the live file.
+    # A restored original can retain its backup; only the journal owns it.
     return checked(managed.manifest(game_root)).is_file()
 
 
@@ -1215,6 +1270,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
     _clear_moved_aside(game_root)
     current, manifest = _installed(game_root, EXECUTABLE, "restore it before applying tweaks")
     original = _original(game_root, current, manifest)
+    claim_menu_files(game_root)
     runtime = _runtime(game_root)
     if runtime["active"]:
         previous = {"mods": list(runtime["record"]["mods"]), "project": runtime["record"].get("project"),
@@ -1454,6 +1510,7 @@ def restore(game_root: Path, root: Path | None = None) -> dict:
     ensure_game_closed()
     game_root = checked(Path(game_root))
     with _exclusive(game_root):
+        claim_menu_files(game_root)
         _clear_moved_aside(game_root)
         managed_files = ([EXECUTABLE] + ([LAYOUT] if _layout_in_use(game_root) else [])
                          + [managed for managed in ESD if _esd_in_use(game_root, managed)])

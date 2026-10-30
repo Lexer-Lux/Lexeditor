@@ -311,14 +311,13 @@ class NativeRules:
         self.validate_save()
         if self.dirty_count or store.get().dirty_count:
             raise ValueError("Save or discard all changes before applying")
-        if self._needs_native():
-            tweak_mods.ensure_game_closed()
+        tweak_mods.ensure_game_closed()
         with tweak_mods.locked(self.game_root):
             return self._apply_locked(store)
 
     def _apply_locked(self, store):
         source = self._preflight_params(store)
-        plan = tweak_mods.prepare(self.game_root, project=self._contribution) if self._needs_native() else None
+        plan = tweak_mods.prepare(self.game_root, project=self._contribution)
 
         def checked_source(current):
             self.validate_save()
@@ -330,11 +329,11 @@ class NativeRules:
         # Every enabled mod is combined with this one over the game's own
         # files, before anything installed is touched.
         from . import mod_loader
-        composition, _mods = mod_loader.build(self.game_root, tweak_mods.mods_root(), self.project)
+        composition, _mods = mod_loader.build(self.game_root, tweak_mods.mods_root(), self.project,
+                                             menu_files=plan['files'])
         # Preflight again after building scripts, before touching installed data.
         checked_source(_read_optional(self.project / RELATIVE, MAX_ARCHIVE))
-        if plan is not None:
-            tweak_mods.commit(self.game_root, plan)
+        tweak_mods.commit(self.game_root, plan)
 
         # The project's saved archive is checked once more just before writing.
         def unchanged(current):
@@ -343,18 +342,20 @@ class NativeRules:
         try:
             deployment.apply(self.game_root, self.project, transform=unchanged, composed=composition.files)
         except Exception as error:
-            if plan is not None:
-                try:
-                    tweak_mods.rollback(self.game_root, plan)
-                except Exception as rollback_error:
-                    raise RuntimeError("Apply stopped with incomplete changes. Retry Apply or Restore original. "
-                                       f"{error}; native rollback: {rollback_error}") from error
+            try:
+                tweak_mods.rollback(self.game_root, plan)
+            except Exception as rollback_error:
+                raise RuntimeError("Apply stopped with incomplete changes. Retry Apply or Restore original. "
+                                   f"{error}; native rollback: {rollback_error}") from error
             raise
         return self.deployment_status()
 
     def restore(self):
         # Original restoration never changes project values or tweak switches.
         shared = any(tweak_mods.checked(self.game_root / name).exists() for name in tweak_mods.OWNED_FILES)
+        shared = shared or any(tweak_mods.checked(path).exists() for managed in (tweak_mods.LAYOUT, *tweak_mods.ESD)
+                               for path in (managed.manifest(self.game_root),
+                                            deployment._marker_path(self.game_root, Path(managed.relative))))
         if shared:
             tweak_mods.restore(self.game_root)
         elif legacy_native.checked(self.game_root / legacy_native.BACKUP).exists():

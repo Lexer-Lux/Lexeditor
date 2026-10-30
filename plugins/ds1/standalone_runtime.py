@@ -102,6 +102,11 @@ def _identity(rows, game, targets):
             contributors.append([str(folder),row['id'],row['name'],mod_requires.declared(folder),requires_data])
             paths.extend(inputs)
     paths.extend(game/mod_library.relative_path(target) for target in targets)
+    for target in targets:
+        relative = mod_library.relative_path(target)
+        managed = tweak_mods.managed_menu(relative)
+        if managed is not None:
+            paths.extend((managed.backup(game), managed.manifest(game), deployment._marker_path(game,relative)))
     record_path = game/tweak_mods.RUNTIME_RECORD
     project = None
     if record_path.is_file():
@@ -147,7 +152,7 @@ def prepare(game, rows):
             raise ModBuildError([row['path']],f"{row['name']}: {error}") from error
     from . import composition_cache
     cache_root = composition_cache.user_root()
-    composition = mod_loader.compose_installed(game,data,cache_root=cache_root)
+    tweak_mods.claim_menu_files(game)
     layouts = _specs(rows,'layout',menu_layout.validate)
     scripts = _specs(rows,'esd',menu_scripts.validate)
     dims = _specs(rows,menu_dim.FOLDER,menu_dim.validate)
@@ -170,6 +175,7 @@ def prepare(game, rows):
         files.append({'managed':managed,'before':current,'after':after,'mods':tweak_mods._changes(specs),
                       'inputs':tweak_mods._menu_identity(original,specs,managed),
                       'previous':tweak_mods._current_manifest(current,manifest,managed),'project':None})
+    composition = mod_loader.compose_installed(game,data,cache_root=cache_root,menu_files=files)
     mod_loader.align_menu_textures(game,composition,tweak_mods.prepared_menu_layout(game,files))
     # Shared menu support is linked at load time; no author script or compiler
     # runs here. Ordinary mod machine code stays in each runtime.lxd.

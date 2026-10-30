@@ -48,6 +48,7 @@ def test_menu_reuses_verified_install_even_after_cache_eviction(tmp_path, monkey
     original, installed = b'original menu', b'composed menu'
     managed = tweak_mods.Managed('menu/menu.drb.dcx', 'test menu', 1024, lambda value: value == original)
     monkeypatch.setattr(tweak_mods, 'LAYOUT', managed)
+    monkeypatch.setattr(tweak_mods, '_menu_baseline', lambda *_: True)
     monkeypatch.setattr(tweak_mods, 'ensure_game_closed', lambda: None)
     live = managed.live(tmp_path)
     live.parent.mkdir()

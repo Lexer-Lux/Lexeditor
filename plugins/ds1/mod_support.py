@@ -205,7 +205,8 @@ class Ds1ModAdapter:
                 content = None
             report = self._read_report(game_root, ordered)
             reused = bool(report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered]
-                          and report.get('menuTextureOrder') == menu_order)
+                          and report.get('menuTextureOrder') == menu_order
+                          and not mod_loader.has_menu_contributions(ordered))
             if reused:
                 # Native settings can change while every data input and
                 # installed data file stays the same. Keep that deployment.
@@ -214,8 +215,12 @@ class Ds1ModAdapter:
                 names = [name for name, _folder in ordered]
             else:
                 data = self._mods(mods)
-                composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root())
+                composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root(),
+                                                           menu_files=plan['files'])
                 conflicts, names = composition.conflicts, [mod.name for mod in data]
+                layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
+                menu_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
+                              if layout is not None and (game_root/main_texture).is_file() else None)
                 mod_loader.align_menu_textures(game_root,composition,layout)
             composed = perf_counter()
             tweak_mods.commit(game_root, plan)
@@ -316,8 +321,12 @@ class Ds1ModAdapter:
             paths.add('menu/menu.tpf.dcx')
         for relative in sorted(paths):
             path = Path(relative)
-            for source in (game_root / path, deployment._backup_path(game_root, path),
-                           deployment._marker_path(game_root, path)):
+            sources = [game_root / path, deployment._backup_path(game_root, path),
+                       deployment._marker_path(game_root, path)]
+            managed = tweak_mods.managed_menu(path)
+            if managed is not None:
+                sources.append(managed.manifest(game_root))
+            for source in sources:
                 try:
                     stat = source.stat()
                     originals.append((str(source), stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns))
