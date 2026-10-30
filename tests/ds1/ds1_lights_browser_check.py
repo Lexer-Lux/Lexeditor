@@ -91,8 +91,8 @@ def main():
                                         ).input_value() == '8'
                     assert page.locator('[data-maps-detail] [data-field-key="posX"]:visible'
                                         ).input_value() == '10'
-                    assert page.locator('[data-maps-detail] [data-row-action="duplicate"]').count() == 0
-                    assert page.locator('[data-maps-detail] [data-row-action="remove"]').count() == 0
+                    assert page.locator('[data-maps-detail] [data-row-action="duplicate"]').count() == 1
+                    assert page.locator('[data-maps-detail] [data-row-action="remove"]').count() == 1
                     assert page.locator('[data-maps-detail] [data-row-action="goto"]').count() == 1
                     preset = page.locator('[data-maps-detail] [data-field-key="preset"]:visible')
                     preset.fill('25')

@@ -94,7 +94,7 @@ def main():
                     page.wait_for_function('state.mapTab==="placements"')
                     assert page.locator('[data-maps-side] .lex-column-list.lex-list-fill').count() == 1
                     if not root:
-                        titled = ["Rat", "Small Rat",
+                        titled = ["Rat", "Small Rat", "piece0",
                                   "chest0", "player0"]
                         assert sorted(page.evaluate("state.rows.map(r=>r.name)")) == sorted(titled)
                     else:

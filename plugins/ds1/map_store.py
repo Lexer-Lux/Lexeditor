@@ -19,11 +19,21 @@ from .store import MARKER, digest
 # the shipped Place_name_ table, which holds every map's areas.
 _MAP_AREA = re.compile(r'm(\d{2})_(\d{2})_\d{2}_\d{2}\.msb\Z')
 
+# MSB event fields that point into the parameter archive. Part and region
+# references are already named by the MSB document itself.
+EVENT_PARAM_LINKS = {
+    **{f'itemLot{i}': ('drop', 'ItemLotParam') for i in range(1, 6)},
+    'activationItem': ('goods', 'EquipParamGoods'),
+    'activationParam': ('catalog', 'ObjActParam'),
+}
+
 
 def parse_key(key):
     """A placement identity from its "type:id" form."""
     try:
         ptype, pid = str(key).split(":")
+        if ptype == 'region' or re.fullmatch(r'event(?:[1-9]|1[0-2])', ptype):
+            return ptype, int(pid)
         return int(ptype), int(pid)
     except (TypeError, ValueError) as error:
         raise MsbError("Select an enemy or player-start placement") from error
@@ -456,6 +466,15 @@ class MapStore:
                   "who": who,
                   "mapNames": [self.display_name(map_name)]}
         display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
+        if 'hitFilter' in placement:
+            values['hitFilter'] = placement['hitFilter']
+        if placement['type'] == 'region' or str(placement['type']).startswith('event') or placement['type'] == 5:
+            fields = self.get(map_name).read_placement((placement['type'], placement['partId']))['fields']
+            self._event_param_links(fields)
+            for field in fields:
+                values[field['key']] = field['value']
+                if field['enum']:
+                    display[field['key']] = field['enum'].get(str(field['value']), str(field['value']))
         modified = self.get(map_name).placement_modified((placement["type"], placement["partId"]))
         return {"id": f"{placement['type']}:{placement['partId']}", "table": map_name,
                 "name": who,
@@ -546,6 +565,29 @@ class MapStore:
                 pass
         return 'enemies', 'monsters'
 
+    def _event_param_links(self, fields):
+        linked = [field for field in fields if field['key'] in EVENT_PARAM_LINKS]
+        if not linked:
+            return []
+        try:
+            document = self.item_store.get() if self.item_store else None
+        except (OSError, FormatError):
+            document = None
+        links = []
+        for field in linked:
+            kind, table = EVENT_PARAM_LINKS[field['key']]
+            choices = document.link_choices(kind, table) if document else {'-1': 'None'}
+            value = field['value']
+            field.update(type='enum', enum=choices)
+            empty = value < 0 or choices.get(str(value)) == 'None'
+            link = {'kind': kind, 'table': table, 'id': value, 'field': field['key'],
+                    'resolved': not empty and str(value) in choices,
+                    'name': 'None' if empty else choices.get(str(value), f'Missing record ({value})')}
+            if table == 'ObjActParam':
+                link.update(tab='maps', sub='treasure')
+            links.append(link)
+        return links
+
     def read(self, map_name, key):
         if str(key).startswith("message:"):
             return self.read_message(map_name, key)
@@ -569,7 +611,7 @@ class MapStore:
             if item["key"] == "npcId":
                 item["type"] = "enum"
                 item["enum"] = {str(row_id): names[row_id] for row_id in sorted(names)}
-        row["recordLinks"] = []
+        row["recordLinks"] = self._event_param_links(row['fields'])
         if npc is not None:
             tab, sub = self._npc_tab(npc, types)
             row["recordLinks"].append({'kind': 'npc', 'table': 'NpcParam', 'id': npc,
@@ -638,6 +680,10 @@ class MapStore:
 
     def add_placement(self, map_name, key):
         self.writable()
+        if str(key).startswith('light:'):
+            from . import msb_events
+            row = msb_events.duplicate(self.get(map_name), ('event0', int(str(key).split(':')[1])))
+            return self.read(map_name, row['key'])
         if str(key).startswith("message:"):
             row = self.get(map_name).add_message(
                 ("message", int(str(key).split(":")[1])))
@@ -646,15 +692,18 @@ class MapStore:
         self._npc_models = None
         return self.read(map_name, f"{row['type']}:{row['partId']}")
 
-    def create_placement(self, map_name, model, pos, rot, npc=None):
+    def create_placement(self, map_name, model, pos, rot, npc=None, part_type=None):
         self.writable()
-        row = self.get(map_name).create_placement(model, pos, rot, npc)
+        row = self.get(map_name).create_placement(model, pos, rot, npc, part_type)
         self._npc_models = None
-        return self.read(map_name, f"{row['type']}:{row['partId']}")
+        return self.read(map_name, row.get('key') or f"{row['type']}:{row['partId']}")
 
     def remove_placement(self, map_name, key):
         self.writable()
         self._npc_models = None
+        if str(key).startswith('light:'):
+            from . import msb_events
+            return msb_events.remove(self.get(map_name), ('event0', int(str(key).split(':')[1])))
         if str(key).startswith("message:"):
             return self.get(map_name).remove_message(
                 ("message", int(str(key).split(":")[1])))
@@ -669,6 +718,8 @@ class MapStore:
         changes = []
         for map_name, document in self.docs.items():
             known = {(part["type"], part["id"]): part["name"] for part in document.parts}
+            known.update({('region', point['index']): point['name'] for point in document.points})
+            known.update({(f"event{event['type']}", event['seq']): event['name'] for event in document.events})
             for (ptype, pid), field in sorted(document.dirty, key=str):
                 if ptype == "message":
                     row = document.read_message((ptype, pid))

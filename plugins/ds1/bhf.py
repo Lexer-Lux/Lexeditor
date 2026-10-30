@@ -39,7 +39,7 @@ def _u32(raw, at):
     return struct.unpack_from('<I', raw, at)[0]
 
 
-def parse_bhf(bhd):
+def parse_bhf(bhd, suffix='.tpf'):
     """Member lookup: filename-minus-.tpf, lowercased, to (BDT offset,
     size). Slots that fail any check are skipped, so a stray partial
     slot can only drop a texture, never misread the data file."""
@@ -58,17 +58,19 @@ def parse_bhf(bhd):
             continue
         if offset > 0xFFFFFFFF - size:
             continue
-        if not path_base <= path_off < len(raw) or raw[path_off:path_off + 1] != b'\\':
+        if not path_base <= path_off < len(raw):
             continue
         end = raw.find(b'\x00', path_off, path_off + MAX_NAME)
         if end <= path_off:
             continue
-        name = raw[path_off + 1:end].decode('ascii', 'replace')
+        name = raw[path_off:end].decode('ascii', 'replace')
         if name.lower().endswith('.dcx'):
             name = name[:-4]
         stem = name.replace('\\', '/').rsplit('/', 1)[-1]
-        if stem.lower().endswith('.tpf'):
-            stem = stem[:-4]
+        if stem.lower().endswith(suffix):
+            stem = stem[:-len(suffix)]
+        elif suffix != '.tpf':
+            continue
         if stem:
             found.setdefault(stem.lower(), (offset, size))
     return found

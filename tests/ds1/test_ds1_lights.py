@@ -29,7 +29,8 @@ def test_lights_listed_with_point_positions_and_sharers():
     assert [(light["seq"], light["name"], light["preset"]) for light in lights] == [
         (0, "lamp0", 8), (1, "lamp1", 15)]
     assert lights[0]["pos"] == (1.0, 2.0, 3.0)
-    assert lights[0]["part"] == "chest0" and lights[0]["areaPart"] == "piece0"
+    # The header's fourth word identifies the event, not an attached part.
+    assert lights[0]["part"] == "piece0" and lights[0]["areaPart"] == "piece0"
     assert lights[0]["sharers"] == [{"type": 2, "kind": "SFX", "name": "flame0"}]
     assert lights[1]["sharers"] == []
     fields = doc.read_light(("light", 0))["fields"]

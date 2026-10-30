@@ -71,4 +71,4 @@ def test_map_view_labels_collision_and_navigation(tmp_path):
     assert [(part["name"], part["kind"]) for part in view["parts"]] == [
         ("enemy0", "Enemy"), ("player0", "Player"), ("piece0", "Map piece"),
         ("chest0", "Object"), ("wall0", "Collision"), ("walk0", "Navigation"),
-        ("bridge0", "Collision")]
+        ("bridge0", "Connect collision")]

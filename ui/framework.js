@@ -13299,6 +13299,7 @@ ${contents.path}`});
     });
     return element("label", {
       class: `lex-pager-filter lex-pager-toggle${spec.disabled ? " disabled" : ""}${spec.lines ? " multiline" : ""}`,
+      "data-lex-view-filter": "",
       title: String(spec.title || spec.label || ""),
     }, input, element("span", {}, spec.lines ? spec.lines.join("\n") : String(spec.label || "Filter")));
   };
@@ -13316,6 +13317,7 @@ ${contents.path}`});
     }
     return element("label", {
       class: "lex-pager-filter lex-pager-select",
+      "data-lex-view-filter": "",
       title: String(spec.title || spec.label || ""),
     }, spec.label ? element("span", {}, String(spec.label)) : null, select);
   };

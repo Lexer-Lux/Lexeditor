@@ -15,7 +15,7 @@ NPC_IDS = frozenset({120000, 120100, 121000})
 def test_placements_listed_with_models_and_links():
     doc = MsbDocument(build_msb())
     placements = doc.placements()
-    assert [(p["type"], p["partId"], p["kind"]) for p in placements] == [(2, 0, "Enemy"), (4, 0, "Player"), (1, 0, "Object")]
+    assert [(p["type"], p["partId"], p["kind"]) for p in placements] == [(2, 0, "Enemy"), (4, 0, "Player"), (0, 0, "Map piece"), (1, 0, "Object")]
     enemy = placements[0]
     assert (enemy["name"], enemy["model"], enemy["npc"], enemy["think"]) == ("enemy0", "c1200", 120000, 1000)
     assert enemy["pos"] == (1.0, 2.0, 3.0) and enemy["rot"] == (0.0, 90.0, 0.0)
@@ -67,8 +67,8 @@ def test_float_validation_and_protected_fields():
             doc.edit((2, 0), key, 0)
     with pytest.raises(MsbError):
         doc.edit((4, 0), "npcId", 120000, NPC_IDS)
-    with pytest.raises(MsbError):
-        doc.edit((0, 0), "posX", 1.0)
+    doc.edit((0, 0), "posX", 12.0)
+    assert doc.read_placement((0, 0))["fields"][0]["value"] == 12.0
     with pytest.raises(MsbError):
         doc.read_placement((2, 99))
 
@@ -151,10 +151,9 @@ def test_create_placement_needs_a_template():
     with pytest.raises(MsbError):
         doc.create_placement("nope", [0, 0, 0], [0, 0, 0])
     single = MsbDocument(build_msb(parts=(("piece", 0, 0, 1, None),)))
-    with pytest.raises(MsbError, match="no enemy or object placement"):
-        single.create_placement("m10piece", [0, 0, 0], [0, 0, 0])
+    assert single.create_placement("m10piece", [0, 0, 0], [0, 0, 0])["kind"] == "Map piece"
     player_only = MsbDocument(build_msb(parts=(("player", 4, 0, 1, None),)))
-    with pytest.raises(MsbError, match="no enemy or object placement"):
+    with pytest.raises(MsbError, match="no copyable placement"):
         player_only.create_placement("m10piece", [0, 0, 0], [0, 0, 0])
 
 

@@ -33,7 +33,7 @@ def build_msb(parts=(("enemy", 2, 0, 0, 120000), ("player", 4, 0, 1, None), ("pi
         elif ptype == 4:
             typedata = bytes(0x10)
         else:
-            typedata = bytes(8)
+            typedata = bytes({5: 0x50, 8: 0x20, 11: 0x10}.get(ptype, 8))
         blobs.append((base, "%s%d" % (kind, pid), "s%s%d" % (kind, pid), entity, typedata))
     point_blobs = []
     for index, (name, pos) in enumerate(points):

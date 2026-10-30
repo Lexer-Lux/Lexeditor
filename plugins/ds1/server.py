@@ -825,7 +825,7 @@ class Handler(PluginRequestHandler):
                             raise ValueError('Placing a model needs its map, model, position and rotation')
                     result = {'row': MAPSTORE.create_placement(payload['map'], payload['model'],
                                                                payload['pos'], payload['rot'],
-                                                               payload.get('npc'))}
+                                                               payload.get('npc'), payload.get('type'))}
                 elif path == '/api/placements/remove':
                     for key in ('map', 'id'):
                         if key not in payload:
