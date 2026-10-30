@@ -51,7 +51,7 @@ class Ds1ModAdapter:
     package_types = ("folder", "zip")
     context: dict[str, str] = {}
 
-    REPORT_VERSION = 1
+    REPORT_VERSION = 2
     REPORT_LIMIT = 2 * 1024 * 1024
 
     ensure_game_closed = staticmethod(tweak_mods.ensure_game_closed)
@@ -193,13 +193,24 @@ class Ds1ModAdapter:
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library, cache_root=self._cache_root())
             prepared = perf_counter()
+            from . import texture_packs
+            main_texture = Path('menu/menu.tpf.dcx')
+            layout = next((item['after'] for item in plan['files']
+                           if item['managed'] == tweak_mods.LAYOUT), None)
+            if layout is None and tweak_mods.LAYOUT.live(game_root).is_file():
+                # The layout has a separate managed journal; the generic data
+                # deployment's vanilla_source is not its pristine source.
+                layout = tweak_mods._read(tweak_mods.checked(tweak_mods.LAYOUT.live(game_root)),tweak_mods.LAYOUT)
+            menu_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
+                          if layout is not None and (game_root/main_texture).is_file() else None)
             ordered = self._ordered_mods(mods)
             try:
                 content = self._content_signature(ordered)
             except Exception:
                 content = None
             report = self._read_report(game_root, ordered)
-            reused = bool(report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered])
+            reused = bool(report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered]
+                          and report.get('menuTextureOrder') == menu_order)
             if reused:
                 # Native settings can change while every data input and
                 # installed data file stays the same. Keep that deployment.
@@ -210,12 +221,23 @@ class Ds1ModAdapter:
                 data = self._mods(mods)
                 composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root())
                 conflicts, names = composition.conflicts, [mod.name for mod in data]
+                if menu_order is not None:
+                    def texture_payload(relative):
+                        return composition.files.get(relative) or deployment.vanilla_source(game_root,relative).read_bytes()
+                    supplements = [texture_payload(Path(f'menu/menu_{index}.tpf.dcx')) for index in range(6)
+                                   if Path(f'menu/menu_{index}.tpf.dcx') in composition.files
+                                   or (game_root/f'menu/menu_{index}.tpf.dcx').is_file()]
+                    combined = texture_packs.align_menu(layout,texture_payload(main_texture),supplements)
+                    original_main = deployment.vanilla_source(game_root,main_texture).read_bytes()
+                    if combined != original_main:
+                        composition.files[main_texture] = combined
             composed = perf_counter()
             tweak_mods.commit(game_root, plan)
             try:
                 if not reused and composition.files:
                     # The last data mod in load order owns the deployment record.
-                    deployment.apply(game_root, data[-1].folder, composed=composition.files)
+                    owner = data[-1].folder if data else Path(mods[-1]) if mods else None
+                    deployment.apply(game_root, owner, composed=composition.files)
                 elif not reused and any(deployment.status(game_root, None).get(key) for key in ("enabled", "everApplied")):
                     deployment.disable(game_root)
             except Exception:
@@ -227,7 +249,8 @@ class Ds1ModAdapter:
         timings = {'prepareSeconds': prepared - started, 'compositionSeconds': composed - prepared,
                    'deploymentSeconds': finished - composed, 'activationSeconds': finished - started,
                    'reusedInstalledData': reused, 'scripts': plan.get('scripts', []), 'menus': plan.get('menus', [])}
-        self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content, timings=timings)
+        self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content, timings=timings,
+                          menu_order=menu_order)
         return {"activated": [Path(path).name for path in mods],
                 "dataMods": names, "conflicts": len(conflicts), 'timings': timings}
 
@@ -293,7 +316,12 @@ class Ds1ModAdapter:
     def _report_key(cls, game_root: Path, ordered) -> str:
         content = cls._content_signature(ordered)
         originals = []
-        for relative in sorted({key for _folder, _name, stamped in content for key, *_stat in stamped}):
+        # The main pack can be derived from a layout plus split TPFs without
+        # any mod carrying it. It is still part of the installed pair.
+        paths = {key for _folder, _name, stamped in content for key, *_stat in stamped}
+        if (game_root/'menu/menu.tpf.dcx').is_file():
+            paths.add('menu/menu.tpf.dcx')
+        for relative in sorted(paths):
             path = Path(relative)
             for source in (game_root / path, deployment._backup_path(game_root, path),
                            deployment._marker_path(game_root, path)):
@@ -333,7 +361,7 @@ class Ds1ModAdapter:
         return self._lines_for_order([(Path(file), part, names) for file, part, names in report["conflicts"]], ordered)
 
     def _save_report(self, game_root, ordered, conflicts, *, installed=False,
-                     expected_key=None, expected_content=None, timings=None):
+                     expected_key=None, expected_content=None, timings=None, menu_order=None):
         from core.plugin_files import atomic_write
         try:
             key = self._report_key(game_root, ordered)
@@ -345,6 +373,7 @@ class Ds1ModAdapter:
                       "conflicts": [[str(row.file), row.part, list(row.mods)] for row in conflicts]}
             if installed:
                 report["installedOrder"] = [str(folder.resolve()) for _name, folder in ordered]
+                report['menuTextureOrder'] = menu_order
             if timings is not None:
                 report['timings'] = timings
             encoded = json.dumps(report).encode("utf-8")
