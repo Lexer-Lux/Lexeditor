@@ -107,12 +107,10 @@ def _identity(rows, game, targets):
         managed = tweak_mods.managed_menu(relative)
         if managed is not None:
             paths.extend((managed.backup(game), managed.manifest(game), deployment._marker_path(game,relative)))
-    record_path = game/tweak_mods.RUNTIME_RECORD
-    project = None
-    if record_path.is_file():
-        if record_path.stat().st_size > tweak_mods.MAX_MANIFEST:
-            raise ValueError('The installed loader record is too large')
-        project = json.loads(record_path.read_text(encoding='utf-8')).get('project')
+    record_path = tweak_mods.checked(game/tweak_mods.RUNTIME_RECORD)
+    record, _warning = tweak_mods.runtime_record(game)
+    project = record.get('project') if record else None
+    paths.append(record_path)
     stamped = []
     for path in paths:
         if path == game/tweak_mods.RUNTIME_PATCH and path.is_file():
@@ -181,14 +179,9 @@ def prepare(game, rows):
     # runs here. Ordinary mod machine code stays in each runtime.lxd.
     dim_patch = menu_dim.patch_spec(dims)
     support = [exe_patches.validate(dim_patch,menu_dim.OWNER)] if dim_patch else []
-    record_path = game/tweak_mods.RUNTIME_RECORD
-    record = None
-    if record_path.is_file():
-        if record_path.stat().st_size > tweak_mods.MAX_MANIFEST:
-            raise ValueError('The installed loader record is too large')
-        record = json.loads(record_path.read_text(encoding='utf-8'))
-        if record.get('project'):
-            support.append(exe_patches.validate(record['project']['spec'],'Project native rules'))
+    record, _warning = tweak_mods.runtime_record(game)
+    if record and record.get('project'):
+        support.append(exe_patches.validate(record['project']['spec'],'Project native rules'))
     if support:
         executable = deployment.vanilla_source(game,Path(exe_patches.EXECUTABLE)).read_bytes()
         from . import runtime_mods
@@ -250,6 +243,7 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
     disabled = []
     with tweak_mods.locked(game):
         before_write()
+        _record, warning = tweak_mods.runtime_record(game)
         while True:
             try:
                 available = {row['id'] for row in rows} | {'lexeditor-loader'}
@@ -294,6 +288,7 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
                 data_folders.add(row['path'].resolve())
         report = {'version':1,'loaded':[row['id'] for row in rows if row['path'].resolve() in data_folders],
                   'disabled':disabled,'targets':targets,
+                  'warnings':[warning] if warning else [],
                   'conflicts':[str(conflict.part) for conflict in composition.conflicts][:128]}
         report['signature'] = _identity(rows,game,targets)
         raw = (json.dumps(report,indent=2)+'\n').encode()

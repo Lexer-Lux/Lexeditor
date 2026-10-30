@@ -1055,18 +1055,24 @@ def loader_bytes(debug: bool = False, *, online: bool = False) -> bytes:
 DEBUG_FILE = ".lexeditor-ds1.json"
 
 
-def _runtime(game_root: Path) -> dict:
-    """What Lexeditor's loader files in the game folder hold now."""
-    game_root = Path(game_root)
-    record_path, patch_path, dll_path = (checked(game_root / name) for name in (RUNTIME_RECORD, RUNTIME_PATCH, RUNTIME_DLL))
-    record = None
-    if record_path.exists():
+def runtime_record(game_root: Path) -> tuple[dict | None, str]:
+    """Read shared runtime metadata without making a cache an activation gate.
+
+    The optional legacy project recipe is not reconstructible from mod folders.
+    A damaged record therefore reports that loss rather than claiming it loaded.
+    Protected paths still fail closed; they are never treated as disposable.
+    """
+    record_path = checked(Path(game_root) / RUNTIME_RECORD)
+    if not record_path.exists():
+        return None, ''
+    try:
         if not record_path.is_file() or record_path.stat().st_size > MAX_MANIFEST:
-            raise TweakError("Lexeditor's loader record is damaged")
-        try:
-            record = json.loads(record_path.read_text(encoding="utf-8"))
-        except ValueError as error:
-            raise TweakError("Lexeditor's loader record is damaged") from error
+            raise ValueError('Invalid record size')
+        with record_path.open('rb') as stream:
+            raw = stream.read(MAX_MANIFEST + 1)
+        if len(raw) > MAX_MANIFEST:
+            raise ValueError('The record grew beyond its limit')
+        record = json.loads(raw)
         if (type(record) is not dict or record.get("version") != 1 or not _mod_names(record.get("mods"))
                 or not _digest(record.get("patchSha256")) or not _digest(record.get("dllSha256"))):
             raise TweakError("Lexeditor's loader record is damaged")
@@ -1079,14 +1085,39 @@ def _runtime(game_root: Path) -> dict:
         if (type(modules) is not dict or len(modules) > 128
                 or any(type(path) is not str or not _digest(value) for path, value in modules.items())):
             raise TweakError("Lexeditor's prebuilt mod record is damaged")
+        recovery = record.get('recovery', '')
+        if type(recovery) is not str or len(recovery) > 2000:
+            raise ValueError('Invalid recovery notice')
+        return record, recovery
+    except (ValueError, OSError, RecursionError):
+        return None, ('The installed loader record is damaged. Folder mods can be rebuilt, '
+                      'but any legacy Project native rules must be applied again from their project.')
+
+
+def _runtime(game_root: Path) -> dict:
+    """What Lexeditor's loader files in the game folder hold now."""
+    game_root = Path(game_root)
+    patch_path, dll_path = (checked(game_root / name) for name in (RUNTIME_PATCH, RUNTIME_DLL))
+    record, problem = runtime_record(game_root)
     patch = None
     if patch_path.exists():
-        if not patch_path.is_file() or patch_path.stat().st_size > MAX_RUNTIME:
-            raise TweakError(f"{RUNTIME_PATCH} is damaged")
-        patch = patch_path.read_bytes()
+        try:
+            if not patch_path.is_file() or patch_path.stat().st_size > MAX_RUNTIME:
+                raise ValueError('Invalid patch size')
+            with patch_path.open('rb') as stream:
+                patch = stream.read(MAX_RUNTIME + 1)
+            if len(patch) > MAX_RUNTIME:
+                raise ValueError('The patch grew beyond its limit')
+            if patch:
+                exe_patches.read_runtime_patch(patch)
+        except (ValueError, OSError, struct.error):
+            patch = None
+            problem = problem or 'The installed shared patch is damaged; apply the mods again to rebuild it.'
     dll = _sha(_read(dll_path, RUNTIME_FILE)) if dll_path.exists() else None
-    ours = {_sha(loader_bytes()), _sha(loader_bytes(debug=True)), _sha(loader_bytes(online=True))} | ({record["dllSha256"]} if record else set())
-    return {"record": record, "patch": patch, "dll": dll, "foreignDll": dll is not None and dll not in ours,
+    # A cache's self-declared hash cannot establish ownership of a foreign DLL.
+    ours = {_sha(loader_bytes()), _sha(loader_bytes(debug=True)), _sha(loader_bytes(online=True))}
+    return {"record": record, "patch": patch, "dll": dll, 'problem': problem,
+            "foreignDll": dll is not None and dll not in ours,
             "active": bool(record and patch is not None and dll in ours and _sha(patch) == record["patchSha256"])}
 
 
@@ -1094,7 +1125,7 @@ def _runtime_status(game_root: Path) -> dict:
     state = _runtime(game_root)
     result = {"applied": list(state["record"]["mods"]) if state["active"] else [],
               "project": state["record"].get("project") if state["active"] else None,
-              "problem": "", "loaderMessage": "",
+              "problem": state['problem'], "loaderMessage": "",
               "installed": bool(state['record'] or state['patch'] is not None
                                 or state['dll'] is not None and not state['foreignDll'])}
 
@@ -1200,6 +1231,11 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     record = {"version": 1, "mods": list(mods), "project": _project(project),
               "patchSha256": _sha(patch), "dllSha256": _sha(loader),
               "built": dict(built or {}), 'modules': dict(modules or {})}
+    # A malformed record may have held an unrecoverable legacy project recipe.
+    # Keep that fact visible after rebuilding healthy folder contributions.
+    _old_record, recovery = runtime_record(game_root)
+    if recovery and project is None:
+        record['recovery'] = recovery
     raw = (json.dumps(record, indent=2, allow_nan=False) + "\n").encode("utf-8")
     if len(raw) > MAX_MANIFEST or len(patch) > MAX_RUNTIME:
         raise TweakError("The combined tweaks are too large")
@@ -1301,7 +1337,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
     previous['config'] = config_path.read_bytes() if config_path.is_file() else None
     previous['modules'] = dict((runtime.get('record') or {}).get('modules') or {})
     # A project contribution can depend on verified original instruction bytes.
-    chosen = previous.get("project") if project is _KEEP_PROJECT else (
+    chosen = (runtime.get('record') or {}).get('project') if project is _KEEP_PROJECT else (
         project(original) if callable(project) else project)
     chosen = _project(chosen)
     if chosen is not None and _needs_loader(chosen["spec"]):
