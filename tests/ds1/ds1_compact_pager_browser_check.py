@@ -101,10 +101,20 @@ def main():
                     page.locator("[data-maps-dir] .lex-subtab-button", has_text="Enemies").click()
                     page.wait_for_function('state.dirTab==="enemies"', timeout=30000)
                     page.wait_for_selector("[data-maps-dir] .lex-pager-controls", timeout=30000)
-                    bottom = page.locator("[data-maps-dir] .lex-compact-pager-bottom").bounding_box()
-                    boxes = page.locator("[data-maps-dir] .lex-compact-pager-bottom > *").evaluate_all(
-                        "nodes => nodes.map(node => { const box = node.getBoundingClientRect();"
-                        " return {x: box.x, y: box.y, width: box.width, height: box.height}; })")
+                    # The tab name changes before its async directory refresh.
+                    # Read parent and children in one DOM snapshot, after the
+                    # enemy rows arrive, instead of measuring a removed pager.
+                    geometry = page.wait_for_function('''() => {
+                        if (!state.dirRows.length || !state.dirRows.every(isDirectoryFoe)) return false;
+                        const node=document.querySelector('[data-maps-dir] .lex-compact-pager-bottom');
+                        if (!node) return false;
+                        const rect=part=>{const box=part.getBoundingClientRect();
+                            return {x:box.x,y:box.y,width:box.width,height:box.height}};
+                        const bottom=rect(node), boxes=[...node.children].map(rect);
+                        return bottom.width && boxes.length>=2 && boxes.every(box=>box.width&&box.height)
+                            ? {bottom,boxes} : false;
+                    }''').json_value()
+                    bottom,boxes = geometry['bottom'],geometry['boxes']
                     assert len(boxes) >= 2, boxes
                     midline = bottom["y"] + bottom["height"] / 2
                     for child in boxes:

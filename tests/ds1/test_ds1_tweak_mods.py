@@ -280,15 +280,10 @@ class LoaderTests(unittest.TestCase):
 
     def test_a_change_while_preparing_is_refused(self):
         self.enable(alpha=True)
-        real = exe_patches.runtime_patch
-
-        def build_then_tamper(*args):
-            result = real(*args)
-            self.live.write_bytes(VANILLA[:-1] + b"\x02")
-            return result
-        with mock.patch.object(exe_patches, "runtime_patch", build_then_tamper):
-            with self.assertRaisesRegex(tweak_mods.TweakError, "changed while"):
-                tweak_mods.apply(self.game, self.library)
+        plan = tweak_mods.prepare(self.game,self.library)
+        self.live.write_bytes(VANILLA[:-1] + b"\x02")
+        with self.assertRaisesRegex(tweak_mods.TweakError, "changed while"):
+            tweak_mods.commit(self.game,plan)
         self.assertEqual(self.live.read_bytes(), VANILLA[:-1] + b"\x02")
 
     def test_a_running_game_stops_everything_before_any_write(self):
