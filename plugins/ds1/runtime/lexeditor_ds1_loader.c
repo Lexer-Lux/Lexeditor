@@ -466,6 +466,8 @@ static int apply_records(unsigned char *image, unsigned image_size, const unsign
     return 1;
 }
 
+#include "lexeditor_ds1_mods.c"
+
 #ifndef LX_NO_DLLMAIN
 static void folder_file(wchar_t *path, size_t capacity, const wchar_t *name)
 {
@@ -483,19 +485,30 @@ static DWORD started;
 static void write_log(const char *text)
 {
     static int lines;
+    static SRWLOCK lock = SRWLOCK_INIT;
+    AcquireSRWLockExclusive(&lock);
     wchar_t path[MAX_PATH * 2];
     folder_file(path, MAX_PATH * 2, L"lexeditor-ds1-patch.log");
     HANDLE file = CreateFileW(path, lines ? FILE_APPEND_DATA : GENERIC_WRITE, FILE_SHARE_READ, NULL,
                               lines ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (file == INVALID_HANDLE_VALUE)
+    if (file == INVALID_HANDLE_VALUE) {
+        ReleaseSRWLockExclusive(&lock);
         return;
-    char line[320];
+    }
+    LARGE_INTEGER size;
+    if (GetFileSizeEx(file, &size) && size.QuadPart > 64000) {
+        CloseHandle(file);
+        file = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (file == INVALID_HANDLE_VALUE) {ReleaseSRWLockExclusive(&lock); return;}
+    }
+    char line[768];
     int length = snprintf(line, sizeof line, "%s%6lu ms  %s", lines ? "\r\n" : "",
                           (unsigned long)(GetTickCount() - started), text);
     DWORD written;
-    WriteFile(file, line, (DWORD)(length > 0 ? length : 0), &written, NULL);
+    WriteFile(file, line, (DWORD)(length <= 0 ? 0 : length < sizeof line ? length : sizeof line - 1), &written, NULL);
     CloseHandle(file);
     ++lines;
+    ReleaseSRWLockExclusive(&lock);
 }
 
 /* --- No network ---------------------------------------------------------- */
@@ -593,8 +606,8 @@ static void apply_from_file(void)
     CloseHandle(file);
     if (!ok)
         snprintf(message, sizeof message, "Could not read lexeditor-ds1-patch.bin; nothing was changed");
-    else
-        lx_apply((unsigned char *)GetModuleHandleW(NULL), data, read, message, sizeof message);
+    else if (lx_apply((unsigned char *)GetModuleHandleW(NULL), data, read, message, sizeof message))
+        lx_check_claims(data, read, NULL, message, sizeof message, 1);
     if (data)
         HeapFree(GetProcessHeap(), 0, data);
     write_log(message);
@@ -624,7 +637,20 @@ __declspec(dllexport) HRESULT WINAPI DirectInput8Create(HINSTANCE instance, DWOR
  * Arxan off, and then applies the tweaks. */
 void lx_debug_start(void);
 void lx_debug_log(const char *text) { write_log(text); }
-void lx_debug_apply(void) { apply_from_file(); }
+void lx_debug_apply(void) { lx_data_ready=lx_prepare_data(); apply_from_file(); lx_load_mod_folders(); }
+#endif
+
+#ifndef LX_DEBUG_BUILD
+static DWORD WINAPI start_mods(void *ignored)
+{
+    (void)ignored;
+    /* Data preparation needs the pre-entry-point dearxan callback supplied
+     * by the online/debug package. The basic proxy loads native-only mods. */
+    lx_data_ready=0;
+    apply_from_file();
+    lx_load_mod_folders();
+    return 0;
+}
 #endif
 
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
@@ -637,7 +663,8 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
 #ifdef LX_DEBUG_BUILD
         lx_debug_start();
 #else
-        apply_from_file();
+        HANDLE worker=CreateThread(NULL,0,start_mods,NULL,0,NULL);
+        if(worker)CloseHandle(worker);
 #endif
     }
     return TRUE;

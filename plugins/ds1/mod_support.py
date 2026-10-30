@@ -54,6 +54,9 @@ class Ds1ModAdapter:
     REPORT_VERSION = 1
     REPORT_LIMIT = 2 * 1024 * 1024
 
+    ensure_game_closed = staticmethod(tweak_mods.ensure_game_closed)
+    configure_library = staticmethod(tweak_mods.configure_library)
+
     @staticmethod
     def _report_path() -> Path:
         from core.runtime_bootstrap import user_data_dir
@@ -69,6 +72,11 @@ class Ds1ModAdapter:
     def inspect(self, root: Path, files: list[Path]) -> dict:
         """Accept a DS1 data mod (its archives) or a tweak mod (its script)."""
         tweak = script_mods.is_script_mod(Path(root))
+        if (Path(root) / 'runtime.lxd').is_file():
+            from .runtime_mods import read
+            tweak_mods.checked(Path(root) / 'runtime.lxd')
+            read(Path(root))
+            tweak = True
         packages, ignored = [], []
         for path in files:
             folded = path.as_posix().casefold()
@@ -83,6 +91,36 @@ class Ds1ModAdapter:
             f"and/or map, character and event files; a tweak mod has a script."]
         return {"valid": not problems, "problems": problems, "packages": sorted(packages),
                 "assets": {}, "notDeployed": sorted(ignored)}
+
+    def standalone_mods(self, game_root: Path) -> list[dict]:
+        """Recognized packages only; never infer ownership of loose game files."""
+        from core.mod_library import metadata
+        from .runtime_mods import inspect, MAX_SIZE
+        game_root = tweak_mods.checked(Path(game_root)).resolve()
+        protected = set(assets.ASSET_ROOTS) | {'param', 'paramdef', 'mods'}
+        found = []
+        for root in (game_root, game_root/'mods'):
+            if not root.is_dir():
+                continue
+            tweak_mods.checked(root)
+            for folder in sorted(root.iterdir()):
+                if folder.name.startswith('.') or (root == game_root and folder.name.casefold() in protected):
+                    continue
+                try:
+                    tweak_mods.checked(folder)
+                    if not folder.is_dir() or folder.resolve().parent != root.resolve():
+                        continue
+                    payload = tweak_mods.checked(folder/'runtime.lxd')
+                    if not payload.is_file() or payload.stat().st_size > MAX_SIZE:
+                        continue
+                    inspect(payload.read_bytes())
+                    info = metadata(folder)
+                except (OSError, ValueError):
+                    continue
+                found.append({'path': str(folder), 'name': info.get('name') or folder.name})
+                if len(found) >= 128:
+                    return found
+        return found
 
     def prepare_editable(self, root: Path) -> None:
         """A new DS1 mod is a project folder: give it the project marker."""
@@ -161,8 +199,20 @@ class Ds1ModAdapter:
     def _ordered_mods(self, mods):
         from core import mods_service
         wanted = {Path(path).resolve() for path in mods}
-        return [(row["name"], Path(row["path"])) for row in mods_service.library_rows(self._library())
-                if Path(row["path"]).resolve() in wanted and (Path(row["path"]) / MARKER).is_file()]
+        # Native-only mods do not change the installed data recipe. Including
+        # their empty content stamp made every native toggle re-merge archives.
+        ordered = []
+        for row in mods_service.library_rows(self._library()):
+            folder = Path(row['path'])
+            if folder.resolve() not in wanted:
+                continue
+            try:
+                if mod_loader.content_files(folder, row['name']):
+                    ordered.append((row['name'], folder))
+            except Exception as error:
+                from core.mod_builds import ModBuildError
+                raise ModBuildError([folder], f"{row['name']}: {error}") from error
+        return ordered
 
     def conflicts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
         """Each switched-on mod's clashes with another one, by mod folder.
@@ -310,7 +360,7 @@ class Ds1ModAdapter:
         for row in rows:
             folder = Path(row["path"])
             try:
-                tweak = script_mods.is_script_mod(folder)
+                tweak = script_mods.is_script_mod(folder) or (folder/'runtime.lxd').is_file()
             except (OSError, ValueError):
                 continue  # Unreadable metadata is the Mods tab's error row, not a mark.
             # Only a tweak mod's built patches are ever composed; a stray

@@ -11384,15 +11384,118 @@ ${contents.path}`});
     // The first time a game opens, offer Lexer's Mod and show where things are.
     // Downloaded Lexer's Mod modules stay up to date: checked as the game
     // opens (at most hourly, in the background) as well as on the Mods tab.
-    const startFirstRun = () => {
+    // Standalone mod folders left in the game directory keep working without
+    // Lexeditor; once per shell the reader is offered a move of the recognized
+    // ones into the mod library. Nothing moves without the Move action.
+    let unmanagedPromptDone = false;
+    const offerUnmanagedMods = async () => {
+      if (unmanagedPromptDone || !window.pywebview?.api) return;
+      unmanagedPromptDone = true;
+      let found = null;
+      try { found = await callWindow("unmanaged_mods", options.plugin.id); }
+      catch (_error) { return; }
+      const eligible = (Array.isArray(found?.mods) ? found.mods : [])
+        .filter(entry => entry && typeof entry.path === "string" && entry.path)
+        .map(entry => ({path: entry.path, name: String(entry.name || entry.path), error: ""}));
+      if (!eligible.length) return;
+      if (document.querySelector(".lex-first-run")) {
+        // Onboarding owns the screen: wait for it to finish rather than
+        // stacking a second dialog over it.
+        await new Promise(resolve => {
+          const watcher = new MutationObserver(() => {
+            if (document.querySelector(".lex-first-run")) return;
+            watcher.disconnect();
+            resolve();
+          });
+          watcher.observe(document.body, {childList: true, subtree: true});
+        });
+      }
+      if (document.querySelector(".lex-dialog-backdrop")) return;
+      return modsDialog("Standalone mods found", closeDialog => {
+      const previousFocus = document.activeElement;
+      const listBox = element("div", {style: "max-height:30vh;overflow:auto"});
+      const status = element("p", {class: "lex-dialog-status", "aria-live": "polite"});
+      const later = element("button", {class: "lex-dialog-action", text: "Later"});
+      const move = element("button", {class: "lex-dialog-action primary", text: "Move to library"});
+      let busy = false;
+      let remaining = eligible;
+      let checks = [];
+      const paint = () => {
+        checks = remaining.map(entry => {
+          const box = element("input", {type: "checkbox", checked: entry.checked!==false, "aria-label": entry.name});
+          box.onchange = () => { entry.checked=box.checked;move.disabled = busy || !checks.some(pair => pair.box.checked); };
+          return {entry, box, row: element("div", {},
+            element("label", {style: "display:block"}, box, ` ${entry.name}`),
+            entry.error ? detailNote(entry.error) : null)};
+        });
+        listBox.replaceChildren(...checks.map(pair => pair.row));
+        move.disabled = busy || !checks.some(pair=>pair.box.checked);
+      };
+      const dismiss = () => {
+        if (busy) return;
+        document.removeEventListener('keydown', escape);
+        closeDialog();
+        previousFocus?.focus?.();
+      };
+      const escape = event => {if(event.key==='Escape')dismiss();};
+      document.addEventListener('keydown', escape);
+      later.onclick = dismiss;
+      move.onclick = async () => {
+        if (busy) return;
+        const chosen = checks.filter(pair => pair.box.checked).map(pair => pair.entry);
+        if (!chosen.length) return;
+        busy = true;
+        later.disabled = true;
+        move.disabled = true;
+        checks.forEach(pair => { pair.box.disabled = true; });
+        status.replaceChildren(loadingStatus("Moving mods…"));
+        setEditorBusy(move, "Moving mods to the library");
+        try {
+          for (const entry of chosen) {
+            status.replaceChildren(loadingStatus(`Moving ${entry.name}…`));
+            try {
+              const moved = await callWindow("adopt_mod", options.plugin.id, entry.path);
+              if (!moved) throw new Error("The mod was not moved.");
+              entry.done = true;
+              entry.error = "";
+            } catch (error) {
+              entry.done = false;
+              entry.error = error?.message || String(error);
+            }
+          }
+          remaining = remaining.filter(entry => !entry.done);
+        } finally {
+          busy = false;
+          setEditorBusy(move, null);
+        }
+        if (!remaining.length) {
+          dismiss();
+          return;
+        }
+        status.textContent = remaining.some(entry=>entry.error)?"Some mods could not be moved.":"Choose more mods to move, or select Later.";
+        paint();
+        later.disabled = false;
+      };
+      paint();
+      setTimeout(()=>later.focus(),0);
+      return [
+        element("p", {text: "These standalone mods were found and can be moved into the existing library."}),
+        listBox,
+        status,
+        element("div", {class: "lex-dialog-actions"}, later, move)];
+      });
+    };
+    const startFirstRun = async () => {
       callWindow("lexmod_update", options.plugin.id).catch(() => {});
-      return firstRun(options.plugin.id, options.plugin.name).catch(() => {});
+      try { await firstRun(options.plugin.id, options.plugin.name); } catch (_error) {}
+      try { await offerUnmanagedMods(); } catch (_error) {}
     };
     if (window.pywebview?.api) startFirstRun();
     else window.addEventListener("pywebviewready", startFirstRun, {once: true});
     return {
       header, nav, context, settings, help, info, github, restart, githubWorkspace: () => githubWorkspace,
       save, game, undo, redo, minimize, maximize, close, history, navigationHistory, refresh,
+      refreshMods: () => mods.refresh({invalidateContents:true}),
     };
   };
 
@@ -16026,6 +16129,7 @@ ${contents.path}`});
   const modsPage = (pluginId, pluginName) => {
     let data = null, selected = null, page = 0, pageSize = 20, query = "", main = null;
     let modDetailTab = "details", contentsMod = null, contentsResult = null, contentsFailed = false;
+    let contentsStale = false, refreshPending = false;
     const contentsWraps = {files: null, records: null};
     const contentsQuery = {records: "", files: ""}, contentsPage = {records: 0, files: 0};
     const contentsFitted = {records: 10, files: 10};
@@ -16229,12 +16333,16 @@ ${contents.path}`});
           detailField({label: "FROM", control: readonlyField(row.lexmod ? `Lexer's Mod ${row.lexmod.version || ""}`.trim() : "Your library")}),
           ...(row.version ? [detailField({label: "VERSION", property: "version", control: readonlyField(row.version)})] : []),
         ]}));
-      if (selected !== contentsMod) {
+      if (selected !== contentsMod || contentsStale) {
+        const changedSelection = selected !== contentsMod;
+        contentsStale = false;
         contentsMod = selected;
-        contentsQuery.records = "";
-        contentsQuery.files = "";
-        contentsPage.records = 0;
-        contentsPage.files = 0;
+        if (changedSelection) {
+          contentsQuery.records = "";
+          contentsQuery.files = "";
+          contentsPage.records = 0;
+          contentsPage.files = 0;
+        }
         contentsResult = null;
         contentsFailed = false;
         // One fetch per selected mod: tab switches redraw from the cache,
@@ -16323,7 +16431,7 @@ ${contents.path}`});
             sortValue: row => row.loaded ? 1 : 0, render: row => booleanMark(row.loaded)},
         ], "Search files", "This mod has no files.", notes,
           row => row.loaded ? "lex-mod-file-loaded" : "",
-          row => row.loaded ? "The mod loader reads this file when the mod is on" : null);
+          row => row.loaded ? "Used when building or loading this mod" : null);
       };
       const contentsNode = tab => {
         if (contentsFailed) return detailNote("Could not read the mod's contents.");
@@ -16564,11 +16672,22 @@ ${contents.path}`});
       } finally { importing = false; }
     };
     return {
-      async refresh() {
+      async refresh({invalidateContents=false}={}) {
         // A save rebuilds what the marks describe; a showing tab re-reads
         // them so a rebuilt mod clears its alert without reopening.
         // A failed re-read keeps the old rows: the save still succeeded.
         if (!main?.isConnected) return;
+        if (invalidateContents) contentsStale = true;
+        if (main.contains(document.activeElement) && document.activeElement.matches('input,textarea,select,[contenteditable="true"]')) {
+          if (!refreshPending) {
+            refreshPending = true;
+            document.activeElement.addEventListener('blur', () => {
+              refreshPending = false;
+              setTimeout(async () => {if(main?.isConnected){try{await load();draw();}catch(_error){}}}, 0);
+            }, {once:true});
+          }
+          return;
+        }
         try { await load(); } catch (_error) { return; }
         if (main?.isConnected) draw();
       },

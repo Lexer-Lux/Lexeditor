@@ -36,7 +36,7 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 PACKAGE = HERE / "package"
-SOURCES = ("lexeditor_ds1_loader.c", "lexeditor_ds1_loader.h")
+SOURCES = ("lexeditor_ds1_loader.c", "lexeditor_ds1_loader.h", "lexeditor_ds1_mods.c")
 DEBUG_SOURCES = SOURCES + ("lexeditor_ds1_debug.c",)
 DEBUG_PACKAGE = PACKAGE / "debug"
 ONLINE_PACKAGE = PACKAGE / "online"
@@ -86,7 +86,7 @@ def build(zig: str, output: Path) -> None:
         for name in SOURCES:
             shutil.copy2(HERE / name, work / name)
         subprocess.run([zig, "cc", "-target", "x86_64-windows-gnu", "-shared", "-O2", "-s",
-                        "-fno-ident",
+                        "-fno-ident", "-lshell32",
                         "-o", str(work / "dinput8.dll"), str(work / SOURCES[0])],
                        check=True, cwd=work,
                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
@@ -128,7 +128,7 @@ def build_debug(dearxan: Path, output: Path, *, online: bool = False) -> None:
         command = (f'call "{find_vcvars()}" >nul && {assembly}cl /nologo /O2 /LD /MD /Brepro /DLX_DEBUG_BUILD '
                    f'/D_CRT_SECURE_NO_WARNINGS lexeditor_ds1_loader.c lexeditor_ds1_debug.c {extra}'
                    f'/link /Brepro /OUT:dinput8.dll "{lib / "dearxan.lib"}" ws2_32.lib ntdll.lib userenv.lib '
-                   f'dbghelp.lib kernel32.lib advapi32.lib bcrypt.lib synchronization.lib')
+                   f'dbghelp.lib kernel32.lib advapi32.lib bcrypt.lib synchronization.lib shell32.lib')
         # A batch file: cmd's quoting does not survive being passed as one argument.
         (work / "build.bat").write_text("@echo off\n" + command + "\n", encoding="utf-8")
         subprocess.run(["cmd", "/c", str(work / "build.bat")], check=True, cwd=work,

@@ -163,7 +163,7 @@ def read_mod(folder: Path, name: str, *, only=None) -> Mod | None:
     """A DS1 data mod's saved files, or None for a folder that is not one."""
     from .tweak_mods import checked
     folder = checked(Path(folder))
-    if not (folder / MARKER).is_file():
+    if not (folder / MARKER).is_file() and not (folder/'mod.json').is_file():
         return None
     files = {}
     try:
@@ -1341,11 +1341,37 @@ def loaded_files(folder: Path):
     try:
         pairs = content_files(folder, folder.name)
     except (ValueError, OSError):
-        return []
-    found = set()
+        pairs = []
+    found = {'mod.json'} if (folder/'mod.json').is_file() else set()
     for _key, disk in pairs:
         try:
             found.add(disk.relative_to(folder).as_posix().casefold())
         except ValueError:
             continue
+    try:
+        from core import script_mods as _scripts
+        if _scripts.is_script_mod(folder):
+            for _rel in _scripts.consumed_files(folder):
+                found.add(_rel.as_posix().casefold())
+            try:
+                _meta = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                _meta = {}
+            _mid = str(_meta.get("id") or folder.name) if isinstance(_meta, dict) else folder.name
+            from .menu_dim import FOLDER as _dim
+            for _dirname in ("native", "layout", "esd", _dim):
+                _candidate = folder / _dirname / f"{_mid}.json"
+                try:
+                    _is_file = _candidate.is_file()
+                except OSError:
+                    continue
+                if _is_file:
+                    found.add(_candidate.relative_to(folder).as_posix().casefold())
+    except (OSError, ValueError):
+        pass
+    try:
+        if (folder / "runtime.lxd").is_file():
+            found.add("runtime.lxd")
+    except OSError:
+        pass
     return sorted(found)

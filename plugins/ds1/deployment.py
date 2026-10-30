@@ -525,7 +525,7 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
     project_root = _assert_no_reparse_ancestry(project_root).resolve()
     project_marker = project_root / MARKER
     _assert_no_reparse_points(project_marker, project_root)
-    if not project_marker.is_file():
+    if not project_marker.is_file() and not (composed is not None and (project_root/'mod.json').is_file()):
         raise ValueError("Select a valid Dark Souls mod project before applying it.")
     source = project_root / RELATIVE
     map_targets = _disk_maps(game_root, project_root)
@@ -547,7 +547,10 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
             and not (project_root / texts.MENU_RELATIVE).is_file() \
             and not any((project_root / relative).is_file() for relative in map_targets + char_targets + asset_targets):
         raise FileNotFoundError("Save the project before applying it; it holds no game files to install.")
-    _assert_disjoint(game_root, project_root)
+    standalone_package = (composed is not None and project_root.parent in (game_root,game_root/'mods')
+                          and (project_root/'mod.json').is_file())
+    if not standalone_package:
+        _assert_disjoint(game_root, project_root)
     # Every file the project holds is checked before any of them is written.
     sources = {}
     for relative, reader in targets:

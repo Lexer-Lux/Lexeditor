@@ -584,6 +584,7 @@ async function discard(){
   // server reply re-sets it, so this runs after the last one; the
   // drift itself stays on disk for the next save to rebuild.
   state.tweaksNeedRebuild=false;
+  ignoredModRevision=modRevision;
 }
 // An item's in-game name lives in the game's text, which the mod carries
 // beside its parameters; the server renames it there.
@@ -4728,5 +4729,36 @@ async function boot(){
   try{await refreshState();await loadItems();render();}catch(error){state.error=error.message;render();}
   finally{document.body.dataset.ds1Ready=state.error?"error":"true";await LexeditorUI.finishPluginLoading();}
 }
+// Directory notifications do the detection; this request reads a revision.
+// Refresh library metadata without reloading the edited project or its history.
+let modRevision=0, ignoredModRevision=null, modRefreshPending=false, modPollTimer=null, modPollBusy=false, modPollStopped=false;
+async function pollModChanges(){
+  if(modPollBusy||modPollStopped)return;
+  modPollBusy=true;
+  try{
+    const response=await fetch(`/api/mod-changes?since=${modRevision}`);
+    if(!response.ok)return;
+    const result=await response.json();
+    const changed=result.revision!==modRevision;
+    modRevision=result.revision;
+    modRefreshPending ||= changed;
+    if(!document.body.inert&&!state.pending&&!document.querySelector('.lex-dialog-backdrop')){
+      state.tweaksNeedRebuild=!!result.tweaksNeedRebuild&&ignoredModRevision!==modRevision;
+      shell.refresh();
+    if(modRefreshPending){
+      modRefreshPending=false;
+      await shell.refreshMods();
+      if(state.tab==="tweaks"&&!document.querySelector('#main .lex-mods-page')&&!document.querySelector('#main input:focus,#main select:focus,#main textarea:focus')){
+        await loadTweaks();render();
+      }
+    }
+    }
+  }catch(_error){/* A session changing projects can briefly be unavailable. */}
+  finally{
+    modPollBusy=false;
+    if(!modPollStopped)modPollTimer=setTimeout(pollModChanges,document.hidden?3000:1000);
+  }
+}
+window.addEventListener('pagehide',()=>{modPollStopped=true;clearTimeout(modPollTimer);},{once:true});
 window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&(state.dirty||state.pending||state.tweaksNeedRebuild))event.preventDefault();});
-boot();
+boot().then(pollModChanges);

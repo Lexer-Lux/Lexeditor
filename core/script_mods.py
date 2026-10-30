@@ -355,13 +355,34 @@ def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
         raise ScriptModError("Generated-file rollback failed: " + "; ".join(errors))
 
 
+_INPUT_NAMES = ('mod.json', SCHEMA_FILE, VALUES_FILE)
+
+
+def consumed_files(root: Path) -> list[Path]:
+    root = Path(root)
+    found = [Path(name) for name in _INPUT_NAMES if (root / name).is_file()]
+    try:
+        candidates = list((root / SCRIPT_FOLDER).rglob('*'))
+    except OSError:
+        return sorted(found)
+    for path in candidates:
+        try:
+            if not path.is_file() or any(part in ('.git', '__pycache__') for part in path.parts):
+                continue
+            relative = path.relative_to(root)
+        except (OSError, ValueError):
+            continue
+        if owns(relative):
+            found.append(relative)
+    return sorted(found)
+
+
 def source_fingerprint(root: Path) -> str:
     """Content identity of a script's source and settings, excluding its outputs."""
     root = Path(root)
-    paths = [root / name for name in ('mod.json', SCHEMA_FILE, VALUES_FILE)]
-    paths += [path for path in (root / SCRIPT_FOLDER).rglob('*')
-              if path.is_file() and '__pycache__' not in path.parts
-              and owns(path.relative_to(root))]
+    paths = [root / name for name in _INPUT_NAMES]
+    paths += [root / relative for relative in consumed_files(root)
+              if relative.parts and relative.parts[0] == SCRIPT_FOLDER]
     digest = hashlib.sha256()
     for path in sorted(paths):
         name = path.relative_to(root).as_posix().encode('utf-8')
@@ -475,6 +496,8 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
         conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
         if conflicts:
             raise error(f"{row['name']} conflicts with {', '.join(conflicts)}", folders=[row['path']])
+        if row.get('prebuilt'):
+            continue
         try:
             snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
         except Exception as failure:
@@ -482,6 +505,8 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
     built = []
     try:
         for row in rows:
+            if row.get('prebuilt'):
+                continue
             context.current = row["name"]
             started = perf_counter()
             result = build(Path(row["path"]), context, allowed_roots=allowed_roots)

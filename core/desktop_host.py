@@ -1767,6 +1767,35 @@ class HostApi:
         from core.runtime_bootstrap import user_data_dir
         return mods_service.Onboarding(user_data_dir() / "onboarding.json")
 
+    def unmanaged_mods(self, plugin_id: str) -> dict:
+        adapter = self._mod_adapter(plugin_id)
+        game = self._installations.snapshot(plugin_id).get('root') or ''
+        discover = getattr(adapter, 'standalone_mods', None)
+        rows = discover(Path(game)) if game and discover else []
+        library = self._game_mods(plugin_id)
+        rows = [row for row in rows if Path(row['path']).resolve().parent != library.resolve()]
+        return {'mods': rows, 'root': str(library)}
+
+    def adopt_mod(self, plugin_id: str, path: str) -> dict:
+        from core.standalone_mods import adopt
+        adapter = self._mod_adapter(plugin_id)
+        game = self._installations.snapshot(plugin_id).get('root') or ''
+        if not game or not hasattr(adapter, 'standalone_mods'):
+            raise ValueError('Locate the game before moving a standalone mod')
+        # A move changes the next loaded mod set; use the adapter's own game
+        # guard rather than touching a folder in a running game's library.
+        guard = getattr(adapter, 'ensure_game_closed', None)
+        if guard:
+            guard()
+        configure = getattr(adapter, 'configure_library', None)
+        if configure:
+            configure(Path(game), self._game_mods(plugin_id))
+        folder = adopt(Path(path), self._game_mods(plugin_id), adapter.standalone_mods(Path(game)))
+        projects = getattr(self, '_projects', None)
+        if projects is not None:
+            projects.remap_prefix(Path(path), folder)
+        return {'path': str(folder)}
+
     def mods_overview(self, plugin_id: str) -> dict:
         """Every mod in this game's library, then Lexer's Mod modules not yet here."""
         from core import mods_service

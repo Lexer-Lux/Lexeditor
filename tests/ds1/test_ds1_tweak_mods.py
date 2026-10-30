@@ -76,10 +76,15 @@ class LoaderTests(unittest.TestCase):
         tweak_mods.save({mod_id: {"enabled": on} for mod_id, on in switches.items()}, self.library)
 
     def expected(self, *ids):
-        return exe_patches.runtime_patch(VANILLA, [exe_patches.validate(SPECS[i], i.title()) for i in ids])
+        from plugins.ds1 import runtime_mods
+        return {name: runtime_mods.build(VANILLA, [exe_patches.validate(SPECS[name], name.title())]) for name in ids} or b''
 
     def runtime(self):
-        return (self.game / tweak_mods.RUNTIME_PATCH).read_bytes()
+        # Ordinary mods now live in independently loadable library folders.
+        # The loader-owned patch must not duplicate any of their hooks.
+        self.assertEqual((self.game / tweak_mods.RUNTIME_PATCH).read_bytes(), b'')
+        return {name: (self.library/name.title()/'runtime.lxd').read_bytes() for name in SPECS
+                if json.loads((self.library/name.title()/'mod.json').read_text())['enabled']} or b''
 
     def old_install(self, *ids):
         """What an earlier Lexeditor left: tweaks built into the executable."""
@@ -195,7 +200,7 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual(self.runtime(), self.expected("alpha"))
         self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(online=True))
         self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.LOCK_FILE, tweak_mods.RUNTIME_DLL,
-                                               tweak_mods.RUNTIME_PATCH, tweak_mods.RUNTIME_RECORD]))
+                                               tweak_mods.RUNTIME_PATCH, tweak_mods.RUNTIME_RECORD, tweak_mods.RUNTIME_CONFIG]))
         lock = self.game / tweak_mods.LOCK_FILE
         lock_identity = (lock.stat().st_dev, lock.stat().st_ino)
         self.assertEqual(lock.read_bytes(), b"0")

@@ -9,6 +9,7 @@ from pathlib import Path
 import threading
 from urllib.parse import parse_qs, urlparse
 
+from core import mod_watch
 from core.plugin_http import PluginRequestHandler
 from . import assets, deployment, data_map, fsb, icons, scripts, shops, theme
 from . import anim
@@ -188,6 +189,10 @@ def _tweaks_flag() -> bool:
         return False
 
 
+_MOD_CHANGES_LOCK = threading.Lock()
+_MOD_CHANGES_CACHE = {"revision": None, "flag": False}
+
+
 def _rebuild_tweaks_on_save() -> dict:
     """Build changed tweaks into the installed game as part of Save.
 
@@ -265,6 +270,37 @@ class Handler(PluginRequestHandler):
                     self.send_json(_textures_detail(files[0] if files else '',
                                                     query.get('side', ['mod'])[0]))
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
+        if path == '/api/mod-changes':
+            # Lock-free status: the watcher and the flag cache carry their own
+            # locks, and nothing here touches STORE, MAPSTORE or unsaved rows.
+            # The staleness check runs only when the watcher revision moves.
+            try:
+                snap = mod_watch.snapshot(
+                    tweak_mods.mods_root(), query.get('since', ['0'])[0])
+                record = Path(STORE.game_root) / tweak_mods.RUNTIME_RECORD
+                try:
+                    stamp = record.stat()
+                    stamp = (stamp.st_mtime_ns, stamp.st_size)
+                except OSError:
+                    stamp = None
+                cache_key = (str(tweak_mods.mods_root()), snap['revision'], stamp)
+                with _MOD_CHANGES_LOCK:
+                    cached_revision = _MOD_CHANGES_CACHE["revision"]
+                    cached_flag = _MOD_CHANGES_CACHE["flag"]
+                if cached_revision != cache_key:
+                    flag = _tweaks_flag()
+                    with _MOD_CHANGES_LOCK:
+                        _MOD_CHANGES_CACHE["revision"] = cache_key
+                        _MOD_CHANGES_CACHE["flag"] = flag
+                else:
+                    flag = cached_flag
+                self.send_json({"revision": snap["revision"],
+                                "changed": snap["changed"],
+                                "status": snap['status'],
+                                "tweaksNeedRebuild": flag})
+            except (ValueError, OSError, RuntimeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
         if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/behaviors', '/api/shop', '/api/data-map', '/api/assets',

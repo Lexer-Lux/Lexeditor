@@ -21,6 +21,7 @@ format facts.
 from __future__ import annotations
 
 import hashlib
+from functools import lru_cache
 import struct
 
 EXECUTABLE = "DarkSoulsRemastered.exe"
@@ -236,6 +237,13 @@ def _rel32(source_next: int, target: int) -> bytes:
     return struct.pack("<i", value)
 
 
+@lru_cache(maxsize=1)
+def _checked_pe(vanilla: bytes, expected_size: int, expected_hash: str):
+    if len(vanilla) != expected_size or hashlib.sha256(vanilla).hexdigest() != expected_hash:
+        raise PatchError('The source is not the supported vanilla Remastered executable')
+    return _Pe(vanilla)
+
+
 def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
     """Where every island goes and what every hook writes, for the vanilla build.
 
@@ -243,12 +251,10 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
     runtime_patch() describes it for the in-memory loader. None when no
     patch changes anything.
     """
-    if len(vanilla) != VANILLA_SIZE or hashlib.sha256(vanilla).hexdigest() != VANILLA_SHA256:
-        raise PatchError("The source is not the supported vanilla Remastered executable")
+    pe = _checked_pe(bytes(vanilla), VANILLA_SIZE, VANILLA_SHA256)
     patches = [spec for spec in specs if spec["islands"] or spec["hooks"] or spec["sectionVirtualSize"]]
     if not patches:
         return None
-    pe = _Pe(vanilla)
     last = pe.last
     section_end = last["rva"] + last["vsize"]
     # Islands start after every original byte, the certificate included, at
@@ -336,7 +342,7 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
                                      f"{max(low, other_low):X}")
         owned.extend((low, high, spec["owner"]) for low, high in ranges)
     return {"pe": pe, "base": base, "cursor": cursor, "codes": codes,
-            "functions": functions, "hooks": hooks, "growth": growth}
+            "functions": functions, "hooks": hooks, "growth": growth, "placed": placed}
 
 
 def compose(vanilla: bytes, specs: list[dict]) -> bytes:
@@ -430,6 +436,11 @@ def runtime_patch(vanilla: bytes, specs: list[dict]) -> bytes | None:
     layout = _layout(vanilla, specs)
     if layout is None:
         return None
+    return _runtime_patch(vanilla, layout)
+
+
+def _runtime_patch(vanilla: bytes, layout: dict) -> bytes:
+    """Encode the shared, already-validated layout for the memory loader."""
     pe, base = layout["pe"], layout["base"]
     image_size = struct.unpack_from("<I", vanilla, pe.size_of_image)[0]
     timestamp = struct.unpack_from("<I", vanilla, pe.nt + 8)[0]

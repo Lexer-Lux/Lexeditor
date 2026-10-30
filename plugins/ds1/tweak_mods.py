@@ -167,9 +167,14 @@ def tweak_rows(root: Path | None = None) -> list[dict]:
                 # Shared library discovery already exposes unreadable metadata
                 # as an off/error row. Never let it hide the healthy catalog.
                 continue
-            if not isinstance(metadata, dict) or not isinstance(metadata.get('script'), dict):
+            if not isinstance(metadata, dict):
                 continue
-            row = script_mods.catalog_row(folder)
+            scripted = isinstance(metadata.get('script'), dict)
+            if not scripted and not (folder/'runtime.lxd').is_file():
+                continue
+            row = script_mods.catalog_row(folder) if scripted else {
+                'path': str(folder), 'error': '', 'values': {}, 'schema': script_mods.schema(folder)}
+            row['prebuilt'] = not scripted
             order = metadata.get('order', 1000)
             if not isinstance(order, int) or isinstance(order, bool):
                 row['error'] = 'Load order must be a whole number'
@@ -493,10 +498,11 @@ def build_specs(root: Path | None = None, game_root: Path | None = None, *, cach
     ensure_loader_mod(root)
     context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root, cache_root=cache_root)
     script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError, timings=timings)
-    specs = _built(rows, "native", exe_patches.validate)
+    specs = _built([row for row in rows if not row.get('prebuilt')], "native", exe_patches.validate)
     dims = _built(rows, menu_dim.FOLDER, menu_dim.validate)
     _refuse_without_loader([spec["owner"] for spec in specs if _needs_loader(spec)]
-                           + [spec["owner"] for spec in dims if spec["textIds"]], root)
+                           + [spec["owner"] for spec in dims if spec["textIds"]]
+                           + [row['name'] for row in rows if row.get('prebuilt')], root)
     try:
         dim = menu_dim.patch_spec(dims)
     except ValueError as error:
@@ -543,6 +549,18 @@ def native_spans(folder: Path, owner: str) -> dict[str, list[tuple[int, int]]]:
     it is enabled. Damaged files are skipped; enabling reports them.
     """
     found: dict[str, list[tuple[int, int]]] = {"hooks": [], "state": [], "islands": []}
+    if not script_mods.is_script_mod(folder) and (Path(folder)/'runtime.lxd').is_file():
+        from . import runtime_mods
+        try:
+            checked(Path(folder)/runtime_mods.FILENAME)
+            module = runtime_mods.inspect(runtime_mods.read(folder))
+            found['hooks'] = [(rva, rva+size) for kind, rva, size, _ in module['records'] if kind == exe_patches.HOOK]
+            found['state'] = [(rva, rva+size) for rva, size in module['claims']]
+            if module['fixed']:
+                found['islands'] = [(rva, rva+size) for kind, rva, size, _ in module['records'] if kind == exe_patches.BLOCK]
+        except (ValueError, OSError):
+            pass
+        return found
     try:
         files = sorted((Path(folder) / "native").glob("*.json"))
     except OSError:
@@ -571,6 +589,10 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
     """
     folder = Path(folder)
     parts = {"source": script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision()}
+    if not script_mods.is_script_mod(folder) and (folder/'runtime.lxd').is_file():
+        from . import runtime_mods
+        checked(folder/runtime_mods.FILENAME)
+        parts['prebuilt'] = _sha(runtime_mods.read(folder))
     if produced:
         manifest = script_mods._read_json(folder / script_mods.MANIFEST_FILE) or {}
         record = manifest.get('build') or {}
@@ -738,7 +760,7 @@ def _manifest(game_root: Path, managed: Managed = EXECUTABLE) -> dict:
         raise TweakError(damaged)
     keys = {"sha256", "mods"} | ({"project"} if data["version"] == 2 else set())
     pending = data.get("pending")
-    if pending is not None and (type(pending) is not dict or set(pending) != keys
+    if pending is not None and (type(pending) is not dict or set(pending) - {"inputs"} != keys
                                 or not _digest(pending["sha256"]) or not _mod_names(pending["mods"])):
         raise TweakError(damaged)
     if data["version"] == 2:
@@ -774,11 +796,12 @@ def _current_manifest(current: bytes, manifest: dict, managed: Managed = EXECUTA
     pending = manifest.get("pending")
     if pending and _sha(current) == pending["sha256"]:
         return {"version": 2, "sha256": pending["sha256"], "mods": list(pending["mods"]),
-                "project": pending.get("project"), "pending": None}
+                "project": pending.get("project"), "inputs": pending.get("inputs"), "pending": None}
     vanilla = managed.vanilla(current)
     return {"version": 2, "sha256": _sha(current),
             "mods": [] if vanilla else list(manifest.get("mods", [])),
             "project": None if vanilla else manifest.get("project"),
+            "inputs": None if vanilla else manifest.get("inputs"),
             "pending": None}
 
 
@@ -790,16 +813,16 @@ def _save_manifest(game_root: Path, value: dict, managed: Managed = EXECUTABLE) 
 
 
 def _finish_manifest(game_root: Path, current: bytes, mods: list[str], project=None,
-                     managed: Managed = EXECUTABLE) -> None:
+                     managed: Managed = EXECUTABLE, *, inputs=None) -> None:
     if managed.vanilla(current) and not mods and project is None:
         checked(managed.manifest(game_root)).unlink(missing_ok=True)
     else:
         _save_manifest(game_root, {"version": 2, "sha256": _sha(current), "mods": list(mods),
-                                   "project": project, "pending": None}, managed)
+                                   "project": project, "inputs": inputs, "pending": None}, managed)
 
 
 def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
-           managed: Managed = EXECUTABLE, project=None) -> None:
+           managed: Managed = EXECUTABLE, project=None, *, inputs=None, before_write=None) -> None:
     """Journal one expected-image replacement; keep the original plus the latest intent."""
     game_root = checked(Path(game_root))
     live = checked(managed.live(game_root))
@@ -810,6 +833,8 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
     original = _original(game_root, before, old, managed)
     project = _project(project)
     desired = {"sha256": _sha(after), "mods": list(mods), "project": project}
+    if inputs is not None:
+        desired['inputs'] = inputs
     journal = {**_current_manifest(before, old, managed), "pending": desired}
     # Check the bound before creating a backup or replacing anything.
     if len(json.dumps(journal, allow_nan=False).encode("utf-8")) > MAX_MANIFEST - 1024:
@@ -828,7 +853,7 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
     # two complete, known images; neither an arbitrary hash nor a partial file
     # is accepted. Restore uses the same protocol.
     _save_manifest(game_root, journal, managed)
-    ensure_game_closed()
+    (before_write or ensure_game_closed)()
     if _read(live, managed) != before:
         raise TweakError(f"The {managed.label} changed before replacement")
     if after != before:
@@ -837,7 +862,7 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
         _put(game_root, live, after)
     if _read(live, managed) != after:
         raise TweakError(f"{managed.label.capitalize()} verification failed; the original and pending intent were kept")
-    _finish_manifest(game_root, after, mods, project, managed)
+    _finish_manifest(game_root, after, mods, project, managed, inputs=inputs)
 
 
 def _installed(game_root: Path, managed: Managed, action: str) -> tuple[bytes, dict]:
@@ -881,10 +906,11 @@ RUNTIME_DLL = "dinput8.dll"
 RUNTIME_PATCH = "lexeditor-ds1-patch.bin"
 RUNTIME_RECORD = "lexeditor-ds1-runtime.json"
 RUNTIME_LOG = "lexeditor-ds1-patch.log"
+RUNTIME_CONFIG = 'lexeditor-ds1.ini'
 LOADER_PACKAGE = Path(__file__).with_name("runtime") / "package"
 MAX_RUNTIME = 16 * 1024 * 1024
 # Any of these in the game folder means Lexeditor's tweaks are, or were, installed.
-OWNED_FILES = (MANIFEST_FILE, BACKUP_FILE, RUNTIME_RECORD, RUNTIME_PATCH)
+OWNED_FILES = (MANIFEST_FILE, BACKUP_FILE, RUNTIME_RECORD, RUNTIME_PATCH, RUNTIME_CONFIG)
 
 
 def loader_bytes(debug: bool = False, *, online: bool = False) -> bytes:
@@ -929,6 +955,10 @@ def _runtime(game_root: Path) -> dict:
         if built is not None and (type(built) is not dict or not all(
                 type(key) is str and _digest(value) for key, value in built.items())):
             raise TweakError("Lexeditor's loader record is damaged")
+        modules = record.get('modules', {})
+        if (type(modules) is not dict or len(modules) > 128
+                or any(type(path) is not str or not _digest(value) for path, value in modules.items())):
+            raise TweakError("Lexeditor's prebuilt mod record is damaged")
     patch = None
     if patch_path.exists():
         if not patch_path.is_file() or patch_path.stat().st_size > MAX_RUNTIME:
@@ -950,7 +980,7 @@ def _runtime_status(game_root: Path) -> dict:
         result["problem"] = (f"Another mod's {RUNTIME_DLL} replaced Lexeditor's loader, so the tweaks are not loaded. "
                              "Remove it, then Apply again.")
     log = checked(Path(game_root) / RUNTIME_LOG)
-    if log.is_file() and log.stat().st_size <= 4096:
+    if log.is_file() and log.stat().st_size <= 65536:
         result["loaderMessage"] = log.read_text(encoding="utf-8", errors="replace").strip()
     return result
 
@@ -988,6 +1018,18 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     record = runtime["record"]
     if record is None:
         return result
+    modules_changed = False
+    for path, expected in (record.get('modules') or {}).items():
+        try:
+            from .runtime_mods import read
+            target = Path(path)
+            if target.name != 'runtime.lxd' or target.parent.parent.resolve() != Path(root or mods_root()).resolve():
+                modules_changed = True
+                continue
+            if _sha(read(checked(Path(path)).parent)) != expected:
+                modules_changed = True
+        except (ValueError, OSError):
+            modules_changed = True
     try:
         rows = [row for row in tweak_rows(root) if row["enabled"]]
     except (ValueError, OSError):
@@ -1007,12 +1049,12 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     result["stale"] = sorted(stale)
     result["set"] = set(built) != {row["id"] for row in rows}
 
-    result["needed"] = bool(stale) or result["set"]
+    result["needed"] = bool(stale) or result["set"] or modules_changed
     return result
 
 
 def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project,
-                   built: dict | None = None) -> None:
+                   built: dict | None = None, *, library=None, modules=None) -> None:
     """Install, replace or remove the loader and its patch description.
 
     With the loader mod on, the loader goes in even with no tweak to apply."""
@@ -1026,6 +1068,7 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
         _remove(game_root, patch_path)
         _remove(game_root, record_path)
         _remove(game_root, checked(game_root / RUNTIME_LOG))
+        _remove(game_root, checked(game_root / RUNTIME_CONFIG))
         return
     if state["foreignDll"]:
         raise TweakError(f"Another mod's {RUNTIME_DLL} is in the game folder. Lexeditor's loader needs that name; "
@@ -1033,7 +1076,7 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     loader = loader_bytes(online=True)
     record = {"version": 1, "mods": list(mods), "project": _project(project),
               "patchSha256": _sha(patch), "dllSha256": _sha(loader),
-              "built": dict(built or {})}
+              "built": dict(built or {}), 'modules': dict(modules or {})}
     raw = (json.dumps(record, indent=2, allow_nan=False) + "\n").encode("utf-8")
     if len(raw) > MAX_MANIFEST or len(patch) > MAX_RUNTIME:
         raise TweakError("The combined tweaks are too large")
@@ -1042,7 +1085,18 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     if state["dll"] != _sha(loader):
         _put(game_root, dll_path, loader)
     _put(game_root, patch_path, patch)
+    configure_library(game_root, Path(library or mods_root()))
     _put(game_root, record_path, raw)
+
+
+def configure_library(game_root: Path, library: Path) -> None:
+    library = checked(Path(library)).absolute()
+    if any(character in str(library) for character in '\r\n'):
+        raise TweakError('The mod library path contains a line break')
+    import sys
+    engine = Path(__file__).resolve().parents[2]
+    contents = '[Mods]\nLibrary='+str(library)+'\n[Runtime]\nPython='+sys.executable+'\nEngine='+str(engine)+'\n'
+    _put(game_root, checked(game_root/RUNTIME_CONFIG), contents.encode('utf-16'))
 
 
 def _menu_cache_value(value):
@@ -1051,17 +1105,27 @@ def _menu_cache_value(value):
     raise TypeError(f'Unsupported menu cache value: {type(value).__name__}')
 
 
-def _compose_menu(original, specs, managed, cache_root):
+def _menu_identity(original, specs, managed):
+    from .mod_loader import _composition_revision
+    kind = 'layout' if managed == LAYOUT else ESD_ARCHIVE[managed]
+    return _sha(json.dumps([_composition_revision().hex(), kind, managed.relative, _sha(original), specs],
+                          sort_keys=True, separators=(',', ':'), default=_menu_cache_value).encode('utf-8'))
+
+
+def _compose_menu(original, specs, managed, cache_root, *, current=None, manifest=None):
     """Reuse unchanged layout/menu-script archives with the same bounded output cache."""
+    identity = _menu_identity(original, specs, managed)
+    # The journal already verifies which bytes are installed. Remember their
+    # recipe there, so eviction from the disposable archive cache cannot force
+    # an unchanged menu through decompression, composition and compression.
+    if current is not None and manifest is not None and _owned(current, manifest, managed):
+        if _current_manifest(current, manifest, managed).get('inputs') == identity:
+            return current
     key = None
     if cache_root is not None:
         from . import composition_cache
         try:
-            from .mod_loader import _composition_revision
-            kind = 'layout' if managed == LAYOUT else ESD_ARCHIVE[managed]
-            key = _sha(json.dumps([_composition_revision().hex(), kind, managed.relative, _sha(original), specs],
-                                  sort_keys=True, separators=(',', ':'), default=_menu_cache_value)
-                       .encode('utf-8')).encode('ascii')
+            key = identity.encode('ascii')
             cached = composition_cache.load(cache_root, key)
             if cached is not None:
                 return cached
@@ -1097,6 +1161,9 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
         built_in = _current_manifest(current, manifest)
         previous = {"mods": list(built_in["mods"]), "project": built_in.get("project"), "patch": None,
                     "debug": False, "built": {}}
+    config_path = checked(game_root/RUNTIME_CONFIG)
+    previous['config'] = config_path.read_bytes() if config_path.is_file() else None
+    previous['modules'] = dict((runtime.get('record') or {}).get('modules') or {})
     # A project contribution can depend on verified original instruction bytes.
     chosen = previous.get("project") if project is _KEEP_PROJECT else (
         project(original) if callable(project) else project)
@@ -1113,10 +1180,62 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
     loader = loader_mod_state(root)[1]
     specs = native + ([exe_patches.validate(chosen["spec"], "Project native rules")] if chosen else [])
     try:
-        patch = exe_patches.runtime_patch(original, specs)
+        # Validate the complete native set together. Ordinary mod code is
+        # linked independently at startup; only shared menu/project support
+        # remains in the loader-owned patch.
+        exe_patches._layout(original, specs)
+        patch = exe_patches.runtime_patch(original, [spec for spec in specs if not spec.get('folder')])
+        from . import runtime_mods
+        module_writes, module_hashes = [], {}
+        for row in tweak_rows(root):
+            if not row['enabled']:
+                continue
+            folder = checked(Path(row['path']))
+            target = checked(folder/runtime_mods.FILENAME)
+            if target.is_file() and target.stat().st_size > runtime_mods.MAX_SIZE:
+                raise TweakError(f"{row['name']}: prebuilt mod is too large", folders=[folder])
+            before = target.read_bytes() if target.is_file() else None
+            if row.get('prebuilt'):
+                if before is None:
+                    raise TweakError(f"{row['name']}: missing prebuilt mod", folders=[folder])
+                try:
+                    runtime_mods.inspect(before)
+                except exe_patches.PatchError as error:
+                    raise TweakError(f"{row['name']}: {error}", folders=[folder]) from error
+                after = before
+            else:
+                owned = [spec for spec in native if spec.get('folder') == row['path']]
+                from . import mod_loader
+                requires_data = bool(mod_loader.content_files(folder, row['name'])) or any(
+                    (folder/kind/f"{row['id']}.json").is_file() for kind in ('layout','esd',menu_dim.FOLDER))
+                after = runtime_mods.build(original, owned, requires_data=requires_data)
+                if before != after:
+                    module_writes.append({'path': str(target), 'before': before, 'after': after})
+            if after is not None:
+                module_hashes[str(target)] = _sha(after)
+        # Prebuilt mods have no source description to feed the old combined
+        # composer. Check their actual compiled claims together with sources.
+        claimed = []
+        writes = {item['path']: item['after'] for item in module_writes}
+        for row in tweak_rows(root):
+            if not row['enabled']:
+                continue
+            target = checked(Path(row['path'])/runtime_mods.FILENAME)
+            data = writes.get(str(target)) if str(target) in writes else (runtime_mods.read(target.parent) if target.is_file() else None)
+            if data is None:
+                continue
+            module = runtime_mods.inspect(data)
+            ranges = [(rva, rva+size) for kind, rva, size, _ in module['records']
+                      if kind == exe_patches.HOOK or kind == exe_patches.BLOCK and module['fixed']]
+            ranges += [(rva, rva+size) for rva, size in module['claims']]
+            for low, high in ranges:
+                for other_low, other_high, name in claimed:
+                    if low < other_high and other_low < high:
+                        raise TweakError(f"{row['name']} conflicts with {name} at {max(low,other_low):X}", folders=[row['path']])
+            claimed.extend((low, high, row['name']) for low, high in ranges)
     except exe_patches.PatchError as error:
         raise TweakError(str(error), folders=error.folders) from error
-    if patch is None and loader:
+    if patch is None and (loader or module_hashes):
         patch = b""
     files = []
     menu_timings = []
@@ -1129,10 +1248,12 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
         layout_current, layout_manifest = _installed(game_root, LAYOUT, "restore it before applying tweaks")
         layout_original = _original(game_root, layout_current, layout_manifest, LAYOUT)
         try:
-            layout_after = _compose_menu(layout_original, layout, LAYOUT, cache_root)
+            layout_after = _compose_menu(layout_original, layout, LAYOUT, cache_root,
+                                         current=layout_current, manifest=layout_manifest)
         except ValueError as error:
             raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
         files.append({"managed": LAYOUT, "before": layout_current, "after": layout_after,
+                      "inputs": _menu_identity(layout_original, layout, LAYOUT),
                       "mods": _changes(layout) if layout_after != layout_original else [], "project": None,
                       "previous": _current_manifest(layout_current, layout_manifest, LAYOUT)})
         menu_timings.append({'file': LAYOUT.relative, 'seconds': perf_counter() - menu_started})
@@ -1144,10 +1265,12 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
             esd_current, esd_manifest = _installed(game_root, managed, "restore it before applying tweaks")
             esd_original = _original(game_root, esd_current, esd_manifest, managed)
             try:
-                esd_after = _compose_menu(esd_original, targeted, managed, cache_root)
+                esd_after = _compose_menu(esd_original, targeted, managed, cache_root,
+                                          current=esd_current, manifest=esd_manifest)
             except ValueError as error:
                 raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
             files.append({"managed": managed, "before": esd_current, "after": esd_after,
+                          "inputs": _menu_identity(esd_original, targeted, managed),
                           "mods": _changes(targeted) if esd_after != esd_original else [], "project": None,
                           "previous": _current_manifest(esd_current, esd_manifest, managed)})
             menu_timings.append({'file': managed.relative, 'seconds': perf_counter() - menu_started})
@@ -1158,19 +1281,38 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
         # patch and its record, so later changes still ask for a rebuild.
         patch = b""
     return {"files": files, "executableSha256": _sha(current), 'scripts': script_timings, 'menus': menu_timings,
-            "runtime": {"patch": patch, "mods": _changes(native) if patch else [],
+            "runtime": {"patch": patch, "mods": _changes(native) + [row['name'] for row in tweak_rows(root) if row['enabled'] and row.get('prebuilt')],
                         "project": chosen if patch else None, "previous": previous,
-                        "built": built}}
+                        "built": built, 'library': str(Path(root or mods_root()).absolute()),
+                        'modules': module_hashes, 'moduleWrites': module_writes}}
 
 
-def _undo(game_root: Path, done: list[dict]) -> None:
+def _undo(game_root: Path, done: list[dict], *, before_write=None) -> None:
     """Put files already written back, newest first. Never undo a file changed since."""
     errors = []
     for item in reversed(done):
         try:
+            if item.get('module'):
+                path = checked(Path(item['path']))
+                current = path.read_bytes() if path.is_file() else None
+                if current == item['before']:
+                    continue
+                if current != item['after']:
+                    raise TweakError('The prebuilt mod changed during rollback')
+                if item['before'] is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    atomic_write(path, item['before'])
+                continue
             previous = item["previous"]
             if item.get("managed") is None:
-                _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"], previous.get("built"))
+                _write_runtime(game_root, previous["patch"], previous["mods"], previous["project"], previous.get("built"),
+                               modules=previous.get('modules'))
+                config = checked(game_root/RUNTIME_CONFIG)
+                if previous.get('config') is None:
+                    _remove(game_root, config)
+                else:
+                    _put(game_root, config, previous['config'])
             else:
                 managed = item['managed']
                 if managed == EXECUTABLE:
@@ -1183,7 +1325,7 @@ def _undo(game_root: Path, done: list[dict]) -> None:
                 if current != item['after']:
                     raise TweakError(f'The {managed.label} changed during rollback')
                 _write(game_root, item["after"], item["before"], previous.get("mods", []),
-                       managed, project=previous.get("project"))
+                       managed, project=previous.get("project"), inputs=previous.get('inputs'), before_write=before_write)
         except Exception as error:
             errors.append(str(error))
     if errors:
@@ -1201,12 +1343,23 @@ def commit(game_root: Path, plan: dict) -> None:
         for item in plan["files"]:
             done.append(item)
             _write(game_root, item["before"], item["after"], item["mods"], item["managed"],
-                   project=item["project"])
+                   project=item["project"], inputs=item.get('inputs'))
         runtime = plan["runtime"]
+        for item in runtime.get('moduleWrites', []):
+            done.append({**item, 'module': True})
+            path = checked(Path(item['path']))
+            current = path.read_bytes() if path.is_file() else None
+            if current != item['before']:
+                raise TweakError('A prebuilt mod changed while the build was being prepared')
+            if item['after'] is None:
+                path.unlink(missing_ok=True)
+            else:
+                atomic_write(path, item['after'])
         # Counted before it starts: a failure between its files must be taken
         # back too, not only a finished install.
         done.append({"managed": None, "previous": runtime["previous"]})
-        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], runtime.get("built"))
+        _write_runtime(game_root, runtime["patch"], runtime["mods"], runtime["project"], runtime.get("built"),
+                       library=runtime.get('library'), modules=runtime.get('modules'))
     except Exception as failure:
         try:
             _undo(game_root, done)
@@ -1217,7 +1370,8 @@ def commit(game_root: Path, plan: dict) -> None:
 
 def rollback(game_root: Path, plan: dict) -> None:
     runtime = plan["runtime"]
-    _undo(game_root, [*plan["files"], {"managed": None, "previous": runtime["previous"]}])
+    _undo(game_root, [*plan["files"], *[{**item, 'module': True} for item in runtime.get('moduleWrites', [])],
+                     {"managed": None, "previous": runtime["previous"]}])
 
 
 def apply(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT) -> dict:
