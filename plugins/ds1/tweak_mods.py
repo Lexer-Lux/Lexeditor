@@ -440,6 +440,8 @@ class BuildContext:
                     elif kind == 'module':
                         dependency = self._enabled.get(name)
                         self._remember('module', name, script_mods.source_fingerprint(dependency) if dependency else None)
+                    elif kind == 'file':
+                        self.game_file(name)
                     elif kind == 'params':
                         self.game_params()
                     else:
@@ -463,6 +465,37 @@ class BuildContext:
     def build_record(self, root, outputs):
         return {'source': self._building_source, 'compiler': _script_compiler_revision(),
                 'game': str(self.game_root), 'originals': self._originals(outputs), 'inputs': self._inputs}
+
+    def game_file(self, relative: str | Path) -> bytes:
+        """Verified pristine game bytes, with their hash recorded as a build input."""
+        from . import assets, deployment
+        path = Path(str(relative).replace("\\", "/"))
+        if (not isinstance(relative, (str, Path)) or not path.parts or path.is_absolute()
+                or path.drive or ".." in path.parts
+                or any(":" in part or "\0" in part or part.rstrip(" .") != part
+                       for part in path.parts)):
+            raise TweakError("A game file must name a safe relative path inside the installed game")
+        managed = next((item for item in (EXECUTABLE, LAYOUT, *ESD)
+                        if path == Path(item.relative)), None)
+        if managed is None and not assets.is_owned(path):
+            assets.check_relative(path)
+        if self.game_root is None:
+            raise TweakError("A game folder is required to read a pristine game file")
+        game_root = checked(self.game_root)
+        checked(game_root / path)
+        if managed is not None:
+            data = _original(game_root, _read(managed.live(game_root), managed),
+                             _manifest(game_root, managed), managed)
+        else:
+            checked(deployment._backup_path(game_root, path))
+            checked(deployment._marker_path(game_root, path))
+            source = checked(deployment.vanilla_source(game_root, path))
+            with source.open("rb") as stream:
+                data = stream.read(assets.MAX_ASSET_BYTES + 1)
+            if len(data) > assets.MAX_ASSET_BYTES:
+                raise TweakError("The pristine game file exceeds the supported asset size")
+        self._remember('file', path.as_posix(), _sha(data))
+        return data
 
     def game_params(self) -> bytes | None:
         """The game's GameParam.parambnd.dcx as this Apply deploys it: vanilla
