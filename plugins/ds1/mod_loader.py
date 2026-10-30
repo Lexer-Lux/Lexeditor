@@ -25,11 +25,10 @@ both apply. Two mods setting the same field of one placement conflict.
 A map a mod restructures (added or removed parts, or any byte outside
 the placement fields) is taken whole from the last mod instead.
 
-Character binders are merged by member: two mods changing different
-animation files in one binder both apply. Two mods changing the same
-member conflict. A resized member rebuilds the binder; a binder a mod
-restructures (added or removed members) is taken whole from the last
-mod instead.
+Character binders combine by member, with ESD state-machine and TAE animation
+records combined inside supported members. Independent animation-event edits
+and added animations both survive. Unsupported member changes conflict as
+whole members. Resized or added members rebuild the binder directory.
 """
 from __future__ import annotations
 
@@ -1048,16 +1047,6 @@ def _compose_maps(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path)
 
 # --- Characters ------------------------------------------------------------
 
-def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
-    touched = [name for name, _data in changed]
-    if len(touched) < 2:
-        return changed[-1][1], []
-    conflict = Conflict(relative, f"{relative.name} (whole {kind})")
-    for name in touched:
-        conflict.add(name)
-    return changed[-1][1], [conflict]
-
-
 def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) -> tuple[bytes, list[Conflict]]:
     """Compose loose character states by field, just like embedded scripts."""
     from . import esd_merge
@@ -1077,6 +1066,26 @@ def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) 
             conflict.add(name)
         conflicts.append(conflict)
     return (vanilla if combined == original else deflate(vanilla, combined)), conflicts
+
+
+def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
+    touched = [name for name, _data in changed]
+    if len(touched) < 2:
+        return changed[-1][1], []
+    conflict = Conflict(relative, f"{relative.name} (whole {kind})")
+    for name in touched:
+        conflict.add(name)
+    return changed[-1][1], [conflict]
+
+
+def _member_composer(member):
+    if member.lower().endswith('.esd'):
+        from .esd_merge import compose
+        return compose
+    if member.lower().endswith('.tae'):
+        from .tae_merge import compose
+        return compose
+    return None
 
 
 def _compose_emevd(vanilla, mods, relative, *, conflicts_only=False):
@@ -1162,21 +1171,21 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
     winners: dict[str, bytes] = {}
     owners: dict[str, str] = {}
     conflicts: dict[str, Conflict] = {}
-    combined_esd = {}
+    combined_records = {}
     for member, base in base_members.items():
-        if not member.lower().endswith('.esd'):
+        composer = _member_composer(member)
+        if composer is None:
             continue
         original = bytes(base_plain[base.offset:base.offset + base.size])
         variants = [(name, bytes(plain[owned[member].offset:owned[member].offset + owned[member].size]))
                     for name, plain, owned in plains]
         if len({data for _, data in variants if data != original}) < 2:
             continue
-        from . import esd_merge
         try:
-            combined, collisions = esd_merge.compose(original, variants)
+            combined, collisions = composer(original, variants)
         except FormatError:
-            continue  # Unknown ESD layouts keep the existing member conflict.
-        combined_esd[member] = combined
+            continue  # Unsupported record layouts retain the member conflict.
+        combined_records[member] = combined
         for part, names in collisions:
             key = f'{member}/{part}'
             conflict = conflicts.setdefault(key, Conflict(relative, key))
@@ -1184,7 +1193,7 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
                 conflict.add(name)
     for name, plain, owned in plains:
         for member, entry in owned.items():
-            if member in combined_esd:
+            if member in combined_records:
                 continue
             base = base_members[member]
             theirs = bytes(plain[entry.offset:entry.offset + entry.size])
@@ -1196,7 +1205,7 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
                 entry_conflict.add(name)
             winners[member] = theirs
             owners[member] = name
-    winners.update(combined_esd)
+    winners.update(combined_records)
     if conflicts_only:
         return vanilla, list(conflicts.values())
     items = {member: bytes(base_plain[entry.offset:entry.offset + entry.size])
@@ -1244,10 +1253,11 @@ def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind
                 result.pop(member, None)
             else:
                 result[member] = theirs
-    # Directory additions do not prevent the existing ESD composer from
-    # combining independent state-machine edits to a retained member.
+    # Directory additions still allow independent state-machine or animation
+    # edits to a retained member to combine through its record composer.
     for member, original in base.items():
-        if not member.lower().endswith('.esd') or any(member not in variant for _, variant in variants):
+        composer = _member_composer(member)
+        if composer is None or any(member not in variant for _, variant in variants):
             continue
         edits = [(name, variant[member]) for name, variant in variants]
         if len({entry.data for _name, entry in edits if entry.data != original.data}) < 2:
@@ -1255,9 +1265,8 @@ def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind
         if any((entry.member_id, entry.name, entry.flags) !=
                (original.member_id, original.name, original.flags) for _, entry in edits):
             continue
-        from . import esd_merge
         try:
-            combined, collisions = esd_merge.compose(original.data, [(name, entry.data) for name, entry in edits])
+            combined, collisions = composer(original.data, [(name, entry.data) for name, entry in edits])
         except FormatError:
             continue
         result[member] = replace(original, data=combined)
@@ -1267,9 +1276,9 @@ def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind
             collision = conflicts.setdefault(part_key, Conflict(relative, part_key))
             for name in names:
                 collision.add(name)
-    entries = [result[key(e)] for e in base_entries if key(e) in result]
-    entries += sorted((e for name, e in result.items() if name not in base),
-                      key=lambda e: (e.member_id, e.name))
+    # Animation binders keep their high-ID skeleton/compendium entries last.
+    # Appending new clips after those entries crashes the native loader.
+    entries = sorted(result.values(), key=lambda e: (e.member_id, e.name))
     if len({e.member_id for e in entries}) != len(entries):
         return _whole_anibnd(changed, relative, kind)
     if conflicts_only:
