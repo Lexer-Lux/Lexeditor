@@ -3796,8 +3796,8 @@ function refreshMapSide(){
 }
 const DIRECTORY_PARAM_TABS=new Set(["drops","treasure"]);
 const DIRECTORY_TABS=["all","drops","treasure","npcs","enemies"];
-const isDirectoryFoe=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.npcType!==2;
-const isDirectoryFriend=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.npcType===2;
+const isDirectoryFoe=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&!row.values.isNpc;
+const isDirectoryFriend=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.isNpc;
 let dirTabRestored=false;
 async function loadDirectory(){
   if(!dirTabRestored){dirTabRestored=true;try{const saved=localStorage.getItem("lex-ds1-directory-tab");if(saved)state.dirTab=saved;}catch(_error){}}

@@ -11,6 +11,7 @@ from . import deployment
 from .formats import FormatError
 from .msb import ENEMY_TYPES, MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError, PLAYER_TYPE
 from .store import MARKER, digest
+from .shops import is_merchant
 
 
 # A map file carries the areas numbered for it: mAA_BB_*.msb owns the
@@ -26,6 +27,10 @@ EVENT_PARAM_LINKS = {
     'activationItem': ('goods', 'EquipParamGoods'),
     'activationParam': ('catalog', 'ObjActParam'),
 }
+
+
+def _is_npc(npc, types):
+    return types.get(npc) == 2 or is_merchant(npc)
 
 
 def parse_key(key):
@@ -406,8 +411,8 @@ class MapStore:
     def map_counts(self):
         """Per-map NPC, enemy and drop counts for the Maps list.
 
-        A placed Enemy of npcType 2 is an NPC; every other placed Enemy
-        is an enemy, mirroring the directory's own predicates. Drops
+        Friendly characters and known merchants are NPCs, matching the
+        directory and the character editor. Other placed enemies are foes. Drops
         count the lots whose dropping NPCs stand in the map. Unreadable
         maps report zeros rather than hiding the readable ones.
         """
@@ -426,7 +431,7 @@ class MapStore:
             for placement in placements:
                 if placement.get('kind') not in ('Enemy', 'Dummy enemy'):
                     continue
-                if types.get(placement.get('npc')) == 2:
+                if _is_npc(placement.get('npc'), types):
                     npcs += 1
                 else:
                     enemies += 1
@@ -499,6 +504,7 @@ class MapStore:
                   "rotX": placement["rot"][0], "rotY": placement["rot"][1], "rotZ": placement["rot"][2],
                   "scaleX": placement["scale"][0], "scaleY": placement["scale"][1], "scaleZ": placement["scale"][2],
                   "npcId": npc, "npcType": types.get(npc) if npc is not None else None,
+                  'isNpc':_is_npc(npc,types),
                   "who": who,
                   "mapNames": [self.display_name(map_name)]}
         display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
