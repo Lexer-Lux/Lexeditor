@@ -133,6 +133,11 @@ class CollisionDocument:
                                                or i > maximum for i in face[:3]):
                     raise FormatError('Collision face points outside its supported vertex range')
                 new_faces.append(list(face[:3]) + [old['faces'][previous][3]])
+            tags = update.get('face_tags', [face[3] for face in new_faces])
+            if len(tags) != len(new_faces) or any(type(value) is not int or not 0 <= value <= maximum for value in tags):
+                raise FormatError('Collision face metadata is invalid')
+            for face, tag in zip(new_faces, tags):
+                face[3] = tag
             vertex_payload = b''.join(struct.pack('<4f', *vertex) for vertex in new_vertices)
             index_payload = b''.join(struct.pack('<4' + {1: 'B', 2: 'H', 4: 'I'}[width], *face)
                                      for face in new_faces)
@@ -143,9 +148,13 @@ class CollisionDocument:
             flags = parameter['vertexDataBuffer']
             if type(stride) is not int or not 1 <= stride <= 256 or len(flags) != len(old['vertices'])*stride:
                 raise FormatError('Collision vertex metadata has an unsupported stride')
-            self._array(material, 'vertexDataBuffer', bytes(
-                value for source in vertex_sources for value in flags[source*stride:(source+1)*stride]),
-                len(vertex_sources)*stride)
+            flag_rows = update.get('vertex_flags', [flags[source*stride:(source+1)*stride]
+                                                    for source in vertex_sources])
+            if (len(flag_rows) != len(new_vertices) or any(len(row) != stride or any(
+                    type(value) is not int or not 0 <= value <= 255 for value in row) for row in flag_rows)):
+                raise FormatError('Collision vertex metadata is invalid')
+            self._array(material, 'vertexDataBuffer', bytes(value for row in flag_rows for value in row),
+                        len(vertex_sources)*stride)
             if parameter.get('primitiveDataBuffer') and len(new_faces) != len(old['faces']):
                 raise FormatError('This collision has primitive metadata that cannot yet be resized')
             values = self._value(storage)

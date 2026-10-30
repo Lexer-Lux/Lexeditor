@@ -170,7 +170,7 @@ def test_malformed_composition_cache_is_a_miss(tmp_path, monkeypatch, payload):
     monkeypatch.setattr(mod_loader, '_compose_cache', {})
     monkeypatch.setattr(composition_cache, 'load', lambda *args: payload)
     monkeypatch.setattr(composition_cache, 'store', lambda *args: None)
-    result = mod_loader._compose_file(relative, None, [mod], False, tmp_path)
+    result = mod_loader._compose_files({relative: None}, [mod], False, tmp_path)
     assert result.files[relative] == b'new'
 
 
@@ -181,7 +181,7 @@ def test_cache_write_failure_does_not_fail_composition(tmp_path, monkeypatch):
     def fail(*args):
         raise TypeError('bad cache')
     monkeypatch.setattr(composition_cache, 'store', fail)
-    result = mod_loader._compose_file(relative, None, [mod_loader.Mod('Healthy', tmp_path, {relative: b'new'})], False, tmp_path)
+    result = mod_loader._compose_files({relative: None}, [mod_loader.Mod('Healthy', tmp_path, {relative: b'new'})], False, tmp_path)
     assert result.files[relative] == b'new'
 
 
@@ -189,9 +189,9 @@ def test_valid_cached_conflict_report_keeps_peer_names(tmp_path, monkeypatch):
     from collections import OrderedDict
     relative = Path('opaque.bin')
     monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
-    payload = json.dumps({'hasData': True, 'conflicts': [[str(relative), 'field', ['A', 'B']]]}).encode() + b'\nnew'
+    payload = json.dumps({'files': [[str(relative), 3]], 'conflicts': [[str(relative), 'field', ['A', 'B']]]}).encode() + b'\nnew'
     monkeypatch.setattr(composition_cache, 'load', lambda *args: payload)
-    result = mod_loader._compose_file(relative, None,
+    result = mod_loader._compose_files({relative: None},
         [mod_loader.Mod('A', tmp_path, {relative: b'input'})], False, tmp_path)
     assert result.files[relative] == b'new'
     assert result.conflicts[0].mods == ['A', 'B']

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from plugins.ds1 import collision_mopp, hkx, hkx_write
+from plugins.ds1 import collision_archive, collision_merge, collision_mopp, hkx, hkx_write
 from plugins.ds1.collision_write import CollisionDocument
 from plugins.ds1.formats import FormatError
 
@@ -340,3 +340,173 @@ def test_missing_subpart_is_a_format_error(collision_source):
     struct.pack_into('<i', data, document.entries[index]['pos']+8, 0)
     with pytest.raises(FormatError, match='missing mesh subpart'):
         CollisionDocument(data)
+
+
+def test_same_mesh_independent_coordinates_and_metadata_combine(collision_source):
+    document = CollisionDocument(collision_source)
+    a = document.export({0: {'vertices': [[2,0,0], [1,0,0], [0,0,1]]}})
+    b = document.export({0: {'vertices': [[0,3,0], [1,0,0], [0,0,1]],
+                             'vertex_flags': [[99], [18], [19]], 'face_tags': [777]}})
+    output, conflicts = collision_merge.merge(collision_source, [('A', a), ('B', b)])
+    merged = CollisionDocument(output)
+    assert not conflicts
+    assert merged.meshes[0]['vertices'][0] == [2,3,0,0]
+    assert merged.meshes[0]['faces'][0][3] == 777
+    assert merged._value(merged.materials[0])['vertexDataBuffer'] == [99,18,19]
+    assert merged.meshes[1] == document.meshes[1]
+
+
+def test_collision_conflicts_report_exact_owners_and_use_load_order(collision_source):
+    document = CollisionDocument(collision_source)
+    a = document.export({0: {'vertices': [[2,0,0], [1,0,0], [0,0,1]]}})
+    b = document.export({0: {'vertices': [[3,0,0], [1,0,0], [0,0,1]]}})
+    output, conflicts = collision_merge.merge(collision_source, [('A', a), ('B', b)])
+    assert conflicts == [('Collision mesh 1, vertices 0:0', ['A', 'B'])]
+    assert CollisionDocument(output).meshes[0]['vertices'][0][0] == 3
+    added = document.export({0: {'faces': [[0,1,2], [0,1,2]], 'face_sources': [0,0]}})
+    output, conflicts = collision_merge.merge(collision_source, [('A', a), ('Add', added)])
+    assert conflicts == [('Collision mesh 1', ['A', 'Add'])]
+    assert len(CollisionDocument(output).meshes[0]['faces']) == 2
+
+
+def split_fixture(source):
+    header = bytearray(b'BHF307D7R6\0\0\x74\0\0\0' + struct.pack('<4I', 2,0,0,0) + bytes(48))
+    body = bytearray(b'BDF307D7R6\0\0' + bytes(4))
+    for index in range(2):
+        body += bytes((-len(body)) % 16)
+        offset = len(body)
+        body += source
+        path_at = len(header)
+        header += f'map/h000{index}a10.hkx'.encode() + b'\0'
+        struct.pack_into('<6I', header, 32+index*24, 64,len(source),offset,index,path_at,len(source))
+    return bytes(header), bytes(body)
+
+
+def test_split_collision_members_compose_without_overwriting_each_other(collision_source):
+    header, body = split_fixture(collision_source)
+    archive = collision_archive.CollisionArchive(header, body)
+    a = CollisionDocument(collision_source).export({0: {'vertices': [[2,0,0], [1,0,0], [0,0,1]]}})
+    b = CollisionDocument(collision_source).export({0: {'vertices': [[0,3,0], [1,0,0], [0,0,1]]}})
+    first = archive.replace({'h0000a10': a})
+    second = archive.replace({'h0001a10': b})
+    output_header, output_body, conflicts = collision_archive.compose(header, body, [('A', *first), ('B', *second)])
+    combined = collision_archive.CollisionArchive(output_header, output_body)
+    assert not conflicts
+    assert CollisionDocument(combined.member('h0000a10')).meshes[0]['vertices'][0][0] == 2
+    assert CollisionDocument(combined.member('h0001a10')).meshes[0]['vertices'][0][1] == 3
+    assert [(key, row['name'], row['id']) for key, row in combined.members.items()] == [
+        (key, row['name'], row['id']) for key, row in archive.members.items()]
+    assert combined.replace({}) == (output_header, output_body)
+
+
+def test_split_collision_bad_bounds_and_missing_members_fail_locally(collision_source):
+    header, body = split_fixture(collision_source)
+    damaged = bytearray(header)
+    struct.pack_into('<I', damaged, 40, len(body)+100)
+    with pytest.raises(FormatError, match='bounds'):
+        collision_archive.CollisionArchive(damaged, body)
+    archive = collision_archive.CollisionArchive(header, body)
+    with pytest.raises(FormatError, match='Unknown'):
+        archive.replace({'h_missing': collision_source})
+    assert archive.replace({}) == (header, body)
+
+
+def test_collision_pair_targets_are_canonical():
+    header = Path('map/m10_00_00_00/h10_00_00_00.hkxbhd')
+    body = header.with_suffix('.hkxbdt')
+    assert collision_archive.pair(header) == (header, body)
+    assert collision_archive.pair(body) == (header, body)
+    assert collision_archive.header_for(Path('map/m10_00_00_00/h11_00_00_00.hkxbhd')) is None
+
+
+def test_conflict_inspection_never_rebuilds_collision_physics(collision_source, monkeypatch, tmp_path):
+    from plugins.ds1 import mod_loader
+    header = Path('map/m10_00_00_00/h10_00_00_00.hkxbhd')
+    body = header.with_suffix('.hkxbdt')
+    raw_header, raw_body = split_fixture(collision_source)
+    archive = collision_archive.CollisionArchive(raw_header, raw_body)
+    variants = []
+    for name, value in (('A', 2), ('B', 3)):
+        changed = CollisionDocument(collision_source).export({0: {'vertices': [[value,0,0], [1,0,0], [0,0,1]]}})
+        other_header, other_body = archive.replace({'h0000a10':changed})
+        variants.append(mod_loader.Mod(name, tmp_path/name, {header:other_header, body:other_body}))
+
+    def no_export(*args, **kwargs):
+        raise AssertionError('Inspecting conflicts must not compile physics')
+
+    monkeypatch.setattr(CollisionDocument, 'export', no_export)
+    result = mod_loader.compose({header:raw_header, body:raw_body}, variants, conflicts_only=True)
+    assert not result.files
+    assert result.conflicts[0].mods == ['A', 'B']
+
+
+def test_installed_collision_pair_uses_shared_memory_and_disk_cache(collision_source, tmp_path, monkeypatch):
+    from collections import OrderedDict
+    from plugins.ds1 import mod_loader
+    header = Path('map/m10_00_00_00/h10_00_00_00.hkxbhd')
+    body = header.with_suffix('.hkxbdt')
+    original_header, original_body = split_fixture(collision_source)
+    game = tmp_path/'game'
+    (game/header).parent.mkdir(parents=True)
+    (game/header).write_bytes(original_header)
+    (game/body).write_bytes(original_body)
+    archive = collision_archive.CollisionArchive(original_header, original_body)
+    changed = CollisionDocument(collision_source).export({0: {'vertices': [[2,0,0], [1,0,0], [0,0,1]]}})
+    new_header, new_body = archive.replace({'h0000a10': changed})
+    mod = mod_loader.Mod('Collision', tmp_path/'mod', {header:new_header, body:new_body})
+    monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
+    monkeypatch.setattr(mod_loader, '_compose_cache_bytes', 0)
+    first = mod_loader.compose_installed(game, [mod], cache_root=tmp_path/'cache')
+    assert header in first.files and body in first.files
+    expected = dict(first.files)
+
+    def no_rebuild(*args, **kwargs):
+        raise AssertionError('Unchanged collision pair must reuse its composed output')
+
+    monkeypatch.setattr(collision_archive, 'compose', no_rebuild)
+    assert mod_loader.compose_installed(game, [mod], cache_root=tmp_path/'cache').files == expected
+    mod_loader._compose_cache.clear()
+    assert mod_loader.compose_installed(game, [mod], cache_root=tmp_path/'cache').files == expected
+    assert (game/header).read_bytes() == original_header
+    assert (game/body).read_bytes() == original_body
+
+
+def test_one_broken_collision_owner_does_not_implicate_healthy_mod(collision_source, tmp_path):
+    from core.mod_builds import ModBuildError
+    from plugins.ds1 import mod_loader
+    header = Path('map/m10_00_00_00/h10_00_00_00.hkxbhd')
+    body = header.with_suffix('.hkxbdt')
+    raw_header, raw_body = split_fixture(collision_source)
+    game = tmp_path/'game'
+    (game/header).parent.mkdir(parents=True)
+    (game/header).write_bytes(raw_header)
+    (game/body).write_bytes(raw_body)
+    healthy = mod_loader.Mod('Healthy', tmp_path/'healthy', {header:raw_header, body:raw_body})
+    broken = mod_loader.Mod('Broken', tmp_path/'broken', {header:b'bad header', body:raw_body})
+    with pytest.raises(ModBuildError) as caught:
+        mod_loader.compose_installed(game, [healthy, broken])
+    assert caught.value.folders == (broken.folder,)
+    assert not mod_loader.compose_installed(game, [healthy]).files
+    assert (game/header).read_bytes() == raw_header
+    assert (game/body).read_bytes() == raw_body
+
+
+@pytest.mark.parametrize('files', [
+    [['opaque.bin', -1]], [['opaque.bin', 999]], [['elsewhere.bin', 3]],
+    [['opaque.bin', 1], ['opaque.bin', 2]], [['opaque.bin', True]],
+])
+def test_bad_group_cache_file_table_is_disposable(tmp_path, monkeypatch, files):
+    from collections import OrderedDict
+    from plugins.ds1 import composition_cache, mod_loader
+    relative = Path('opaque.bin')
+    monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
+    monkeypatch.setattr(mod_loader, '_compose_cache_bytes', 0)
+    monkeypatch.setattr(composition_cache, 'load', lambda *_: json_bytes(files))
+    monkeypatch.setattr(composition_cache, 'store', lambda *_: None)
+    mod = mod_loader.Mod('Healthy', tmp_path, {relative:b'fresh'})
+    assert mod_loader._compose_files({relative:None}, [mod], False, tmp_path).files == {relative:b'fresh'}
+
+
+def json_bytes(files):
+    import json
+    return json.dumps({'files':files, 'conflicts':[]}).encode() + b'\ncached'

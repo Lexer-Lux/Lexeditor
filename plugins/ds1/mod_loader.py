@@ -44,7 +44,7 @@ import zlib
 
 from plugins.ds3.formats import DS3FormatError, ParamView
 
-from . import assets, texts, emevd, composition_cache
+from . import assets, texts, emevd, composition_cache, collision_archive
 from .formats import FormatError, MAX_ARCHIVE, TABLES, deflate, inflate, members, pack, schema
 from .msb import MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError
 from .store import MARKER, RELATIVE
@@ -263,14 +263,22 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
     """Load every mod's original assets before composing the enabled set."""
     if menu_files is not None and conflicts_only:
         raise ValueError('Conflict-only composition cannot mutate a deployment plan')
-    paths = frozenset(name for mod in mods for name in (mod.files.keys()|mod.edits.keys()))
+    paths = frozenset(target for mod in mods for name in (mod.files.keys()|mod.edits.keys())
+                      for target in collision_archive.pair(name))
     originals = vanilla_files(game_root, paths)
     files, conflicts = {}, []
+    processed = set()
     for relative in sorted(paths):
+        group = collision_archive.pair(relative)
+        if relative in processed:
+            continue
+        processed.update(group)
+        relative = group[0]
+        baseline = {target: originals.get(target) for target in group}
         selected = [Mod(mod.name,mod.folder,
-                        {relative:mod.files[relative]} if relative in mod.files else {},
-                        {relative:mod.edits[relative]} if relative in mod.edits else {})
-                    for mod in mods if relative in mod.files or relative in mod.edits]
+                        {target:mod.files[target] for target in group if target in mod.files},
+                        {target:mod.edits[target] for target in group if target in mod.edits})
+                    for mod in mods if any(target in mod.files or target in mod.edits for target in group)]
         from . import tweak_mods
         managed = tweak_mods.managed_menu(relative) if menu_files is not None else None
         planned = next((item for item in menu_files if item['managed'] == managed), None) if managed else None
@@ -280,21 +288,21 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
             selected.insert(0, Mod(declaration_label, Path(game_root),
                                    {relative: planned['after']}))
         try:
-            result = _compose_file(relative, originals.get(relative), selected, conflicts_only, cache_root)
+            result = _compose_files(baseline, selected, conflicts_only, cache_root)
         except Exception as error:
             from core.mod_builds import ModBuildError
             if isinstance(error, ModBuildError):
                 raise
-            original = originals.get(relative)
+            present = {target: payload for target, payload in baseline.items() if payload is not None}
             # Diagnose only on failure. A broken original or composer remains
             # an operation error; it must not switch off an innocent mod.
-            if original is not None:
-                compose({relative: original}, [Mod('Vanilla', Path(game_root), {relative: original})],
+            if present:
+                compose(present, [Mod('Vanilla', Path(game_root), present)],
                         conflicts_only=True)
             failed = []
             for mod in selected:
                 try:
-                    compose({relative: original} if original is not None else {}, [mod], conflicts_only=True)
+                    compose(present, [mod], conflicts_only=True)
                 except Exception:
                     failed.append(mod.folder)
             if failed:
@@ -372,37 +380,46 @@ def _composition_revision():
     return digest.digest()
 
 
-def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
+def _compose_files(originals, mods, conflicts_only, cache_root=None):
     """Reuse unchanged archive outputs without retaining their input buffers.
 
     Bytes, names and load order determine the result. Hash actual contents so
     external edits are detected even when a file's timestamp is unchanged.
     """
     global _compose_cache_bytes
+    relatives = tuple(sorted(originals))
     digest = sha256()
     def chunk(blob):
         digest.update(len(blob).to_bytes(8,'little'))
         digest.update(blob)
-    chunk(bytes([original is not None]))
-    chunk(original or b'')
+    for relative in relatives:
+        original = originals[relative]
+        chunk(relative.as_posix().encode('utf-8'))
+        chunk(bytes([original is not None]))
+        chunk(original or b'')
     for mod in mods:
         chunk(mod.name.encode('utf-8'))
-        if relative in mod.edits:
-            if relative in mod.files:
-                from core.mod_builds import ModBuildError
-                raise ModBuildError([mod.folder],f'{mod.name}: duplicate archive and record contributions')
-            try:
-                encoded = json.dumps(mod.edits[relative],sort_keys=True,
-                                     separators=(',',':'),allow_nan=False).encode('utf-8')
-            except (ValueError,TypeError,RecursionError) as error:
-                from core.mod_builds import ModBuildError
-                raise ModBuildError([mod.folder],f'{mod.name}: invalid portable records ({error})') from error
-            chunk(b'portable-records')
-            chunk(encoded)
-            del encoded
-        else:
-            chunk(mod.files[relative])
-    key = (relative, conflicts_only, digest.digest())
+        for relative in relatives:
+            chunk(relative.as_posix().encode('utf-8'))
+            if relative in mod.edits:
+                if relative in mod.files:
+                    from core.mod_builds import ModBuildError
+                    raise ModBuildError([mod.folder],f'{mod.name}: duplicate archive and record contributions')
+                try:
+                    encoded = json.dumps(mod.edits[relative],sort_keys=True,
+                                         separators=(',',':'),allow_nan=False).encode('utf-8')
+                except (ValueError,TypeError,RecursionError) as error:
+                    from core.mod_builds import ModBuildError
+                    raise ModBuildError([mod.folder],f'{mod.name}: invalid portable records ({error})') from error
+                chunk(b'portable-records')
+                chunk(encoded)
+                del encoded
+            elif relative in mod.files:
+                chunk(b'archive')
+                chunk(mod.files[relative])
+            else:
+                chunk(b'absent')
+    key = (relatives, conflicts_only, digest.digest())
     with _compose_cache_lock:
         cached = _compose_cache.get(key)
         if cached is not None:
@@ -411,46 +428,58 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
     disk_key = None
     if cached is None and cache_root is not None and not conflicts_only:
         try:
-            disk_key = sha256(_composition_revision() + relative.as_posix().encode('utf-8') + digest.digest()).digest()
+            disk_key = sha256(_composition_revision() + digest.digest()).digest()
             payload = composition_cache.load(cache_root, disk_key)
             if payload is not None:
                 header, data = payload.split(b'\n', 1)
                 metadata = json.loads(header)
-                if (not isinstance(metadata, dict) or type(metadata.get('hasData')) is not bool
+                if (not isinstance(metadata, dict) or not isinstance(metadata.get('files'), list)
                         or not isinstance(metadata.get('conflicts'), list)):
                     raise ValueError('Invalid composition cache header')
+                restored, at = {}, 0
+                for row in metadata['files']:
+                    if (not isinstance(row, list) or len(row) != 2 or type(row[0]) is not str
+                            or type(row[1]) is not int or row[1] < 0 or row[1] > len(data)-at
+                            or Path(row[0]) not in relatives or Path(row[0]) in restored):
+                        raise ValueError('Invalid composition cache files')
+                    restored[Path(row[0])] = data[at:at+row[1]]
+                    at += row[1]
+                if at != len(data):
+                    raise ValueError('Invalid composition cache payload length')
                 for row in metadata['conflicts']:
-                    if (not isinstance(row, list) or len(row) != 3 or row[0] != str(relative)
+                    if (not isinstance(row, list) or len(row) != 3 or type(row[0]) is not str
+                            or Path(row[0]) not in relatives
                             or not isinstance(row[1], str) or not isinstance(row[2], list)
                             or any(not isinstance(name, str) for name in row[2])):
                         raise ValueError('Invalid composition cache conflict')
                 rows = tuple((Path(path), part, tuple(names)) for path, part, names in metadata['conflicts'])
-                cached = (data if metadata['hasData'] else None, rows, len(payload))
+                cached = (restored, rows, len(payload))
         except Exception:
             pass
     if cached is None:
-        originals = {relative:original} if original is not None else {}
-        prepared = [materialize_mod(mod,originals) if mod.edits else mod for mod in mods]
+        present = {relative: original for relative, original in originals.items() if original is not None}
+        prepared = [materialize_mod(mod,present) if mod.edits else mod for mod in mods]
         from . import tweak_mods
-        managed = tweak_mods.managed_menu(relative)
-        if managed is not None:
-            from core.mod_builds import ModBuildError
-            for mod in prepared:
-                payload = mod.files[relative]
-                if len(payload) > managed.limit or not tweak_mods._menu_baseline(payload, managed):
-                    raise ModBuildError([mod.folder], f'{mod.name}: invalid {managed.label}')
-        result = compose(originals, prepared,
+        for relative in relatives:
+            managed = tweak_mods.managed_menu(relative)
+            if managed is not None:
+                from core.mod_builds import ModBuildError
+                for mod in prepared:
+                    payload = mod.files[relative]
+                    if len(payload) > managed.limit or not tweak_mods._menu_baseline(payload, managed):
+                        raise ModBuildError([mod.folder], f'{mod.name}: invalid {managed.label}')
+        result = compose(present, prepared,
                          conflicts_only=conflicts_only)
-        data = result.files.get(relative)
+        data = result.files
         rows = tuple((c.file, c.part, tuple(c.mods)) for c in result.conflicts)
-        size = len(data or b'') + sum(len(part.encode('utf-8')) +
+        size = sum(len(payload) for payload in data.values()) + sum(len(part.encode('utf-8')) +
                sum(len(name.encode('utf-8')) for name in names) for _, part, names in rows)
         cached = (data, rows, size)
         if disk_key is not None:
             try:
-                metadata = {'hasData': data is not None,
+                metadata = {'files': [(str(path), len(payload)) for path, payload in data.items()],
                             'conflicts': [(str(path), part, names) for path, part, names in rows]}
-                payload = json.dumps(metadata).encode('utf-8') + b'\n' + (data or b'')
+                payload = json.dumps(metadata).encode('utf-8') + b'\n' + b''.join(data.values())
                 composition_cache.store(cache_root, disk_key, payload)
             except Exception:
                 pass
@@ -465,7 +494,7 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
                 _, evicted = _compose_cache.popitem(last=False)
                 _compose_cache_bytes -= evicted[2]
     data, rows, _ = cached
-    return Composition({relative: data} if data is not None else {},
+    return Composition(dict(data),
                        [Conflict(path, part, list(names)) for path, part, names in rows])
 
 
@@ -493,6 +522,8 @@ def _is_asset(relative: Path) -> bool:
         return False
     if relative.suffix == ".msb" and relative.parent == MAP_DIR:
         return False
+    if collision_archive.header_for(relative) is not None:
+        return False
     from . import assets
     return not assets.is_character_file(relative)
 
@@ -504,6 +535,26 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool
     lowest first. Only files that end up different from vanilla are returned.
     """
     files, conflicts = {}, []
+    headers = {collision_archive.header_for(relative)
+               for relative in list(vanilla) + [path for mod in mods for path in mod.files]}
+    for header in sorted(path for path in headers if path is not None):
+        pair = collision_archive.pair(header)
+        if any(relative not in vanilla for relative in pair):
+            raise ValueError(f'{header}: the installed split collision pair is missing')
+        variants = []
+        for mod in mods:
+            if not any(relative in mod.files for relative in pair):
+                continue
+            if not all(relative in mod.files for relative in pair):
+                raise ValueError(f'{mod.name}: split collision contributions need both header and data')
+            variants.append((mod.name, *(mod.files[relative] for relative in pair)))
+        output_header, output_body, collisions = collision_archive.compose(
+            *(vanilla[relative] for relative in pair), variants, conflicts_only=conflicts_only)
+        conflicts.extend(Conflict(header, part, owners) for part, owners in collisions)
+        if not conflicts_only:
+            for relative, payload in zip(pair, (output_header, output_body)):
+                if payload != vanilla[relative]:
+                    files[relative] = payload
     if RELATIVE in vanilla:
         result = _compose_params(vanilla[RELATIVE], [(mod.name, mod.files[RELATIVE])
                                                      for mod in mods if RELATIVE in mod.files], conflicts_only=conflicts_only)
