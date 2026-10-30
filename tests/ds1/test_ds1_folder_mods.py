@@ -128,10 +128,11 @@ def test_runtime_writes_require_a_live_pre_entry_window(monkeypatch):
 
 
 
-def test_export_contains_a_prebuilt_mod_without_developer_files(vanilla, tmp_path):
+@pytest.mark.parametrize('encoding',['utf-8','utf-8-sig'])
+def test_export_contains_a_prebuilt_mod_without_developer_files(vanilla, tmp_path, encoding):
     source = tmp_path/'source'
     (source/'native').mkdir(parents=True)
-    (source/'mod.json').write_text(json.dumps({'id':'example','name':'Example','enabled':False}))
+    (source/'mod.json').write_text(json.dumps({'id':'example','name':'Example','enabled':False}),encoding=encoding)
     raw = {'version':1,'hooks':[{'rva':HOOK_A,'original':'e800000000','bytes':'9090909090'}]}
     (source/'native/example.json').write_text(json.dumps(raw))
     (source/'native/second-component.json').write_text(json.dumps({'version':1,

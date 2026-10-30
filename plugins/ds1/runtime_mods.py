@@ -177,7 +177,7 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
     from . import assets, menu_dim, mod_loader, tweak_mods, record_edits, native_support, native_rules
     folder, destination = Path(folder), Path(destination)
     tweak_mods.checked(folder)
-    metadata = json.loads((folder/'mod.json').read_text(encoding='utf-8'))
+    metadata = mod_metadata._stored(folder)
     scripted = script_mods.is_script_mod(folder)
     if scripted:
         manifest = script_mods._read_json(folder/script_mods.MANIFEST_FILE) or {}

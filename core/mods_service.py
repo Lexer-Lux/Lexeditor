@@ -141,7 +141,7 @@ def _claims_bundle(folder: Path) -> bool:
     ordinary mod is already an error row without one.
     """
     try:
-        data = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+        data = mod_metadata._stored(folder)
     except (OSError, ValueError):
         return False
     return isinstance(data, dict) and "bundle" in data

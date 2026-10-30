@@ -38,7 +38,7 @@ import sys
 import struct
 from typing import Callable
 
-from core import mod_requires, script_mods
+from core import mod_metadata, mod_requires, script_mods
 from core.plugin_files import atomic_write
 from core.process_probe import live_processes
 
@@ -270,7 +270,7 @@ def save(changes: dict, root: Path | None = None) -> list[dict]:
             if "values" in change:
                 script_mods.save_values(folder, change["values"])
             if "enabled" in change:
-                metadata = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+                metadata = mod_metadata._stored(folder)
                 metadata["enabled"] = change["enabled"]
                 atomic_write(folder / "mod.json", (json.dumps(metadata, indent=2) + "\n").encode("utf-8"))
     except Exception:
@@ -307,7 +307,7 @@ def _loader_folder(root: Path) -> Path | None:
         if not candidate.is_dir() or candidate.name.startswith("."):
             continue
         try:
-            stored = json.loads((candidate / "mod.json").read_text(encoding="utf-8"))
+            stored = mod_metadata._stored(candidate)
         except (OSError, ValueError):
             continue
         if isinstance(stored, dict) and str(stored.get("id") or candidate.name) == LOADER_ID:
@@ -328,7 +328,7 @@ def ensure_loader_mod(root: Path | None = None) -> Path:
     found = _loader_folder(folder)
     if found is not None:
         # Update only our description, preserving the reader's other metadata.
-        metadata = json.loads((found / "mod.json").read_text(encoding="utf-8"))
+        metadata = mod_metadata._stored(found)
         if metadata.get("description") != LOADER_DESCRIPTION:
             metadata["description"] = LOADER_DESCRIPTION
             atomic_write(found / "mod.json", (json.dumps(metadata, indent=2) + "\n").encode("utf-8"))
@@ -361,7 +361,7 @@ def loader_mod_state(root: Path | None = None) -> tuple[bool, bool]:
     if folder is None:
         return False, False
     try:
-        stored = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
+        stored = mod_metadata._stored(folder)
     except (OSError, ValueError):
         return False, False
     return True, isinstance(stored, dict) and stored.get("enabled") is True
