@@ -33,6 +33,7 @@ import os
 from pathlib import Path
 from time import perf_counter
 import stat
+import struct
 from typing import Callable
 
 from core import mod_requires, script_mods
@@ -113,7 +114,11 @@ def _read(path: Path, managed: "Managed | None" = None) -> bytes:
         raise TweakError(f"{path.name} is missing")
     if path.stat().st_size > managed.limit:
         raise TweakError(f"{path.name} is too large to be the Remastered {managed.label}")
-    return path.read_bytes()
+    with path.open('rb') as stream:
+        data = stream.read(managed.limit+1)
+    if len(data) > managed.limit:
+        raise TweakError(f'{path.name} grew beyond its size limit')
+    return data
 
 
 def _sha(data: bytes) -> str:
@@ -766,6 +771,8 @@ def _manifest(game_root: Path, managed: Managed = EXECUTABLE) -> dict:
     if (type(data) is not dict or type(data.get("version")) is not int or data["version"] not in (1, 2)
             or not _digest(data.get("sha256")) or not _mod_names(data.get("mods"))):
         raise TweakError(damaged)
+    if 'originalHash' in data and (managed == EXECUTABLE or not _digest(data['originalHash'])):
+        raise TweakError(damaged)
     keys = {"sha256", "mods"} | ({"project"} if data["version"] == 2 else set())
     pending = data.get("pending")
     if pending is not None and (type(pending) is not dict or set(pending) - {"inputs"} != keys
@@ -778,15 +785,45 @@ def _manifest(game_root: Path, managed: Managed = EXECUTABLE) -> dict:
     return data
 
 
+def _menu_baseline(current: bytes, managed: Managed) -> bool:
+    """Recognize data we can edit; this never relaxes executable identity."""
+    from . import formats, esd
+    try:
+        if managed == LAYOUT:
+            layout = menu_layout.Drb(formats.inflate(current))
+            for dialog in layout.dialogs():
+                layout.nodes(dialog)
+            return True
+        if managed in ESD:
+            plain = formats.inflate(current)
+            entries = formats.members(plain)
+            scripts = [entry for name,entry in entries.items() if name.endswith('.esd')]
+            if not scripts:
+                return False
+            for entry in scripts:
+                esd.parse(bytes(plain[entry.offset:entry.offset+entry.size]))
+            return True
+    except (ValueError,IndexError,KeyError,struct.error):
+        return False
+    return False
+
+
+def _original_matches(original: bytes, manifest: dict, managed: Managed) -> bool:
+    digest = manifest.get('originalHash')
+    return _sha(original) == digest if digest is not None else managed.vanilla(original)
+
+
 def _original(game_root: Path, current: bytes, manifest: dict, managed: Managed = EXECUTABLE) -> bytes:
-    """The verified vanilla bytes: the preserved copy, or the live file itself."""
+    """The verified deployment baseline, including a preserved foreign menu."""
     backup = checked(managed.backup(game_root))
     if backup.exists():
         original = _read(backup, managed)
-        if not managed.vanilla(original):
+        if not _original_matches(original,manifest,managed):
             raise TweakError(f"The preserved original {managed.label} changed; refusing to continue")
+        if not manifest and current != original:
+            raise TweakError(f'The installed {managed.label} differs from its unmanaged preserved copy; both were kept')
         return original
-    if managed.vanilla(current):
+    if managed.vanilla(current) or (not manifest and _menu_baseline(current,managed)):
         return current
     raise TweakError(f"The preserved original {managed.label} is missing; refusing to continue")
 
@@ -795,18 +832,21 @@ def _owned(current: bytes, manifest: dict, managed: Managed = EXECUTABLE) -> boo
     if managed.vanilla(current):
         return True
     digest = _sha(current)
-    return bool(manifest) and digest in (
-        manifest.get("sha256"), (manifest.get("pending") or {}).get("sha256"))
+    if manifest:
+        return digest in (manifest.get("sha256"), (manifest.get("pending") or {}).get("sha256"))
+    return _menu_baseline(current,managed)
 
 
 def _current_manifest(current: bytes, manifest: dict, managed: Managed = EXECUTABLE) -> dict:
     """Which recipe produced the bytes, including a write interrupted before completion."""
     pending = manifest.get("pending")
     if pending and _sha(current) == pending["sha256"]:
-        return {"version": 2, "sha256": pending["sha256"], "mods": list(pending["mods"]),
+        return {**({'originalHash':manifest['originalHash']} if 'originalHash' in manifest else {}),
+                "version": 2, "sha256": pending["sha256"], "mods": list(pending["mods"]),
                 "project": pending.get("project"), "inputs": pending.get("inputs"), "pending": None}
     vanilla = managed.vanilla(current)
-    return {"version": 2, "sha256": _sha(current),
+    return {**({'originalHash':manifest['originalHash']} if 'originalHash' in manifest else {}),
+            "version": 2, "sha256": _sha(current),
             "mods": [] if vanilla else list(manifest.get("mods", [])),
             "project": None if vanilla else manifest.get("project"),
             "inputs": None if vanilla else manifest.get("inputs"),
@@ -821,11 +861,12 @@ def _save_manifest(game_root: Path, value: dict, managed: Managed = EXECUTABLE) 
 
 
 def _finish_manifest(game_root: Path, current: bytes, mods: list[str], project=None,
-                     managed: Managed = EXECUTABLE, *, inputs=None) -> None:
+                     managed: Managed = EXECUTABLE, *, inputs=None, original_hash=None) -> None:
     if managed.vanilla(current) and not mods and project is None:
         checked(managed.manifest(game_root)).unlink(missing_ok=True)
     else:
-        _save_manifest(game_root, {"version": 2, "sha256": _sha(current), "mods": list(mods),
+        _save_manifest(game_root, {**({'originalHash':original_hash} if original_hash is not None else {}),
+                                   "version": 2, "sha256": _sha(current), "mods": list(mods),
                                    "project": project, "inputs": inputs, "pending": None}, managed)
 
 
@@ -844,6 +885,8 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
     if inputs is not None:
         desired['inputs'] = inputs
     journal = {**_current_manifest(before, old, managed), "pending": desired}
+    if managed != EXECUTABLE:
+        journal['originalHash'] = _sha(original)
     # Check the bound before creating a backup or replacing anything.
     if len(json.dumps(journal, allow_nan=False).encode("utf-8")) > MAX_MANIFEST - 1024:
         raise TweakError(f"The {managed.label} tweak manifest exceeds its size limit")
@@ -855,7 +898,7 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
             stream.write(original)
             stream.flush()
             os.fsync(stream.fileno())
-        if not managed.vanilla(_read(backup, managed)):
+        if _read(backup, managed) != original:
             raise TweakError(f"The original {managed.label} backup did not verify")
     # Journal first. A crash before or after replacement leaves one of these
     # two complete, known images; neither an arbitrary hash nor a partial file
@@ -870,7 +913,8 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
         _put(game_root, live, after)
     if _read(live, managed) != after:
         raise TweakError(f"{managed.label.capitalize()} verification failed; the original and pending intent were kept")
-    _finish_manifest(game_root, after, mods, project, managed, inputs=inputs)
+    _finish_manifest(game_root, after, mods, project, managed, inputs=inputs,
+                     original_hash=_sha(original) if managed != EXECUTABLE else None)
 
 
 def _installed(game_root: Path, managed: Managed, action: str) -> tuple[bytes, dict]:
@@ -1429,7 +1473,7 @@ def _file_status(game_root: Path, managed: Managed) -> dict:
     current = _read(managed.live(game_root), managed)
     manifest = _manifest(game_root, managed)
     backup = checked(managed.backup(game_root))
-    result = {"backupOk": backup.is_file() and managed.vanilla(_read(backup, managed)),
+    result = {"backupOk": backup.is_file() and _original_matches(_read(backup, managed),manifest,managed),
               "state": "unknown", "applied": [], "problem": "", "project": None,
               "pendingRecovery": bool(manifest.get("pending"))}
     if not _owned(current, manifest, managed):

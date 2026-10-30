@@ -75,6 +75,14 @@ Runtime logs and composition reports are bounded. `lexeditor-ds1-load.json`
 records data preparation and disabled mods; `lexeditor-ds1-patch.log` records
 native loading. Data-dependent native modules do not load if preparation fails.
 
+Declarative layout and menu-command edits can start from another author's
+structurally valid installed menu. Its exact bytes become the preserved
+baseline, verified by the ownership journal; disabling these edits restores
+that baseline. Missing anchors identify the affected mod before deployment.
+Later edits to a file already managed by the loader are kept and reported,
+never overwritten. An unowned backup that disagrees with the installed file
+also needs reconciliation before either copy can be replaced.
+
 This implements the current drop-in/install/adopt workflow. Older issue #954's
-C-only port and rebasing over unrelated whole-file mods
+C-only port and rebasing full archive contributions over unrelated whole-file mods
 are separate requirements; this implementation does not claim those completed.
