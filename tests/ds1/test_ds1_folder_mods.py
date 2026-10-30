@@ -312,7 +312,13 @@ def test_native_folder_loader_isolates_broken_disabled_and_conflicting_mods(tmp_
     assert 'results=42,77' in result.stdout, result.stdout
     assert 'prepared=1' in result.stdout, result.stdout
     assert 'unwind=1,1' in result.stdout, result.stdout
-    assert 'broken: Damaged' in result.stdout
+    # Preparation now validates native-only artifacts too, before the C
+    # scanner can load them. Its structured log retains the owning failure.
+    from plugins.ds1.standalone_runtime import REPORT
+    report = json.loads((tmp_path/REPORT).read_text())
+    failure = next(row for row in report['disabled'] if row['id'] == 'broken')
+    assert failure['name'] == 'broken' and 'invalid size' in failure['error']
+    assert json.loads((broken/'mod.json').read_text())['enabled'] is False
     assert 'conflicting: Conflicts' in result.stdout
     assert 'disabled:' not in result.stdout
     # A stale shared patch must be skipped when preparation is absent or

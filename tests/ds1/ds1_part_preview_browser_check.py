@@ -398,6 +398,7 @@ def main():
                     names = page.locator('.lex-chr-viewer-list .lex-list-row').all_inner_texts()
                     assert len(names) >= 1, names
                     assert 'Attack 100' in names[0], names
+                    page.locator('.lex-chr-viewer-fields input').first.wait_for(state='visible')
                     assert page.locator('.lex-chr-viewer-fields input').count() > 0
                     trigger.click()
                     page.wait_for_function('!document.querySelector(".lex-chr-viewer")')
