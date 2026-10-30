@@ -137,7 +137,7 @@ class LoaderTests(unittest.TestCase):
         # no tweak enabled.
         self.assertEqual(tweak_mods.loader_mod_state(self.library), (True, True))
         result = tweak_mods.apply(self.game, self.library)
-        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
+        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(online=True))
         self.assertEqual(self.runtime(), b"")
         self.assertEqual(result["applied"], [])
         self.assertEqual(self.live.read_bytes(), VANILLA)
@@ -193,7 +193,7 @@ class LoaderTests(unittest.TestCase):
         tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), VANILLA)
         self.assertEqual(self.runtime(), self.expected("alpha"))
-        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(debug=True))
+        self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(online=True))
         self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.LOCK_FILE, tweak_mods.RUNTIME_DLL,
                                                tweak_mods.RUNTIME_PATCH, tweak_mods.RUNTIME_RECORD]))
         lock = self.game / tweak_mods.LOCK_FILE

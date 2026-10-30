@@ -26,6 +26,7 @@ ALLOWED_BINARIES = {
     "plugins/ff9/runtime/Memoria.Scripts.Lexeditor.dll": "FF9 tweaks, moving to library mods in #913",
     "plugins/ds1/runtime/package/dinput8.dll": "DS1 mod loader, built from plugins/ds1/runtime (plugin infrastructure)",
     "plugins/ds1/runtime/package/debug/dinput8.dll": "DS1 debug loader: Arxan off, no network (plugin infrastructure)",
+    "plugins/ds1/runtime/package/online/dinput8.dll": "DS1 loader: multiplayer protection and isolated saves (plugin infrastructure)",
 }
 # Folders holding tweak source that has not moved yet.
 ALLOWED_FOLDERS = {

@@ -226,14 +226,16 @@ def save(changes: dict, root: Path | None = None) -> list[dict]:
 
 #: The loader as its own library mod: switching it on installs Lexeditor's
 #: loader (dinput8.dll), which applies executable patches in memory, switches
-#: the game's anti-tamper protection off and keeps the game offline.
+#: the game's anti-tamper protection off, installs multiplayer protection,
+#: and isolates modded saves.
 #: Executable-patch mods need it on.
 LOADER_ID = "lexeditor-loader"
 LOADER_FOLDER = "Lexeditor Loader"
 LOADER_NAME = "Lexeditor Loader"
 LOADER_DESCRIPTION = ("Installs Lexeditor's loader, which applies executable patches in memory "
                       "when the game starts. The loader switches the game's anti-tamper protection "
-                      "off and keeps the game offline. Switch it on to use executable-patch mods.")
+                      "off and adds multiplayer protection. Modded play uses separate characters "
+                      "that Steam Cloud can sync. Removing the loader returns to your vanilla characters.")
 
 
 def _loader_folder(root: Path) -> Path | None:
@@ -266,6 +268,11 @@ def ensure_loader_mod(root: Path | None = None) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     found = _loader_folder(folder)
     if found is not None:
+        # Update only our description, preserving the reader's other metadata.
+        metadata = json.loads((found / "mod.json").read_text(encoding="utf-8"))
+        if metadata.get("description") != LOADER_DESCRIPTION:
+            metadata["description"] = LOADER_DESCRIPTION
+            atomic_write(found / "mod.json", (json.dumps(metadata, indent=2) + "\n").encode("utf-8"))
         _drop_debug_flag(folder)
         return found
     enabled = False
@@ -880,25 +887,21 @@ MAX_RUNTIME = 16 * 1024 * 1024
 OWNED_FILES = (MANIFEST_FILE, BACKUP_FILE, RUNTIME_RECORD, RUNTIME_PATCH)
 
 
-def loader_bytes(debug: bool = False) -> bytes:
+def loader_bytes(debug: bool = False, *, online: bool = False) -> bytes:
     """The shipped loader, checked against the hash it was published with.
 
     The debug loader (runtime/package/debug) blocks the game's network and
-    switches Arxan off with dearxan, so a debugger can attach (#742). It is
-    the one Apply installs (PROTECTED_LOADER)."""
-    package = LOADER_PACKAGE / "debug" if debug else LOADER_PACKAGE
+    switches Arxan off with dearxan, so a debugger can attach (#742).
+    Apply installs the online build with reporting protection and isolated saves."""
+    if debug and online:
+        raise TweakError("Choose the debug or online loader")
+    package = LOADER_PACKAGE / "online" if online else LOADER_PACKAGE / "debug" if debug else LOADER_PACKAGE
     manifest = json.loads((package / "runtime-manifest.json").read_text(encoding="utf-8"))
     data = (package / RUNTIME_DLL).read_bytes()
     if _sha(data) != manifest.get("sha256"):
         raise TweakError("Lexeditor's DS1 loader does not match its published hash; reinstall Lexeditor")
     return data
 
-
-# Apply always installs the debug loader: Arxan off (tweaks hook code Arxan
-# checks, and only Debug mode's play tests proved them) and no network (a
-# patched game must never reach other players). Lexer's call, 2026-10-23; the
-# standalone loader (#954) is to do the same.
-PROTECTED_LOADER = True
 
 # Removed flag, read once to migrate: a debug install becomes an enabled loader mod.
 
@@ -932,7 +935,7 @@ def _runtime(game_root: Path) -> dict:
             raise TweakError(f"{RUNTIME_PATCH} is damaged")
         patch = patch_path.read_bytes()
     dll = _sha(_read(dll_path, RUNTIME_FILE)) if dll_path.exists() else None
-    ours = {_sha(loader_bytes()), _sha(loader_bytes(debug=True))} | ({record["dllSha256"]} if record else set())
+    ours = {_sha(loader_bytes()), _sha(loader_bytes(debug=True)), _sha(loader_bytes(online=True))} | ({record["dllSha256"]} if record else set())
     return {"record": record, "patch": patch, "dll": dll, "foreignDll": dll is not None and dll not in ours,
             "active": bool(record and patch is not None and dll in ours and _sha(patch) == record["patchSha256"])}
 
@@ -952,47 +955,21 @@ def _runtime_status(game_root: Path) -> dict:
     return result
 
 
-#: Said when the game starts offline; the loader blocks the network for either.
-OFFLINE_MODS = "Online play is off: enabled mods change the game's code, which may trigger anti-cheat."
-OFFLINE_DEBUG = "Online play is off: debug mode is on."
+ONLINE_NOTICE = ("Mods use separate characters with multiplayer protection. "
+                 "Removing the loader returns to your vanilla characters.")
 
 
-def offline_reason(game_root: Path) -> str:
-    """Why the installed loader keeps the game offline, or "" when it is online.
-
-    Reads what is installed, not what the library would build: the loader
-    blocks the network whenever its patch holds anything, and always in
-    debug mode (runtime/lexeditor_ds1_loader.c).
-    """
+def launch_notice(game_root: Path) -> str:
+    """Describe the installed runtime; old offline loaders remain identified."""
     try:
         runtime = _runtime(checked(Path(game_root)))
     except (ValueError, OSError):
         return ""
     if not runtime["active"]:
         return ""
-    if runtime["record"].get("debug") is True:
-        return OFFLINE_DEBUG
-    return OFFLINE_MODS if runtime["patch"] else ""
-
-
-def changes_code(folder: Path) -> bool:
-    """True when a tweak mod patches the game's code, so the game goes offline.
-
-    Read from its last build without running anything: built native patches
-    or a native binary mean code. A tweak never built yet counts as code
-    until a build shows otherwise; one that only built a menu layout (a data
-    file) does not.
-    """
-    from core import memory_conflicts
-    folder = Path(folder)
-    if memory_conflicts.carries_native_code(folder):
-        return True
-    try:
-        if any((folder / "native").glob("*.json")):
-            return True
-        return not any((folder / "layout").glob("*.json"))
-    except OSError:
-        return True
+    if runtime["dll"] == _sha(loader_bytes(online=True)):
+        return ONLINE_NOTICE
+    return "Online play is off: the installed loader needs updating."
 
 
 def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
@@ -1053,7 +1030,7 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     if state["foreignDll"]:
         raise TweakError(f"Another mod's {RUNTIME_DLL} is in the game folder. Lexeditor's loader needs that name; "
                          "remove or rename the other file, then Apply again. Nothing was changed.")
-    loader = loader_bytes(PROTECTED_LOADER)
+    loader = loader_bytes(online=True)
     record = {"version": 1, "mods": list(mods), "project": _project(project),
               "patchSha256": _sha(patch), "dllSha256": _sha(loader),
               "built": dict(built or {})}

@@ -1,0 +1,15 @@
+{
+  "repository": "https://github.com/metal-crow/Dark-Souls-1-Overhaul",
+  "revision": "2a3d8cbe2acee663bef03c7be4f968dbb68f951f",
+  "license": "AGPL-3.0-only",
+  "licenseText": "../../credits.md",
+  "upstreamSha256": {
+    "OverhaulDLL/src/AntiAntiCheat.cpp": "365ae0ca7ec2f85c8405270fae94030dbf137bd5dd4973dcc942f919c532dab6",
+    "OverhaulDLL/include/AntiAntiCheat.h": "4ea2dda4c63ccb13eb304625b87fccea2045ddb8ddd2041a51a33dc10a0baf4c",
+    "OverhaulDLL/src/AntiAntiCheatASM.asm": "90e19ef1232ffa3fdc343f7504ae36008234c5e8c6de0b79269ff34edbe1dd80",
+    "LICENSE.txt": "e1ec41f30b86470d5176560801f478778af6ecdd44420ca5321ca57a2df5629f"
+  },
+  "changes": [
+    "Bound the flag array compaction loop to avoid reading past the input array."
+  ]
+}
