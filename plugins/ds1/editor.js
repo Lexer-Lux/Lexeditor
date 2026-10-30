@@ -9,7 +9,7 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attack
   assetTabs:[{id:"files",label:"Files"}],soundTabs:[{id:"sfx",label:"Sound effects"},{id:"music",label:"Music"}],scriptTabs:[{id:"ingame",label:"Ingame menus"},{id:"common",label:"Common menus"},{id:"talk",label:"Dialogue"}],scriptDetail:null,assetDetail:null,assetBusy:false,assetUpload:null,
   assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
-  mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",
+  mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapCollisionHigh:false,mapCollisionLow:false,mapNavigation:false,mapRegions:false,mapPlacementFilter:"all",
   dirTab:"all",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null,
   dirFit:null,mapListPage:0,mapListFit:null,mapListSort:null,mapFit:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0,animMount=0;
@@ -140,7 +140,7 @@ const shell=LexeditorUI.mountShell({
     {id:"drops",label:"Drops",help:"Edit enemy and corpse drop tables: what each lot drops and at what rates. One lot may serve several enemies. Vanilla is read-only. Save changes the mod project."},
     {id:"attacks",label:"Attacks",help:"Edit enemy and player attack damage and hitboxes. The Attacks list holds enemy attacks, Player attacks holds yours, and Projectiles holds flying attacks: arrows, spells and breath. One attack record can serve several monsters or several player moves, so an edit changes every use of it. Vanilla is read-only. Save changes the mod project."},
     {id:"ai",label:"AI",help:"Enemy brains. AI tables are how enemies sense and answer the player; behaviors are the moves each one can choose from. Vanilla is read-only. Save changes the mod project."},
-    {id:"maps",label:"Maps",help:"Browse maps in 3D and move enemy and object placements. Pick a map from the Maps list, click a placement to select it, drag its arrows to move it. Map buttons appear over the picture. Wire boxes mark collision and navigation parts; they show where those parts sit, not their shapes. Vanilla is read-only. Save changes the mod project."},
+    {id:"maps",label:"Maps",help:"Select a map record to edit its properties, or move and rotate it in the picture. The layer controls show high collision, low collision, navigation meshes and region boundaries. Collision behavior includes kill planes, lethal falls and death cameras. Regions and events also appear in the placements list. Vanilla is read-only. Save writes the mod project."},
     {id:"animations",label:"Animations",help:"Edit animation event timing and settings. Pick a character, then an animation, then an event. Add inserts a documented event, and Remove deletes the selected one. Events that share a timestamp change together. Character files this version cannot open are skipped. Vanilla is read-only, and Save changes the mod project."},
     {id:"effects",label:"Effects",help:"Edit buffs, debuffs and equipment passives. A shared effect changes every item or ability using it. Unknown properties stay protected."},
     {id:"stats",label:"Stats",help:"Stat scaling for the Stats Rework. Scaling curves holds the 39 scaling graphs: weapon paths, Max HP, Max MP, defense, resistances, level-up cost and level sync. Weapon upgrades and Armor upgrades hold each upgrade level's multipliers. Level-up gains holds what each level-up adds to defense. Full records stay in Items, and no scaling graph here covers stamina recovery or attunement slots."},
@@ -556,8 +556,8 @@ async function deploymentAction(action){
   finally{state.deployBusy=false;render();}
 }
 function reportTweakRebuild(result){
-  if(result.disabledMods?.length)LexeditorUI.showToast("Changes saved. Other enabled mods rebuilt. " + result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});
-  else if(result.tweaksError)LexeditorUI.showAlert({title:"Changes saved; deployment failed",message:result.tweaksError});
+  if(result.tweaksError)LexeditorUI.showToast("Changes saved; deployment failed. " + result.tweaksError,{tone:"warning"});
+  else if(result.disabledMods?.length)LexeditorUI.showToast("Changes saved. Other enabled mods rebuilt. " + result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});
   else if(result.tweaksDeferred)LexeditorUI.showToast("Changes saved. Close the game, then save again to rebuild the tweaks.");
   else if(result.tweaksRebuilt)LexeditorUI.showToast("Changes saved and tweaks rebuilt.");
   else return false;
@@ -688,7 +688,7 @@ function commit(row,field,value,control,beforeOverride){
       if(row.table==="NativeRules"||["goodsType","weaponCategory"].includes(field.key)||hadLink!==hasLink){await loadItems();render();}
       else{
         for(const update of updates)patchRowValues(row.table,update.id,update.result.values,update.result.display,update.result.name,update.result.modified);
-        if(row.table.endsWith(".msb")&&state.tab==="maps"&&state.mapView&&["posX","posY","posZ","rotX","rotY","rotZ"].includes(field.key)){
+        if(row.table.endsWith(".msb")&&state.tab==="maps"&&state.mapView&&["posX","posY","posZ","rotX","rotY","rotZ","scaleX","scaleY","scaleZ"].includes(field.key)){
           // A typed move or turn moves the scene part too; only the
           // gizmo did, so typed edits left the mesh standing behind.
           const fresh=updates[updates.length-1].result.values||{};
@@ -707,6 +707,24 @@ function commit(row,field,value,control,beforeOverride){
               viewportCtl?.scaleTo?.(row.id,scale);
             }
           }
+        }
+        if(row.table.endsWith(".msb")&&state.tab==="maps"&&state.mapView?.map===row.table&&String(row.id).startsWith("region:")&&["shapeType","width","height","depth","radius"].includes(field.key)){
+          const part=state.mapView.parts.find(entry=>entry.key===row.id);
+          const fresh=updates[updates.length-1].result.row;
+          const values=Object.fromEntries((fresh?.fields||[]).map(item=>[item.key,item.value]));
+          if(part){
+            part.shape=values.shapeType;
+            part.dimensions=Object.fromEntries(["width","height","depth","radius"].filter(name=>values[name]!==undefined).map(name=>[name,values[name]]));
+            viewportCtl?.updateRegion?.(row.id,part.shape,part.dimensions);
+          }
+          if(field.key==="shapeType")refreshMapsDetail();
+        }
+        if(row.table.endsWith(".msb")&&field.key==="hitFilter"&&state.mapView?.map===row.table){
+          const hitFilter=updates[updates.length-1].result.row.fields.find(item=>item.key==="hitFilter")?.value;
+          const part=state.mapView.parts.find(entry=>entry.key===row.id);
+          if(part)part.hitFilter=hitFilter;
+          viewportCtl?.updateCollision?.(row.id,hitFilter);
+          refreshMapSide();
         }
         if(row.table.endsWith(".msb")&&String(row.id).startsWith("light:")&&state.tab==="maps"&&state.mapView&&row.table===state.mapView.map){
           // The lights list reads the view, not the record lists, so
@@ -1771,7 +1789,7 @@ function msbDetail(row,groups){
     // (no Name row: the heading owns the name, like every other record)
     detailField({label:"Kind",control:readonlyField(row.kind,{format:false})}),
     detailField({label:"Part",control:readonlyField(row.id,{format:false})}),
-    detailField({label:"Model",control:readonlyField(row.model,{format:false})})];
+    ...(row.model&&row.kind!=="Region"?[detailField({label:"Model",control:readonlyField(row.model,{format:false})})]:[])];
   if(row.think!==null&&row.think!==undefined)identity.push(
     detailField({label:"AI table",control:readonlyField(row.think,{format:false}),
       help:infoHelp("Which AI table drives this enemy.")}));
@@ -1942,7 +1960,7 @@ function assetModelCounts(model){
   return LexeditorUI.controlGroup(parts,{columns:parts.length,stacked:true});
 }
 const ASSET_MODEL_INFO={
-  collision:["Collision data","Collision files shape where the player can walk. They hold no visible mesh."],
+  collision:["Collision data","Collision surfaces control where characters can walk and where death zones apply. Show their high and low meshes in Maps."],
   "no-mesh":["No model mesh","This file holds no model mesh to preview. It still replaces as a whole file."],
   unreadable:["Unreadable model","This file does not open as a model. It still replaces as a whole file."]};
 // One shared thumbnail strip for the Models and Textures tabs: the
@@ -2174,7 +2192,7 @@ function mapsNoun(){
 function rowActionButtons(kind){
   const locked=state.readOnly||state.rowBusy;
   const playerStart=kind==="placement"&&state.row.kind==="Player";
-  const nouns=kind==="message"?["message","map"]:kind==="placement"?["placement","map"]:["record","table"];
+  const nouns=kind==="message"?["message","map"]:kind==="placement"?["placement","map"]:kind==="light"?["light","map"]:["record","table"];
   const light=kind==="light";
   const goTo=(kind==="placement"||kind==="message"||light)
     ?[el("button",{type:"button",class:"lex-header-icon","data-row-action":"goto","data-row-kind":kind,
@@ -2187,9 +2205,6 @@ function rowActionButtons(kind){
     :[];
   const duplicateTitle=state.readOnly?`Open a mod project to add ${nouns[0]}s`:`Copy this ${nouns[0]} under the next free ID`;
   const removeTitle=playerStart?"The player start cannot be removed":state.readOnly?`Open a mod project to remove ${nouns[0]}s`:`Remove this ${nouns[0]} from its ${nouns[1]}`;
-  // Lights cannot be copied or deleted: events have no free IDs and
-  // the file keeps no spare room, so the buttons stay off entirely.
-  if(light)return goTo;
   return [...goTo,el("button",{type:"button",class:"lex-header-icon","data-row-action":"duplicate","data-row-kind":kind,disabled:locked,
       title:duplicateTitle,"aria-label":duplicateTitle,
       onclick:()=>duplicateRow(kind)},LexeditorUI.copyIcon()),
@@ -2242,8 +2257,9 @@ async function removeMessage(){
 async function duplicateRow(kind){
   if(kind==="message")return duplicateMessage();
   if(state.rowBusy||!state.row)return;
-  const placement=kind==="placement";
-  state.rowBusy=true;render();
+  const placement=kind==="placement"||kind==="light";
+  state.rowBusy=true;
+  if(state.tab==="maps")refreshMapsDetail();else render();
   try{
     const result=placement?await api("/api/placements/add",{map:state.row.table,id:state.row.id})
       :await api("/api/rows/add",{table:state.row.table,id:state.row.id});
@@ -2252,8 +2268,8 @@ async function duplicateRow(kind){
     state.selected=key(result.row);
     const index=sortedRows().findIndex(row=>key(row)===state.selected);
     if(index>=0)state.page=Math.floor(index/state.pageSize);
-    await loadDetail();
     if(placement&&state.tab==="maps")await refreshMapsAfterStructure();
+    await loadDetail();
   }
   catch(error){notify(error);}
   finally{state.rowBusy=false;render();}
@@ -2261,14 +2277,15 @@ async function duplicateRow(kind){
 async function removeRow(kind){
   if(kind==="message")return removeMessage();
   if(state.rowBusy||!state.row)return;
-  const placement=kind==="placement";
+  const placement=kind==="placement"||kind==="light";
   const impact=!placement&&state.tab==="attacks"&&state.row.impact
     ?` It is reached by ${state.row.impact.variants.length} NPC variants and ${state.row.impact.behaviors.length} behaviors.`:"";
   if(!await confirmAction({title:placement?"Remove this placement?":"Remove this record?",
     message:(placement?"The placement leaves the map. Its bytes stay in the file, unused."
       :"The record leaves its table. Anything that points at it will point at nothing.")+impact,
     confirmLabel:"Remove",cancelLabel:"Cancel"}))return;
-  state.rowBusy=true;render();
+  state.rowBusy=true;
+  if(state.tab==="maps")refreshMapsDetail();else render();
   try{
     const result=placement?await api("/api/placements/remove",{map:state.row.table,id:state.row.id})
       :await api("/api/rows/remove",{table:state.row.table,id:state.row.id});
@@ -3430,7 +3447,7 @@ function renderItems(){
   return LexeditorUI.stack(strip,view);
 }
 function viewportHooks(){
-  return {readOnly:state.readOnly,
+  return {readOnly:state.readOnly,collision:{high:state.mapCollisionHigh===true,low:state.mapCollisionLow===true},navigation:state.mapNavigation,regions:state.mapRegions,
     onSelect:(key,info)=>{state.mapSelected=key;state.mapInfo=info||null;refreshViewportBar();
     if(!key||!state.mapView)return;
     const placementKey=`${state.mapView.map}:${key}`;
@@ -3448,19 +3465,17 @@ function refreshViewportBar(){
   for(const button of buttons){
     const action=button.dataset.viewportAction;
     if(action==="duplicate"){
-      button.disabled=state.readOnly||state.mapBusy||!movable||light;
-      button.title=light?"Lights cannot be duplicated"
-        :state.readOnly?"Open a mod project to add placements"
+      button.disabled=state.readOnly||state.mapBusy||!movable;
+      button.title=state.readOnly?"Open a mod project to add placements"
         :!state.mapSelected?"Select a placement in the viewport first"
-        :!movable?"Only enemy, object and player-start placements can be duplicated"
+        :!movable?"This placement cannot be duplicated here"
         :"Copy this placement under the next free ID";
     }else if(action==="remove"){
-      button.disabled=state.readOnly||state.mapBusy||!movable||playerStart||light;
-      button.title=light?"Lights cannot be removed"
-        :playerStart?"The player start cannot be removed"
+      button.disabled=state.readOnly||state.mapBusy||!movable||playerStart;
+      button.title=playerStart?"The player start cannot be removed"
         :state.readOnly?"Open a mod project to remove placements"
         :!state.mapSelected?"Select a placement in the viewport first"
-        :!movable?"Only enemy, object and player-start placements can be removed"
+        :!movable?"This placement cannot be removed here"
         :"Remove this placement from its map";
     }else if(action==="add"){
       button.disabled=state.readOnly||state.mapBusy;
@@ -3510,6 +3525,23 @@ async function refreshMapsAfterUndo(entry){
   let namesChanged=false;
   for(const edit of edits){
     if(!String(edit.table).endsWith(".msb"))continue;
+    const row=state.rows.find(row=>row.table===edit.table&&row.id===edit.id);
+    if(row&&state.mapView?.map===edit.table){
+      const part=state.mapView.parts.find(part=>part.key===edit.id);
+      if(part&&String(edit.id).startsWith("region:")&&["shapeType","width","height","depth","radius"].includes(edit.field)){
+        part.shape=row.values.shapeType;
+        part.dimensions=Object.fromEntries(["width","height","depth","radius"].filter(name=>row.values[name]!==undefined).map(name=>[name,row.values[name]]));
+        viewportCtl?.updateRegion?.(edit.id,part.shape,part.dimensions);
+      }
+      if(part&&edit.field==="hitFilter"){
+        part.hitFilter=row.values.hitFilter;
+        viewportCtl?.updateCollision?.(edit.id,part.hitFilter);
+      }
+      if(part&&edit.field.startsWith("scale")){
+        part.scale=[row.values.scaleX,row.values.scaleY,row.values.scaleZ];
+        viewportCtl?.scaleTo?.(edit.id,part.scale);
+      }
+    }
     if(edit.field==="npcId")namesChanged=true;
     else if(["posX","posY","posZ","rotX","rotY","rotZ"].includes(edit.field))
       moved.set(edit.table+":"+edit.id,{map:edit.table,id:edit.id});
@@ -3622,6 +3654,8 @@ async function reloadViewport(map,selectKey){
     if(token!==viewportMount){ctl?.dispose?.();return;}
     viewportCtl=ctl;
     viewportCtl?.setGizmoMode?.(state.mapGizmo);
+    viewportCtl?.setCollisionLayers?.(state.mapCollisionHigh===true,state.mapCollisionLow===true);
+    viewportCtl?.setMapOverlays?.(state.mapNavigation,state.mapRegions);
     if(selectKey&&viewportCtl)viewportCtl.select(selectKey);
   }
   refreshViewportBar();
@@ -3632,7 +3666,7 @@ async function viewportDuplicate(map){
   try{
     const result=await api("/api/placements/add",{map,id:state.mapSelected});
     state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
-    await reloadViewport(map,`${result.row.type}:${result.row.partId}`);
+    await reloadViewport(map,result.row.id);
   }catch(error){notify(error);}
   finally{state.mapBusy=false;refreshViewportBar();}
 }
@@ -3654,21 +3688,21 @@ async function viewportAdd(map,anchor){
   if(state.readOnly||state.mapBusy||!state.mapView)return;
   const counts=new Map();
   for(const part of state.mapView.parts){
-    if(part.kind!=="Enemy"&&part.kind!=="Dummy enemy"&&part.kind!=="Object")continue;
+    if(part.kind==="Player")continue;
     if(!part.model)continue;
     counts.set(part.model,(counts.get(part.model)||0)+1);
   }
   const models=[...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
-  if(!models.length){notify(new Error("This map has no enemy or object models to place."));return;}
   LexeditorUI.choicePopover({label:"Model",
-    choices:models.map(([name,count])=>({label:`${name} (${count})`,value:name})),
+    choices:[...models.map(([name,count])=>({label:`${name} (${count})`,value:name})),
+      ...(state.mapView.createKinds||[]).map(kind=>({label:kind.label,value:kind.id}))],
     select:async model=>{
       state.mapBusy=true;refreshViewportBar();
       try{
         const at=viewportCtl?.aim?.()||[0,0,0];
         const result=await api("/api/placements/create",{map,model,pos:at,rot:[0,0,0]});
         state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
-        await reloadViewport(map,`${result.row.type}:${result.row.partId}`);
+        await reloadViewport(map,result.row.id);
       }catch(error){notify(error);}
       finally{state.mapBusy=false;refreshViewportBar();}
     }}).openFor(anchor);
@@ -3688,10 +3722,10 @@ function clampMapSelection(){
   const here=state.rows.filter(row=>row.table===state.mapId);
   // Messages ride the view, not the record lists: a selection on
   // one survives the clamp like a placement's does.
-  const viewKeys=state.mapView?(state.mapView.messages||[]).map(entry=>`${state.mapView.map}:${entry.key}`):[];
+  const viewKeys=state.mapView?[...(state.mapView.messages||[]),...(state.mapView.lights||[])].map(entry=>`${state.mapView.map}:${entry.key}`):[];
   if(!here.some(row=>key(row)===state.selected)&&!viewKeys.includes(state.selected))state.selected=here[0]?key(here[0]):null;
   const row=state.rows.find(row=>key(row)===state.selected);
-  state.mapSelected=row?row.id:null;
+  state.mapSelected=row?row.id:viewKeys.includes(state.selected)?state.selected.slice(state.mapId.length+1):null;
 }
 async function chooseMap(id){
   if(!id||id===state.mapId)return;
@@ -3903,8 +3937,22 @@ function mapsListPane(){
   fitPaneList(list,"maps",size,both);
   return both;
 }
+function placementFilterMatches(row){
+  const filter=state.mapPlacementFilter||"all";
+  if(filter==="all")return true;
+  const viewPart=state.mapView?.parts.find(entry=>entry.key===row.id);
+  const kind=row.values?.kind||viewPart?.kind||"";
+  const hit=row.values?.hitFilter??viewPart?.hitFilter;
+  if(filter==="collisions")return kind==="Collision"||kind==="Connect collision";
+  if(filter==="death")return hit===13||hit===14||hit===15;
+  if(filter==="pieces")return kind==="Map piece";
+  if(filter==="navigation")return kind==="Navigation";
+  if(filter==="regions")return kind==="Region";
+  if(filter==="events")return String(row.id).startsWith("event");
+  return true;
+}
 function placementsPane(){
-  const here=sortedRows().filter(row=>row.table===state.mapId);
+  const here=sortedRows().filter(row=>row.table===state.mapId&&placementFilterMatches(row));
   const size=paneSize("placements");
   const pages=Math.max(1,Math.ceil(here.length/size));
   if(state.page>pages-1)state.page=pages-1;
@@ -3922,8 +3970,11 @@ function placementsPane(){
     sortValue:row=>dirRowMap(row),render:row=>dirRowMap(row)});
   columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row))));
   const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",columns});
+  const kindFilter=LexeditorUI.pagerSelect({label:"Show",value:state.mapPlacementFilter||"all",
+    options:[{id:"all",label:"All placements"},{id:"collisions",label:"Collisions"},{id:"death",label:"Death zones"},{id:"pieces",label:"Map pieces"},{id:"navigation",label:"Navigation"},{id:"regions",label:"Regions"},{id:"events",label:"Events"}],
+    change:value=>{state.mapPlacementFilter=value;state.page=0;refreshMapSide();}});
   const pager=LexeditorUI.compactPager({pages,page:state.page,total:here.length,pageSize:size,
-    change:value=>{state.page=value;refreshMapSide();}});
+    filters:[kindFilter],change:value=>{state.page=value;refreshMapSide();}});
   const both=LexeditorUI.pagedPane(list,pager);
   both.style.flex="1 1 auto";both.style.minHeight="0";
   sizePaneRows(list,size,false);
@@ -3934,7 +3985,7 @@ function placementsPane(){
         // Filtering picks its first match, as the old list did, but
         // stays on this tab: the reader asked to search, not to leave.
         // The pick routes through selection so the details follow it.
-        const matches=sortedRows().filter(row=>row.table===state.mapId);
+        const matches=sortedRows().filter(row=>row.table===state.mapId&&placementFilterMatches(row));
         if(matches.length&&!matches.some(row=>key(row)===state.selected)){
           void selectPlacement(key(matches[0]),false);
         }else refreshMapSide();}}),
@@ -4496,6 +4547,14 @@ function renderMaps(){
     onclick:event=>viewportAdd(current.id,event.currentTarget)},"Add");
   const rotate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"rotate",
     onclick:()=>{state.mapGizmo=state.mapGizmo==="rotate"?"move":"rotate";viewportCtl?.setGizmoMode?.(state.mapGizmo);refreshViewportBar();}},"Rotate");
+  const highToggle=LexeditorUI.pagerToggle({label:"High collision",checked:state.mapCollisionHigh===true,
+    change:value=>{state.mapCollisionHigh=value;viewportCtl?.setCollisionLayers?.(state.mapCollisionHigh===true,state.mapCollisionLow===true);}});
+  const lowToggle=LexeditorUI.pagerToggle({label:"Low collision",checked:state.mapCollisionLow===true,
+    change:value=>{state.mapCollisionLow=value;viewportCtl?.setCollisionLayers?.(state.mapCollisionHigh===true,state.mapCollisionLow===true);}});
+  const navigationToggle=LexeditorUI.pagerToggle({label:"Navigation",checked:state.mapNavigation,
+    change:value=>{state.mapNavigation=value;viewportCtl?.setMapOverlays?.(state.mapNavigation,state.mapRegions);}});
+  const regionsToggle=LexeditorUI.pagerToggle({label:"Regions",checked:state.mapRegions,
+    change:value=>{state.mapRegions=value;viewportCtl?.setMapOverlays?.(state.mapNavigation,state.mapRegions);}});
   const host=el("div",{class:"lex-viewport-host","data-viewport-host":"",style:VIEWPORT_STYLE+"height:100%;flex:1 1 auto;"},LexeditorUI.loadingPanel({label:"Loading map"}));
   requestAnimationFrame(()=>{
     viewportCtl=null;refreshViewportBar();
@@ -4504,6 +4563,8 @@ function renderMaps(){
       if(token!==viewportMount)return;
       viewportCtl=ctl;
       viewportCtl?.setGizmoMode?.(state.mapGizmo);
+      viewportCtl?.setCollisionLayers?.(state.mapCollisionHigh===true,state.mapCollisionLow===true);
+      viewportCtl?.setMapOverlays?.(state.mapNavigation,state.mapRegions);
       if(state.mapSelected&&viewportCtl)viewportCtl.select(state.mapSelected);
       if(state.mapFocus&&viewportCtl){viewportCtl.focus(state.mapFocus);state.mapFocus=null;}
       refreshViewportBar();
@@ -4513,7 +4574,7 @@ function renderMaps(){
   // on a wrapper: mounting clears the host itself for its canvas.
   const wrap=el("div",{style:"position:relative;min-width:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:520px;"},host);
   LexeditorUI.hoverActions(wrap,{label:"Map actions",
-    actions:[{node:duplicate},{node:remove},{node:add},{node:rotate}]});
+    actions:[{node:duplicate},{node:remove},{node:add},{node:rotate},{node:highToggle},{node:lowToggle},{node:navigationToggle},{node:regionsToggle}]});
   const viewPane=el("div",{style:"min-width:0;display:flex;flex-direction:column;"},wrap);
   const lists=el("div",{"data-maps-side":"",class:"ds1-maps-left","aria-label":"Map lists",
     style:"min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},mapsStrip(),mapsPane());

@@ -36,6 +36,7 @@ beyond its rectangle.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from bisect import bisect_right
 import hashlib
 from pathlib import Path
 import struct
@@ -101,6 +102,10 @@ class Drb:
         if plain[:16] != b"DRB\0" + b"\0" * 12:
             raise LayoutError("Expected a DS1 menu layout (DRB)")
         self.sections: dict[str, list] = {}
+        self._strings = {}
+        self._dialogs = None
+        self._blob_starts = {}
+        self._strings_used = None
         at = 16
         for tag in SECTIONS:
             if plain[at:at + 4] != tag.encode("ascii").ljust(4, b"\0"):
@@ -127,13 +132,17 @@ class Drb:
     # --- reading ------------------------------------------------------------
 
     def string(self, offset: int) -> str:
+        if offset in self._strings:
+            return self._strings[offset]
         data = self.sections["STR"][0]
         if not 0 <= offset < len(data) or offset % 2:
             raise LayoutError(f"Name offset {offset:#x} is outside the name table")
         end = offset
         while end + 1 < len(data) and data[end:end + 2] != b"\0\0":
             end += 2
-        return data[offset:end].decode("utf-16-le")
+        result = data[offset:end].decode("utf-16-le")
+        self._strings[offset] = result
+        return result
 
     def _entry(self, tag: str, offset: int) -> tuple[int, int]:
         data, count = self.sections[tag]
@@ -145,10 +154,14 @@ class Drb:
         """One shape or control's type name and data span, bounded by the next blob."""
         kind, start = self._entry(tag, offset)
         data, count = self.sections[tag]
-        starts = sorted({struct.unpack_from("<ii", data, index * 8)[1] for index in range(count)})
+        cached = self._blob_starts.get(tag)
+        if cached is None or cached[0] != count:
+            cached = (count, sorted({struct.unpack_from("<ii", data, index * 8)[1] for index in range(count)}))
+            self._blob_starts[tag] = cached
+        starts = cached[1]
         blobs = self.sections[blob_tag][0]
-        later = [item for item in starts if item > start]
-        end = later[0] if later else len(blobs)
+        following = bisect_right(starts, start)
+        end = starts[following] if following < len(starts) else len(blobs)
         if not 0 <= start < end <= len(blobs):
             raise LayoutError(f"{tag} data at {start:#x} is outside {blob_tag}")
         return self.string(kind), start, end
@@ -160,14 +173,19 @@ class Drb:
 
     def dialogs(self) -> dict[str, int]:
         """Dialog names mapped to their DLG offsets."""
+        if self._dialogs is not None:
+            return dict(self._dialogs)
         data, count = self.sections["DLG"]
         result = {}
         for index in range(count):
             result.setdefault(self.string(struct.unpack_from("<i", data, index * DLG_SIZE)[0]), index * DLG_SIZE)
-        return result
+        self._dialogs = result
+        return dict(result)
 
     def _dialog(self, name: str) -> int:
-        offset = self.dialogs().get(name)
+        if self._dialogs is None:
+            self.dialogs()
+        offset = self._dialogs.get(name)
         if offset is None:
             raise LayoutError(f"The menu layout has no dialog {name}")
         return offset
@@ -422,6 +440,7 @@ class Drb:
         # Names, shape and control data go at the ends of their sections.
         self._trim("STR", self._strings_end())
         name_offset = self._append("STR", name.encode("utf-16-le") + b"\0\0")
+        self._strings_used = len(self.sections["STR"][0])
         self.sections["STR"][1] += 1
         self._pad("STR")
         self._trim("SHPR", self._blobs_end("SHAP", "SHPR"))
@@ -471,6 +490,8 @@ class Drb:
                         struct.pack_into("<i", data, index * size + field, value + 8)
 
     def _strings_end(self) -> int:
+        if self._strings_used is not None:
+            return self._strings_used
         data, count = self.sections["STR"]
         at = 0
         for _ in range(count):
@@ -479,6 +500,7 @@ class Drb:
                 if at >= len(data):
                     raise LayoutError("The name table is shorter than its count")
             at += 2
+        self._strings_used = at
         return at
 
     def _blobs_end(self, tag: str, blob_tag: str) -> int:

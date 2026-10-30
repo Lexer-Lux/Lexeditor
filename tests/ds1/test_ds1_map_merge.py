@@ -6,6 +6,7 @@ values conflict and the later one is used. Synthetic maps only.
 """
 from pathlib import Path
 import sys
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from msb_fixture import build_msb
@@ -77,8 +78,8 @@ def test_a_restructured_map_is_taken_whole_from_the_last_mod():
     assert result.files[MAP] == grown
     assert [(c.part, c.mods) for c in result.conflicts] == [("m10_00_00_00.msb (whole map)", ["B", "A"])]
     foreign = mod("C", (MAP, b"not a map file"))
-    result = mod_loader.compose(GAME, [foreign])
-    assert result.files[MAP] == b"not a map file" and result.conflicts == []
+    with pytest.raises(mod_loader.MsbError):
+        mod_loader.compose(GAME, [foreign])
 
 
 def test_a_map_missing_from_vanilla_is_taken_whole():

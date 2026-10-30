@@ -42,6 +42,14 @@ def resolve_model(game_root, project, map_name, model):
     """Where a map model's geometry lives: ('piece', path),
     ('member', binder path, member name), or ('skip', reason)."""
     mtype, name = model['type'], model['name']
+    if mtype == 5:
+        from .map_collision import sources
+        found = next(sources(game_root, project, map_name, name), None)
+        return ('collision', found[1]) if found else ('skip', 'no collision file')
+    if mtype == 6:
+        relative = Path('map') / Path(map_name).stem / (Path(map_name).stem + '.nvmbnd.dcx')
+        path = _overlay(project, relative) or Path(game_root) / relative
+        return ('navigation', path) if path.is_file() else ('skip', 'no navigation binder')
     if mtype == 0:
         folder = Path(map_name).stem
         for suffix in ('.flver.dcx', '.flver'):
@@ -902,6 +910,28 @@ def model_geometry(game_root, project, map_name, model, known=None):
     """Base64 float32 geometry for one model, cached by file stamp,
     with UVs and diffuse textures for the viewport. known skips
     texture blobs the caller already holds (content ids stay)."""
+    if model['type'] == 5:
+        from .map_collision import geometry
+        return geometry(game_root, project, map_name, model['name'])
+    if model['type'] == 6:
+        from .map_navigation import geometry
+        resolved = resolve_model(game_root, project, map_name, model)
+        if resolved[0] == 'skip':
+            raise FlverError(resolved[1])
+        if Path(resolved[1]).stat().st_size > MAX_GEOMETRY:
+            raise FlverError('Navigation binder is too large')
+        plain = inflate(Path(resolved[1]).read_bytes())
+        entries = members(plain)
+        lookup = entries if isinstance(entries, dict) else {entry.name: entry for entry in entries}
+        stem = model['name'].lower()
+        matches = [name for name in lookup
+                   if name.replace('\\', '/').rsplit('/', 1)[-1].lower().startswith(stem)
+                   and name.lower().endswith('.nvm')]
+        if len(matches) != 1:
+            raise FlverError('No unique navigation mesh for ' + model['name'])
+        member = lookup[matches[0]]
+        offset, size = (member['offset'], member['size']) if isinstance(member, dict) else (member.offset, member.size)
+        return geometry(plain[offset:offset+size])
     resolved = resolve_model(game_root, project, map_name, model)
     if resolved[0] == 'skip':
         raise FlverError(resolved[1])
@@ -1201,7 +1231,10 @@ def map_view(mapstore, map_name):
     doc = mapstore.get(map_name)
     models = {}
     for model in doc.models:
-        resolved = resolve_model(mapstore.game_root, mapstore.project, map_name, model)
+        try:
+            resolved = resolve_model(mapstore.game_root, mapstore.project, map_name, model)
+        except (FormatError, OSError, ValueError) as error:
+            resolved = ('skip', str(error))
         models[model['name']] = {'type': model['type'], 'available': resolved[0] != 'skip',
                                   'reason': '' if resolved[0] != 'skip' else resolved[1]}
     parts = []
@@ -1210,6 +1243,10 @@ def map_view(mapstore, map_name):
                       'kind': part['kind'], 'model': part['model'],
                       'pos': list(part['pos']), 'rot': list(part['rot']),
                       'scale': list(part['scale'])})
+        if 'hitFilter' in part:
+            parts[-1]['hitFilter'] = part['hitFilter']
+        if part['kind'] == 'Region':
+            parts[-1].update(shape=part['shape'], dimensions=part['dimensions'])
     lights = []
     for light in doc.lights():
         lights.append({'key': light['key'], 'name': light['name'],
@@ -1220,5 +1257,9 @@ def map_view(mapstore, map_name):
         messages.append({'key': message['key'], 'name': message['name'],
                          'textId': message['textId'],
                          'pos': list(message['pos']) if message['pos'] is not None else None})
-    return {'map': map_name, 'models': models, 'parts': parts,
+    from .msb import REGION_SHAPES
+    from .msb_events import LABELS
+    create_kinds = [{'id': f'@region:{kind}', 'label': 'Region: '+entry[0]} for kind, entry in REGION_SHAPES.items()]
+    create_kinds += [{'id': f'@event:{kind}', 'label': 'Event: '+label} for kind, label in LABELS.items()]
+    return {'map': map_name, 'models': models, 'parts': parts, 'createKinds': create_kinds,
             'lights': lights, 'messages': messages}

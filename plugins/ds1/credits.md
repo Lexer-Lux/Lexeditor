@@ -28,6 +28,23 @@ terms, with license files riding the per-plugin credits automation.
 (An earlier agent note claimed GPL excluded; that was never Lexer's
 decision.)
 
+## Event-script composition (emevd.py)
+
+DS1 EMEVD layout facts were checked against TKGP / JKAnderson's SoulsFormats,
+`SoulsFormats/Formats/EMEVD/{EMEVD,Event,Instruction,Parameter,Layer}.cs`.
+Its repository license is GPL-3.0. This bounded DS1 reader, writer and event-ID
+composer are an original implementation; no upstream code is redistributed.
+https://github.com/JKAnderson/SoulsFormats
+
+## Named texture composition (texture_packs.py)
+
+PC TPF directory and encoding facts were checked against TKGP / JKAnderson's
+SoulsFormats, `SoulsFormats/Formats/TPF/TPF.cs` (`Read`, `Texture.WriteHeader`,
+`WriteName` and `WriteData`). Its repository license is GPL-3.0. The reader,
+writer and record-comparison implementation here are original; no upstream
+code is redistributed.
+https://github.com/JKAnderson/SoulsFormats
+
 ## Animation events (tae.py)
 
 The TAE container layout (header, animation table, event headers,
@@ -913,3 +930,12 @@ specific requirements.
 if any, to sign a "copyright disclaimer" for the program, if necessary.
 For more information on this, and how to apply and follow the GNU AGPL, see
 <https://www.gnu.org/licenses/>.
+Map collision hit-filter names and MSB1 region/event field meanings were
+checked against Soulstruct's DS1 format definitions (Grimrukh, GPL-3.0):
+https://github.com/Grimrukh/soulstruct/tree/main/src/soulstruct/darksouls1ptde/maps
+Collision triangle storage was checked against soulstruct-havok's
+`fromsoft/shared/map_collision.py`; the editor reads it using its existing
+TAG0 type reader. Navigation triangle layout was checked against
+SoulsFormats `Formats/NVM.cs` (JKAnderson, MIT):
+https://github.com/JKAnderson/SoulsFormats/blob/master/SoulsFormats/Formats/NVM.cs
+No upstream implementation code or game geometry is redistributed.

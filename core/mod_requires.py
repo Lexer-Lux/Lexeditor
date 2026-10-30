@@ -62,12 +62,27 @@ def needs(folder: Path, schema: dict | None = None) -> list[str]:
         try:
             from core import script_mods
             schema = script_mods.schema(folder)
-        except (OSError, ValueError):
+        except Exception:
             schema = {}
     for need in (schema or {}).get("requires", []):
         if isinstance(need, str) and need and need != mod_id(folder) and need not in wanted:
             wanted.append(need)
     return wanted
+
+
+def _stored_mods(library: Path):
+    """Readable mod declarations; discovery never runs component or script code."""
+    root = Path(library)
+    if not root.is_dir():
+        return
+    for folder in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
+        if not folder.is_dir() or folder.name.startswith("."):
+            continue
+        try:
+            stored = mod_metadata._stored(folder)
+        except (OSError, ValueError):
+            continue
+        yield folder, stored
 
 
 def _states(library: Path) -> tuple[dict[str, bool], dict[str, str], dict[str, Path]]:
@@ -79,16 +94,7 @@ def _states(library: Path) -> tuple[dict[str, bool], dict[str, str], dict[str, P
     enabled: dict[str, bool] = {}
     names: dict[str, str] = {}
     folders: dict[str, Path] = {}
-    root = Path(library)
-    if not root.is_dir():
-        return enabled, names, folders
-    for folder in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
-        if not folder.is_dir() or folder.name.startswith("."):
-            continue
-        try:
-            stored = mod_metadata._stored(folder)
-        except (OSError, ValueError):
-            continue
+    for folder, stored in _stored_mods(library):
         mod = str(stored.get("id") or folder.name)
         enabled[mod] = enabled.get(mod, False) or stored.get("enabled") is True
         names.setdefault(mod, display_name(folder))
@@ -142,13 +148,17 @@ def check_changes(library: Path, changes: dict[str, bool]) -> None:
 
 def check_enabled(library: Path) -> None:
     """Refuse to build while any switched-on mod's needs are unmet."""
-    enabled, _, folders = _states(library)
-    for mod, folder in folders.items():
-        if not enabled.get(mod, False):
+    enabled, _, _ = _states(library)
+    for folder, stored in _stored_mods(library):
+        if stored.get('enabled') is not True:
             continue
-        missing = [need for need in needs(folder) if not enabled.get(need, False)]
+        from core.mod_builds import ModBuildError
+        try:
+            missing = [need for need in needs(folder) if not enabled.get(need, False)]
+        except (OSError, ValueError) as error:
+            raise ModBuildError([folder], str(error)) from error
         if missing:
-            raise ValueError(f"{display_name(folder)} requires {_describe(missing, enabled)}")
+            raise ModBuildError([folder], f"{display_name(folder)} requires {_describe(missing, enabled)}")
 
 
 def unmet_lines(library: Path) -> dict[str, list[str]]:
