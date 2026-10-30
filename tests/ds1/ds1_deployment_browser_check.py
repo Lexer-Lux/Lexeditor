@@ -75,7 +75,7 @@ def main():
                         await api('/api/save', {});
                         await loadDeployment();render();
                     }''')
-                    assert field_value(page, 'UP TO DATE') == 'No, reapply after the latest save'
+                    assert field_value(page, 'UP TO DATE') == 'No, rebuild after the latest save'
                     page.get_by_role('button', name='Reapply', exact=True).click()
                     dialog.get_by_role('button', name='Apply', exact=True).click()
                     page.wait_for_function('!state.deployBusy && state.deployment.stale===false')
