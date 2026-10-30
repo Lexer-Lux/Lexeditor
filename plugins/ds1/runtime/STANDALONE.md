@@ -48,6 +48,16 @@ payload. Tests, research notes, builder source, bytecode caches and local build
 journals stay out. Dependencies from metadata and the settings schema remain
 declared in the exported metadata.
 
+Native properties edited in the editor travel as generated
+`native-support/native-rules.json`, alongside their saved values. The shared
+runtime links those prepared patch bytes beside the mod's `runtime.lxd`; it
+does not run the author's builder. Importing a release retains its editable
+property values. Export regenerates this contribution from the saved values
+and preserves existing prebuilt machine code and relocations. A missing or
+stale property contribution disables its owning mod before data is deployed.
+Library switches control these properties too; an old global project recipe
+for the same library folder is retired so an unchecked mod cannot stay active.
+
 Parameter and item/menu text contributions use `records.lxd`: only changed
 rows and text entries, with their old values as anchors. They preserve other
 installed fields and records instead of treating a complete archive as this

@@ -57,6 +57,7 @@ def test_damaged_module_is_rejected_without_linking(vanilla):
 
 def test_shared_support_links_beyond_independently_built_fixed_mod(vanilla):
     fixed_spec = spec()
+    fixed_spec['hooks'] = fixed_spec['hooks'][:1]
     fixed_spec['islands'][0]['rva'] = 0x10000
     fixed = runtime_mods.build(vanilla, [fixed_spec])
     support = exe_patches.validate({'version':2,
@@ -82,9 +83,9 @@ def test_standalone_cache_tracks_fixed_allocations_and_ignores_broken_native_sib
     fixed_spec['islands'][0]['rva'] = 0x10000
     (folder/'runtime.lxd').write_bytes(runtime_mods.build(vanilla,[fixed_spec]))
     assert standalone_runtime._identity([row],tmp_path,[]) != baseline
-    assert len(standalone_runtime._fixed_modules([row])) == 1
+    assert len(standalone_runtime._modules([row])) == 1
     (folder/'runtime.lxd').write_bytes(b'Broken native module')
-    assert standalone_runtime._fixed_modules([row]) == []
+    assert standalone_runtime._modules([row]) == []
     assert standalone_runtime._identity([row],tmp_path,[]) == baseline
 
 
@@ -602,7 +603,9 @@ def test_standalone_data_merger_combines_records_and_disables_only_broken_mod(tm
     # still be reused when enabling, then disabling, a native-only sibling.
     for enabled in (True,False):
         (native/'mod.json').write_text(json.dumps({'id':'iframe-display','name':'Iframe Display','enabled':enabled}))
-        (game/tweak_mods.RUNTIME_RECORD).write_text(json.dumps({'project':None,'mods':['Iframe Display'] if enabled else []}))
+        (game/tweak_mods.RUNTIME_RECORD).write_text(json.dumps({'version':1,'project':None,
+            'mods':['Iframe Display'] if enabled else [],'dllSha256':'0'*64,
+            'patchSha256':hashlib.sha256((game/tweak_mods.RUNTIME_PATCH).read_bytes()).hexdigest()}))
         (game/tweak_mods.RUNTIME_PATCH).write_bytes((game/tweak_mods.RUNTIME_PATCH).read_bytes())
         assert run(game,[library])['reused'] is True
     (game/'lexeditor-ds1-load.json').write_bytes(b'Broken cache')

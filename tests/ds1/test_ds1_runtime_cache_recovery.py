@@ -78,9 +78,10 @@ def test_standalone_loads_healthy_data_and_reports_damaged_runtime_record(game,m
     assert 'legacy Project' in report['warnings'][0]
     assert (root/'menu/example.bin').read_bytes() == b'healthy data'
     assert (root/exe_patches.EXECUTABLE).read_bytes() == built
-    # Reuse keeps the warning, and a second metadata change invalidates reuse.
+    # Reuse keeps the warning; repairing the record invalidates that warning.
     assert standalone_runtime._run(root,[],lambda:None)['reused']
-    (root/tweak_mods.RUNTIME_RECORD).write_bytes(b'{"version":0}')
+    (root/tweak_mods.RUNTIME_RECORD).write_text(json.dumps({'version':1,'mods':[],'project':None,
+        'dllSha256':'0'*64,'patchSha256':hashlib.sha256(b'').hexdigest()}))
     assert not standalone_runtime._run(root,[],lambda:None).get('reused')
 
 

@@ -1511,7 +1511,10 @@ def loaded_files(folder: Path):
         if scripted:
             for _rel in _scripts.consumed_files(folder):
                 found.add(_rel.as_posix().casefold())
-        if scripted or (folder/'runtime.lxd').is_file():
+        from . import native_rules, native_support
+        if (folder/native_rules.SETTINGS_FILE).is_file():
+            found.add(native_rules.SETTINGS_FILE.casefold())
+        if scripted or (folder/'runtime.lxd').is_file() or (folder/native_support.FOLDER).is_dir():
             for _dirname in BUILT_FOLDERS if scripted else BUILT_FOLDERS[1:]:
                 for _candidate in built_files(folder,_dirname):
                     found.add(_candidate.relative_to(folder).as_posix().casefold())

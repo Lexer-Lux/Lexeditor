@@ -110,6 +110,8 @@ class Ds1ModAdapter:
     def inspect(self, root: Path, files: list[Path]) -> dict:
         """Accept a DS1 data mod (its archives) or a tweak mod (its script)."""
         tweak = script_mods.is_script_mod(Path(root))
+        from . import native_rules, native_support
+        tweak = tweak or (Path(root)/native_rules.SETTINGS_FILE).is_file() or (Path(root)/native_support.FOLDER).is_dir()
         if (Path(root) / 'runtime.lxd').is_file():
             from .runtime_mods import read
             tweak_mods.checked(Path(root) / 'runtime.lxd')
@@ -429,7 +431,9 @@ class Ds1ModAdapter:
         for row in rows:
             folder = Path(row["path"])
             try:
-                tweak = script_mods.is_script_mod(folder) or (folder/'runtime.lxd').is_file()
+                from . import native_rules, native_support
+                tweak = (script_mods.is_script_mod(folder) or (folder/'runtime.lxd').is_file()
+                         or (folder/native_rules.SETTINGS_FILE).is_file() or (folder/native_support.FOLDER).is_dir())
             except (OSError, ValueError):
                 continue  # Unreadable metadata is the Mods tab's error row, not a mark.
             # Only a tweak mod's built patches are ever composed; a stray

@@ -218,11 +218,14 @@ def tweak_rows(root: Path | None = None) -> list[dict]:
             if not isinstance(metadata, dict):
                 continue
             scripted = isinstance(metadata.get('script'), dict)
-            if not scripted and not (folder/'runtime.lxd').is_file():
+            from . import native_rules, native_support
+            module = (folder/'runtime.lxd').is_file()
+            if not scripted and not module and not (folder/native_rules.SETTINGS_FILE).is_file() and not (folder/native_support.FOLDER).is_dir():
                 continue
             row = script_mods.catalog_row(folder) if scripted else {
                 'path': str(folder), 'error': '', 'values': {}, 'schema': script_mods.schema(folder)}
             row['prebuilt'] = not scripted
+            row['module'] = module
             order = metadata.get('order', 1000)
             if not isinstance(order, int) or isinstance(order, bool):
                 row['error'] = 'Load order must be a whole number'
@@ -527,7 +530,7 @@ def _script_compiler_revision():
     return _sha(_composition_revision() + Path(script_mods.__file__).read_bytes() + Path(__file__).read_bytes())
 
 
-def build_specs(root: Path | None = None, game_root: Path | None = None, *, cache_root=None, timings=None) -> list[dict]:
+def build_specs(root: Path | None = None, game_root: Path | None = None, *, cache_root=None, timings=None, original=None) -> list[dict]:
     """Build every enabled tweak mod and read back its executable patches.
 
     Mods whose build patches the executable need the loader mod switched
@@ -545,16 +548,23 @@ def build_specs(root: Path | None = None, game_root: Path | None = None, *, cach
     ensure_loader_mod(root)
     context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root, cache_root=cache_root)
     script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError, timings=timings)
+    from . import native_support, native_rules
+    if game_root is not None and any((Path(row['path'])/native_rules.SETTINGS_FILE).is_file() for row in rows):
+        if original is None:
+            original = _read(checked(Path(game_root)/exe_patches.EXECUTABLE))
+        native_support.build_sources(rows,original)
     specs = _built([row for row in rows if not row.get('prebuilt')], "native", exe_patches.validate)
+    support = native_support.specs(rows)
     dims = _built(rows, menu_dim.FOLDER, menu_dim.validate)
     _refuse_without_loader([spec["owner"] for spec in specs if _needs_loader(spec)]
                            + [spec["owner"] for spec in dims if spec["textIds"]]
-                           + [row['name'] for row in rows if row.get('prebuilt')], root)
+                           + [row['name'] for row in rows if row.get('prebuilt') and row.get('module',True)]
+                           + [spec['owner'] for spec in support if _needs_loader(spec)], root)
     try:
         dim = menu_dim.patch_spec(dims)
     except ValueError as error:
         raise TweakError(str(error), folders=[spec["folder"] for spec in dims]) from error
-    return specs + ([exe_patches.validate(dim, menu_dim.OWNER)] if dim else [])
+    return specs + support + ([exe_patches.validate(dim, menu_dim.OWNER)] if dim else [])
 
 
 def layout_specs(root: Path | None = None) -> list[dict]:
@@ -567,7 +577,7 @@ def esd_specs(root: Path | None = None) -> list[dict]:
     return _built([row for row in tweak_rows(root) if row["enabled"]], "esd", menu_scripts.validate)
 
 
-BUILT_FOLDERS = ('native', 'layout', 'esd', menu_dim.FOLDER)
+BUILT_FOLDERS = ('native', 'layout', 'esd', menu_dim.FOLDER, 'native-support')
 MAX_BUILT_COMPONENTS = 64
 MAX_BUILT_COMPONENT_BYTES = 16 * 1024 * 1024
 
@@ -579,14 +589,24 @@ def built_files(root: Path, kind: str) -> list[Path]:
     directory = checked(Path(root)/kind)
     if not directory.exists():
         return []
-    files = sorted(directory.glob('*.json'))
-    if len(files) > MAX_BUILT_COMPONENTS:
-        raise TweakError(f'{kind} has more than {MAX_BUILT_COMPONENTS} patch components')
+    files = []
+    for path in directory.glob('*.json'):
+        files.append(path)
+        if len(files) > MAX_BUILT_COMPONENTS:
+            raise TweakError(f'{kind} has more than {MAX_BUILT_COMPONENTS} patch components')
     for path in files:
         checked(path)
         if not path.is_file() or path.stat().st_size > MAX_BUILT_COMPONENT_BYTES:
             raise TweakError(f'{kind}/{path.name} is not a bounded patch file')
-    return files
+    return sorted(files)
+
+
+def read_built(path: Path) -> bytes:
+    with checked(path).open('rb') as stream:
+        raw = stream.read(MAX_BUILT_COMPONENT_BYTES+1)
+    if len(raw) > MAX_BUILT_COMPONENT_BYTES:
+        raise ValueError('The patch component grew beyond its limit')
+    return raw
 
 
 def _built(rows: list[dict], folder: str, check) -> list[dict]:
@@ -594,7 +614,12 @@ def _built(rows: list[dict], folder: str, check) -> list[dict]:
     for row in rows:
         try:
             for target in built_files(Path(row['path']), folder):
-                spec = check(json.loads(target.read_text(encoding="utf-8")), row["name"])
+                raw = read_built(target)
+                value = json.loads(raw)
+                if folder == 'native-support':
+                    from . import native_support
+                    native_support.check_source(Path(row['path']),target.relative_to(row['path']),value)
+                spec = check(value, row["name"])
                 spec["folder"] = row["path"]
                 specs.append(spec)
         except Exception as error:
@@ -627,9 +652,10 @@ def native_spans(folder: Path, owner: str) -> dict[str, list[tuple[int, int]]]:
                 found['islands'] = [(rva, rva+size) for kind, rva, size, _ in module['records'] if kind == exe_patches.BLOCK]
         except (ValueError, OSError):
             pass
-        return found
     try:
-        files = sorted((Path(folder) / "native").glob("*.json"))
+        from . import native_support
+        files = sorted((Path(folder) / "native").glob("*.json")) if script_mods.is_script_mod(folder) else []
+        files += built_files(Path(folder),native_support.FOLDER)
     except OSError:
         return found
     for path in files[:MAX_NATIVE_FILES]:
@@ -656,6 +682,9 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
     """
     folder = Path(folder)
     parts = {"source": script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision()}
+    from . import native_rules, native_support
+    parts['nativeRules'] = native_rules.digest(native_rules._read_optional(folder/native_rules.SETTINGS_FILE,native_rules.SETTINGS_LIMIT))
+    parts['nativeSupport'] = {path.name:_sha(read_built(path)) for path in built_files(folder,native_support.FOLDER)}
     if not script_mods.is_script_mod(folder) and (folder/'runtime.lxd').is_file():
         from . import runtime_mods
         checked(folder/runtime_mods.FILENAME)
@@ -1125,6 +1154,7 @@ def _runtime_status(game_root: Path) -> dict:
     state = _runtime(game_root)
     result = {"applied": list(state["record"]["mods"]) if state["active"] else [],
               "project": state["record"].get("project") if state["active"] else None,
+              'built': dict(state['record'].get('built') or {}) if state['active'] else {},
               "problem": state['problem'], "loaderMessage": "",
               "installed": bool(state['record'] or state['patch'] is not None
                                 or state['dll'] is not None and not state['foreignDll'])}
@@ -1340,10 +1370,16 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
     chosen = (runtime.get('record') or {}).get('project') if project is _KEEP_PROJECT else (
         project(original) if callable(project) else project)
     chosen = _project(chosen)
+    if chosen is not None:
+        from . import native_support
+        # Once this folder has ordinary mod-native properties, its switch is
+        # authoritative, including when it is off. Retire the old global copy.
+        if native_support.owns_project(chosen,[root or mods_root()]):
+            chosen = None
     if chosen is not None and _needs_loader(chosen["spec"]):
         _refuse_without_loader(["Project native rules"], root)
     script_timings = []
-    native = build_specs(root, game_root, cache_root=cache_root, timings=script_timings)
+    native = build_specs(root, game_root, cache_root=cache_root, timings=script_timings, original=original)
     # Fingerprinted after the build, so the fingerprint covers the built files too.
     built = {row["id"]: build_fingerprint(Path(row["path"]), produced=True)
              for row in tweak_rows(root) if row["enabled"]}
@@ -1368,14 +1404,20 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
             before = target.read_bytes() if target.is_file() else None
             if row.get('prebuilt'):
                 if before is None:
-                    raise TweakError(f"{row['name']}: missing prebuilt mod", folders=[folder])
-                try:
-                    runtime_mods.inspect(before)
-                except exe_patches.PatchError as error:
-                    raise TweakError(f"{row['name']}: {error}", folders=[folder]) from error
+                    if row.get('module',True):
+                        raise TweakError(f"{row['name']}: missing prebuilt mod", folders=[folder])
+                else:
+                    try:
+                        runtime_mods.inspect(before)
+                    except exe_patches.PatchError as error:
+                        raise TweakError(f"{row['name']}: {error}", folders=[folder]) from error
                 after = before
+                if after is not None and any(built_files(folder,kind) for kind in BUILT_FOLDERS[1:]):
+                    after = runtime_mods.require_data(after)
+                    if before != after:
+                        module_writes.append({'path':str(target),'before':before,'after':after})
             else:
-                owned = [spec for spec in native if spec.get('folder') == row['path']]
+                owned = [spec for spec in native if spec.get('folder') == row['path'] and not spec.get('shared')]
                 from . import mod_loader
                 requires_data = bool(mod_loader.content_files(folder, row['name'])) or any(
                     built_files(folder, kind) for kind in BUILT_FOLDERS[1:])
@@ -1385,7 +1427,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
             if after is not None:
                 module_hashes[str(target)] = _sha(after)
                 modules.append(after)
-        patch = runtime_mods.shared_patch(original, [spec for spec in specs if not spec.get('folder')], modules)
+        patch = runtime_mods.shared_patch(original, [spec for spec in specs if not spec.get('folder') or spec.get('shared')], modules)
         # Prebuilt mods have no source description to feed the old combined
         # composer. Check their actual compiled claims together with sources.
         claimed = []
@@ -1599,6 +1641,7 @@ def status(game_root: Path, root: Path | None = None) -> dict:
     result = {"applied": [], "state": "unknown", "backupOk": False, "problem": "",
               "pendingRecovery": False, "project": None, "loaderMessage": "",
               "canRestore": False,
+              'built': {},
               "windows": os.name == "nt", "modsRoot": str(Path(root or mods_root())),
               "needsRebuild": False, "staleMods": []}
     try:
@@ -1620,6 +1663,7 @@ def status(game_root: Path, root: Path | None = None) -> dict:
         names = runtime["applied"] + [name for item in files for name in item["applied"]]
         result["applied"] = list(dict.fromkeys(names))
         result["project"] = runtime["project"] or executable["project"]
+        result['built'] = runtime['built']
         result["pendingRecovery"] = any(item["pendingRecovery"] for item in files)
         result["loaderMessage"] = runtime["loaderMessage"]
 

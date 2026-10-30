@@ -76,14 +76,14 @@ def _requires_data(folder):
     return magic == MAGIC and version == VERSION and values[-1] == 1
 
 
-def _fixed_modules(rows):
+def _modules(rows):
     from . import runtime_mods
     modules = []
     for row in rows:
         try:
             with (row['path']/runtime_mods.FILENAME).open('rb') as stream:
                 header = stream.read(runtime_mods.HEADER.size)
-            if len(header) == runtime_mods.HEADER.size and runtime_mods.HEADER.unpack(header)[-2] == 1:
+            if len(header) == runtime_mods.HEADER.size:
                 modules.append(runtime_mods.read(row['path']))
         except (OSError,ValueError):
             pass  # The native scanner diagnoses/skips this module independently.
@@ -107,10 +107,8 @@ def _identity(rows, game, targets):
         managed = tweak_mods.managed_menu(relative)
         if managed is not None:
             paths.extend((managed.backup(game), managed.manifest(game), deployment._marker_path(game,relative)))
-    record_path = tweak_mods.checked(game/tweak_mods.RUNTIME_RECORD)
-    record, _warning = tweak_mods.runtime_record(game)
+    record, warning = tweak_mods.runtime_record(game)
     project = record.get('project') if record else None
-    paths.append(record_path)
     stamped = []
     for path in paths:
         if path == game/tweak_mods.RUNTIME_PATCH and path.is_file():
@@ -123,9 +121,9 @@ def _identity(rows, game, targets):
             value = _stamp(path)
         stamped.append([str(path),value])
     from . import runtime_mods
-    allocations = [[rva,size] for data in _fixed_modules(rows)
+    allocations = [[rva,size] for data in _modules(rows) if runtime_mods.inspect(data)['fixed']
                    for kind,rva,size,_ in runtime_mods.inspect(data)['records'] if kind == exe_patches.BLOCK]
-    payload = [mod_loader._composition_revision().hex(), contributors, project, stamped, allocations]
+    payload = [mod_loader._composition_revision().hex(), contributors, project, warning, stamped, allocations]
     return hashlib.sha256(json.dumps(payload,separators=(',',':')).encode()).hexdigest()
 
 
@@ -136,10 +134,12 @@ def _specs(rows, kind, validate):
         raise ModBuildError(error.folders,str(error)) from error
 
 
-def prepare(game, rows):
+def prepare(game, rows, roots=()):
+    from . import native_support
     data = []
     for row in rows:
         try:
+            native_support.require_built_rules(row['path'])
             mod = mod_loader.read_mod(row['path'],row['name'])
             if mod is not None and (mod.files or mod.edits):
                 data.append(mod)
@@ -179,13 +179,17 @@ def prepare(game, rows):
     # runs here. Ordinary mod machine code stays in each runtime.lxd.
     dim_patch = menu_dim.patch_spec(dims)
     support = [exe_patches.validate(dim_patch,menu_dim.OWNER)] if dim_patch else []
+    support.extend(_specs(rows,native_support.FOLDER,native_support.validate))
     record, _warning = tweak_mods.runtime_record(game)
+    libraries = [*roots,*(row['path'].parent for row in rows)]
+    if record and native_support.owns_project(record.get('project'),libraries):
+        record = {**record,'project':None}
     if record and record.get('project'):
         support.append(exe_patches.validate(record['project']['spec'],'Project native rules'))
     if support:
         executable = deployment.vanilla_source(game,Path(exe_patches.EXECUTABLE)).read_bytes()
         from . import runtime_mods
-        patch = runtime_mods.shared_patch(executable,support,_fixed_modules(rows)) or b''
+        patch = runtime_mods.shared_patch(executable,support,_modules(rows)) or b''
     else:
         patch = b''
     return data, composition, files, patch, record
@@ -250,7 +254,7 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
                 for row in rows:
                     if any(need not in available for need in mod_requires.declared(row['path'])):
                         raise ModBuildError([row['path']],f"{row['name']}: a required mod is unavailable")
-                data, composition, files, patch, record = prepare(game,rows)
+                data, composition, files, patch, record = prepare(game,rows,roots)
                 break
             except ModBuildError as error:
                 failed = {Path(path).resolve() for path in error.folders}

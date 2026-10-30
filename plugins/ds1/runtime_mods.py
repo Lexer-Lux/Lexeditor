@@ -122,6 +122,16 @@ def link(data: bytes, base: int) -> bytes:
     return bytes(result)
 
 
+def require_data(data: bytes) -> bytes:
+    """Gate existing machine code on its newly attached data/support files."""
+    if inspect(data)['requiresData']:
+        return data
+    result = bytearray(data)
+    struct.pack_into('<I',result,HEADER.size-4,1)
+    struct.pack_into('<I',result,len(result)-4,zlib.crc32(result[:-4]))
+    return bytes(result)
+
+
 def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes]) -> bytes | None:
     """Place loader-owned support beyond each mod's fixed code allocation.
 
@@ -137,6 +147,15 @@ def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes]) -> byt
     occupied = []
     for data in modules:
         module = inspect(data)
+        module_ranges = [(rva,rva+size) for kind,rva,size,_ in module['records'] if kind == patches.HOOK]
+        module_ranges += [(rva,rva+size) for rva,size in module['claims']]
+        for spec in specs:
+            spans = patches.spans(spec)
+            shared_ranges = spans['hooks'] + spans['state']
+            if any(low < other_high and other_low < high for low,high in shared_ranges
+                   for other_low,other_high in module_ranges):
+                raise patches.PatchError(f"{spec['owner']}: shared native properties conflict with a prebuilt mod",
+                                         folders=[spec['folder']] if spec.get('folder') else [])
         occupied.extend((rva, rva+size) for kind, rva, size, _ in module['records']
                         if kind == patches.BLOCK and module['fixed'])
     if blocks and not support['fixed']:
@@ -152,7 +171,7 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
     """Export built contributions without developer files or local paths."""
     from core import mod_metadata, mod_requires, script_mods
     from core.mod_library import relative_path
-    from . import assets, menu_dim, mod_loader, tweak_mods, record_edits
+    from . import assets, menu_dim, mod_loader, tweak_mods, record_edits, native_support, native_rules
     folder, destination = Path(folder), Path(destination)
     tweak_mods.checked(folder)
     metadata = json.loads((folder/'mod.json').read_text(encoding='utf-8'))
@@ -175,9 +194,28 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
     prebuilt = not scripted and (folder/FILENAME).is_file()
     specs = [] if prebuilt else tweak_mods._built([row],'native',patches.validate)
     contributions = list(mod_loader.content_files(folder,metadata.get('name') or mod_id))
+    rules = native_support.rules_output(folder,vanilla)
     for kind in tweak_mods.BUILT_FOLDERS[1:]:
         for path in tweak_mods.built_files(folder,kind):
+            if rules is not None and path.relative_to(folder) == native_support.RULES_FILE:
+                continue  # Regenerated from the saved settings for this release.
             contributions.append((path.relative_to(folder),path))
+    if rules is not None:
+        contributions.append((Path(native_rules.SETTINGS_FILE),folder/native_rules.SETTINGS_FILE))
+        from .store import MARKER
+        marker = folder/MARKER
+        if marker.is_file():
+            contributions.append((Path(MARKER),marker))
+    # Check every retained support component before exporting it. A bad
+    # component cannot hide behind a perfectly valid opaque runtime.lxd.
+    support_specs = []
+    for relative,path in contributions:
+        if relative.parts[0] == native_support.FOLDER:
+            value = json.loads(tweak_mods.read_built(path))
+            native_support.check_source(folder,relative,value)
+            support_specs.append(native_support.validate(value,row['name']))
+    if rules is not None:
+        support_specs.append(native_support.validate(json.loads(rules),row['name']))
     portable = {}
     existing_records = None
     for relative,path in contributions:
@@ -204,6 +242,10 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
     payload = read(folder) if prebuilt else build(vanilla, specs, requires_data=bool(contributions)) if specs else None
     if payload is not None and inspect(payload)['requiresData'] and not contributions:
         raise ValueError('This prebuilt mod is missing its required data; rebuild or reinstall it before exporting')
+    if payload is not None and contributions:
+        payload = require_data(payload)
+    if support_specs:
+        shared_patch(vanilla,support_specs,[payload] if payload is not None else [])
     if payload is None:
         if not contributions:
             raise ValueError('This mod has no built contributions to export')
@@ -223,6 +265,10 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
             raise ValueError('The release metadata exceeds the loader size limit')
         (target/'mod.json').write_bytes(encoded)
         (target/FILENAME).write_bytes(payload)
+        if rules is not None:
+            output = target/native_support.RULES_FILE
+            output.parent.mkdir(parents=True,exist_ok=True)
+            output.write_bytes(rules)
         if portable:
             (target/record_edits.FILENAME).write_bytes(existing_records if not archives and existing_records is not None
                                                      else record_edits.encode(portable))
@@ -233,6 +279,8 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
             output = target/relative
             output.parent.mkdir(parents=True,exist_ok=True)
             output.write_bytes(source.read_bytes())
+        if rules is not None:
+            native_support.check_source(target,native_support.RULES_FILE,json.loads(rules))
     except Exception:
         import shutil
         if target.resolve().parent != destination.resolve():

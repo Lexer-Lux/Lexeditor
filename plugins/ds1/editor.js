@@ -546,14 +546,15 @@ async function deploymentAction(action){
   if(state.deployBusy)return;
   if(state.dirty+state.pending){LexeditorUI.showAlert({title:"Save project changes first",message:"Applying installs the archive already saved to the mod project."});return;}
   const confirmations={
-    apply:{title:"Apply this mod to the installed game?",message:"Lexeditor installs the saved parameter archive, map files and character files and composes this project's native rules with enabled library tweaks. Each original is preserved once. Close the game first and test native changes offline.",confirmLabel:"Apply"},
+    apply:{title:"Apply this mod to the installed game?",message:"Lexeditor combines this mod's saved changes with enabled library mods. It preserves the original data and applies native changes in memory. Close the game first.",confirmLabel:"Apply"},
     disable:{title:"Restore the original installed files?",message:"Lexeditor restores owned data files and removes its loader. Saved mod settings and the game executable stay unchanged.",confirmLabel:"Restore original"}
   };
   if(action==="apply"&&state.nativeRules?.migration)confirmations.apply.message+=" "+state.nativeRules.migration;
   const ok=await confirmAction({...confirmations[action],cancelLabel:"Cancel"});
   if(!ok)return;
   state.deployBusy=true;render();
-  try{await api("/api/deployment/"+action,{});await loadDeployment();}
+  try{const result=await api("/api/deployment/"+action,{});await loadDeployment();
+    if(result.disabledMods?.length)LexeditorUI.showToast(result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});}
   catch(error){notify(error);}
   finally{state.deployBusy=false;render();}
 }
@@ -4669,23 +4670,23 @@ function renderInfo(){
       detailField({label:"ORIGINAL PRESERVED",control:readonlyField(deploy.everApplied?(deploy.backupOk?"Yes":"No, needs attention"):"Not yet applied"),
         help:infoHelp("The first Apply keeps one copy of the installed file exactly as it was. Disable always restores that copy.")}),
       detailField({label:"UP TO DATE",control:readonlyField(upToDate),
-        help:infoHelp("Apply installs the archive already saved in the mod project. Reapply after every later save that should reach the installed game.")}),
+        help:infoHelp("Save builds changes for enabled library mods. Apply installs saved changes from this project.")}),
       needsAttentionNote(deploy),
       actionRow(
         el("button",{type:"button",disabled:state.deployBusy||!deploy.isProject||!deploy.sourceReady||deploy.changedExternally,onclick:()=>deploymentAction("apply")},deploy.everApplied?"Reapply":"Apply"),
         el("button",{type:"button",disabled:state.deployBusy||(!deploy.everApplied&&!deploy.native?.canRestore)||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
       )].filter(Boolean)}),
     detailSection({title:"NATIVE RULES",body:[
-      detailField({label:"APPLIED PROJECT",control:readonlyField(deploy.native?.project?.path||"None"),
-        help:infoHelp("Native rules are applied in memory by the same loader as library tweaks, from one patch. Applying library tweaks keeps the last applied project rules. Restore original removes both without changing saved settings.")}),
+      detailField({label:"APPLIED PROJECT",control:readonlyField(deploy.native?.project?.path||(deploy.nativeProjectActive?"Selected library mod":"None")),
+        help:infoHelp("Library native rules follow each mod's switch. Projects outside the library keep their last applied rules until reapplied or restored.")}),
       deploy.native?.problem?LexeditorUI.detailNote(deploy.native.problem):null,
       deploy.native?.pendingRecovery?LexeditorUI.detailNote("An interrupted native operation is recoverable. Retry Apply or Restore original."):null,
       state.nativeRules?.migration?LexeditorUI.detailNote(state.nativeRules.migration):null
     ].filter(Boolean)}),
-    modLoaderSection({loader:deploy.note||"Dark Souls Remastered reads this file as a loose file; no mod loader is installed.",
-      output:"Apply replaces the installed parameter archive, map, animation and asset files with the mod project's saved copies, after preserving each original once.",
-      order:"One complete parameter archive and the project's map files. Separate projects are not merged; applying a different project replaces what is currently installed.",
-      safety:"Apply composes enabled library tweaks and project native rules before replacing the executable, parameter archive and map files. Outside changes are refused.",
+    modLoaderSection({loader:deploy.note||"Enabled mods combine over the game's files. Native mods use Lexeditor Loader.",
+      output:"Apply combines saved changes from enabled mods with the game's preserved originals.",
+      order:"The Mods tab lists overlaps and changes that cannot combine.",
+      safety:"Apply prepares enabled mods before it writes installed files. The loader applies native changes in memory.",
       removal:"Restore original restores all owned files. The project and library tweak settings stay unchanged."})]});
 }
 // Tweaks are library mods: a switch saves at once, and changed tweaks

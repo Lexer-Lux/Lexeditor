@@ -56,6 +56,25 @@ def _read_optional(path, limit):
     return raw
 
 
+def decode_settings(raw):
+    try:
+        content = json.loads(raw)
+    except (ValueError,RecursionError) as error:
+        raise ValueError('Unsupported native-rule settings file') from error
+    if (type(content) is not dict or set(content) != {'schema','rules'}
+            or type(content['schema']) is not int or content['schema'] != 1):
+        raise ValueError('Unsupported native-rule settings file')
+    return settings(content['rules'])
+
+
+def patch_spec(original, value):
+    parts = [load_bands_patch.patch_spec(original,load_bands.native_projection(value)),
+             levelup_gains.patch_spec(original,value['levelupGains'])]
+    return {'version':max(part['version'] for part in parts),
+            'islands':[island for part in parts for island in part['islands']],
+            'hooks':[hook for part in parts for hook in part['hooks']]}
+
+
 class NativeRules:
     def __init__(self, game_root, project=None, read_only=True):
         self.game_root = tweak_mods.checked(Path(game_root))
@@ -81,11 +100,7 @@ class NativeRules:
         self.legacy = None
         raw = _read_optional(self._path(), SETTINGS_LIMIT)
         if raw is not None:
-            content = json.loads(raw)
-            if (type(content) is not dict or set(content) != {"schema", "rules"}
-                    or type(content["schema"]) is not int or content["schema"] != 1):
-                raise ValueError("Unsupported native-rule settings file")
-            return settings(content["rules"]), digest(raw)
+            return decode_settings(raw), digest(raw)
         # Read the predecessor's draft settings without ever overwriting them.
         legacy_raw = _read_optional(self.project / LEGACY_FILE, SETTINGS_LIMIT)
         self.legacy = None
@@ -122,10 +137,11 @@ class NativeRules:
 
     def save(self):
         self.validate_save()
-        if self.dirty_count:
+        if self.dirty_count or self.legacy is not None and self.saved_hash is None:
             raw = (json.dumps({"schema": 1, "rules": self.value}, indent=2, allow_nan=False) + "\n").encode()
             atomic_write(self._path(), raw)
             self.saved, self.saved_hash = deepcopy(self.value), digest(raw)
+            self.legacy = None
         return self.snapshot()
 
     def discard(self):
@@ -271,11 +287,7 @@ class NativeRules:
 
     def _contribution(self, original):
         self.validate_save()
-        parts = [load_bands_patch.patch_spec(original, load_bands.native_projection(self.saved)),
-                 levelup_gains.patch_spec(original, self.saved["levelupGains"])]
-        spec = {"version": max(part["version"] for part in parts),
-                "islands": [island for part in parts for island in part["islands"]],
-                "hooks": [hook for part in parts for hook in part["hooks"]]}
+        spec = patch_spec(original,self.saved)
         if not spec["hooks"] and not spec["islands"]:
             return None
         encoded = json.dumps(self.saved, sort_keys=True, separators=(",", ":")).encode()
@@ -312,6 +324,27 @@ class NativeRules:
         if self.dirty_count or store.get().dirty_count:
             raise ValueError("Save or discard all changes before applying")
         tweak_mods.ensure_game_closed()
+        library = tweak_mods.checked(tweak_mods.mods_root()).resolve()
+        if self.project.resolve().parent == library and (self.project/'mod.json').is_file():
+            from core import mod_requires, mods_service
+            from core.mod_builds import activate_with_recovery
+            from .mod_support import Ds1ModAdapter
+            identity = mod_requires.mod_id(self.project)
+            mod_requires.check_changes(library,{identity:True})
+            metadata = self.project/'mod.json'
+            before = metadata.read_bytes()
+            mods_service.set_enabled(self.project,True)
+            switched = metadata.read_bytes()
+            adapter = Ds1ModAdapter()
+            adapter.attach_context(project_root=self.project,library_root=library,game_root=self.game_root)
+            try:
+                result = activate_with_recovery(adapter,[Path(row['path']) for row in mods_service.library_rows(library)
+                                                         if row['enabled']],self.game_root)
+            except Exception:
+                if metadata.read_bytes() == switched:
+                    atomic_write(metadata,before)
+                raise
+            return {**self.deployment_status(),'disabledMods':result['disabledMods']}
         with tweak_mods.locked(self.game_root):
             return self._apply_locked(store)
 
@@ -375,12 +408,25 @@ class NativeRules:
 
     def deployment_status(self):
         result = deployment.status(self.game_root, self.project)
+        if self.project is not None and (self.project/SETTINGS_FILE).is_file():
+            result['sourceReady'] = True
         result["native"] = tweak_mods.status(self.game_root)
         result["nativeRules"] = self.snapshot()
         current = result["native"].get("project")
         encoded = json.dumps(self.saved, sort_keys=True, separators=(",", ":")).encode()
         active = bool(current and self.project and current["path"] == str(self.project.resolve()))
+        stale = bool(active and current['settingsHash'] != digest(encoded))
+        built = result['native'].get('built') or {}
+        if not active and self.project is not None and built:
+            from core import mod_requires
+            try:
+                identity = mod_requires.mod_id(self.project)
+                if identity in built and (self.project/SETTINGS_FILE).is_file():
+                    active = True
+                    stale = built[identity] != tweak_mods.build_fingerprint(self.project)
+            except (ValueError,OSError):
+                stale = True
         result["nativeProjectActive"] = active
-        result["nativeStale"] = bool(active and current["settingsHash"] != digest(encoded))
+        result["nativeStale"] = stale
         result["stale"] = bool(result["stale"] or result["nativeStale"])
         return result
