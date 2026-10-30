@@ -359,15 +359,17 @@ def test_legacy_file_change_before_migration_save_is_not_lost(project):
     assert not (mod / SETTINGS_FILE).exists()
 
 
-def test_verified_legacy_native_only_restore_then_shared_apply(project, monkeypatch):
+def test_legacy_executable_is_read_only_then_shared_apply_after_steam_verification(project):
     from plugins.ds1 import stamina_patch
     game, mod, store, rules, original = project
-    monkeypatch.setattr(stamina_patch, "ensure_game_closed", lambda: None)
-    stamina_patch.install(game, {**stamina_patch.DEFAULT_RULES, "baseRecovery": 67})
+    built = stamina_patch.transform(original,{**stamina_patch.DEFAULT_RULES,'baseRecovery':67})
+    (game/stamina_patch.EXECUTABLE).write_bytes(built)
+    (game/stamina_patch.BACKUP).write_bytes(original)
     status = rules.deployment_status()
-    assert not status["everApplied"] and status["legacyRestoreAvailable"]
+    assert not status['everApplied'] and 'Verify' in status['native']['problem']
     rules.restore()
-    assert image(game) == original
+    assert image(game) == built
+    (game/stamina_patch.EXECUTABLE).write_bytes(original)  # Simulated Steam verification.
     edit_rules(rules)
     rules.apply(store)
     assert tweak_mods.status(game)["project"] is not None

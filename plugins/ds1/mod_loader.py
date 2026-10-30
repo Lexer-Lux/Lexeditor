@@ -166,6 +166,25 @@ def content_files(folder: Path, name: str, *, only=None) -> list[tuple[Path, Pat
     return found
 
 
+def _file_limit(relative):
+    return (MAX_ARCHIVE if relative in FILES else MAX_MAP
+            if relative.suffix == '.msb' and relative.parent == MAP_DIR else MAX_BINDER
+            if assets.is_character_file(relative) else assets.MAX_ASSET_BYTES)
+
+
+def _read_data(path, relative):
+    from .tweak_mods import checked
+    path = checked(path)
+    size = path.stat().st_size
+    if size > _file_limit(relative):
+        raise ValueError(f'{relative.name} is too large')
+    with path.open('rb') as stream:
+        data = stream.read(size+1)
+    if len(data) != size:
+        raise ValueError(f'{relative.name} changed size while it was being read')
+    return data
+
+
 def read_mod(folder: Path, name: str, *, only=None) -> Mod | None:
     """A DS1 data mod's saved files, or None for a folder that is not one."""
     from .tweak_mods import checked
@@ -182,7 +201,7 @@ def read_mod(folder: Path, name: str, *, only=None) -> Mod | None:
                 if only is not None:
                     edits = {key:spec for key,spec in edits.items() if key in only}
             else:
-                files[key] = path.read_bytes()
+                files[key] = _read_data(path,key)
         if files.keys() & edits.keys():
             raise ValueError('A mod cannot declare both an archive and record edits for the same target')
     except Exception as error:
@@ -222,7 +241,6 @@ def vanilla_files(game_root: Path, paths: frozenset[Path]) -> dict[Path, bytes]:
     from . import deployment
     from .tweak_mods import checked
     result = {}
-    from . import assets as _assets
     for relative in sorted(paths):
         from . import tweak_mods
         managed = tweak_mods.managed_menu(relative)
@@ -231,12 +249,7 @@ def vanilla_files(game_root: Path, paths: frozenset[Path]) -> dict[Path, bytes]:
             continue
         path = checked(deployment.vanilla_source(Path(game_root), relative))
         if path.is_file():
-            limit = (MAX_ARCHIVE if relative in FILES else MAX_MAP
-                     if relative.suffix == ".msb" and relative.parent == MAP_DIR else MAX_BINDER
-                     if relative.suffix == ".dcx" and relative.parent == CHR_DIR else _assets.MAX_ASSET_BYTES)
-            if path.stat().st_size > limit:
-                raise ValueError(f"The game's {relative.name} is too large")
-            result[relative] = path.read_bytes()
+            result[relative] = _read_data(path,relative)
     return result
 
 

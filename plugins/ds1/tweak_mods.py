@@ -10,9 +10,8 @@ DarkSoulsRemastered.exe is never written. Applying installs Lexeditor's
 loader (dinput8.dll) and lexeditor-ds1-patch.bin beside it, and the loader
 patches the game in memory as it starts (plugins/ds1/runtime/). Writing the
 executable failed whenever a crashed game was still listed by Windows,
-which keeps the file locked; FF8 learned the same lesson ("the executable is
-never modified"). An executable patched by an earlier Lexeditor is put back
-once, by the next Apply or Restore.
+which keeps the file locked. Old executable backups and journals remain
+read-only; Steam verifies the executable when an older tool changed it.
 
 The menu layout is a data file and is still replaced, only when a tweak asks
 for nodes or an earlier Apply changed it. The ingame and common menu scripts
@@ -696,6 +695,8 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
 
 
 STUCK_GAME = ('A closed Dark Souls Remastered is still listed by Windows and keeps DarkSoulsRemastered.exe locked (a crashed game whose process cannot be ended). Close every Lexeditor window; if DarkSoulsRemastered.exe is still in Task Manager after that, restart Windows. Then try again; nothing was lost.')
+EXECUTABLE_CHANGED = ('Native mods need the verified Steam executable. Verify Dark Souls Remastered game files in Steam, '
+                      'then apply the mods again. Lexeditor leaves the executable and its old backups untouched.')
 
 
 def ensure_game_closed() -> None:
@@ -715,8 +716,7 @@ def game_closed() -> bool:
 
 
 LOCKED_SUFFIX = ".lexeditor-locked"
-# Moved-aside copies kept per file: four of the 50 MB executable, more of the
-# small files (every crash pins another copy of the 27 KB loader).
+# Moved-aside copies kept per data file; small loader files have a larger cap.
 MAX_LOCKED = 4
 MAX_LOCKED_SMALL = 64
 SMALL_FILE = 1024 * 1024
@@ -725,15 +725,18 @@ SMALL_FILE = 1024 * 1024
 def _move_aside(game_root: Path, live: Path, error: Exception) -> None:
     """Rename a pinned file out of the way, keeping at most MAX_LOCKED of each.
 
-    A crashed game Windows keeps listed pins every file it had loaded: the
-    executable and dinput8.dll alike. Windows refuses to replace or delete
-    such a file but lets it be renamed, and the game never loads it by the
-    new name.
+    Windows can pin a loaded DLL or data file after a crash. The executable
+    is excluded from this writer and is never moved aside.
     """
+    if live.name.casefold() == exe_patches.EXECUTABLE.casefold():
+        raise TweakError('Lexeditor never moves a game executable') from error
     _clear_moved_aside(game_root)
     limit = MAX_LOCKED_SMALL if live.is_file() and live.stat().st_size <= SMALL_FILE else MAX_LOCKED
     for index in range(limit):
-        target = checked(live.with_name(live.name + LOCKED_SUFFIX + (f"-{index}" if index else "")))
+        try:
+            target = checked(live.with_name(live.name + LOCKED_SUFFIX + (f"-{index}" if index else "")))
+        except TweakError:
+            continue  # An unsafe leftover occupies this slot; preserve it.
         if target.exists():
             continue
         try:
@@ -746,15 +749,20 @@ def _move_aside(game_root: Path, live: Path, error: Exception) -> None:
 
 def _clear_moved_aside(game_root: Path) -> None:
     """Delete files moved aside earlier, once Windows has let go of them."""
+    owned = {name.casefold() for name in (RUNTIME_DLL, RUNTIME_PATCH, RUNTIME_RECORD, RUNTIME_LOG, RUNTIME_CONFIG)}
     for path in Path(game_root).glob("*" + LOCKED_SUFFIX + "*"):
+        if path.name.casefold().split(LOCKED_SUFFIX, 1)[0] not in owned:
+            continue
         try:
             checked(path).unlink()
-        except OSError:
+        except (OSError, TweakError):
             pass  # still pinned; a later Apply or Restore tries again
 
 
 def _put(game_root: Path, path: Path, data: bytes) -> None:
     """Write a game-folder file, moving a pinned old copy aside first."""
+    if path.name.casefold() == exe_patches.EXECUTABLE.casefold():
+        raise TweakError('Lexeditor never writes a game executable')
     try:
         atomic_write(path, data)
     except PermissionError as error:
@@ -764,6 +772,8 @@ def _put(game_root: Path, path: Path, data: bytes) -> None:
 
 def _remove(game_root: Path, path: Path) -> None:
     """Delete a game-folder file, or move it aside when it is pinned."""
+    if path.name.casefold() == exe_patches.EXECUTABLE.casefold():
+        raise TweakError('Lexeditor never deletes a game executable')
     try:
         path.unlink(missing_ok=True)
     except PermissionError as error:
@@ -928,6 +938,8 @@ def _finish_manifest(game_root: Path, current: bytes, mods: list[str], project=N
 def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
            managed: Managed = EXECUTABLE, project=None, *, inputs=None, before_write=None) -> None:
     """Journal one expected-image replacement; keep the original plus the latest intent."""
+    if Path(managed.relative).name.casefold() == exe_patches.EXECUTABLE.casefold():
+        raise TweakError('Lexeditor never writes a game executable')
     game_root = checked(Path(game_root))
     live = checked(managed.live(game_root))
     backup = checked(managed.backup(game_root))
@@ -1007,9 +1019,8 @@ def _changes(specs: list[dict]) -> list[str]:
 # loader (dinput8.dll, built from plugins/ds1/runtime/) beside it with the
 # combined patch description; the game loads the DLL before its own code runs
 # and the DLL patches the game in memory. A crashed game Windows keeps listed
-# locks only the executable, which is no longer written, and removing these
-# files is a full restore. An executable patched by an earlier Lexeditor is put
-# back once, by the first Apply or Restore.
+# locks only the executable, which is never written or moved. Old executable
+# copies are preserved; Steam verification restores an altered game image.
 
 RUNTIME_DLL = "dinput8.dll"
 RUNTIME_PATCH = "lexeditor-ds1-patch.bin"
@@ -1083,7 +1094,9 @@ def _runtime_status(game_root: Path) -> dict:
     state = _runtime(game_root)
     result = {"applied": list(state["record"]["mods"]) if state["active"] else [],
               "project": state["record"].get("project") if state["active"] else None,
-              "problem": "", "loaderMessage": ""}
+              "problem": "", "loaderMessage": "",
+              "installed": bool(state['record'] or state['patch'] is not None
+                                or state['dll'] is not None and not state['foreignDll'])}
 
     if state["foreignDll"] and (state["record"] or state["patch"] is not None):
         result["problem"] = (f"Another mod's {RUNTIME_DLL} replaced Lexeditor's loader, so the tweaks are not loaded. "
@@ -1271,8 +1284,10 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
     ensure_game_closed()
     game_root = checked(Path(game_root))
     _clear_moved_aside(game_root)
-    current, manifest = _installed(game_root, EXECUTABLE, "restore it before applying tweaks")
-    original = _original(game_root, current, manifest)
+    current = _read(EXECUTABLE.live(game_root))
+    if not is_vanilla(current):
+        raise TweakError(EXECUTABLE_CHANGED)
+    original = current
     claim_menu_files(game_root)
     runtime = _runtime(game_root)
     if runtime["active"]:
@@ -1280,9 +1295,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
                     "patch": runtime["patch"], "debug": runtime["record"].get("debug") is True,
                     "built": dict(runtime["record"].get("built") or {})}
     else:
-        # Before the loader, an earlier Lexeditor kept this in the executable.
-        built_in = _current_manifest(current, manifest)
-        previous = {"mods": list(built_in["mods"]), "project": built_in.get("project"), "patch": None,
+        previous = {"mods": [], "project": None, "patch": None,
                     "debug": False, "built": {}}
     config_path = checked(game_root/RUNTIME_CONFIG)
     previous['config'] = config_path.read_bytes() if config_path.is_file() else None
@@ -1363,10 +1376,6 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
         patch = b""
     files = []
     menu_timings = []
-    if not is_vanilla(current) or manifest:
-        # Put an executable patched by an earlier Lexeditor back, once.
-        files.append({"managed": EXECUTABLE, "before": current, "after": original, "mods": [], "project": None,
-                      "previous": _current_manifest(current, manifest)})
     if layout or _layout_in_use(game_root):
         menu_started = perf_counter()
         layout_current, layout_manifest = _installed(game_root, LAYOUT, "restore it before applying tweaks")
@@ -1439,10 +1448,6 @@ def _undo(game_root: Path, done: list[dict], *, before_write=None) -> None:
                     _put(game_root, config, previous['config'])
             else:
                 managed = item['managed']
-                if managed == EXECUTABLE:
-                    # Restoring a legacy patched executable is a forward
-                    # repair. Never put the patched image back on disk.
-                    continue
                 current = _read(managed.live(game_root), managed)
                 if current == item['before']:
                     continue
@@ -1515,7 +1520,7 @@ def restore(game_root: Path, root: Path | None = None) -> dict:
     with _exclusive(game_root):
         claim_menu_files(game_root)
         _clear_moved_aside(game_root)
-        managed_files = ([EXECUTABLE] + ([LAYOUT] if _layout_in_use(game_root) else [])
+        managed_files = (([LAYOUT] if _layout_in_use(game_root) else [])
                          + [managed for managed in ESD if _esd_in_use(game_root, managed)])
         # Every file is checked before any of them is written.
         targets = [(managed, *_installed(game_root, managed, "it was left alone")) for managed in managed_files]
@@ -1530,6 +1535,10 @@ def restore(game_root: Path, root: Path | None = None) -> dict:
 
 def _file_status(game_root: Path, managed: Managed) -> dict:
     current = _read(managed.live(game_root), managed)
+    if managed == EXECUTABLE:
+        vanilla = is_vanilla(current)
+        return {'backupOk': vanilla, 'state': 'vanilla' if vanilla else 'unknown', 'applied': [],
+                'problem': '' if vanilla else EXECUTABLE_CHANGED, 'project': None, 'pendingRecovery': False}
     manifest = _manifest(game_root, managed)
     backup = checked(managed.backup(game_root))
     result = {"backupOk": backup.is_file() and _original_matches(_read(backup, managed),manifest,managed),
@@ -1551,7 +1560,7 @@ def status(game_root: Path, root: Path | None = None) -> dict:
     """What is installed now, without building or changing anything."""
     result = {"applied": [], "state": "unknown", "backupOk": False, "problem": "",
               "pendingRecovery": False, "project": None, "loaderMessage": "",
-              "builtIntoExecutable": False,
+              "canRestore": False,
               "windows": os.name == "nt", "modsRoot": str(Path(root or mods_root())),
               "needsRebuild": False, "staleMods": []}
     try:
@@ -1565,9 +1574,7 @@ def status(game_root: Path, root: Path | None = None) -> dict:
             if _esd_in_use(game_root, managed):
                 files.append(_file_status(game_root, managed))
         runtime = _runtime_status(game_root)
-        # An executable still patched by an earlier Lexeditor is put back by
-        # the next Apply or Restore.
-        result["builtIntoExecutable"] = executable["state"] == "tweaked"
+        result['canRestore'] = runtime['installed'] or any(item['applied'] for item in files[1:])
         result["backupOk"] = executable["backupOk"] or executable["state"] == "vanilla"
         states = {item["state"] for item in files}
         tweaked = "tweaked" in states or bool(runtime["applied"])

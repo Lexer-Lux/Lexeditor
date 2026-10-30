@@ -547,7 +547,7 @@ async function deploymentAction(action){
   if(state.dirty+state.pending){LexeditorUI.showAlert({title:"Save project changes first",message:"Applying installs the archive already saved to the mod project."});return;}
   const confirmations={
     apply:{title:"Apply this mod to the installed game?",message:"Lexeditor installs the saved parameter archive, map files and character files and composes this project's native rules with enabled library tweaks. Each original is preserved once. Close the game first and test native changes offline.",confirmLabel:"Apply"},
-    disable:{title:"Restore the original installed files?",message:"Lexeditor restores its owned parameter, map, character and executable changes. Project values and library tweak switches remain unchanged.",confirmLabel:"Restore original"}
+    disable:{title:"Restore the original installed files?",message:"Lexeditor restores owned data files and removes its loader. Saved mod settings and the game executable stay unchanged.",confirmLabel:"Restore original"}
   };
   if(action==="apply"&&state.nativeRules?.migration)confirmations.apply.message+=" "+state.nativeRules.migration;
   const ok=await confirmAction({...confirmations[action],cancelLabel:"Cancel"});
@@ -4673,13 +4673,12 @@ function renderInfo(){
       needsAttentionNote(deploy),
       actionRow(
         el("button",{type:"button",disabled:state.deployBusy||!deploy.isProject||!deploy.sourceReady||deploy.changedExternally,onclick:()=>deploymentAction("apply")},deploy.everApplied?"Reapply":"Apply"),
-        el("button",{type:"button",disabled:state.deployBusy||(!deploy.everApplied&&!deploy.native?.backupOk&&!deploy.legacyRestoreAvailable)||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
+        el("button",{type:"button",disabled:state.deployBusy||(!deploy.everApplied&&!deploy.native?.canRestore)||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
       )].filter(Boolean)}),
     detailSection({title:"NATIVE RULES",body:[
       detailField({label:"APPLIED PROJECT",control:readonlyField(deploy.native?.project?.path||"None"),
         help:infoHelp("Native rules are applied in memory by the same loader as library tweaks, from one patch. Applying library tweaks keeps the last applied project rules. Restore original removes both without changing saved settings.")}),
-      deploy.legacyRestoreAvailable?LexeditorUI.detailNote("Restore the earlier draft's native patch before applying the combined rules. Its verified original is available."):
-        deploy.native?.problem?LexeditorUI.detailNote(deploy.native.problem):null,
+      deploy.native?.problem?LexeditorUI.detailNote(deploy.native.problem):null,
       deploy.native?.pendingRecovery?LexeditorUI.detailNote("An interrupted native operation is recoverable. Retry Apply or Restore original."):null,
       state.nativeRules?.migration?LexeditorUI.detailNote(state.nativeRules.migration):null
     ].filter(Boolean)}),
@@ -4699,9 +4698,9 @@ async function tweakRequest(path,body,failure){
   finally{state.tweakBusy=false;render();}
 }
 async function restoreTweaks(){
-  const ok=await confirmAction({title:"Restore the original executable?",message:"Close the game first. The tweaks' switches stay as they are.",confirmLabel:"Restore original",cancelLabel:"Cancel"});
+  const ok=await confirmAction({title:"Remove the installed tweaks?",message:"Restores owned menu files and removes Lexeditor's loader. Close the game first. Saved mod settings stay unchanged.",confirmLabel:"Restore original",cancelLabel:"Cancel"});
   if(!ok)return;
-  await tweakRequest("/api/tweaks/restore",{},"Could not restore the executable");
+  await tweakRequest("/api/tweaks/restore",{},"Could not restore the game files");
 }
 function renderTweaks(){
   const status=state.tweaks;
@@ -4726,9 +4725,8 @@ function renderTweaks(){
       status.loaderMessage?detailField({label:"LAST GAME START",control:readonlyField(status.loaderMessage),
         help:infoHelp("What the loader reported the last time the game started. If the game was updated or another tool changed it, the loader changes nothing and says so here.")}):null,
       empty?missingMods:null,
-      status.builtIntoExecutable?LexeditorUI.detailNote("An earlier Lexeditor built tweaks into DarkSoulsRemastered.exe. Restore original puts the original executable back; tweaks then load from dinput8.dll."):null,
       status.problem?LexeditorUI.detailNote(status.problem):null,
-      actionRow(el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:restoreTweaks},"Restore original"))].filter(Boolean)});
+      actionRow(el("button",{type:"button",disabled:busy||!status.windows||!status.canRestore,onclick:restoreTweaks},"Restore original"))].filter(Boolean)});
   return LexeditorUI.tweaksPage({plugin:"ds1",render,
     pages:[{id:"mods",label:"Mods",body:()=>[installed,...panels],bind,whole:empty?installed:null}]});
 }

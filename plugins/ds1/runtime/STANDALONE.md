@@ -89,6 +89,14 @@ bytes and conflicting claims are checked before that module's hooks change.
 Malformed, disabled, missing-dependency and conflicting modules are skipped with
 named log messages; unrelated modules continue. Code is changed in memory only.
 
+The editor never writes, renames or deletes the game executable, including
+legacy recovery. Steam verification handles a modified executable. Old native
+backups and journals remain untouched and cannot block an already-verified
+image. Restore removes owned loader files and restores managed data even when
+the executable was changed. Asset mods cannot supply executable replacements;
+the failing mod is isolated before deployment. Asset enumeration and input
+reads are bounded, and private backup/bytecode artifacts are excluded.
+
 The online/debug loader's pre-entry callback runs the private data merger before
 the game opens its data. It uses the same `mod_loader`, menu and deployment code
 as Lexeditor, rather than maintaining a second composer. Prebuilt parameter,

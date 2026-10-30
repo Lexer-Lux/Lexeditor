@@ -370,23 +370,12 @@ class NativeRules:
                                             deployment._marker_path(self.game_root, Path(managed.relative))))
         if shared:
             tweak_mods.restore(self.game_root)
-        elif legacy_native.checked(self.game_root / legacy_native.BACKUP).exists():
-            legacy_native.install(self.game_root, legacy_native.DEFAULT_RULES)
         deployment.disable(self.game_root)
         return self.deployment_status()
 
     def deployment_status(self):
         result = deployment.status(self.game_root, self.project)
         result["native"] = tweak_mods.status(self.game_root)
-        result["legacyRestoreAvailable"] = False
-        if not result["native"]["backupOk"]:
-            old_backup = tweak_mods.checked(self.game_root / legacy_native.BACKUP)
-            if old_backup.exists():
-                try:
-                    legacy_native.inspect(self.game_root)
-                    result["legacyRestoreAvailable"] = True
-                except (ValueError, RuntimeError, OSError):
-                    pass
         result["nativeRules"] = self.snapshot()
         current = result["native"].get("project")
         encoded = json.dumps(self.saved, sort_keys=True, separators=(",", ":")).encode()

@@ -5,6 +5,7 @@ synthetic texture bytes; nothing touches an installed game.
 """
 import base64
 import json
+import os
 from pathlib import Path
 import struct
 import sys
@@ -116,6 +117,61 @@ def test_check_relative_accepts_assets_and_rejects_the_rest():
         assets.check_relative("chr/.lexeditor-upload-x.part")
 
 
+def test_asset_tree_is_streamed_and_bounded(tmp_path,monkeypatch):
+    _game,mod = project(tmp_path)
+    (mod/'menu').mkdir()
+    for index in range(8):
+        (mod/f'menu/{index}.bin').write_bytes(b'x')
+    monkeypatch.setattr(assets,'MAX_ASSET_NODES',3)
+    def no_unbounded_walk(*_args,**_kwargs):
+        pytest.fail('Asset discovery must not materialize an unbounded rglob')
+    monkeypatch.setattr(Path,'rglob',no_unbounded_walk)
+    with pytest.raises(AssetError,match='more than 3'):
+        assets.scan_project(mod)
+    assert len(assets.scan_project(mod,strict=False)) <= 3
+
+
+def test_asset_links_are_refused_for_builds_and_skipped_in_soft_listing(tmp_path):
+    _game,mod = project(tmp_path)
+    (mod/'menu').mkdir()
+    outside = tmp_path/'outside.bin'
+    outside.write_bytes(b'not a mod input')
+    os.link(outside,mod/'menu/linked.bin')
+    (mod/'menu/valid.bin').write_bytes(b'valid data')
+    with pytest.raises(AssetError,match='hard link'):
+        assets.scan_project(mod)
+    assert [row['relative'] for row in assets.scan_project(mod,strict=False)] == ['menu/valid.bin']
+    assert outside.read_bytes() == b'not a mod input'
+
+
+def test_growing_asset_read_is_bounded_and_identifies_its_mod(tmp_path,monkeypatch):
+    from core.mod_builds import ModBuildError
+    from plugins.ds1 import mod_loader
+    _game,mod = project(tmp_path)
+    (mod/'menu').mkdir()
+    target = mod/'menu/data.bin'
+    target.write_bytes(b'old')
+    open_file = Path.open
+    requests = []
+    class Read:
+        def __enter__(self):
+            target.write_bytes(b'new longer data')
+            self.stream = open_file(target,'rb')
+            return self
+        def __exit__(self,*_):
+            self.stream.close()
+        def read(self,size=-1):
+            requests.append(size)
+            return self.stream.read(size)
+    def opening(self,mode='r',*args,**kwargs):
+        return Read() if self == target and mode == 'rb' else open_file(self,mode,*args,**kwargs)
+    monkeypatch.setattr(Path,'open',opening)
+    with pytest.raises(ModBuildError,match='changed size') as failed:
+        mod_loader.read_mod(mod,'Changing mod')
+    assert list(failed.value.folders) == [mod]
+    assert requests == [4]
+
+
 def test_store_remove_and_scan_roundtrip(tmp_path):
     _, mod = project(tmp_path)
     blob = make_tpf([("a.dds", make_dds())])
@@ -136,6 +192,12 @@ def test_scan_project_skips_owned_and_partials(tmp_path):
     (mod / RELATIVE).write_bytes(b"params live here")
     (mod / "chr").mkdir(exist_ok=True)
     (mod / "chr" / ".lexeditor-upload-abc.part").write_bytes(b"partial")
+    (mod/'chr/old.tpf.lexeditor-original').write_bytes(b'old backup')
+    (mod/'chr/old.tpf.lexeditor-tweaks.json').write_bytes(b'damaged old journal')
+    (mod/'chr/__pycache__').mkdir()
+    source = tmp_path/'cache-link-source'
+    source.write_bytes(b'unused cache bytes')
+    os.link(source,mod/'chr/__pycache__/unused.pyc')
     assets.store_bytes(mod, TPF.as_posix(), b"pixels")
     assert [row["relative"] for row in assets.scan_project(mod)] == [TPF.as_posix()]
 

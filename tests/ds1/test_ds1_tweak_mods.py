@@ -228,16 +228,20 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual(self.live.read_bytes(), VANILLA)
         self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.LOCK_FILE]))
 
-    def test_an_executable_an_earlier_lexeditor_patched_is_put_back_once(self):
+    def test_an_executable_an_earlier_lexeditor_patched_is_left_for_steam(self):
         self.old_install("alpha")
         self.enable(alpha=True)
-        before = tweak_mods.status(self.game, self.library)
-        self.assertTrue(before["builtIntoExecutable"])
+        before = self.live.read_bytes()
+        with self.assertRaisesRegex(tweak_mods.TweakError, 'Verify.*Steam'):
+            tweak_mods.apply(self.game, self.library)
+        tweak_mods.restore(self.game, self.library)
+        self.assertEqual(self.live.read_bytes(), before)
+        self.live.write_bytes(VANILLA)  # Simulated verification outside Lexeditor.
         result = tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), VANILLA)
         self.assertEqual(self.runtime(), self.expected("alpha"))
-        self.assertEqual((result["applied"], result["builtIntoExecutable"]), (["Alpha"], False))
-        self.assertNotIn(tweak_mods.MANIFEST_FILE, self.files())
+        self.assertEqual(result["applied"], ["Alpha"])
+        self.assertIn(tweak_mods.MANIFEST_FILE, self.files())
 
     def test_another_mods_dinput8_is_never_replaced(self):
         (self.game / tweak_mods.RUNTIME_DLL).write_bytes(b"someone else's loader")
@@ -253,21 +257,20 @@ class LoaderTests(unittest.TestCase):
         tweak_mods.apply(self.game, self.library)
         foreign = self.live.read_bytes()[:-1] + b"\x7f"
         self.live.write_bytes(foreign)
-        for action in (tweak_mods.apply, tweak_mods.restore):
-            with self.assertRaisesRegex(tweak_mods.TweakError, "outside Lexeditor"):
-                action(self.game, self.library)
+        with self.assertRaisesRegex(tweak_mods.TweakError, "Verify.*Steam"):
+            tweak_mods.apply(self.game, self.library)
+        tweak_mods.restore(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), foreign)
-        self.assertIn("outside Lexeditor", tweak_mods.status(self.game, self.library)["problem"])
+        self.assertIn('Verify', tweak_mods.status(self.game, self.library)['problem'])
+        self.assertNotIn(tweak_mods.RUNTIME_DLL, self.files())
 
-    def test_a_changed_or_missing_original_is_refused(self):
+    def test_a_changed_or_missing_old_executable_backup_is_never_used(self):
         self.enable(alpha=True)
         patched = self.old_install("alpha")
         (self.game / tweak_mods.BACKUP_FILE).write_bytes(VANILLA[:-1] + b"\x01")
-        with self.assertRaisesRegex(tweak_mods.TweakError, "original"):
-            tweak_mods.restore(self.game, self.library)
+        tweak_mods.restore(self.game, self.library)
         (self.game / tweak_mods.BACKUP_FILE).unlink()
-        with self.assertRaisesRegex(tweak_mods.TweakError, "original"):
-            tweak_mods.restore(self.game, self.library)
+        tweak_mods.restore(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), patched)
 
     def test_a_failed_write_keeps_the_original(self):

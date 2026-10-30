@@ -55,6 +55,22 @@ MAX_MARKER = 64 * 1024
 MAX_TRANSACTION_BYTES = 32 * 1024**3
 MAX_TRANSACTION_FILES = 4096
 DATA_LOCK = '.lexeditor-ds1-data.lock'
+
+
+def _target_relative(value):
+    """This writer owns game data inside known roots, never executables."""
+    from core.mod_library import relative_path
+    from .tweak_mods import managed_menu
+    relative = relative_path(str(value))
+    if relative.suffix.casefold() == '.exe':
+        raise ValueError('Lexeditor never writes a game executable')
+    if managed_menu(relative) is not None:
+        raise ValueError('Menu files must be combined into the shared menu deployment plan before applying')
+    if relative not in dict(FILES) and not assets.is_owned(relative):
+        assets.check_relative(relative)
+    return relative
+
+
 NOTE = (
     "Dark Souls Remastered reads param/GameParam/GameParam.parambnd.dcx, its map "
     "files, its character files and any other asset as loose files from disk; no "
@@ -133,7 +149,7 @@ def _disk_assets(game_root: Path | None = None, project_root: Path | None = None
                 relative = path.relative_to(root)
                 if managed_menu(relative) is not None:
                     continue
-                if assets.is_owned(relative):
+                if assets.is_owned(relative) or relative.suffix.casefold() == '.exe':
                     continue
                 if _marker_path(root, relative).is_file():
                     found.setdefault(relative)
@@ -208,6 +224,7 @@ def _atomic_copy(source: Path, target: Path) -> None:
 
 def _preflight(game_root: Path, relative: Path) -> dict | None:
     """Validate every target before a batch changes its first game file."""
+    relative = _target_relative(relative)
     live,backup,marker_path = game_root/relative,_backup_path(game_root,relative),_marker_path(game_root,relative)
     for path in (live,backup,marker_path):
         _assert_no_reparse_points(path,game_root)
@@ -384,6 +401,8 @@ def vanilla_source(game_root: Path, relative: Path = RELATIVE) -> Path:
     back to live and silently label modded data as Vanilla."""
     game_root = Path(game_root).resolve()
     from . import tweak_mods
+    if relative.suffix.casefold() == '.exe':
+        return tweak_mods.checked(game_root/relative)
     managed = tweak_mods.managed_menu(relative)
     if managed is not None:
         _current, original, _manifest = tweak_mods.menu_baseline(game_root, managed)
@@ -646,9 +665,11 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
     """
     if project_root is None:
         raise ValueError("Select or create a mod project before applying it to the installed game.")
-    from .tweak_mods import managed_menu
-    if composed is not None and any(managed_menu(relative) is not None for relative in composed):
-        raise ValueError('Menu files must be combined into the shared menu deployment plan before applying')
+    if composed is not None:
+        normalized = {_target_relative(relative):payload for relative,payload in composed.items()}
+        if len(normalized) != len(composed):
+            raise ValueError('Duplicate data deployment targets')
+        composed = normalized
     # Check the raw roots themselves, and everything above them, before any
     # .resolve() call: resolving first would silently follow a reparse point
     # at the root or on a parent and erase the evidence we need to reject it.
@@ -733,9 +754,7 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
 
 def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Path, new_bytes: bytes,
                 source_hash: str) -> None:
-    from .tweak_mods import managed_menu
-    if managed_menu(relative) is not None:
-        raise ValueError('The shared menu deployment plan owns this file')
+    relative = _target_relative(relative)
     live = game_root / relative
     backup = _backup_path(game_root, relative)
     marker_path = _marker_path(game_root, relative)
@@ -803,6 +822,7 @@ def disable(game_root: Path) -> dict:
 
 
 def _restore_file(game_root: Path, relative: Path) -> None:
+    relative = _target_relative(relative)
     marker_path = _marker_path(game_root, relative)
     marker = _read_marker(marker_path)
     if marker is None:

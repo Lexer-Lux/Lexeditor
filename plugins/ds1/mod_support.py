@@ -1,11 +1,10 @@
 """Hand DS1 mods from the shared library to the DS1 mod loader.
 
 Switching a mod on or off in the Mods tab applies the new set at once, the
-same way the editor's Apply does: tweak mods are composed onto the original
-executable (tweak_mods.py), and data mods are combined over the game's own
-parameter, item-name, map and character files (mod_loader.py), all under
-one lock and with the executable put back if the data files cannot be
-written.
+same way the editor's Apply does: native mods prepare a loader patch stream,
+and data mods combine over the game's preserved baseline. Preparation and
+deployment share one lock; a failed data deployment rolls back the menu and
+loader plan. The game executable is read-only.
 """
 from __future__ import annotations
 
