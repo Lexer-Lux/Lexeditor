@@ -1126,6 +1126,15 @@ def _menu_cache_value(value):
     raise TypeError(f'Unsupported menu cache value: {type(value).__name__}')
 
 
+def prepared_menu_layout(game_root: Path, files: list[dict]) -> bytes | None:
+    """The future layout when planned, otherwise the actual installed layout."""
+    for item in files:
+        if item.get('managed') == LAYOUT:
+            return item['after']
+    path = checked(LAYOUT.live(game_root))
+    return _read(path,LAYOUT) if path.is_file() else None
+
+
 def _menu_identity(original, specs, managed):
     try:
         from .mod_loader import _composition_revision

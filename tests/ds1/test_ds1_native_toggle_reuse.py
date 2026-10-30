@@ -154,3 +154,44 @@ def test_prepared_texture_order_invalidates_only_the_installed_pair_reuse(tmp_pa
     (game/main).write_bytes(stock)
     assert adapter._read_report(game,adapter._ordered_mods([folder,native])) is None
 
+
+def test_standalone_startup_uses_the_same_prepared_layout_texture_pair(tmp_path,monkeypatch):
+    sys.path.insert(0,str(Path(__file__).resolve().parent))
+    from drb_fixture import make_drb,make_dcx
+    from tpf_fixture import make_tpf,make_dds_rgba
+    from plugins.ds1 import standalone_runtime,tweak_mods,texture_packs,formats
+    game,library = tmp_path/'game',tmp_path/'library'
+    folder = library/'atlas'
+    for root in (game,folder):
+        (root/'menu').mkdir(parents=True)
+    (folder/'mod.json').write_text(json.dumps({'id':'atlas','name':'Atlas','enabled':True}))
+    (folder/'layout').mkdir()
+    component = folder/'layout/atlas.json'
+    component.write_text('{}')
+    images = {name:make_dds_rgba(2,2,[color]*4) for name,color in
+              [('Base',(255,0,0,255)),('Warp',(0,0,255,255)),('Estus',(0,255,0,255))]}
+    stock = make_dcx(make_tpf([(name,images[name]) for name in ('Base','Warp')]))
+    (game/'menu/menu.tpf.dcx').write_bytes(stock)
+    (game/'menu/menu_3.tpf.dcx').write_bytes(stock)
+    (folder/'menu/menu_3.tpf.dcx').write_bytes(make_dcx(make_tpf(list(images.items()))))
+    original = make_dcx(make_drb(['Base','Warp'],{}))
+    managed = tweak_mods.Managed('menu/menu.drb.dcx','fixture menu',1024*1024,lambda value:value==original)
+    managed.live(game).write_bytes(original)
+    monkeypatch.setattr(tweak_mods,'LAYOUT',managed)
+    monkeypatch.setattr(tweak_mods,'ensure_game_closed',lambda:None)
+    wanted = [make_dcx(make_drb(['Base','Estus','Warp'],{}))]
+    monkeypatch.setattr(standalone_runtime,'_specs',lambda rows,kind,validate:
+        [{'owner':'Atlas','folder':str(folder),'nodes':[],'moves':[]}] if kind=='layout' else [])
+    monkeypatch.setattr(tweak_mods,'_compose_menu',lambda *args,**kwargs:wanted[0])
+    for index in range(2):
+        if index:
+            wanted[0] = make_dcx(make_drb(['Estus','Warp','Base'],{}))
+            component.write_text('{"changed":true}')
+        report = standalone_runtime.run(game,[library])
+        assert report['loaded'] == ['atlas'] and not report['disabled']
+        expected = texture_packs.menu_texture_names(managed.live(game).read_bytes())
+        _,textures = texture_packs.read(formats.inflate((game/'menu/menu.tpf.dcx').read_bytes()))
+        assert [texture.name for texture in textures] == expected
+        assert textures[expected.index('Estus')].data == images['Estus']
+        assert standalone_runtime.run(game,[library])['reused']
+

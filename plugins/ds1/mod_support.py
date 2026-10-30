@@ -195,12 +195,7 @@ class Ds1ModAdapter:
             prepared = perf_counter()
             from . import texture_packs
             main_texture = Path('menu/menu.tpf.dcx')
-            layout = next((item['after'] for item in plan['files']
-                           if item['managed'] == tweak_mods.LAYOUT), None)
-            if layout is None and tweak_mods.LAYOUT.live(game_root).is_file():
-                # The layout has a separate managed journal; the generic data
-                # deployment's vanilla_source is not its pristine source.
-                layout = tweak_mods._read(tweak_mods.checked(tweak_mods.LAYOUT.live(game_root)),tweak_mods.LAYOUT)
+            layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
             menu_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
                           if layout is not None and (game_root/main_texture).is_file() else None)
             ordered = self._ordered_mods(mods)
@@ -221,16 +216,7 @@ class Ds1ModAdapter:
                 data = self._mods(mods)
                 composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root())
                 conflicts, names = composition.conflicts, [mod.name for mod in data]
-                if menu_order is not None:
-                    def texture_payload(relative):
-                        return composition.files.get(relative) or deployment.vanilla_source(game_root,relative).read_bytes()
-                    supplements = [texture_payload(Path(f'menu/menu_{index}.tpf.dcx')) for index in range(6)
-                                   if Path(f'menu/menu_{index}.tpf.dcx') in composition.files
-                                   or (game_root/f'menu/menu_{index}.tpf.dcx').is_file()]
-                    combined = texture_packs.align_menu(layout,texture_payload(main_texture),supplements)
-                    original_main = deployment.vanilla_source(game_root,main_texture).read_bytes()
-                    if combined != original_main:
-                        composition.files[main_texture] = combined
+                mod_loader.align_menu_textures(game_root,composition,layout)
             composed = perf_counter()
             tweak_mods.commit(game_root, plan)
             try:

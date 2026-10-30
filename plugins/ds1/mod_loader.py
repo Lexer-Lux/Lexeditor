@@ -347,6 +347,24 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
                        [Conflict(path, part, list(names)) for path, part, names in rows])
 
 
+def align_menu_textures(game_root: Path, composition: Composition, layout: bytes | None) -> None:
+    """Couple derived main-pack indices to the layout in either build host."""
+    from . import deployment,texture_packs
+    main = Path('menu/menu.tpf.dcx')
+    if layout is None or not (game_root/main).is_file():
+        return
+    def payload(relative):
+        return composition.files.get(relative) or deployment.vanilla_source(game_root,relative).read_bytes()
+    supplements = [payload(Path(f'menu/menu_{index}.tpf.dcx')) for index in range(6)
+                   if Path(f'menu/menu_{index}.tpf.dcx') in composition.files
+                   or (game_root/f'menu/menu_{index}.tpf.dcx').is_file()]
+    combined = texture_packs.align_menu(layout,payload(main),supplements)
+    if combined != deployment.vanilla_source(game_root,main).read_bytes():
+        composition.files[main] = combined
+    else:
+        composition.files.pop(main,None)
+
+
 def _is_asset(relative: Path) -> bool:
     """A mod file no structured composer handles: a whole asset."""
     if relative in FILES:

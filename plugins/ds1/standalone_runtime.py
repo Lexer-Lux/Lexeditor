@@ -168,6 +168,7 @@ def prepare(game, rows):
         files.append({'managed':managed,'before':current,'after':after,'mods':tweak_mods._changes(specs),
                       'inputs':tweak_mods._menu_identity(original,specs,managed),
                       'previous':tweak_mods._current_manifest(current,manifest,managed),'project':None})
+    mod_loader.align_menu_textures(game,composition,tweak_mods.prepared_menu_layout(game,files))
     # Shared menu support is linked at load time; no author script or compiler
     # runs here. Ordinary mod machine code stays in each runtime.lxd.
     dim_patch = menu_dim.patch_spec(dims)
@@ -266,7 +267,8 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
                                  inputs=item.get('inputs'), before_write=before_write)
             before_write()
             if composition.files:
-                deployment.apply(game,data[-1].folder,composed=composition.files)
+                owner = data[-1].folder if data else rows[-1]['path'] if rows else None
+                deployment.apply(game,owner,composed=composition.files)
             else:
                 deployment.disable(game)
         except Exception:
