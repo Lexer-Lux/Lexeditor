@@ -132,7 +132,7 @@ def test_bad_shared_patch_preserves_valid_legacy_project_recipe(game,monkeypatch
     monkeypatch.setattr(tweak_mods,'loader_mod_state',lambda *_:(True,True))
     plan = tweak_mods.prepare(root,library)
     assert plan['runtime']['project'] == project
-    assert plan['runtime']['previous']['patch'] is None
+    assert plan['runtime']['expected'][tweak_mods.RUNTIME_PATCH] == b'broken shared patch'
     assert exe_patches.read_runtime_patch(plan['runtime']['patch'])['records']
     tweak_mods.commit(root,plan)
     assert tweak_mods._runtime(root)['active']

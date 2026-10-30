@@ -771,9 +771,9 @@ def test_failed_rollback_is_reported_and_remaining_files_are_attempted(tmp_path,
         restored.append('runtime')
         raise OSError('rollback disk failure')
     monkeypatch.setattr(tweak_mods, '_write', write)
-    monkeypatch.setattr(tweak_mods, '_write_runtime', fail)
+    monkeypatch.setattr(tweak_mods, '_rollback_runtime', fail)
     done = [{'managed': managed, 'before': b'before', 'after': b'after', 'previous': {}},
-            {'managed': None, 'previous': {'patch': None, 'mods': [], 'project': None}}]
+            {'runtime':{}}]
     with pytest.raises(tweak_mods.TweakError, match='rollback disk failure'):
         tweak_mods._undo(tmp_path, done)
     assert restored == ['runtime', 'file']

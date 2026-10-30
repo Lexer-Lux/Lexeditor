@@ -402,8 +402,14 @@ class NativeRules:
                                for path in (managed.manifest(self.game_root),
                                             deployment._marker_path(self.game_root, Path(managed.relative))))
         if shared:
-            tweak_mods.restore(self.game_root)
-        deployment.disable(self.game_root)
+            tweak_mods.ensure_game_closed()
+            with tweak_mods.locked(self.game_root):
+                # Transfer old dual-writer menu journals before the data
+                # transaction owns its lock. Both paths keep tweak -> data order.
+                tweak_mods.claim_menu_files(self.game_root)
+                deployment.disable(self.game_root,after_restore=lambda:tweak_mods._restore_locked(self.game_root))
+        else:
+            deployment.disable(self.game_root)
         return self.deployment_status()
 
     def deployment_status(self):

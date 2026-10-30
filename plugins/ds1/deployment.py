@@ -801,8 +801,12 @@ def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Pat
     _write_marker(marker_path, marker)
 
 
-def disable(game_root: Path) -> dict:
-    """Restore the exact preserved original bytes, leaving the backup in place for later reapply."""
+def disable(game_root: Path, *, after_restore=None) -> dict:
+    """Restore originals, retaining rollback until a related restore finishes.
+
+    A caller combining native restoration holds the outer tweak lock before
+    entering this data transaction. Backups remain available for later reapply.
+    """
     game_root = _assert_no_reparse_ancestry(game_root).resolve()
     targets = (list(FILES) + [(relative, MsbDocument) for relative in _disk_maps(game_root)]
                + [(relative, _check_anibnd) for relative in _disk_chars(game_root)]
@@ -818,6 +822,8 @@ def disable(game_root: Path) -> dict:
                 raise RuntimeError(f'{relative.name} changed during deployment; the external bytes were kept')
             touched.append(relative)
             _restore_file(game_root, relative)
+        if after_restore is not None:
+            after_restore()
         return status(game_root, None)
 
 

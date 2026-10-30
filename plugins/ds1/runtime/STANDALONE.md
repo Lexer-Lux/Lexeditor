@@ -11,6 +11,15 @@ patches inactive while independent native-only folder modules can still load.
 The basic proxy has no pre-entry preparation callback and loads native-only
 folder modules without using a previous shared patch.
 
+Native installation compares bounded snapshots before writing. A caught write
+failure restores the exact previous DLL, patch, record and configuration. A
+later deployment failure uses the same receipt, preserving metadata extensions
+and legacy project selections. Restore retains rollback across data, menus and
+loader removal. Unexpected external changes are preserved and reported.
+An abrupt process exit leaves each individual file atomic. The last committed
+record retains its legacy project selection, startup regenerates shared support
+and data, and a later Apply repairs an interrupted loader/record pair.
+
 If another mod already installed `dinput8.dll`, rename that other loader to
 `dinput8.chain.dll` before extracting this package. The loader loads that DLL
 before game entry and forwards its input calls, or uses system input when the
