@@ -51,7 +51,9 @@ def test_structural_changes_keep_exact_anchor_and_refuse_to_discard_foreign_edit
         record_edits.materialize(MAP,edited((PLAYER,'posZ',55.0)),spec)
 
 
-def test_exported_maps_run_through_standalone_with_foreign_baseline(vanilla,tmp_path):
+def test_exported_maps_run_through_standalone_with_foreign_baseline(vanilla,tmp_path,monkeypatch):
+    from plugins.ds1 import composition_cache
+    monkeypatch.setattr(composition_cache,'user_root',lambda:tmp_path/'cache')
     game=tmp_path/'game';library=game/'mods'
     (game/MAP).parent.mkdir(parents=True)
     foreign=edited((ENEMY,'npcId',120100))

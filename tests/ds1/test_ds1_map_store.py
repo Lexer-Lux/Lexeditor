@@ -63,7 +63,8 @@ def test_local_npc_directory_renders_a_merchant_with_nonfriendly_type(tmp_path):
     (game/RELATIVE).write_bytes(make_archive(table_ids={'NpcParam':[6040,120000]},
         field_values={'NpcParam':{6040:{'npcType':0}}}))
     session=DS1Session({'LEXEDITOR_DS1_ROOT':str(game),'LEXEDITOR_NO_MOD':'1',
-                       'LEXEDITOR_MOD_READ_ONLY':'1','LEXEDITOR_DS1_MODS_ROOT':str(tmp_path/'library')})
+                       'LEXEDITOR_MOD_READ_ONLY':'1','LEXEDITOR_DS1_MODS_ROOT':str(tmp_path/'library'),
+                       'LOCALAPPDATA':str(tmp_path/'appdata')})
     session.start()
     try:
         with sync_playwright() as play:
