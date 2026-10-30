@@ -56,21 +56,9 @@ def _exclusive(game_root: Path):
     path = checked(Path(game_root) / LOCK_FILE)
     if path.exists() and (not path.is_file() or path.stat().st_size > 1):
         raise TweakError("The executable tweak lock file is invalid")
-    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
-    try:
-        if os.fstat(descriptor).st_size == 0:
-            os.write(descriptor, b"0")
-        os.lseek(descriptor, 0, os.SEEK_SET)
-        if os.name == "nt":
-            import msvcrt
-            msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    from core.file_lock import exclusive
+    with exclusive(path):
         yield
-    finally:
-        # Do not unlink: a waiting process must lock the same inode.
-        os.close(descriptor)
 
 
 class TweakError(script_mods.ScriptModError):

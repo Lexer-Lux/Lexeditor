@@ -34,6 +34,9 @@ import json
 import os
 from pathlib import Path
 import stat
+from contextlib import contextmanager,ExitStack
+import shutil
+import tempfile
 
 from core.plugin_files import atomic_write
 from . import assets, emevd
@@ -48,6 +51,10 @@ from . import texts
 FILES = ((RELATIVE, ItemDocument), (texts.RELATIVE, texts.TextDocument), (texts.MENU_RELATIVE, texts.MenuDocument))
 
 MOD_ID = "lexeditor-ds1"
+MAX_MARKER = 64 * 1024
+MAX_TRANSACTION_BYTES = 32 * 1024**3
+MAX_TRANSACTION_FILES = 4096
+DATA_LOCK = '.lexeditor-ds1-data.lock'
 NOTE = (
     "Dark Souls Remastered reads param/GameParam/GameParam.parambnd.dcx, its map "
     "files, its character files and any other asset as loose files from disk; no "
@@ -170,7 +177,13 @@ def _read_marker(path: Path) -> dict | None:
     if not path.is_file():
         return None
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        if path.stat().st_size > MAX_MARKER:
+            raise RuntimeError('The Lexeditor deployment marker is too large')
+        with path.open('rb') as stream:
+            raw = stream.read(MAX_MARKER+1)
+        if len(raw) > MAX_MARKER:
+            raise RuntimeError('The Lexeditor deployment marker grew beyond its limit')
+        value = json.loads(raw)
     except (OSError, json.JSONDecodeError) as error:
         raise RuntimeError(f"Could not read the Lexeditor deployment marker: {error}") from error
     if not isinstance(value, dict) or value.get("modId") != MOD_ID or not isinstance(value.get("originalHash"), str):
@@ -186,6 +199,108 @@ def _write_marker(path: Path, marker: dict) -> None:
 
 def _atomic_copy(source: Path, target: Path) -> None:
     atomic_write(target, source.read_bytes())
+
+
+def _preflight(game_root: Path, relative: Path) -> dict | None:
+    """Validate every target before a batch changes its first game file."""
+    live,backup,marker_path = game_root/relative,_backup_path(game_root,relative),_marker_path(game_root,relative)
+    for path in (live,backup,marker_path):
+        _assert_no_reparse_points(path,game_root)
+    marker = _read_marker(marker_path)
+    if not live.is_file():
+        raise FileNotFoundError(f'The installed game has no {relative.as_posix()}; cannot safely preserve its original data.')
+    if marker is None:
+        if backup.exists():
+            raise RuntimeError(f'An unmanaged backup already exists at {backup}; remove or restore it manually before continuing.')
+    else:
+        if not backup.is_file() or _hash_file(backup) != marker['originalHash']:
+            raise RuntimeError('The preserved original copy is missing or changed; refusing to continue until it is restored.')
+        marker = _reconcile(marker,marker_path,live)
+    return marker
+
+
+@contextmanager
+def _data_transaction(game_root: Path, desired: dict[Path,str]):
+    """Rollback a failed batch. Anonymous snapshots disappear on process exit.
+
+    Per-file pending journals remain the crash-recovery authority; snapshots
+    are only for caught failures and never become another persistent cache.
+    """
+    from core.file_lock import exclusive
+    lock = game_root/DATA_LOCK
+    _assert_no_reparse_points(lock,game_root)
+    if len(desired) > MAX_TRANSACTION_FILES:
+        raise ValueError('The deployment contains too many files')
+    with exclusive(lock),ExitStack() as stack:
+        markers = {relative:_preflight(game_root,relative) for relative in desired}
+        before_hashes = {relative:_hash_file(game_root/relative) for relative in desired}
+        for relative,marker in markers.items():
+            if marker is not None and before_hashes[relative] not in (marker['originalHash'],marker.get('activeHash')):
+                raise RuntimeError(f'{relative.name} changed while deployment was being prepared')
+        needed = sum((game_root/relative).stat().st_size for relative in desired
+                     if before_hashes[relative] != desired[relative])
+        if needed > MAX_TRANSACTION_BYTES:
+            raise ValueError('Deployment rollback snapshots exceed the 32 GiB limit')
+        if shutil.disk_usage(tempfile.gettempdir()).free < needed:
+            raise OSError('There is not enough temporary space to preserve the current game files during deployment')
+        snapshots = {}
+        for relative in desired:
+            live = game_root/relative
+            expected = before_hashes[relative]
+            if expected == desired[relative]:
+                snapshots[relative] = (None,expected,markers[relative])
+                continue
+            snapshot = stack.enter_context(tempfile.TemporaryFile())
+            digest = hashlib.sha256()
+            with live.open('rb') as source:
+                for block in iter(lambda:source.read(1024*1024),b''):
+                    snapshot.write(block)
+                    digest.update(block)
+            if digest.hexdigest() != expected:
+                raise RuntimeError(f'{relative.name} changed while its rollback copy was being prepared')
+            snapshots[relative] = (snapshot,expected,markers[relative])
+        touched = []
+        try:
+            yield touched, {relative:row[1] for relative,row in snapshots.items()}
+        except Exception as failure:
+            errors = []
+            for relative in reversed(touched):
+                try:
+                    live,marker_path,backup = game_root/relative,_marker_path(game_root,relative),_backup_path(game_root,relative)
+                    for path in (live,marker_path,backup):
+                        _assert_no_reparse_points(path,game_root)
+                    snapshot,before,marker = snapshots[relative]
+                    current = _hash_file(live)
+                    if current not in (before,desired[relative]):
+                        raise RuntimeError(f'{relative.name} changed outside this deployment; the external bytes were kept')
+                    if not backup.is_file():
+                        if current == before and marker is None:
+                            continue  # Failure before creating any ownership state.
+                        raise RuntimeError(f'{relative.name} lost its preserved original during rollback')
+                    original = marker['originalHash'] if marker else before
+                    if _hash_file(backup) != original:
+                        raise RuntimeError(f'{relative.name} original changed during rollback')
+                    # An interrupted rollback is itself a known pending write.
+                    intent = {**(marker or {}),'schema':1,'modId':MOD_ID,'originalHash':original,
+                              'activeHash':current,'pendingHash':before,'pendingKind':'apply'}
+                    _write_marker(marker_path,intent)
+                    if current != before:
+                        snapshot.seek(0)
+                        atomic_write(live,snapshot.read())
+                    if _hash_file(live) != before:
+                        raise RuntimeError(f'{relative.name} rollback did not verify')
+                    # A first install may already have preserved its original.
+                    # Keep that verified original with a disabled marker rather
+                    # than leave an unmanaged backup that blocks the next build.
+                    restored = marker or {'schema':1,'modId':MOD_ID,'originalHash':before,
+                        'activeHash':None,'activeProjectRoot':None,'enabled':False,'appliedAt':None,
+                        'pendingHash':None,'pendingKind':None}
+                    _write_marker(marker_path,restored)
+                except Exception as error:
+                    errors.append(str(error))
+            if errors:
+                raise RuntimeError(f'Deployment failed: {failure}; rollback needs attention: '+ '; '.join(errors)) from failure
+            raise
 
 
 def _is_reparse_point(path: Path) -> bool:
@@ -578,13 +693,22 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
         # Reject corrupt/unsupported project output before any backup or live write.
         _check_asset_like(game_root, relative, payload) if reader is None else reader(payload)
         sources[relative] = (candidate, payload, source_hash)
-    for relative, _reader in targets:
-        if relative in sources:
-            _apply_file(game_root, project_root, relative, *sources[relative])
-        elif _read_marker(_marker_path(game_root, relative)):
-            # The project no longer changes this file: put the original back.
-            _restore_file(game_root, relative)
-    return status(game_root, project_root)
+    desired = {relative:hashlib.sha256(row[1]).hexdigest() for relative,row in sources.items()}
+    for relative,_reader in targets:
+        if relative not in sources:
+            marker = _read_marker(_marker_path(game_root,relative))
+            if marker is not None:
+                desired[relative] = marker['originalHash']
+    with _data_transaction(game_root,desired) as (touched,before):
+        for relative in desired:
+            if _hash_file(game_root/relative) != before[relative]:
+                raise RuntimeError(f'{relative.name} changed during deployment; the external bytes were kept')
+            touched.append(relative)
+            if relative in sources:
+                _apply_file(game_root, project_root, relative, *sources[relative])
+            else:
+                _restore_file(game_root, relative)
+        return status(game_root, project_root)
 
 
 def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Path, new_bytes: bytes,
@@ -641,10 +765,18 @@ def disable(game_root: Path) -> dict:
     targets = (list(FILES) + [(relative, MsbDocument) for relative in _disk_maps(game_root)]
                + [(relative, _check_anibnd) for relative in _disk_chars(game_root)]
                + [(relative, None) for relative in _disk_assets(game_root)])
-    for relative, _reader in targets:
-        if _read_marker(_marker_path(game_root, relative)) is not None:
+    desired = {}
+    for relative,_reader in targets:
+        marker = _read_marker(_marker_path(game_root,relative))
+        if marker is not None:
+            desired[relative] = marker['originalHash']
+    with _data_transaction(game_root,desired) as (touched,before):
+        for relative in desired:
+            if _hash_file(game_root/relative) != before[relative]:
+                raise RuntimeError(f'{relative.name} changed during deployment; the external bytes were kept')
+            touched.append(relative)
             _restore_file(game_root, relative)
-    return status(game_root, None)
+        return status(game_root, None)
 
 
 def _restore_file(game_root: Path, relative: Path) -> None:

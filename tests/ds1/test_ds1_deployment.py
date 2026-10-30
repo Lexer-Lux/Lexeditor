@@ -75,6 +75,10 @@ def read_marker(game):
     return json.loads(marker_path(game).read_text())
 
 
+class SimulatedCrash(BaseException):
+    """A terminated process cannot run the caught-error rollback."""
+
+
 class CrashAfter:
     """Monkeypatches deployment.atomic_write to perform the real write, then raise
     immediately after the call targeting `trigger`, simulating a process crash that
@@ -89,7 +93,7 @@ class CrashAfter:
             self.original(path, data)
             if Path(path) == self.trigger and not self.fired:
                 self.fired = True
-                raise RuntimeError("simulated crash")
+                raise SimulatedCrash("simulated crash")
         monkeypatch.setattr(deployment, "atomic_write", fake)
 
 
@@ -120,6 +124,47 @@ def test_invalid_saved_archive_is_rejected_before_any_installed_write(tmp_path):
     assert not marker_path(game).exists()
 
 
+@pytest.mark.parametrize('operation', ['apply', 'reapply', 'disable'])
+def test_later_write_failure_restores_the_entire_batch(tmp_path, monkeypatch, operation):
+    game,mod = project(tmp_path)
+    with_map(game)
+    store = ItemStore(game,mod,False)
+    store.edit('EquipParamGoods',100,'sellValue',42)
+    store.save()
+    (mod/MAP).parent.mkdir(parents=True,exist_ok=True)
+    # A structurally valid map is enough to exercise the second write.
+    (mod/MAP).write_bytes(build_msb())
+    if operation != 'apply':
+        deployment.apply(game,mod)
+        store.edit('EquipParamGoods',100,'sellValue',43)
+        store.save()
+    before = {relative:(game/relative).read_bytes() for relative in (RELATIVE,MAP)}
+    markers = {relative:deployment._read_marker(deployment._marker_path(game,relative))
+               for relative in before}
+    write = deployment.atomic_write
+    fired = False
+    def fail_after_map(path,data):
+        nonlocal fired
+        write(path,data)
+        if Path(path) == game/MAP and not fired:
+            fired = True
+            raise OSError('second file failed')
+    monkeypatch.setattr(deployment,'atomic_write',fail_after_map)
+    with pytest.raises(OSError,match='second file failed'):
+        deployment.disable(game) if operation == 'disable' else deployment.apply(game,mod)
+    assert fired
+    for relative,payload in before.items():
+        assert (game/relative).read_bytes() == payload
+        marker = deployment._read_marker(deployment._marker_path(game,relative))
+        if markers[relative] is not None:
+            assert marker == markers[relative]
+        else:
+            assert not marker['enabled'] and marker['pendingHash'] is None
+    # The preserved originals and ownership state allow a normal retry.
+    monkeypatch.setattr(deployment,'atomic_write',write)
+    deployment.disable(game) if operation == 'disable' else deployment.apply(game,mod)
+
+
 def test_apply_checks_live_bytes_before_marking_success(tmp_path, monkeypatch):
     game, mod = project(tmp_path)
     original = (game / RELATIVE).read_bytes()
@@ -134,9 +179,32 @@ def test_apply_checks_live_bytes_before_marking_success(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match='failed verification'):
         deployment.apply(game, mod)
     assert not deployment.status(game, mod)['enabled']
-    assert read_marker(game)['pendingHash'] is not None
+    assert read_marker(game)['pendingHash'] is None
     assert (game / RELATIVE).read_bytes() == original
     assert backup_path(game).read_bytes() == original
+
+
+def test_external_edit_during_batch_is_preserved_and_earlier_write_rolled_back(tmp_path, monkeypatch):
+    game,mod = project(tmp_path)
+    with_map(game)
+    store = ItemStore(game,mod,False)
+    store.edit('EquipParamGoods',100,'sellValue',42)
+    store.save()
+    (mod/MAP).parent.mkdir(parents=True,exist_ok=True)
+    (mod/MAP).write_bytes(build_msb())
+    before = (game/RELATIVE).read_bytes()
+    external = b'external map editor bytes'
+    apply_file = deployment._apply_file
+    def edit_next_file(*args):
+        apply_file(*args)
+        if args[2] == RELATIVE:
+            (game/MAP).write_bytes(external)
+    monkeypatch.setattr(deployment,'_apply_file',edit_next_file)
+    with pytest.raises(RuntimeError,match='external bytes were kept'):
+        deployment.apply(game,mod)
+    assert (game/RELATIVE).read_bytes() == before
+    assert (game/MAP).read_bytes() == external
+    assert not deployment._backup_path(game,MAP).exists()
 
 def test_apply_preserves_original_once_and_installs_the_saved_archive(tmp_path):
     game, mod = project(tmp_path)
@@ -339,7 +407,7 @@ def test_crash_between_live_write_and_marker_commit_on_initial_apply(tmp_path, m
     live = game / RELATIVE
 
     crash = CrashAfter(monkeypatch, live)
-    with pytest.raises(RuntimeError, match="simulated crash"):
+    with pytest.raises(SimulatedCrash, match="simulated crash"):
         deployment.apply(game, mod)
     assert crash.fired
 
@@ -374,7 +442,7 @@ def test_crash_between_live_write_and_marker_commit_on_reapply(tmp_path, monkeyp
     old_active = read_marker(game)["activeHash"]
 
     crash = CrashAfter(monkeypatch, live)
-    with pytest.raises(RuntimeError, match="simulated crash"):
+    with pytest.raises(SimulatedCrash, match="simulated crash"):
         deployment.apply(game, mod)
     assert crash.fired
     assert deployment._hash_file(live) == new_hash
@@ -396,7 +464,7 @@ def test_crash_between_live_write_and_marker_commit_on_disable(tmp_path, monkeyp
     live = game / RELATIVE
 
     crash = CrashAfter(monkeypatch, live)
-    with pytest.raises(RuntimeError, match="simulated crash"):
+    with pytest.raises(SimulatedCrash, match="simulated crash"):
         deployment.disable(game)
     assert crash.fired
     assert live.read_bytes() == original
@@ -422,7 +490,7 @@ def test_a_pending_apply_is_finalized_even_if_disable_is_called_next(tmp_path, m
     live = game / RELATIVE
 
     crash = CrashAfter(monkeypatch, live)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(SimulatedCrash):
         deployment.apply(game, mod)
     monkeypatch.undo()
 
