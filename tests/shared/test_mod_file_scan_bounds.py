@@ -7,6 +7,11 @@ import pytest
 from core import mods_service
 
 
+@pytest.fixture(autouse=True)
+def supported_pathlib(monkeypatch):
+    monkeypatch.delattr(Path,'is_junction',raising=False)
+
+
 def test_file_limit_stops_discovery_instead_of_collecting_the_whole_tree(tmp_path,monkeypatch):
     for index in range(30):
         (tmp_path/f'{index}.bin').write_bytes(b'x')

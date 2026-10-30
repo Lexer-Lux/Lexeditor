@@ -7,6 +7,7 @@ that code once, with the message passed in.
 from __future__ import annotations
 
 import os
+import stat
 import tempfile
 import time
 import urllib.request
@@ -15,6 +16,15 @@ from typing import Callable
 
 Progress = Callable[[int, int, str], None]
 USER_AGENT = "Lexeditor/1.0"
+
+
+def is_link(path: Path) -> bool:
+    """Recognize symlinks and Windows reparse points on supported Python versions."""
+    try:
+        info = Path(path).lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISLNK(info.st_mode) or bool(getattr(info, 'st_file_attributes', 0) & 0x400)
 
 
 def atomic_write(path: Path, data: bytes) -> None:

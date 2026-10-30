@@ -15,6 +15,7 @@ import time
 
 from core import bundled_mods, lexmods, mod_metadata, mod_requires, script_mods
 from core.mod_library import metadata
+from core.plugin_files import is_link
 
 CATALOG_TTL = 600
 UPDATE_INTERVAL = 3600
@@ -106,7 +107,7 @@ def mod_files(folder: Path) -> dict:
         directory = pending.pop()
         try:
             # Directory junctions need the same treatment as symlinks on Windows.
-            if directory.is_symlink() or directory.is_junction():
+            if is_link(directory):
                 continue
             with os.scandir(directory) as entries:
                 for entry in entries:
@@ -116,7 +117,7 @@ def mod_files(folder: Path) -> dict:
                     visited += 1
                     path = Path(entry.path)
                     try:
-                        if entry.is_symlink() or path.is_junction():
+                        if is_link(path):
                             continue
                         if entry.is_dir(follow_symlinks=False):
                             pending.append(path)

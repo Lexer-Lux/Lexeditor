@@ -6,6 +6,13 @@ import pytest
 from core import script_mods
 
 
+@pytest.fixture(autouse=True)
+def supported_pathlib(monkeypatch):
+    # The desktop's Python 3.10 has no Path.is_junction. Keep every source
+    # discovery/import boundary covered on that API surface even on newer CI.
+    monkeypatch.delattr(Path,'is_junction',raising=False)
+
+
 def project(tmp_path):
     (tmp_path/'script').mkdir()
     (tmp_path/'script/tweak.py').write_text('def build(settings,context): return {}')

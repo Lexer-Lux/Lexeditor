@@ -31,7 +31,7 @@ import threading
 from time import perf_counter
 from typing import Any, Callable
 
-from core.plugin_files import atomic_write
+from core.plugin_files import atomic_write, is_link
 from core.mod_builds import ModBuildError
 
 SCRIPT_VERSION = 1
@@ -230,7 +230,7 @@ def _load(root: Path):
             if relative.parts[0] != SCRIPT_FOLDER or relative.suffix != '.py':
                 continue
             bytecode = Path(importlib.util.cache_from_source(str(root/relative)))
-            if bytecode.parent.is_symlink() or bytecode.parent.is_junction():
+            if is_link(bytecode.parent):
                 raise ScriptModError('Build bytecode cache must not be a link')
             if not bytecode.resolve().is_relative_to(package_dir.resolve()):
                 raise ScriptModError('Build bytecode cache is outside the script folder')
@@ -379,7 +379,7 @@ def consumed_files(root: Path) -> list[Path]:
     while pending:
         directory = pending.pop()
         try:
-            if directory.is_symlink() or directory.is_junction():
+            if is_link(directory):
                 raise ScriptModError('Build source directories must not be links')
             if not directory.exists():
                 continue
@@ -391,7 +391,7 @@ def consumed_files(root: Path) -> list[Path]:
                     if entry.name in ('.git', '__pycache__'):
                         continue
                     path = Path(entry.path)
-                    if entry.is_symlink() or path.is_junction():
+                    if is_link(path):
                         raise ScriptModError('Build sources must not be links')
                     if entry.is_dir(follow_symlinks=False):
                         pending.append(path)
