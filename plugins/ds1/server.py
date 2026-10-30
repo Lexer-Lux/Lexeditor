@@ -20,6 +20,7 @@ from .flver import FlverError
 from .tae import EVENT_TYPES, TaeError
 from .tae_store import TaeStore
 from .native_rules import NativeRules
+from .weapon_skills import WeaponSkills, TABLE as SKILL_TABLE, TAB as SKILL_TAB, RELATIVE as SKILL_FILE
 from .formats import FormatError, stats_fields, TABLES, FMG_TABLES, save_description
 from .effects import TABLE as EFFECT_TABLE
 from .store import ItemStore
@@ -29,7 +30,7 @@ from . import viewport
 
 # Armor shows its male icon; male and female differ only on a few pieces,
 # and the male set is complete.
-_ICON_KEYS = {'EquipParamWeapon': 'iconId', 'EquipParamProtector': 'iconIdM',
+_ICON_KEYS = {'WeaponSkill': 'iconId', 'EquipParamWeapon': 'iconId', 'EquipParamProtector': 'iconIdM',
               'EquipParamAccessory': 'iconId', 'EquipParamGoods': 'iconId',
               'Magic': 'iconId', 'SpEffectParam': 'iconId'}
 ROOT = Path(__file__).resolve().parents[2]
@@ -55,6 +56,7 @@ STORE = ItemStore(os.environ.get('LEXEDITOR_DS1_ROOT', r'C:\Program Files (x86)\
                   or not os.environ.get('LEXEDITOR_DS1_PROJECT'))
 
 RULES = NativeRules(STORE.game_root, STORE.project, STORE.read_only)
+SKILLS = WeaponSkills(STORE.game_root, STORE.project, STORE.read_only)
 MAPSTORE = MapStore(STORE.game_root, STORE.project, STORE.read_only, STORE)
 TAESTORE = TaeStore(STORE.game_root, STORE.project, STORE.read_only, STORE)
 NATIVE_TABS = {"encumbrance", "encumbrance-overrides", "levelup", "misc"}
@@ -340,6 +342,7 @@ class Handler(PluginRequestHandler):
                                 found['modelPick'] = pick
                     elif path == '/api/state':
                         result = STORE.state()
+                        result['tabs'].append({'id': SKILL_TAB, 'label': 'Ashes of War', 'table': SKILL_TABLE, 'count': len(SKILLS.value['skills'])})
                         result['animTabs'] = [{'id': 'animations', 'label': 'Animations',
                                                'table': 'Tae', 'count': len(TAESTORE.binders())}]
                         for entry in result.get('miscTabs', []):
@@ -350,6 +353,7 @@ class Handler(PluginRequestHandler):
                         result['theme'] = theme_status()
                     elif path == '/api/data-map':
                         result = data_map.payload(STORE, RULES.snapshot(refresh=True), theme_status())
+                        result['rows'].append({'id': 'weapon-skills', 'filename': SKILL_FILE.as_posix(), 'path': str(STORE.project / SKILL_FILE) if STORE.project else '', 'coverage': 'editable', 'status': 'integrated', 'openable': True, 'controls': 'Ashes of War', 'notes': 'Mod-owned skill definitions and exact weapon assignments. Combat actions are supplied separately.', 'target': 'items', 'sub': SKILL_TAB, 'targets': [{'id': 'items', 'label': 'Items'}]})
                     elif path == '/api/theme':
                         self.send_json(theme_status())
                         return
@@ -552,7 +556,12 @@ class Handler(PluginRequestHandler):
                             else:
                                 result = {'rows': TAESTORE.list_chars()}
                         else:
-                            result = {'rows': RULES.list_rows(tab) if tab in NATIVE_TABS else STORE.get().list_rows(tab)}
+                            result = {'rows': SKILLS.list_rows() if tab == SKILL_TAB else RULES.list_rows(tab) if tab in NATIVE_TABS else STORE.get().list_rows(tab)}
+                            for listed in result['rows']:
+                                if listed.get('table') == 'EquipParamWeapon':
+                                    skill = SKILLS.assignment(listed['id'])
+                                    listed.setdefault('values', {})['ashOfWar'] = skill
+                                    listed.setdefault('display', {})['ashOfWar'] = next((s['name'] for s in SKILLS.value['skills'] if s['id'] == skill), 'None')
                             if tab == 'drops':
                                 links = MAPSTORE.lot_maps()
                                 displays = MAPSTORE.place_display_names()
@@ -581,10 +590,12 @@ class Handler(PluginRequestHandler):
                         else:
                             row_id = int(query.get('id', [''])[0])
                             only = stats_fields(query.get('sub', [''])[0], table)
-                            result = {'row': RULES.read_row(row_id) if table == 'NativeRules'
+                            result = {'row': SKILLS.read_row(row_id) if table == SKILL_TABLE else RULES.read_row(row_id) if table == 'NativeRules'
                                       else STORE.get().read_row(table, row_id, only=only, game_root=STORE.game_root)}
-                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count
-                    result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes()
+                            if table == 'EquipParamWeapon':
+                                SKILLS.decorate_weapon(result['row'])
+                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count + SKILLS.dirty_count
+                    result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes() + SKILLS.pending_changes()
                     result['nativeRules'] = RULES.snapshot()
                     result['tweaksNeedRebuild'] = _tweaks_flag()
                     self.send_json(result)
@@ -641,7 +652,7 @@ class Handler(PluginRequestHandler):
                     # requests run side by side instead of queueing behind it.
                     with LOCK:
                         _warm_icon_table()
-                        icon_id = STORE.get().value(table, row_id, key)
+                        icon_id = SKILLS.icon_id(row_id) if table == SKILL_TABLE else STORE.get().value(table, row_id, key)
                     if not isinstance(icon_id, int) or icon_id <= 0:
                         raise LookupError('That record has no item picture')
                     png = icons.icon_png(STORE.game_root, icon_id)
@@ -761,7 +772,16 @@ class Handler(PluginRequestHandler):
                 if path == '/api/edit':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))
                     extra = {}
-                    if payload.get('table') == 'NativeRules':
+                    if payload.get('table') == SKILL_TABLE:
+                        row = SKILLS.edit(payload.get('id'), payload.get('field'), payload.get('value'))
+                        listed = next(s for s in SKILLS.list_rows() if s['id'] == row['id'])
+                        extra = {'values': listed['values'], 'display': listed['display'], 'modified': listed['modified']}
+                    elif payload.get('table') == 'EquipParamWeapon' and payload.get('field') == 'ashOfWar':
+                        SKILLS.assign(payload.get('id'), payload.get('value'), {r.row_id for r in STORE.get().params['EquipParamWeapon'].rows})
+                        row = SKILLS.decorate_weapon(STORE.get().read_row('EquipParamWeapon', payload['id'], game_root=STORE.game_root))
+                        values, display = STORE.get().row_values('EquipParamWeapon', payload['id'])
+                        extra = {'values': values, 'display': display, 'name': row['name']}
+                    elif payload.get('table') == 'NativeRules':
                         row = RULES.edit_row(payload.get('id'), payload.get('field'), payload.get('value'))
                         extra = {'modified': RULES.row_modified(payload.get('id'))}
                     elif str(payload.get('table', '')).endswith('.msb'):
@@ -799,9 +819,9 @@ class Handler(PluginRequestHandler):
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count, **extra}
                 elif path == '/api/rename':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))
-                    row = STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'), only=only)
+                    row = SKILLS.edit(payload.get('id'), 'name', payload.get('name')) if payload.get('table') == SKILL_TABLE else STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'), only=only)
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count,
-                              'modified': STORE.get().row_modified(payload.get('table'), payload.get('id'))}
+                              'modified': True if payload.get('table') == SKILL_TABLE else STORE.get().row_modified(payload.get('table'), payload.get('id'))}
                 elif path == '/api/tae/add':
                     for key in ('table', 'tae', 'anim', 'type', 'start', 'end'):
                         if key not in payload:
@@ -846,12 +866,12 @@ class Handler(PluginRequestHandler):
                     for key in ('table', 'id'):
                         if key not in payload:
                             raise ValueError('Duplicating a record needs its table and ID')
-                    result = {'row': STORE.add_row(payload['table'], payload['id'], payload.get('newId'))}
+                    result = {'row': SKILLS.add(payload['id']) if payload['table'] == SKILL_TABLE else STORE.add_row(payload['table'], payload['id'], payload.get('newId'))}
                 elif path == '/api/rows/remove':
                     for key in ('table', 'id'):
                         if key not in payload:
                             raise ValueError('Removing a record needs its table and ID')
-                    result = {'removed': STORE.remove_row(payload['table'], payload['id'])}
+                    result = {'removed': SKILLS.remove(payload['id']) if payload['table'] == SKILL_TABLE else STORE.remove_row(payload['table'], payload['id'])}
                 elif path == '/api/placements/add':
                     for key in ('map', 'id'):
                         if key not in payload:
@@ -878,6 +898,7 @@ class Handler(PluginRequestHandler):
                               at=payload.get('at'), neighbour=payload.get('neighbour'), keep=payload.get('keep'))}
                 elif path == '/api/save':
                     RULES.validate_save()
+                    SKILLS.validate_save()
                     STORE.validate_save()
                     MAPSTORE.validate_save()
                     TAESTORE.validate_save()
@@ -885,12 +906,14 @@ class Handler(PluginRequestHandler):
                     MAPSTORE.save()
                     TAESTORE.save()
                     RULES.save()
+                    SKILLS.save()
                     result.update(_rebuild_tweaks_on_save())
                 elif path == '/api/discard':
                     result = STORE.discard()
                     MAPSTORE.discard()
                     TAESTORE.discard()
                     RULES.discard()
+                    SKILLS.discard()
                 # Tweaks are library mods, not part of the selected project, so
                 # they save at once; the rebuild rides on Save, or installs straight
                 # away when the session has no writable project.
@@ -911,10 +934,15 @@ class Handler(PluginRequestHandler):
                     result = RULES.apply(STORE)
                 else:
                     result = RULES.restore()
+                if result.get('row', {}).get('table') == 'EquipParamWeapon':
+                    SKILLS.decorate_weapon(result['row'])
+                    skill = SKILLS.assignment(result['row']['id'])
+                    result.setdefault('values', {})['ashOfWar'] = skill
+                    result.setdefault('display', {})['ashOfWar'] = next((s['name'] for s in SKILLS.value['skills'] if s['id'] == skill), 'None')
                 if not path.startswith('/api/tweaks/'):
                     result['tweaksNeedRebuild'] = _tweaks_flag()
-                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count
-                    result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes()
+                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count + SKILLS.dirty_count
+                    result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes() + SKILLS.pending_changes()
                     result['nativeRules'] = RULES.snapshot()
                 self.send_json(result)
         except PermissionError as error:

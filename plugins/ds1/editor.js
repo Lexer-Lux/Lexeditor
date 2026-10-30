@@ -1075,7 +1075,10 @@ async function openIconGallery(row,field,face){
   }
   const dialog=el("section",{class:"lex-dialog ds1-icon-gallery",role:"dialog","aria-modal":"true","aria-label":`Choose icon for ${field.label}`},
     el("h2",{},`Choose icon for ${field.label}`),grid,
-    el("div",{class:"lex-dialog-actions"},el("button",{type:"button",class:"lex-dialog-action",onclick:close},"Cancel")));
+    el("div",{class:"lex-dialog-actions"},
+      ...(field.emptyValue!==undefined?[el("button",{type:"button",class:"lex-dialog-action",onclick:()=>{
+        commit(row,field,field.emptyValue,face);face.value=String(field.emptyValue);close();}},"Clear icon")]:[]),
+      el("button",{type:"button",class:"lex-dialog-action",onclick:close},"Cancel")));
   backdrop.append(dialog);
   backdrop.addEventListener("click",event=>{if(event.target===backdrop)close();});
   document.body.append(backdrop);
@@ -2192,6 +2195,21 @@ function mapsNoun(){
   if(table==="ObjActParam")return "Treasure";
   return "Placement";
 }
+function addSkillButton(){
+  return el("button",{type:"button",class:"lex-header-icon","aria-label":"Add Ash of War",title:"Add Ash of War",disabled:state.rowBusy,onclick:()=>addSkill()},LexeditorUI.addIcon());
+}
+function emptySkillDetail(){
+  return detailPanel({title:"Ashes of War",actions:[addSkillButton()],body:[LexeditorUI.detailNote(
+    state.rows.length?"No matching Ashes of War. Change the search, or add a skill.":"No Ashes of War yet. Add a skill, then assign it from a weapon’s details.")]});
+}
+async function addSkill(){
+  if(state.readOnly){await viewportRequestMod();return;}
+  if(state.rowBusy)return;
+  state.rowBusy=true;render();
+  try{const result=await api("/api/rows/add",{table:"WeaponSkill",id:null});state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.query="";await loadItems();state.selected=key(result.row);const index=sortedRows().findIndex(row=>key(row)===state.selected);if(index>=0)state.page=Math.floor(index/state.pageSize);await loadDetail();}
+  catch(error){notify(error);}
+  finally{state.rowBusy=false;render();}
+}
 function rowActionButtons(kind){
   const locked=state.readOnly||state.rowBusy;
   const playerStart=kind==="placement"&&state.row.kind==="Player";
@@ -2208,7 +2226,7 @@ function rowActionButtons(kind){
     :[];
   const duplicateTitle=state.readOnly?`Open a mod project to add ${nouns[0]}s`:`Copy this ${nouns[0]} under the next free ID`;
   const removeTitle=playerStart?"The player start cannot be removed":state.readOnly?`Open a mod project to remove ${nouns[0]}s`:`Remove this ${nouns[0]} from its ${nouns[1]}`;
-  return [...goTo,el("button",{type:"button",class:"lex-header-icon","data-row-action":"duplicate","data-row-kind":kind,disabled:locked,
+  return [...(state.row?.table==="WeaponSkill"?[addSkillButton()]:[]),...goTo,el("button",{type:"button",class:"lex-header-icon","data-row-action":"duplicate","data-row-kind":kind,disabled:locked,
       title:duplicateTitle,"aria-label":duplicateTitle,
       onclick:()=>duplicateRow(kind)},LexeditorUI.copyIcon()),
     el("button",{type:"button",class:"lex-header-icon","data-row-action":"remove","data-row-kind":kind,disabled:locked||playerStart,
@@ -2446,6 +2464,7 @@ function detail(){
   if(ASSET_TABS.has(state.tab))return renderAssetDetail();
   if(state.tab==="scripts"&&state.row?.table==="ScriptState")return renderScriptDetail();
   if(!state.row){
+    if(state.tab==="items"&&state.sub==="ashes-of-war")return emptySkillDetail();
     if(state.tab==="animations"&&state.animScope.level==="events")
       return detailPanel({title:"Event",actions:taeActions().slice(0,1),
         body:[LexeditorUI.detailNote(state.rows.length?"Select an event, or add one.":"This animation has no events yet. Add the first one.")]});
@@ -2513,7 +2532,7 @@ const ds1LabelKinds=new Set(["physical","magic","fire","lightning","critical",
   "poison","toxic","bleed","curse","poise",
   "vit","att","end","res","soulLv","souls","slot","humanity","humanityStat","hp","stamina","mp",
   "divine","occult","stability"]);const ds1IconTables=new Set(["EquipParamWeapon","EquipParamProtector","EquipParamAccessory",
-  "EquipParamGoods","Magic","SpEffectParam"]);
+  "EquipParamGoods","Magic","SpEffectParam","WeaponSkill"]);
 function ds1LabelArt(panel){
   if(!(panel instanceof Element))return;
   for(const field of panel.querySelectorAll("[data-lex-icon]")){
@@ -3438,7 +3457,7 @@ function renderItems(){
     // names: a menu label keeps its slot name, so an edited label keeps its record.
     renamable:row=>state.tab==="text"?false:state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam","CharaInitParam","NativeRules"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     describePinnedCell,commitPinnedCell,
-    detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,...(ASSET_TABS.has(state.tab)?{actions:[assetUploadButton()]}:{}),body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
+    detail,emptyDetail:()=>state.tab==="items"&&state.sub==="ashes-of-war"?emptySkillDetail():detailPanel({title:"No matching "+noun,...(ASSET_TABS.has(state.tab)?{actions:[assetUploadButton()]}:{}),body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   state.pagedView=view;
   // Pinned headers take the same game art as their fields; the master
   // list renders here, outside any detail panel.
