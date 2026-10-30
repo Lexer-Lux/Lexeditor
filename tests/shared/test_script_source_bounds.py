@@ -78,3 +78,14 @@ def test_import_clears_only_expected_bytecode_without_recursive_cache_walk(tmp_p
     monkeypatch.setattr(Path,'rglob',forbidden)
     assert script_mods.load_script(root).build({},None) == {}
     assert unrelated.read_bytes() == b'private'
+
+
+def test_windows_utf8_bom_metadata_is_still_recognized_as_a_script_mod(tmp_path):
+    root = project(tmp_path)
+    path = root/'mod.json'
+    path.write_bytes(b'\xef\xbb\xbf'+path.read_bytes())
+    (root/script_mods.SCHEMA_FILE).write_bytes(b'\xef\xbb\xbf{"fields":[]}')
+    (root/script_mods.VALUES_FILE).write_bytes(b'\xef\xbb\xbf{"values":{}}')
+    assert script_mods.is_script_mod(root)
+    assert script_mods.schema(root)['fields']==[]
+    assert script_mods.values(root)=={}

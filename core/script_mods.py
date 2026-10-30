@@ -78,7 +78,7 @@ def _read_json(path: Path) -> Any:
             data = stream.read(MAX_METADATA_BYTES + 1)
         if len(data) > MAX_METADATA_BYTES:
             raise ValueError('exceeds the 8 MiB metadata limit')
-        return json.loads(data.decode('utf-8'))
+        return json.loads(data.decode('utf-8-sig'))
     except FileNotFoundError:
         return None
     except (OSError, ValueError, RecursionError) as error:
