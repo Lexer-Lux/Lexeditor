@@ -8,6 +8,7 @@ The first-run screen offers Lexer's Mod once per game.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import threading
 import time
@@ -17,6 +18,8 @@ from core.mod_library import metadata
 
 CATALOG_TTL = 600
 UPDATE_INTERVAL = 3600
+MAX_LISTED_FILES = 2000
+MAX_FILE_NODES = 32000
 _catalogs: dict[str, tuple[float, dict]] = {}
 _catalog_lock = threading.Lock()
 
@@ -97,18 +100,38 @@ def mod_files(folder: Path) -> dict:
     the Mods tab read there. Thousands of files would swamp the detail,
     so the list stops at two thousand and says so.
     """
-    found = []
-    for path in sorted(folder.rglob('*')):
-        if not path.is_file() or path.is_symlink():
-            continue
+    folder = Path(folder)
+    found, pending, visited, truncated = [], [folder], 0, False
+    while pending and not truncated:
+        directory = pending.pop()
         try:
-            size = path.stat().st_size
+            # Directory junctions need the same treatment as symlinks on Windows.
+            if directory.is_symlink() or directory.is_junction():
+                continue
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    if visited >= MAX_FILE_NODES:
+                        truncated = True
+                        break
+                    visited += 1
+                    path = Path(entry.path)
+                    try:
+                        if entry.is_symlink() or path.is_junction():
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            pending.append(path)
+                        elif entry.is_file(follow_symlinks=False):
+                            size = entry.stat(follow_symlinks=False).st_size
+                            found.append({'relative': path.relative_to(folder).as_posix(), 'size': size,
+                                          'sizeLabel': _human_size(size), 'loaded': False})
+                            if len(found) > MAX_LISTED_FILES:
+                                truncated = True
+                                break
+                    except OSError:
+                        continue
         except OSError:
             continue
-        found.append({'relative': path.relative_to(folder).as_posix(), 'size': size,
-                      'sizeLabel': _human_size(size), 'loaded': False})
-    truncated = len(found) > 2000
-    return {'files': found[:2000], 'truncated': truncated}
+    return {'files': sorted(found[:MAX_LISTED_FILES],key=lambda row:row['relative']), 'truncated': truncated}
 
 
 def _claims_bundle(folder: Path) -> bool:
