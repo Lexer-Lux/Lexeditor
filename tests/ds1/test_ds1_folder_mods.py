@@ -434,6 +434,10 @@ def test_player_zip_exports_prebuilt_mod_with_loader_and_declared_dependencies(v
     with pytest.raises(ValueError,match='existing'):
         adapter.export_release(folder,game,output)
     assert output.read_bytes() == before
+    (folder/'runtime.lxd').write_bytes(runtime_mods.build(vanilla,[spec()],requires_data=True))
+    with pytest.raises(ValueError,match='missing its required data'):
+        adapter.export_release(folder,game,tmp_path/'missing-data.zip')
+    assert not (tmp_path/'missing-data.zip').exists()
 
 
 def test_shared_export_action_locks_ui_and_recovers_from_failure(tmp_path):

@@ -179,6 +179,8 @@ def write_release(folder: Path, destination: Path, vanilla: bytes) -> Path:
         for path in tweak_mods.built_files(folder,kind):
             contributions.append((path.relative_to(folder),path))
     payload = read(folder) if prebuilt else build(vanilla, specs, requires_data=bool(contributions)) if specs else None
+    if payload is not None and inspect(payload)['requiresData'] and not contributions:
+        raise ValueError('This prebuilt mod is missing its required data; rebuild or reinstall it before exporting')
     if payload is None:
         if not contributions:
             raise ValueError('This mod has no built contributions to export')

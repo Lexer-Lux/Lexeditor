@@ -15,7 +15,15 @@ to one mod and are not offered for a move.
 
 ## Author builds
 
-Save/build the mod in Lexeditor, then export its built contributions:
+Save/build the mod in Lexeditor, select it in Mods, then use **Export for
+players** in its detail header. The ZIP contains the common loader and its
+private runtime, plus `mods/<id>/` with that mod's prebuilt contributions.
+Extract the ZIP into the game directory. Other required mods remain declared
+in `mod.json`; install their releases too. Export does not enable or deploy
+anything. Changed source/settings or missing built data must be rebuilt first.
+
+The command-line tool exports only the mod folder, for authors distributing
+the common loader separately:
 
     python tools/export_ds1_mod.py MOD_FOLDER --game GAME_FOLDER --output RELEASE.zip
 
