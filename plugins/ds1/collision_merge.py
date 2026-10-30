@@ -5,6 +5,8 @@ from .collision_write import CollisionDocument
 from . import collision_hull
 from .formats import FormatError
 
+FACE_ARRAYS = {'materialIndices':255, 'materialIndices16':65535}
+
 
 def _metadata(document):
     ignored = {
@@ -21,7 +23,9 @@ def _metadata(document):
     def strip(value):
         if isinstance(value, dict):
             omit = ignored.get(value.get('__class__'), set())
-            return {key: strip(item) for key, item in value.items() if key not in omit}
+            return {key: (True if item and key in FACE_ARRAYS and value.get('__class__') in
+                         ('hkpStorageExtendedMeshShape::MeshSubpartStorage','hkpStorageMeshShape::SubpartStorage')
+                         else strip(item)) for key, item in value.items() if key not in omit}
         if isinstance(value, list):
             return [strip(item) for item in value]
         return value
@@ -40,11 +44,21 @@ def _mesh(document, index):
     stride, flags = material['vertexDataStride'], material['vertexDataBuffer'] or []
     if type(stride) is not int or not 0 <= stride <= 256 or len(flags) != len(mesh['vertices'])*stride:
         raise FormatError('Collision vertex metadata has an unsupported stride')
-    return {'vertices': mesh['vertices'], 'faces': mesh['faces'],
-            'flags': [flags[i*stride:(i+1)*stride] for i in range(len(mesh['vertices']))]}
+    result = {'vertices': mesh['vertices'], 'faces': mesh['faces'],
+              'flags': [flags[i*stride:(i+1)*stride] for i in range(len(mesh['vertices']))]}
+    storage = document._value(document.storage[index])
+    for name,maximum in FACE_ARRAYS.items():
+        if storage.get(name):
+            values = storage[name]
+            if len(values) != len(mesh['faces']) or any(type(v) is not int or not 0 <= v <= maximum for v in values):
+                raise FormatError('Collision face metadata has an unsupported layout')
+            result[name] = [[v] for v in values]
+    return result
 
 
 def _update(old, new):
+    if set(old) != set(new):
+        raise FormatError('Collision mesh metadata arrays do not match their source')
     # The fourth vertex component is preserved game metadata, not a spatial
     # coordinate. Match it explicitly when a topology edit adds a vertex.
     sources = []
@@ -60,7 +74,8 @@ def _update(old, new):
             'faces': [row[:3] for row in new['faces']],
             'vertex_sources': sources,
             'face_sources': [min(i, len(old['faces'])-1) for i in range(len(new['faces']))],
-            'vertex_flags': new['flags'], 'face_tags': [row[3] for row in new['faces']]}
+            'vertex_flags': new['flags'], 'face_tags': [row[3] for row in new['faces']],
+            'face_data': {name:[row[0] for row in new[name]] for name in FACE_ARRAYS if name in new}}
 
 
 def merge(original, variants, *, conflicts_only=False):

@@ -4030,6 +4030,7 @@ async function changeCollisionStructure(action){
   try{
     const before=(await api(`/api/map/collision/state?table=${encodeURIComponent(table)}`)).mesh;
     const after=structuredClone(before);
+    const faceArrays=['faces','materialIndices','materialIndices16'].filter(name=>Array.isArray(after[name]));
     let selected=index;
     if(action==='remove'){
       if(after[kind].length===1)throw new Error(`Keep at least one ${kind==='vertices'?'vertex':'face'} in a collision mesh. Remove the collision placement to remove it from the map.`);
@@ -4039,8 +4040,12 @@ async function changeCollisionStructure(action){
         if(!collision.derivedFaces&&connected===after.faces.length)throw new Error('Removing this vertex would leave no faces. Remove the collision placement instead.');
         if(connected&&!await confirmAction({title:'Remove connected faces?',message:`Removing Vertex ${index} also removes ${connected} connected faces.`,confirmLabel:'Remove',cancelLabel:'Cancel'}))return;
         after.vertices.splice(index,1);after.flags.splice(index,1);
-        if(!collision.derivedFaces)after.faces=after.faces.filter(face=>!face.slice(0,3).includes(index)).map(face=>face.map((value,i)=>i<3&&value>index?value-1:value));
-      }else after.faces.splice(index,1);
+        if(!collision.derivedFaces){
+          const keep=after.faces.map(face=>!face.slice(0,3).includes(index));
+          for(const name of faceArrays)after[name]=after[name].filter((row,i)=>keep[i]);
+          after.faces=after.faces.map(face=>face.map((value,i)=>i<3&&value>index?value-1:value));
+        }
+      }else for(const name of faceArrays)after[name].splice(index,1);
       selected=Math.min(index,after[kind].length-1);
     }else{
       selected=after[kind].length;
@@ -4051,6 +4056,7 @@ async function changeCollisionStructure(action){
       }else{
         if(action==='add'&&after.vertices.length<3)throw new Error('Add at least three vertices before adding a face.');
         after.faces.push(action==='duplicate'?[...after.faces[index]]:[0,1,2,after.faces[0][3]]);
+        for(const name of faceArrays)if(name!=='faces')after[name].push([...after[name][action==='duplicate'?index:0]]);
       }
     }
     const snapshotBytes=JSON.stringify(before).length+JSON.stringify(after).length;

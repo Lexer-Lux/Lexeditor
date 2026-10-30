@@ -224,12 +224,19 @@ class CollisionDocument:
             if parameter.get('primitiveDataBuffer') and len(new_faces) != len(old['faces']):
                 raise FormatError('This collision has primitive metadata that cannot yet be resized')
             values = self._value(storage)
+            face_data = update.get('face_data')
+            if face_data is not None and (type(face_data) is not dict or set(face_data) !=
+                    {name for name in ('materialIndices','materialIndices16') if values.get(name)}):
+                raise FormatError('Collision face metadata arrays do not match their source')
             for name, code in (('materialIndices', 'B'), ('materialIndices16', 'H')):
                 if values.get(name):
                     if len(values[name]) != len(old['faces']):
                         raise FormatError('Collision face metadata has an unsupported layout')
-                    payload = struct.pack('<' + str(len(face_sources)) + code,
-                                          *(values[name][source] for source in face_sources))
+                    data = face_data[name] if face_data is not None else [values[name][source] for source in face_sources]
+                    if (type(data) is not list or len(data) != len(new_faces)
+                            or any(type(v) is not int or not 0 <= v <= (255 if code == 'B' else 65535) for v in data)):
+                        raise FormatError('Collision face metadata is invalid')
+                    payload = struct.pack('<' + str(len(data)) + code, *data)
                     self._array(storage, name, payload, len(face_sources))
             self._patch(part, 'numVertices', len(new_vertices))
             self._patch(part, 'numTriangleShapes' if self.kind == 'extended' else 'numTriangles', len(new_faces))

@@ -12,10 +12,11 @@ from msb_fixture import build_msb
 from test_ds1_collision_store import setup,MAP
 from test_ds1_collision_write import collision_source
 from test_ds1_legacy_collision import legacy_source
+from test_ds1_collision_face_materials import material_source
 from test_ds1_portable_collisions import HEADER,BODY
 
 
-@pytest.mark.parametrize('source_name,loose',[('collision_source',False),('collision_source',True),('legacy_source',False)])
+@pytest.mark.parametrize('source_name,loose',[('collision_source',False),('collision_source',True),('legacy_source',False),('material_source',False)])
 def test_collision_editor_fields_structure_history_and_preview(request,tmp_path,source_name,loose):
     collision_source=request.getfixturevalue(source_name)
     game,project,store,pair=setup(tmp_path,collision_source)
@@ -90,10 +91,21 @@ def test_collision_editor_fields_structure_history_and_preview(request,tmp_path,
                 page.wait_for_function('state.pending===0&&state.collision.kind==="faces"&&state.row?.values.vertexA===2')
                 if page.locator('.lex-important-backdrop').count():
                     pytest.fail(str((page.locator('.lex-important-backdrop').inner_text(),requests)))
+                face_count=page.evaluate('state.collision.rows.length')
                 page.get_by_role('button',name='Add collision face',exact=True).click()
-                page.wait_for_function('state.collision.rows.length===2&&!state.rowBusy')
+                page.wait_for_function('(count)=>state.collision.rows.length===count+1&&!state.rowBusy',arg=face_count)
                 page.get_by_role('button',name='Remove collision face',exact=True).click()
-                page.wait_for_function('state.collision.rows.length===1&&!state.rowBusy')
+                page.wait_for_function('(count)=>state.collision.rows.length===count&&!state.rowBusy',arg=face_count)
+                if source_name=='material_source':
+                    page.locator('.lex-barrel-grid').get_by_text('Face 0',exact=True).click()
+                    page.wait_for_function('state.row?.id==="f:0"')
+                    page.get_by_role('button',name='Remove collision face',exact=True).click()
+                    page.wait_for_function('state.collision.rows.length===1&&!state.rowBusy')
+                    page.get_by_role('button',name='Duplicate collision face',exact=True).click()
+                    page.wait_for_function('state.collision.rows.length===2&&!state.rowBusy')
+                    snapshot=page.evaluate('(async()=> (await api(`/api/map/collision/state?table=${encodeURIComponent(state.collision.table)}`)).mesh)()')
+                    assert snapshot['materialIndices']==[[9],[9]]
+                    assert snapshot['materialIndices16']==[[900],[900]]
                 page.evaluate('commit(state.row,state.row.fields.find(f=>f.key==="vertexA"),0,null)')
                 page.wait_for_function('state.pending===0&&state.row?.values.vertexA===0')
                 page.get_by_role('combobox',name='Layer',exact=True).select_option('low')

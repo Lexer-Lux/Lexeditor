@@ -14145,7 +14145,12 @@ ${contents.path}`});
     const selectionKey=options.splitKey || rowPreferenceKey;
     const selection=tableSelections.get(selectionKey)||{keys:new Set([selected]),anchor:selected};
     selection.keys=new Set([...selection.keys].filter(key=>records.some(row=>keyOf(row)===key)));
-    if(!selection.keys.size)selection.keys.add(selected);
+    if(!selection.keys.size||selection.keys.size===1&&!selection.keys.has(selected)){
+      // A link or structural edit can select a new record between renders.
+      // Its detail and single highlighted row must follow the same identity;
+      // otherwise the stale highlight suppresses the next click on that row.
+      selection.keys=new Set([selected]);selection.anchor=selected;
+    }
     tableSelections.set(selectionKey,selection);
     options.sync?.({page, pageSize, selected, selection: [...selection.keys]});
     const pinOwner={store:autoPins(options.rowsKey||rowPreferenceKey),

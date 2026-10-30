@@ -23,24 +23,28 @@ def _layout(document):
 
 
 def _validate_mesh(mesh):
-    if type(mesh) is not dict or set(mesh) != {'vertices', 'faces', 'flags'}:
+    if (type(mesh) is not dict or not {'vertices','faces','flags'} <= mesh.keys()
+            or set(mesh)-{'vertices','faces','flags'}-collision_merge.FACE_ARRAYS.keys()):
         raise FormatError('Invalid portable collision mesh')
     for name, rows in mesh.items():
         if type(rows) is not list or not 0 < len(rows) <= 1000000:
             raise FormatError('Invalid portable collision element count')
         for row in rows:
-            if (type(row) is not list or (name != 'flags' and len(row) != 4)
+            if (type(row) is not list or (name in ('vertices','faces') and len(row) != 4)
+                    or (name in collision_merge.FACE_ARRAYS and len(row) != 1)
                     or (name == 'flags' and not 0 <= len(row) <= 256)):
                 raise FormatError('Invalid portable collision element')
             if name == 'vertices':
                 if any(type(v) not in (float, int) or not math.isfinite(v) for v in row):
                     raise FormatError('Invalid portable collision coordinate')
-            elif any(type(v) is not int or v < 0 or v > (255 if name == 'flags' else 0xffffffff) for v in row):
+            elif any(type(v) is not int or v < 0 or v > collision_merge.FACE_ARRAYS.get(name,255 if name == 'flags' else 0xffffffff) for v in row):
                 raise FormatError('Invalid portable collision metadata')
     if len(mesh['vertices']) != len(mesh['flags']) or len({len(row) for row in mesh['flags']}) != 1:
         raise FormatError('Portable collision vertex metadata does not match its vertices')
     if any(index >= len(mesh['vertices']) for face in mesh['faces'] for index in face[:3]):
         raise FormatError('Portable collision face points outside its vertices')
+    if any(len(mesh[name]) != len(mesh['faces']) for name in collision_merge.FACE_ARRAYS if name in mesh):
+        raise FormatError('Collision face metadata does not match its faces')
 
 
 def create_state(first, last, values=None):
