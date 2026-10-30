@@ -13,6 +13,72 @@ from plugins.ds1.map_store import MapStore
 from plugins.ds1.store import MARKER
 
 
+def collision_fixture(monkeypatch):
+    import hkx_fixture as fixture
+    from plugins.ds1 import hkx, map_collision
+    extra = [('class', map_collision.MESH_TYPE, 8, [('vertices', 0, 'A_Vector'), ('indices16', 4, 'A_i16')]),
+             ('array', 'A_Vector', 'hkVector4f')]
+    types = fixture.TYPES + extra
+    monkeypatch.setattr(fixture, 'TYPES', types)
+    monkeypatch.setattr(fixture, 'TIDS', {entry[1]: index+1 for index, entry in enumerate(types)})
+    source = fixture.build_tag0()
+    root, _ = hkx._section(source, 0)
+    table = hkx._peek_tables(source)
+    item_count = len(table)
+    parts = []
+    mesh_at = vertex_at = index_at = None
+    for section in root['subs']:
+        raw = source[section['pos']:section['pos']+section['length']]
+        if section['sig'] == 'DATA':
+            mesh_at = len(raw)
+            vertex_at, index_at = mesh_at+8, mesh_at+8+48
+            raw += struct.pack('<2i', item_count+1, item_count+2)
+            raw += struct.pack('<12f', 0,0,0,0, 1,0,0,0, 0,0,1,0)
+            raw += struct.pack('<4h', 0,1,2,999)  # Fourth index is face metadata.
+        elif section['sig'] == 'INDX':
+            chunks = []
+            for child in section['subs']:
+                payload = source[child['pos']:child['pos']+child['length']]
+                if child['sig'] == 'ITEM':
+                    payload += struct.pack('<3I', fixture.TIDS[map_collision.MESH_TYPE], mesh_at, 1)
+                    payload += struct.pack('<3I', fixture.TIDS['hkVector4f'], vertex_at, 3)
+                    payload += struct.pack('<3I', fixture.TIDS['hkInt16'], index_at, 4)
+                chunks.append(fixture._section(child['sig'].encode(), payload, False))
+            raw = b''.join(chunks)
+        parts.append(fixture._section(section['sig'].encode(), raw, bool(section['subs'])))
+    return fixture._section(b'TAG0', b''.join(parts), True)
+
+
+def test_collision_triangles_and_one_broken_layer(monkeypatch, tmp_path):
+    import base64
+    from plugins.ds1 import map_collision
+    source = collision_fixture(monkeypatch)
+    mesh = map_collision.meshes(source)[0]
+    assert struct.unpack('<3I', base64.b64decode(mesh['indices'])) == (0,1,2)
+    folder = tmp_path/'map/m10_02_00_00'
+    folder.mkdir(parents=True)
+    (folder/'h0000.hkx').write_bytes(source)
+    (folder/'l0000.hkx').write_bytes(b'Broken low collision')
+    result = map_collision.geometry(tmp_path, None, 'm10_02_00_00.msb', 'h0000')
+    assert [mesh['layer'] for mesh in result['meshes']] == ['collisionHigh']
+    assert len(result['notes']) == 1 and result['notes'][0].startswith('collisionLow:')
+
+
+def test_navigation_binary_geometry_validates_indices():
+    import base64
+    from plugins.ds1.map_navigation import geometry
+    from plugins.ds1.formats import FormatError
+    data = bytearray(128)
+    struct.pack_into('<5i', data, 0, 1, 3, 128, 1, 164)
+    data += struct.pack('<9f', 0,0,0, 1,0,0, 0,0,1)
+    data += struct.pack('<7i', 0,1,2,-1,-1,-1,0)
+    mesh = geometry(data)['meshes'][0]
+    assert struct.unpack('<3I', base64.b64decode(mesh['indices'])) == (0,1,2)
+    struct.pack_into('<i', data, 164, 100)
+    with pytest.raises(FormatError):
+        geometry(data)
+
+
 def document():
     return MsbDocument(build_msb(parts=(('piece', 0, 0, 0, None), ('hit', 5, 0, 1, None),
                                          ('nav', 8, 0, 2, None)),

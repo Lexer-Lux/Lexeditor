@@ -26,4 +26,5 @@ def geometry(source):
         indices.extend(triangle)
     return {'meshes': [{'positions': base64.b64encode(positions).decode('ascii'),
                         'indices': base64.b64encode(struct.pack(f'<{len(indices)}I', *indices)).decode('ascii'),
-                        'normals': '', 'layer': 'navigation', 'mat_def': '', 'cull': False}], 'notes': []}
+                        'normals': '', 'layer': 'navigation', 'mat_def': '', 'cull': False,
+                        'verts': vertices, 'tris': faces}], 'notes': []}

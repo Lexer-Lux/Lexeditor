@@ -47,6 +47,7 @@ def meshes(source):
                 raise FormatError('Collision face points outside its vertices')
             result.append({'positions': _encode(positions, 'f'),
                            'indices': _encode(triangles, 'I'), 'normals': '',
+                           'verts': len(vertices), 'tris': len(triangles)//3,
                            'cull': False, 'mat_def': '', 'name': f'Collision {len(result)+1}'})
     if not result:
         raise FormatError('This collision has no supported triangle storage')
