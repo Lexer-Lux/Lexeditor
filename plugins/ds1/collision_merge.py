@@ -22,7 +22,8 @@ def _metadata(document):
             return [strip(item) for item in value]
         return value
 
-    return json.dumps(strip(document.reader.item_objects(1)), sort_keys=True, separators=(',', ':'))
+    values = [document.reader.item_objects(1), document._value(document.shape), document._value(document.code)]
+    return json.dumps(strip(values), sort_keys=True, separators=(',', ':'))
 
 
 def _mesh(document, index):

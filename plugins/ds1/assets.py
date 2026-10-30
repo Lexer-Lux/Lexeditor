@@ -54,6 +54,7 @@ COLLISION_EXTENSIONS = frozenset({'.hkx', '.hkxbhd', '.hkxbdt'})
 TEXTURE_EXTENSIONS = frozenset({'.tpf', '.tpfbhd', '.tpfbdt', '.chrtpfbdt', '.dds', '.png', '.ccm'})
 SPLIT_ARCHIVE_EXTENSIONS = frozenset({'.tpfbdt'})
 SOUND_EXTENSIONS = frozenset({'.fev', '.fsb', '.itl', '.mix', '.mch', '.rpc'})
+BUILD_INPUT_SUFFIXES = frozenset({'.py', '.pyc', '.pyo'})
 # FMOD bank name tags that mark music: area themes (m), streamed themes
 # (sm) and the mix setup. Every other bank is sound effects.
 MUSIC_TAGS = ('_sm', '_m', 'main', 'mixer', 'multi')
@@ -131,6 +132,8 @@ def check_relative(value):
         raise AssetError(f"The {relative.parts[0]} folder holds no replaceable game files")
     if relative.suffix.casefold() == '.exe':
         raise AssetError('Executable files are not mod data; Lexeditor never writes game executables')
+    if relative.suffix.casefold() in BUILD_INPUT_SUFFIXES:
+        raise AssetError('Python files are build inputs, not Dark Souls game assets')
     if is_owned(relative):
         raise AssetError("That file has its own editor; change it there instead")
     if '.lexeditor-' in relative.name.casefold():
@@ -162,7 +165,7 @@ def _project_files(root, strict):
                             path = _checked(Path(entry.path))
                             if path.is_dir():
                                 stack.append(path)
-                            else:
+                            elif path.suffix.casefold() not in BUILD_INPUT_SUFFIXES:
                                 yield path
                         except (OSError, ValueError) as error:
                             if strict:

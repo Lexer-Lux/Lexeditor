@@ -233,17 +233,23 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
             if game_root is not None:
                 originals = mod_loader.vanilla_files(Path(game_root),frozenset(declared))
                 mod_loader.materialize_mod(mod_loader.Mod(row['name'],folder,{},declared),originals)
+    from . import collision_archive
+    portable_targets = {target for relative in portable for target in collision_archive.pair(relative)}
+    if any(relative in portable_targets for relative,_path in contributions):
+        raise ValueError('The mod contains duplicate archive and record contributions')
     archives = [(relative,path) for relative,path in contributions if record_edits.supports(relative)]
     if archives:
         if game_root is None:
             raise ValueError('Locate the installed game to export portable record edits')
         originals = mod_loader.vanilla_files(Path(game_root),frozenset(relative for relative,_path in archives))
-        for relative,path in archives:
-            if relative in portable:
-                raise ValueError('The mod contains duplicate archive and record contributions')
-            if relative not in originals:
-                raise ValueError(f'{relative}: the export baseline is missing')
-            portable[relative] = record_edits.create(relative,originals[relative],path.read_bytes())
+        sources, changed = dict(contributions), {}
+        for relative,_path in archives:
+            for target in collision_archive.pair(relative):
+                if target not in originals or target not in sources:
+                    raise ValueError(f'{target}: the complete export archive unit is missing')
+                changed[target] = mod_loader._read_data(sources[target],target)
+        portable.update(record_edits.create_group(originals,changed))
+        portable_targets = {target for relative in portable for target in collision_archive.pair(relative)}
     payload = read(folder) if prebuilt else build(vanilla, specs, requires_data=bool(contributions)) if specs else None
     if payload is not None and inspect(payload)['requiresData'] and not contributions:
         raise ValueError('This prebuilt mod is missing its required data; rebuild or reinstall it before exporting')
@@ -278,7 +284,7 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
             (target/record_edits.FILENAME).write_bytes(existing_records if not archives and existing_records is not None
                                                      else record_edits.encode(portable))
         for relative, source in contributions:
-            if relative in portable or relative == record_edits.FILENAME:
+            if relative in portable_targets or relative == record_edits.FILENAME:
                 continue
             relative = relative_path(relative.as_posix())
             output = target/relative

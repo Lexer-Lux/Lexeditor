@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from core.mod_library import relative_path
-from . import formats, texts, script_edits, binder_edits, map_edits, tae_merge
+from . import formats, texts, script_edits, binder_edits, map_edits, tae_merge, collision_archive, collision_edits
 
 FILENAME = Path('records.lxd')
 LIMIT = 64 * 1024 * 1024
@@ -27,7 +27,8 @@ def supports(relative):
     from .mod_loader import FILES
     from . import emevd
     return (relative in FILES or emevd.is_event_file(relative)
-            or script_edits.supported(relative) or binder_edits.supported(relative) or map_edits.supported(relative))
+            or script_edits.supported(relative) or binder_edits.supported(relative) or map_edits.supported(relative)
+            or collision_edits.supported(relative))
 
 
 @lru_cache(maxsize=128)
@@ -154,9 +155,29 @@ def validate_original(relative,original):
         document(original)
 
 
+def create_group(originals, changed):
+    """Create records for complete file units, including split collision pairs."""
+    result, processed = {}, set()
+    for relative in sorted(changed):
+        if relative in processed:
+            continue
+        group = collision_archive.pair(relative)
+        processed.update(group)
+        if any(target not in originals or target not in changed for target in group):
+            raise ValueError(f'{relative}: the complete archive unit is required')
+        if len(group) == 2:
+            result[group[0]] = collision_edits.create(*(originals[target] for target in group),
+                                                      *(changed[target] for target in group))
+        else:
+            result[relative] = create(relative, originals[relative], changed[relative])
+    return result
+
+
 def create(relative,before,after):
     from . import mod_loader
     from . import emevd
+    if collision_edits.supported(relative):
+        raise ValueError('Split collision records require both header and data; use create_group')
     if map_edits.supported(relative):
         return map_edits.create(relative,before,after)
     if emevd.is_event_file(relative):
@@ -243,6 +264,8 @@ def materialize(relative,original,spec):
     if original is None:
         raise ValueError(f'{relative}: the installed baseline is missing')
     from . import emevd
+    if collision_edits.supported(relative):
+        raise ValueError('Split collision records require both header and data')
     if map_edits.supported(relative):
         return map_edits.materialize(relative,original,spec)
     if emevd.is_event_file(relative):
@@ -362,6 +385,20 @@ def describe(files):
     """Identity-level changes already carried by portable script/event records."""
     changes = []
     for relative,spec in files.items():
+        if spec.get('kind') == 'collision':
+            for member in spec['members']:
+                edits = member['edits']
+                if edits.get('kind') == 'collisionRaw':
+                    changes.append({'table':relative.name, 'id':member['name'], 'label':member['name'],
+                                    'fields':['Collision physics'], 'added':False, 'removed':False})
+                    continue
+                for mesh in edits['meshes']:
+                    kinds = {field['kind'] for field in mesh['fields']} if 'fields' in mesh else {'vertices','faces','flags'}
+                    changes.append({'table':relative.name, 'id':f"{member['name']}:{mesh['id']}",
+                        'label':f"{member['name']}, mesh {mesh['id']+1}",
+                        'fields':[{'vertices':'Vertices', 'faces':'Faces', 'flags':'Vertex metadata'}[key] for key in sorted(kinds)],
+                        'added':False, 'removed':False})
+            continue
         if spec.get('kind') == 'esd':
             changes += script_edits.describe(spec,f'ESD ({relative.name})')
             continue

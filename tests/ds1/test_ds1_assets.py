@@ -186,6 +186,17 @@ def test_store_remove_and_scan_roundtrip(tmp_path):
         assets.remove_override(mod, TPF.as_posix())
 
 
+def test_orphan_python_inputs_never_become_game_assets(tmp_path):
+    game, mod = project(tmp_path)
+    (mod/'script').mkdir()
+    (mod/'script/tweak.py').write_text('raise AssertionError("builder input")')
+    (mod/'script/helper.PYC').write_bytes(b'cache')
+    (mod/'script/m10_00_00_00.luabnd.dcx').write_bytes(b'game archive')
+    assert [row['relative'] for row in assets.scan_project(mod)] == ['script/m10_00_00_00.luabnd.dcx']
+    with pytest.raises(assets.AssetError, match='build inputs'):
+        assets.check_relative('script/tweak.py')
+
+
 def test_scan_project_skips_owned_and_partials(tmp_path):
     _, mod = project(tmp_path)
     (mod / RELATIVE).parent.mkdir(parents=True, exist_ok=True)

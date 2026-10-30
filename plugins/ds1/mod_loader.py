@@ -241,7 +241,7 @@ def vanilla_files(game_root: Path, paths: frozenset[Path]) -> dict[Path, bytes]:
     from . import deployment
     from .tweak_mods import checked
     result = {}
-    for relative in sorted(paths):
+    for relative in sorted({target for path in paths for target in collision_archive.pair(path)}):
         from . import tweak_mods
         managed = tweak_mods.managed_menu(relative)
         if managed is not None:
@@ -345,17 +345,28 @@ def has_menu_contributions(ordered):
 
 def materialize_mod(mod: Mod, originals: dict) -> Mod:
     """Resolve portable edits against the actual baseline before composing."""
-    from . import record_edits
+    from . import record_edits, collision_edits
     from core.mod_builds import ModBuildError
     files = dict(mod.files)
     try:
         for relative,spec in mod.edits.items():
-            if relative in files:
+            group = collision_archive.pair(relative)
+            if any(target in files for target in group):
                 raise ValueError('Duplicate archive and record contributions')
-            files[relative] = record_edits.materialize(relative,originals.get(relative),spec)
+            if collision_edits.supported(relative):
+                if any(target not in originals for target in group):
+                    raise ValueError('The installed split collision baseline is missing')
+                payloads = collision_edits.materialize(*(originals[target] for target in group), spec)
+                files.update(zip(group, payloads))
+            else:
+                files[relative] = record_edits.materialize(relative,originals.get(relative),spec)
     except Exception as error:
         for relative in mod.edits:
-            if originals.get(relative) is not None:
+            if collision_edits.supported(relative):
+                group = collision_archive.pair(relative)
+                if all(target in originals for target in group):
+                    collision_edits.validate_original(*(originals[target] for target in group), mod.edits[relative])
+            elif originals.get(relative) is not None:
                 record_edits.validate_original(relative,originals[relative])
         raise ModBuildError([mod.folder],f'{mod.name}: {error}') from error
     return Mod(mod.name,mod.folder,files)

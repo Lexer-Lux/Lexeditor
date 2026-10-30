@@ -98,7 +98,7 @@ def _modules(rows):
 
 
 def _identity(rows, game, targets):
-    from . import native_rules
+    from . import native_rules, collision_archive
     paths, contributors = [], []
     for row in rows:
         folder = row['path']
@@ -112,9 +112,10 @@ def _identity(rows, game, targets):
         if inputs or requires_data:
             contributors.append([str(folder),row['id'],row['name'],mod_requires.declared(folder),requires_data])
             paths.extend(inputs)
-    paths.extend(game/mod_library.relative_path(target) for target in targets)
-    for target in targets:
-        relative = mod_library.relative_path(target)
+    dependencies = {relative for target in targets
+                    for relative in collision_archive.pair(mod_library.relative_path(target))}
+    paths.extend(game/relative for relative in sorted(dependencies))
+    for relative in sorted(dependencies):
         managed = tweak_mods.managed_menu(relative)
         if managed is not None:
             paths.extend((managed.backup(game), managed.manifest(game), deployment._marker_path(game,relative)))

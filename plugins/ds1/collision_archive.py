@@ -73,6 +73,9 @@ class CollisionArchive:
         entry = self.members[name]
         return self.body[entry['offset']:entry['offset']+entry['size']]
 
+    def identities(self):
+        return tuple((key, row['id'], row['name']) for key, row in self.members.items())
+
     def replace(self, updates):
         if any(name not in self.members for name in updates):
             raise FormatError('Unknown split collision member')
@@ -99,9 +102,7 @@ def compose(header, body, variants, *, conflicts_only=False):
     archives = []
     for name, other_header, other_body in variants:
         other = CollisionArchive(other_header, other_body)
-        identities = lambda archive: [(key, value['id'], value['name'])
-                                      for key, value in archive.members.items()]
-        if identities(other) != identities(original):
+        if other.identities() != original.identities():
             raise FormatError(f'{name}: split collision directory identities changed')
         archives.append((name, other))
     updates, conflicts = {}, []
