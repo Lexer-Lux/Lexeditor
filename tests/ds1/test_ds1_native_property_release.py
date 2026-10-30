@@ -208,6 +208,7 @@ def test_imported_properties_render_in_existing_controls(project,tmp_path,monkey
                     page.screenshot(path=screenshot)
                 page.evaluate('navigate("info")')
                 page.wait_for_function("Array.from(document.querySelectorAll('input.lex-readonly-field')).some(input=>input.value==='Selected library mod')")
+                assert "Yes, this mod's native rules" in page.locator('input.lex-readonly-field').evaluate_all('inputs=>inputs.map(input=>input.value)')
                 assert page.get_by_role('button',name='Apply',exact=True).is_enabled()
                 if screenshot:
                     page.screenshot(path=str(Path(screenshot).with_name('native-property-information.png')))

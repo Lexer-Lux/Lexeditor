@@ -4645,6 +4645,7 @@ function renderAnimPanels(){
   return el("div",{class:"ds1-anim"},lists,viewPane,selection);
 }
 function appliedLabel(deploy){
+  if(!deploy.enabled&&deploy.nativeProjectActive)return "Yes, this mod's native rules";
   if(!deploy.everApplied)return "No";
   if(deploy.changedExternally)return "Unknown — installed file changed outside Lexeditor";
   if(deploy.pendingRecovery)return "Unknown — an interrupted operation needs Apply or Restore to finish";
@@ -4661,13 +4662,14 @@ function needsAttentionNote(deploy){
 }
 function renderInfo(){
   const deploy=state.deployment||{};
-  const upToDate=deploy.enabled&&deploy.thisProjectActive?(deploy.stale?"No, reapply after the latest save":"Yes"):"-";
+  const selectedActive=deploy.enabled&&deploy.thisProjectActive||deploy.nativeProjectActive;
+  const upToDate=selectedActive?(deploy.stale?"No, rebuild after the latest save":"Yes"):"-";
   return detailPanel({className:"lex-information-panel",title:"Information",body:[
     detailSection({title:"ITEMS",body:[detailField({label:"EDITION",control:readonlyField("Dark Souls Remastered / Steam")}),
       detailField({label:"SUPPORT",control:readonlyField("Items, effects, native rules, monster stats, enemy attacks, placements, animation events and assets"),help:infoHelp("Edit documented item properties, reviewed monster stats, enemy attack damage, map placements and animation event timing, or replace whole asset files. Names are reference labels. Unknown fields and padding stay unchanged. Saves go to the selected mod project.")})]}),
     detailSection({title:"INSTALLED GAME",body:[
       detailField({label:"APPLIED",control:readonlyField(appliedLabel(deploy))}),
-      detailField({label:"ORIGINAL PRESERVED",control:readonlyField(deploy.everApplied?(deploy.backupOk?"Yes":"No, needs attention"):"Not yet applied"),
+      detailField({label:"ORIGINAL PRESERVED",control:readonlyField(deploy.everApplied?(deploy.backupOk?"Yes":"No, needs attention"):(deploy.nativeProjectActive?"Not needed for native rules":"Not yet applied")),
         help:infoHelp("The first Apply keeps one copy of the installed file exactly as it was. Disable always restores that copy.")}),
       detailField({label:"UP TO DATE",control:readonlyField(upToDate),
         help:infoHelp("Save builds changes for enabled library mods. Apply installs saved changes from this project.")}),
