@@ -17775,7 +17775,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // of a tab follows its own font.
     fitNavStrip(nav, laneChanged);
   }));
-  const fitAllLabels = (root, reset, lanes) => {
+  const fitAllLabels = (root, reset, lanes, cellScopes) => {
     // Shared-lane labels fit as one scope: fitting each label alone ran the
     // whole scope sweep per label (quadratic), which made every property
     // drop cost hundreds of milliseconds. Each scope fits once per frame,
@@ -17797,7 +17797,10 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fit(root);
     root.querySelectorAll?.(LABEL_SELECTOR).forEach(fit);
     if (!lanes) laneScopes.forEach((hint, scope) => fitFieldLabelScope(scope, hint));
-    const scopes = new Set();
+    // A resize reports both the text and cell of every visible row. Share
+    // table scopes across those targets too: fitting the complete barrel
+    // grid once for each reported cell makes this pass quadratic.
+    const scopes = cellScopes || new Set();
     const collect = label => {
       labelSizeObserver.observe(label);
       // Plain cell text hugs its glyphs; after shrinking, its own box does not
@@ -17809,7 +17812,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     };
     if (root instanceof Element && root.matches?.(CELL_TEXT_SELECTOR)) collect(root);
     root.querySelectorAll?.(CELL_TEXT_SELECTOR).forEach(collect);
-    scopes.forEach(fitCellTextScope);
+    if (!cellScopes) scopes.forEach(fitCellTextScope);
     const strips = new Set();
     const own = root instanceof Element ? root.closest?.('.lex-shell-header nav') : null;
     if (own) strips.add(own);
@@ -17848,8 +17851,10 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       if (targets === null || !targets.size) fitAllLabels(document, resetNow);
       else {
         const lanes = new Map();
-        for (const root of targets) if (root.isConnected) fitAllLabels(root, resetNow, lanes);
+        const cellScopes = new Set();
+        for (const root of targets) if (root.isConnected) fitAllLabels(root, resetNow, lanes, cellScopes);
         lanes.forEach((hint, scope) => fitFieldLabelScope(scope, hint));
+        cellScopes.forEach(fitCellTextScope);
       }
     });
   };
