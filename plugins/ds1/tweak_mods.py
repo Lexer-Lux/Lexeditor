@@ -1207,9 +1207,8 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
         # linked independently at startup; only shared menu/project support
         # remains in the loader-owned patch.
         exe_patches._layout(original, specs)
-        patch = exe_patches.runtime_patch(original, [spec for spec in specs if not spec.get('folder')])
         from . import runtime_mods
-        module_writes, module_hashes = [], {}
+        module_writes, module_hashes, modules = [], {}, []
         for row in tweak_rows(root):
             if not row['enabled']:
                 continue
@@ -1236,6 +1235,8 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
                     module_writes.append({'path': str(target), 'before': before, 'after': after})
             if after is not None:
                 module_hashes[str(target)] = _sha(after)
+                modules.append(after)
+        patch = runtime_mods.shared_patch(original, [spec for spec in specs if not spec.get('folder')], modules)
         # Prebuilt mods have no source description to feed the old combined
         # composer. Check their actual compiled claims together with sources.
         claimed = []

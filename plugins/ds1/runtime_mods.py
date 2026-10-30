@@ -122,6 +122,32 @@ def link(data: bytes, base: int) -> bytes:
     return bytes(result)
 
 
+def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes]) -> bytes | None:
+    """Place loader-owned support beyond each mod's fixed code allocation.
+
+    Compiling each contribution independently must not assign shared menu
+    support the same default address as a position-dependent native mod.
+    """
+    payload = build(vanilla, specs)
+    if payload is None:
+        return None
+    support = inspect(payload)
+    blocks = [rva for kind, rva, _, _ in support['records'] if kind == patches.BLOCK]
+    base = blocks[0] if blocks else 0
+    occupied = []
+    for data in modules:
+        module = inspect(data)
+        occupied.extend((rva, rva+size) for kind, rva, size, _ in module['records']
+                        if kind == patches.BLOCK and module['fixed'])
+    if blocks and not support['fixed']:
+        base = max([base] + [(high+65535) & ~65535 for _, high in occupied])
+    result = link(payload, base)
+    for kind, rva, size, _ in patches.read_runtime_patch(result)['records']:
+        if kind == patches.BLOCK and any(rva < high and low < rva+size for low, high in occupied):
+            raise patches.PatchError('Shared support overlaps a mod requiring a fixed code address')
+    return result
+
+
 def write_release(folder: Path, destination: Path, vanilla: bytes) -> Path:
     """Export built contributions without developer files or local paths."""
     from core import mod_metadata, mod_requires

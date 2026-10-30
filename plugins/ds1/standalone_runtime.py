@@ -63,6 +63,19 @@ def _stamp(path):
         return None
 
 
+def _requires_data(folder):
+    from .runtime_mods import FILENAME, HEADER, MAGIC, VERSION
+    path = tweak_mods.checked(Path(folder)/FILENAME)
+    if not path.is_file():
+        return False
+    with path.open('rb') as stream:
+        header = stream.read(HEADER.size)
+    if len(header) != HEADER.size:
+        return False  # Native loading diagnoses an invalid module separately.
+    magic,version,*values = HEADER.unpack(header)
+    return magic == MAGIC and version == VERSION and values[-1] == 1
+
+
 def _identity(rows, game, targets):
     paths, contributors = [], []
     for row in rows:
@@ -70,8 +83,9 @@ def _identity(rows, game, targets):
         inputs = [path for _, path in mod_loader.content_files(folder,row['name'])]
         for kind in tweak_mods.BUILT_FOLDERS[1:]:
             inputs.extend(tweak_mods.built_files(folder,kind))
-        if inputs:
-            contributors.append([str(folder),row['id'],row['name'],mod_requires.declared(folder)])
+        requires_data = _requires_data(folder)
+        if inputs or requires_data:
+            contributors.append([str(folder),row['id'],row['name'],mod_requires.declared(folder),requires_data])
             paths.extend(inputs)
     paths.extend(game/mod_library.relative_path(target) for target in targets)
     record_path = game/tweak_mods.RUNTIME_RECORD
@@ -109,6 +123,9 @@ def prepare(game, rows):
             mod = mod_loader.read_mod(row['path'],row['name'])
             if mod is not None and mod.files:
                 data.append(mod)
+            elif _requires_data(row['path']) and not any(
+                    tweak_mods.built_files(row['path'],kind) for kind in tweak_mods.BUILT_FOLDERS[1:]):
+                raise ModBuildError([row['path']],f"{row['name']}: required prebuilt data is missing; rebuild or reinstall this mod")
         except (ValueError,OSError) as error:
             raise ModBuildError([row['path']],f"{row['name']}: {error}") from error
     composition = mod_loader.compose_installed(game,data)
@@ -127,7 +144,10 @@ def prepare(game, rows):
         try:
             after = tweak_mods._compose_menu(original,specs,managed,None,current=current,manifest=manifest)
         except ValueError as error:
-            raise ModBuildError([spec['folder'] for spec in specs],str(error)) from error
+            folders = getattr(error,'folders',())
+            if not folders:
+                raise
+            raise ModBuildError(folders,str(error)) from error
         files.append({'managed':managed,'before':current,'after':after,'mods':tweak_mods._changes(specs),
                       'inputs':tweak_mods._menu_identity(original,specs,managed),
                       'previous':tweak_mods._current_manifest(current,manifest,managed),'project':None})
@@ -145,7 +165,10 @@ def prepare(game, rows):
             support.append(exe_patches.validate(record['project']['spec'],'Project native rules'))
     if support:
         executable = deployment.vanilla_source(game,Path(exe_patches.EXECUTABLE)).read_bytes()
-        patch = exe_patches.runtime_patch(executable,support) or b''
+        from . import runtime_mods
+        modules = [runtime_mods.read(Path(row['path'])) for row in rows
+                   if (Path(row['path'])/runtime_mods.FILENAME).is_file()]
+        patch = runtime_mods.shared_patch(executable,support,modules) or b''
     else:
         patch = b''
     return data, composition, files, patch, record

@@ -635,7 +635,9 @@ static void lx_load_mod_folders(void)
         for (unsigned i = 0; i < count; ++i) {
             lx_mod_t *mod = mods + i;
             if (!mod->valid || mod->applied) continue;
-            if(mod->needs_data && !lx_data_ready){mod->valid=0;lx_mod_log(mod,"Required data could not be prepared; skipped");continue;}
+            if(mod->needs_data && (!lx_data_ready || !lx_data_loaded(mod->id))){
+                mod->valid=0;lx_mod_log(mod,"Required data could not be prepared; skipped");continue;
+            }
             int ready = 1;
             for (unsigned n = 0; n < mod->needed; ++n) {
                 if (!strcmp(mod->needs[n], mod->id) || !strcmp(mod->needs[n], "lexeditor-loader")) continue;

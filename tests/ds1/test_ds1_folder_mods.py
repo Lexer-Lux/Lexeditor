@@ -55,6 +55,23 @@ def test_damaged_module_is_rejected_without_linking(vanilla):
         runtime_mods.inspect(payload)
 
 
+def test_shared_support_links_beyond_independently_built_fixed_mod(vanilla):
+    fixed_spec = spec()
+    fixed_spec['islands'][0]['rva'] = 0x10000
+    fixed = runtime_mods.build(vanilla, [fixed_spec])
+    support = exe_patches.validate({'version':2,
+        'islands':[island('shared',relocations=[{'at':8,'rel32':HOOK_A}])],
+        'hooks':[{'rva':HOOK_B,'original':'488d1500000000','pad':'9090','branch':
+                  {'opcode':'E8','island':'shared','offset':4}}]},'Shared support')
+    patch = runtime_mods.shared_patch(vanilla,[support],[fixed])
+    decoded = exe_patches.read_runtime_patch(patch)
+    block = next(row for row in decoded['records'] if row[0] == exe_patches.BLOCK)
+    assert block[1] >= 0x20000
+    assert block[1]+12+struct.unpack_from('<i',block[3],8)[0] == HOOK_A
+    hook = next(row for row in decoded['records'] if row[0] == exe_patches.HOOK)
+    assert hook[1]+5+struct.unpack_from('<i',hook[3],hook[2]+1)[0] == block[1]+4
+
+
 @pytest.mark.skipif(os.name != 'nt', reason='Windows pre-entry event')
 def test_runtime_writes_require_a_live_pre_entry_window(monkeypatch):
     import ctypes
@@ -277,6 +294,36 @@ def test_native_folder_loader_isolates_broken_disabled_and_conflicting_mods(tmp_
     unavailable = subprocess.run([str(harness),str(tmp_path)],capture_output=True,text=True,timeout=20)
     assert unavailable.returncode == 0 and 'results=42,1' in unavailable.stdout, unavailable
     assert 'second: Missing, failed or cyclic dependency' in unavailable.stdout
+    # A successful helper for someone else's data must not satisfy this
+    # module's own missing prebuilt data requirement.
+    import zlib
+    module = bytearray((library/'second/runtime.lxd').read_bytes())
+    struct.pack_into('<I',module,28,1)
+    struct.pack_into('<I',module,len(module)-4,zlib.crc32(module[:-4]))
+    (library/'second/runtime.lxd').write_bytes(module)
+    missing_own = subprocess.run([str(harness),str(tmp_path),'--prepare-data'],capture_output=True,text=True,timeout=20)
+    assert missing_own.returncode == 0 and 'results=42,1' in missing_own.stdout, missing_own
+    assert not json.loads(second.read_text())['enabled']
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows native hook workers')
+def test_competing_mod_hook_workers_install_and_repair_without_freezing(tmp_path):
+    from test_ds1_runtime_loader import build_module
+    build = build_module()
+    try:
+        vcvars = build.find_vcvars()
+    except SystemExit:
+        pytest.skip('MSVC is not installed')
+    source = Path(__file__).with_name('concurrent_hook_harness.c')
+    executable = tmp_path/'concurrent-hooks.exe'
+    batch = tmp_path/'build-concurrent.bat'
+    batch.write_text(f'@echo off\ncall "{vcvars}" >nul\nif errorlevel 1 exit /b %errorlevel%\n'
+                     f'cl /nologo /O1 /std:c17 /D_CRT_SECURE_NO_WARNINGS "{source}" '
+                     f'/Fe:"{executable}" /Fo:"{tmp_path / "concurrent.obj"}" /link shell32.lib\n')
+    subprocess.run(['cmd','/c',str(batch)],cwd=tmp_path,check=True,capture_output=True)
+    result = subprocess.run([str(executable)],capture_output=True,text=True,timeout=15)
+    assert result.returncode == 0, result
+    assert 'installed=24 repaired=22 protection=RX responsive=1' in result.stdout
 
 
 def test_standalone_discovery_and_adoption_preserve_one_mod_copy(tmp_path):
@@ -403,6 +450,35 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     assert result.returncode == 0, result
     report = json.loads((game/'lexeditor-ds1-load.json').read_text())
     assert report['loaded'] == [] and not report.get('error')
+
+
+def test_standalone_menu_failure_disables_only_its_owner(tmp_path, monkeypatch):
+    from plugins.ds1 import tweak_mods, standalone_runtime
+    from test_ds1_menu_scripts import archive, build_script, script, passes_of
+    original = archive({'i02-00.esd':build_script().to_bytes()})
+    managed = tweak_mods.Managed('menu/ingame.menuesdbnd.dcx','test menu scripts',1024*1024,
+                                 lambda data:data == original)
+    monkeypatch.setattr(tweak_mods,'ESD',(managed,))
+    monkeypatch.setattr(tweak_mods,'ESD_ARCHIVE',{managed:'ingame'})
+    monkeypatch.setattr(tweak_mods,'ensure_game_closed',lambda:None)
+    game,library = tmp_path/'game',tmp_path/'library'
+    managed.live(game).parent.mkdir(parents=True)
+    managed.live(game).write_bytes(original)
+    for mod_id,member in [('healthy','i02-00.esd'),('broken','missing.esd')]:
+        folder = library/mod_id
+        (folder/'esd').mkdir(parents=True)
+        (folder/'mod.json').write_text(json.dumps({'id':mod_id,'name':mod_id,'enabled':True}))
+        (folder/'esd/component.json').write_text(json.dumps(script(member=member)))
+    report = standalone_runtime.run(game,[library])
+    assert [row['id'] for row in report['disabled']] == ['broken']
+    assert report['loaded'] == ['healthy']
+    assert json.loads((library/'healthy/mod.json').read_text())['enabled']
+    assert [command.id for command in passes_of(managed.live(game).read_bytes())] == [15,29,20]
+    # An unattributed game-file problem must not blame or disable every mod.
+    managed.live(game).write_bytes(b'Externally changed menu')
+    with pytest.raises(tweak_mods.TweakError,match='changed outside'):
+        standalone_runtime.run(game,[library])
+    assert json.loads((library/'healthy/mod.json').read_text())['enabled']
 
 
 def test_adoption_prompt_and_used_files_render_without_changing_selection(tmp_path):
