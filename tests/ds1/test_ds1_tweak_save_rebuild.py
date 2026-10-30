@@ -104,9 +104,9 @@ def api(game, library, monkeypatch, tmp_path):
                             get=lambda: SimpleNamespace(dirty_count=0, pending_changes=lambda: []))
     rules = SimpleNamespace(validate_save=lambda: None, save=lambda: None, discard=lambda: {},
                             dirty_count=0, pending_changes=lambda: [], snapshot=lambda: {})
-    maps = SimpleNamespace(validate_save=lambda: None, save=lambda: None, discard=lambda: {},
+    maps = SimpleNamespace(validate_save=lambda: None, save=lambda: {'recordsChanged':False}, discard=lambda: {},
                            dirty_count=0, pending_changes=lambda: [])
-    taes = SimpleNamespace(validate_save=lambda: None, save=lambda: None, discard=lambda: {},
+    taes = SimpleNamespace(validate_save=lambda: None, save=lambda: {'recordsChanged':False}, discard=lambda: {},
                            dirty_count=0, pending_changes=lambda: [])
     monkeypatch.setattr(ds1_server, "STORE", store)
     monkeypatch.setattr(ds1_server, "RULES", rules)
