@@ -745,8 +745,9 @@ class MsbDocument:
                     raise MsbError('Select a collision behavior')
                 offset = 0
             else:
-                if type(value) is not bool:
+                if not (type(value) is bool or type(value) is int and value in (0, 1)):
                     raise MsbError('Starts disabled must be on or off')
+                value = bool(value)
                 offset = 0x26
             self._write(part['type_data'] + offset, 1, bytes([value]))
         elif field == 'npcId':
@@ -1302,9 +1303,9 @@ class MsbDocument:
             self.dirty.add(((ptype, new_id), field))
         return self.read_placement((ptype, new_id))
 
-    def create_placement(self, model_name, pos, rot, npc=None):
+    def create_placement(self, model_name, pos, rot, npc=None, part_type=None):
         """A new placement copied from the map's own bytes: the first
-        enemy or object placement of the named model is the template, so
+        placement of the named model and selected kind is the template, so
         sibling paths, entities and type data stay model-correct. The
         copy takes the given transform, a fresh identity and a fresh
         entity; a pasted enemy also takes the copied enemy identity."""
@@ -1321,6 +1322,9 @@ class MsbDocument:
             except ValueError:
                 raise MsbError('Select a map event kind') from None
             return msb_events.create(self, etype, pos)
+        if part_type is not None and (type(part_type) is not int or part_type not in PLACEMENT_TYPES
+                                      or part_type == PLAYER_TYPE):
+            raise MsbError('Select a copyable placement kind')
         index = next((num for num, model in enumerate(self.models)
                       if model['name'] == model_name), None)
         if index is None:
@@ -1333,9 +1337,10 @@ class MsbDocument:
             raise MsbError('A placement needs a position and a rotation')
         template = next((part for part in self.parts
                          if part['model'] == index and part['type'] in PLACEMENT_TYPES
+                         and (part_type is None or part['type'] == part_type)
                          and part['type'] != PLAYER_TYPE), None)
         if template is None:
-            raise MsbError('That model has no enemy or object placement in this map to copy from')
+            raise MsbError('That model has no copyable placement of this kind in this map')
         row = self.add_placement((template['type'], template['id']))
         key = (row['type'], row['partId'])
         for field, value in zip(('posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ'), pos + rot):

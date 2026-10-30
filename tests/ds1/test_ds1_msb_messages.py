@@ -346,8 +346,13 @@ def test_remove_then_add_keeps_the_map_sound():
 def test_message_merge_units_cover_text_point_flag_and_spot():
     doc = MsbDocument(build_messages())
     units = [unit for unit in doc.merge_units() if unit[0] == ("message", 0)]
-    assert {unit[1] for unit in units} == {"text", "point", "flag", "posX", "posY", "posZ"}
+    assert {unit[1] for unit in units} == {"text", "point", "flag"}
     event = doc._messages[(MESSAGE_EVENT, 0)]
+    region_key = ('region', doc.points[event['point']]['index'])
+    region_units = [unit for unit in doc.merge_units() if unit[0] == region_key]
+    assert {'posX', 'posY', 'posZ'} <= {unit[1] for unit in region_units}
+    spans = [(unit[2], unit[3]) for unit in doc.merge_units()]
+    assert len(spans) == len(set(spans))
     starts = {unit[1]: unit[2] for unit in units}
     assert starts["text"] == event["bhead"]
     assert (starts["point"], starts["flag"]) == (event["ahead"] + 4, event["ahead"] + 8)

@@ -67,9 +67,10 @@ def parse_bhf(bhd, suffix='.tpf'):
         if name.lower().endswith('.dcx'):
             name = name[:-4]
         stem = name.replace('\\', '/').rsplit('/', 1)[-1]
-        if not stem.lower().endswith(suffix):
+        if stem.lower().endswith(suffix):
+            stem = stem[:-len(suffix)]
+        elif suffix != '.tpf':
             continue
-        stem = stem[:-len(suffix)]
         if stem:
             found.setdefault(stem.lower(), (offset, size))
     return found

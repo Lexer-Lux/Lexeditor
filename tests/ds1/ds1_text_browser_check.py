@@ -62,10 +62,9 @@ def main():
                     # The Text tab opens on the three labels under their slot names.
                     page.locator('button[data-tab="text"]').click()
                     page.wait_for_function('state.tab === "text" && state.rows.length === 3 && !state.error')
-                    # State lands before the rows render: wait for text.
-                    page.wait_for_function(
-                        'document.querySelector(".lex-column-list .lex-list-row")'
-                        '.textContent.replace(/\u200b/g, "").trim() !== ""')
+                    # State lands before the rows render; the shared list can
+                    # begin with a blank filler, so wait for the expected row.
+                    page.get_by_text('Fire defense label', exact=True).wait_for()
                     subs = page.locator('[data-subtab]').evaluate_all(
                         'nodes => nodes.map(node => node.getAttribute("data-subtab"))')
                     assert subs == ['fmg-dialogue', 'menu-labels', 'fmg-menu-text'], subs

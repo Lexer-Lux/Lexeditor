@@ -167,7 +167,7 @@ def test_msb_add_remove_fixture():
     row = document.add_placement([2, 0])
     assert (row["type"], row["partId"]) == (2, 1)
     assert row["name"] == "enemy0_1"
-    assert len(document.placements()) == 4
+    assert len(document.placements()) == 5
     assert [field["value"] for field in row["fields"] if field["key"] == "npcId"] == [120000]
     assert all(field["vanilla"] is None for field in row["fields"])
     # The fixture entities are all 0, so the copy takes the next one.
@@ -175,11 +175,11 @@ def test_msb_add_remove_fixture():
     edited = document.edit([2, 1], "posX", 9.5)
     assert edited["fields"][0]["value"] == 9.5
     reopened = MsbDocument(document.export())
-    assert len(reopened.placements()) == 4
+    assert len(reopened.placements()) == 5
     assert reopened.read_placement([2, 1])["fields"][0]["value"] == 9.5
     gone = document.remove_placement([2, 1])
     assert (gone["type"], gone["id"]) == (2, 1)
-    assert len(document.placements()) == 3
+    assert len(document.placements()) == 4
     assert any(change["label"].endswith("(removed)") for change in
                MapStore_pending(document))
     assert MsbDocument(document.export()).placements() is not None

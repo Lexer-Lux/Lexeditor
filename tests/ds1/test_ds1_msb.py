@@ -151,10 +151,9 @@ def test_create_placement_needs_a_template():
     with pytest.raises(MsbError):
         doc.create_placement("nope", [0, 0, 0], [0, 0, 0])
     single = MsbDocument(build_msb(parts=(("piece", 0, 0, 1, None),)))
-    with pytest.raises(MsbError, match="no enemy or object placement"):
-        single.create_placement("m10piece", [0, 0, 0], [0, 0, 0])
+    assert single.create_placement("m10piece", [0, 0, 0], [0, 0, 0])["kind"] == "Map piece"
     player_only = MsbDocument(build_msb(parts=(("player", 4, 0, 1, None),)))
-    with pytest.raises(MsbError, match="no enemy or object placement"):
+    with pytest.raises(MsbError, match="no copyable placement"):
         player_only.create_placement("m10piece", [0, 0, 0], [0, 0, 0])
 
 

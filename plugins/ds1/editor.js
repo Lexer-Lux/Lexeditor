@@ -3690,17 +3690,21 @@ async function viewportAdd(map,anchor){
   for(const part of state.mapView.parts){
     if(part.kind==="Player")continue;
     if(!part.model)continue;
-    counts.set(part.model,(counts.get(part.model)||0)+1);
+    const type=Number(part.key.split(":")[0]);
+    const identity=`${type}:${part.model}`;
+    const entry=counts.get(identity)||{model:part.model,type,kind:part.kind,count:0};
+    entry.count++;counts.set(identity,entry);
   }
-  const models=[...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+  const models=[...counts.values()].sort((a,b)=>a.kind.localeCompare(b.kind)||a.model.localeCompare(b.model));
   LexeditorUI.choicePopover({label:"Model",
-    choices:[...models.map(([name,count])=>({label:`${name} (${count})`,value:name})),
+    choices:[...models.map(entry=>({label:`${entry.kind}: ${entry.model} (${entry.count})`,value:{model:entry.model,type:entry.type}})),
       ...(state.mapView.createKinds||[]).map(kind=>({label:kind.label,value:kind.id}))],
-    select:async model=>{
+    select:async choice=>{
       state.mapBusy=true;refreshViewportBar();
       try{
         const at=viewportCtl?.aim?.()||[0,0,0];
-        const result=await api("/api/placements/create",{map,model,pos:at,rot:[0,0,0]});
+        const result=await api("/api/placements/create",{map,
+          ...(typeof choice==="string"?{model:choice}:choice),pos:at,rot:[0,0,0]});
         state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.nativeRules=result.nativeRules||state.nativeRules;
         await reloadViewport(map,result.row.id);
       }catch(error){notify(error);}

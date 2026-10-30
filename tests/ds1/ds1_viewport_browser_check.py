@@ -265,7 +265,7 @@ def phase_edit(play, game, mod, output, errors):
             assert page.evaluate('state.mapSelected') == '1:0'
             gen = page.evaluate('viewportMount')
             page.evaluate('viewportAdd(\'test.msb\',document.querySelector(\'[data-viewport-action="add"]\'))')
-            page.locator('.lex-choice-popover button', has_text='m10piece').click()
+            page.locator('.lex-choice-popover button', has_text='Object: m10piece').click()
             page.wait_for_function('state.mapSelected==="1:1"', timeout=30000)
             page.wait_for_function('state.mapView.parts.length===7', timeout=30000)
             page.wait_for_function('(g)=>viewportMount>g && document.querySelector("[data-viewport-host]").dataset.ready==="true"', arg=gen, timeout=30000)

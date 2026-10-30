@@ -79,6 +79,27 @@ def test_navigation_binary_geometry_validates_indices():
         geometry(data)
 
 
+def test_split_archive_texture_members_keep_their_original_names():
+    from plugins.ds1 import bhf
+    data = bytearray(76)
+    data[:12] = bhf.MAGIC
+    struct.pack_into('<6I', data, 28, 0, 64, 128, 16, 0, 76)
+    data += b'\\wall_diffuse.dds\x00'
+    assert bhf.parse_bhf(data) == {'wall_diffuse.dds': (16, 128)}
+    assert bhf.parse_bhf(data, suffix='.hkx') == {}
+
+
+def test_creation_distinguishes_placement_kinds_sharing_one_model():
+    doc = MsbDocument(build_msb())
+    for kind, expected in ((0, 'Map piece'), (1, 'Object')):
+        row = doc.create_placement('m10piece', [0, 0, 0], [0, 0, 0], part_type=kind)
+        assert row['type'] == kind and row['kind'] == expected
+    before = doc.export()
+    with pytest.raises(MsbError, match='placement kind'):
+        doc.create_placement('m10piece', [0, 0, 0], [0, 0, 0], part_type=True)
+    assert doc.export() == before
+
+
 def document():
     return MsbDocument(build_msb(parts=(('piece', 0, 0, 0, None), ('hit', 5, 0, 1, None),
                                          ('nav', 8, 0, 2, None)),
@@ -154,6 +175,8 @@ def test_create_all_supported_event_kinds_and_light_lifecycle():
         row = doc.create_placement(f'@event:{kind}', (1., 2., 3.), (0., 0., 0.))
         assert row['kind'] == msb_events.LABELS[kind]
         MsbDocument(doc.export())
+    doc.edit(('event4', 0), 'inChest', 1)
+    assert next(field['value'] for field in doc.read_placement(('event4', 0))['fields'] if field['key'] == 'inChest') is True
     light = doc.lights()[0]
     clone = msb_events.duplicate(doc, ('event0', light['seq']))
     doc.edit_light(('light', int(clone['key'].split(':')[1])), 'posX', 42.)
@@ -163,7 +186,7 @@ def test_create_all_supported_event_kinds_and_light_lifecycle():
     assert len(MsbDocument(doc.export()).lights()) == 1
 
 
-@pytest.mark.parametrize('key,field,value', [((5, 0), 'hitFilter', 24), ((5, 0), 'startsDisabled', 1),
+@pytest.mark.parametrize('key,field,value', [((5, 0), 'hitFilter', 24), ((5, 0), 'startsDisabled', 2),
     (('region', 0), 'shapeType', 6), (('event1', 0), 'attachedRegion', 99)])
 def test_invalid_edits_leave_document_unchanged(key, field, value):
     doc = document()
@@ -292,6 +315,8 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path, read_only):
                     assert page.locator('[data-field-key="startsDisabled"]:visible').is_disabled()
                     assert not errors, errors
                     return
+                page.locator('[data-field-key="startsDisabled"]:visible').check()
+                page.wait_for_function('state.pending===0 && state.row.fields.find(f=>f.key==="startsDisabled").value===true')
                 page.evaluate('selectPlacement("m10_02_00_00.msb:region:0",false)')
                 page.wait_for_selector('[data-field-key="width"]:visible')
                 control = page.locator('[data-field-key="width"]:visible')

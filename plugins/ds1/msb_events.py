@@ -99,8 +99,9 @@ def edit(doc, key, name, value):
         raise MsbError('This map event field is protected')
     _, address, dtype, reference = spec
     if dtype == '?':
-        if type(value) is not bool:
+        if not (type(value) is bool or type(value) is int and value in (0, 1)):
             raise MsbError('Choose on or off')
+        value = bool(value)
     elif dtype == 'f':
         if type(value) not in (int, float) or not math.isfinite(value):
             raise MsbError('Enter a finite number')

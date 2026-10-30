@@ -78,7 +78,7 @@ def main():
                     page.wait_for_function('state.mapTab==="placements"')
                     page.wait_for_function(
                         'state.tab==="maps" && state.rows.some(r=>r.id==="2:0") && !state.error')
-                    page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row').length===3")
+                    page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row').length===4")
                     first = page.locator('.lex-list-row[data-key="%s:2:0"]' % MAP)
                     assert first.inner_text().split() == ["Rat"]
                     first.click()
@@ -97,8 +97,8 @@ def main():
                     page.wait_for_function('state.mapTab==="placements"')
                     page.wait_for_function(
                         'state.tab==="maps" && state.rows.some(r=>r.id==="2:1") && !state.error')
-                    assert len(MsbDocument((mod / MAP_DIR / MAP).read_bytes()).placements()) == 4
-                    page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row').length===4")
+                    assert len(MsbDocument((mod / MAP_DIR / MAP).read_bytes()).placements()) == 5
+                    page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row').length===5")
                     dupe = page.locator('.lex-list-row[data-key="%s:2:1"]' % MAP)
                     assert dupe.inner_text().split() == ["Rat"]
                     dupe.click()
