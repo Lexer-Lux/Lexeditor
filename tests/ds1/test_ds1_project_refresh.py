@@ -138,13 +138,17 @@ def test_loaded_maps_and_animations_reload_atomically(tmp_path):
     assert fresh[0].get().value('EquipParamGoods',100,'sellValue') == 42
 
 
-def test_browser_watcher_refreshes_clean_data_and_preserves_unsaved_edit(tmp_path):
+@pytest.mark.parametrize('outside_library',[False,True])
+def test_browser_watcher_refreshes_clean_data_and_preserves_unsaved_edit(tmp_path,outside_library):
     from plugins.ds1.plugin import DS1Session
     from playwright.sync_api import sync_playwright
     game,mod = setup_library(tmp_path)
+    library = tmp_path/'separate-library' if outside_library else mod.parent
+    library.mkdir(exist_ok=True)
+    revision = 'modProjectRevision' if outside_library else 'modRevision'
     with DS1Session({'LEXEDITOR_DS1_ROOT':str(game),'LEXEDITOR_DS1_PROJECT':str(mod),
                      'LEXEDITOR_NO_MOD':'0','LEXEDITOR_MOD_READ_ONLY':'0',
-                     'LEXEDITOR_DS1_MODS_ROOT':str(mod.parent)}) as session:
+                     'LEXEDITOR_DS1_MODS_ROOT':str(library)}) as session:
         with sync_playwright() as play:
             browser = play.chromium.launch(headless=True)
             try:
@@ -158,7 +162,7 @@ def test_browser_watcher_refreshes_clean_data_and_preserves_unsaved_edit(tmp_pat
                 value = 'state.row?.fields.find(f=>f.key==="sellValue")?.value'
                 page.wait_for_function(value+'===42')
                 page.locator('.lex-tabbed-panel [data-subtab]').filter(has_text='Value').first.click()
-                page.wait_for_function('modRevision>=0&&!modPollBusy')
+                page.wait_for_function(revision+'>0&&!modPollBusy')
                 # Source-only notifications must not interrupt a click or lock
                 # an unchanged view while checking for new generated data.
                 assert page.evaluate('''async()=>{
@@ -172,11 +176,11 @@ def test_browser_watcher_refreshes_clean_data_and_preserves_unsaved_edit(tmp_pat
                     }finally{LexeditorUI.setEditorBusy=original}
                 }''')
                 # A different tool updates the currently open release's data.
-                before = page.evaluate('modRevision')
+                before = page.evaluate(revision)
                 change(ItemStore(game,mod,False),43)
                 page.wait_for_function(value+'===43&&!document.body.inert',timeout=15000)
                 assert page.evaluate('state.selected') == 'EquipParamGoods:100'
-                assert page.evaluate('modRevision') > before
+                assert page.evaluate(revision) > before
                 screenshot = os.environ.get('LEXEDITOR_PROJECT_REFRESH_SCREENSHOT')
                 if screenshot:
                     Path(screenshot).parent.mkdir(parents=True,exist_ok=True)
@@ -186,10 +190,10 @@ def test_browser_watcher_refreshes_clean_data_and_preserves_unsaved_edit(tmp_pat
                     await refreshState();await loadItems();
                     fieldHistory.undoStack.push({marker:'keep this unsaved history'});
                 }''')
-                before = page.evaluate('modRevision')
+                before = page.evaluate(revision)
                 change(ItemStore(game,mod,False),44)
                 try:
-                    page.wait_for_function('(before)=>modRevision>before&&!modPollBusy',arg=before,timeout=15000)
+                    page.wait_for_function('(before)=>'+revision+'>before&&!modPollBusy',arg=before,timeout=15000)
                 except Exception:
                     pytest.fail(str({'before':before,'client':page.evaluate('({modRevision,modPollBusy,modPollStopped,dirty:state.dirty})'),
                                      'server':page.request.get(session.url+'/api/mod-changes?since=0').json(),'errors':errors}))

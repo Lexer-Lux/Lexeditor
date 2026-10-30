@@ -266,7 +266,7 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path, read_only):
     session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
                           'LEXEDITOR_NO_MOD': '1' if read_only else '0',
                           'LEXEDITOR_MOD_READ_ONLY': '1' if read_only else '0',
-                          'LEXEDITOR_DS1_MODS':str(tmp_path/'library')})
+                          'LEXEDITOR_DS1_MODS_ROOT':str(tmp_path/'library')})
     session.start()
     try:
         with sync_playwright() as play:

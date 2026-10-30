@@ -4752,7 +4752,7 @@ async function boot(){
 // Directory notifications do the detection; this request reads a revision.
 // Clean project data follows external edits. Unsaved edits and focused inputs
 // defer replacement; history only resets when a new disk baseline was loaded.
-let modRevision=0, ignoredModRevision=null, modRefreshPending=false, modProjectRefreshPending=false, modPollTimer=null, modPollBusy=false, modPollStopped=false;
+let modRevision=0, modProjectRevision=0, ignoredModRevision=null, modRefreshPending=false, modProjectRefreshPending=false, modPollTimer=null, modPollBusy=false, modPollStopped=false;
 let modProjectFiles=[];
 async function refreshProjectData(){
   let locked=false;
@@ -4782,11 +4782,12 @@ async function pollModChanges(){
   if(modPollBusy||modPollStopped)return;
   modPollBusy=true;
   try{
-    const response=await fetch(`/api/mod-changes?since=${modRevision}`);
+    const response=await fetch(`/api/mod-changes?since=${modRevision}&projectSince=${modProjectRevision}`);
     if(!response.ok)return;
     const result=await response.json();
     const changed=result.revision!==modRevision;
     modRevision=result.revision;
+    modProjectRevision=result.projectRevision||0;
     modRefreshPending ||= changed;
     if(result.projectChanged){
       modProjectRefreshPending=true;

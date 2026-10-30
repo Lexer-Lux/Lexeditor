@@ -84,11 +84,16 @@ def _refresh_project(paths=None, check_only=False):
     return {'refreshed': fresh is not None, 'deferred': False}
 
 
-def _project_paths(snapshot):
+def _project_paths(snapshot, *, project_root=False):
     if STORE.project is None:
         return []
     paths = []
     for path in snapshot.get('paths', ['*']):
+        if project_root:
+            if path == '*':
+                return None
+            paths.append(path)
+            continue
         folder, separator, relative = path.partition('/')
         if folder == '*' or folder.casefold() == STORE.project.name.casefold():
             if not separator:
@@ -313,15 +318,20 @@ class Handler(PluginRequestHandler):
             # locks, and nothing here touches STORE, MAPSTORE or unsaved rows.
             # The staleness check runs only when the watcher revision moves.
             try:
-                snap = mod_watch.snapshot(
-                    tweak_mods.mods_root(), query.get('since', ['0'])[0])
+                library = tweak_mods.mods_root()
+                snap = mod_watch.snapshot(library, query.get('since', ['0'])[0])
+                # An explicitly opened project can live outside the global
+                # library. Watch that folder itself, never its whole parent.
+                project_snap = None
+                if STORE.project is not None and STORE.project.parent.resolve() != library.resolve():
+                    project_snap = mod_watch.snapshot(STORE.project, query.get('projectSince',['0'])[0])
                 record = Path(STORE.game_root) / tweak_mods.RUNTIME_RECORD
                 try:
                     stamp = record.stat()
                     stamp = (stamp.st_mtime_ns, stamp.st_size)
                 except OSError:
                     stamp = None
-                cache_key = (str(tweak_mods.mods_root()), snap['revision'], stamp)
+                cache_key = (str(library), snap['revision'], stamp)
                 with _MOD_CHANGES_LOCK:
                     cached_revision = _MOD_CHANGES_CACHE["revision"]
                     cached_flag = _MOD_CHANGES_CACHE["flag"]
@@ -333,12 +343,13 @@ class Handler(PluginRequestHandler):
                 else:
                     flag = cached_flag
                 self.send_json({"revision": snap["revision"],
+                                "projectRevision":project_snap['revision'] if project_snap is not None else 0,
                                 "changed": snap["changed"],
-                                "projectChanged": STORE.project is not None and any(
+                                "projectChanged": bool(project_snap['changed']) if project_snap is not None else STORE.project is not None and any(
                                     name == '*' or name.casefold() == STORE.project.name.casefold()
                                     for name in snap['changed']),
-                                "projectFiles": _project_paths(snap),
-                                "status": snap['status'],
+                                "projectFiles": _project_paths(project_snap,project_root=True) if project_snap is not None else _project_paths(snap),
+                                "status": (project_snap['status'] if project_snap is not None else None) or snap['status'],
                                 "tweaksNeedRebuild": flag})
             except (ValueError, OSError, RuntimeError) as error:
                 self.send_json({'error': str(error)}, 400)
