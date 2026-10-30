@@ -21,6 +21,7 @@ FIELDS = ("name", "author", "description", "credits")
 # Name and author stay bounded: they render in table cells, headers and
 # dialog inputs. Description and credits are free text with no cap.
 LIMITS = {"name": 120, "author": 200}
+MAX_BYTES = 8 * 1024 * 1024
 
 
 class MetadataError(ValueError):
@@ -35,8 +36,14 @@ def _stored(root: Path) -> dict:
     if not path.is_file():
         return {}
     try:
-        value = json.loads(path.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError) as error:
+        if path.is_symlink() or getattr(path.lstat(), 'st_file_attributes', 0) & 0x400:
+            raise ValueError('mod metadata must not be a link')
+        with path.open('rb') as stream:
+            raw = stream.read(MAX_BYTES+1)
+        if len(raw)>MAX_BYTES:
+            raise ValueError('exceeds the 8 MiB metadata limit')
+        value = json.loads(raw.decode('utf-8-sig'))
+    except (OSError, ValueError, RecursionError) as error:
         raise MetadataError(f"{FILE} is not readable JSON: {error}") from error
     if not isinstance(value, dict):
         raise MetadataError(f"{FILE} must contain an object")
@@ -70,7 +77,11 @@ def read(root: Path) -> dict:
     A mod without a usable name reports it in `missing` and borrows its
     folder name for display only; nothing is written until someone names it.
     """
-    stored = _stored(root)
+    return _standard(root,_stored(root))
+
+
+def _standard(root: Path, stored: dict) -> dict:
+    """Display fields from the same decoded declaration as game-specific keys."""
     result = {}
     for key in FIELDS:
         value = stored.get(key, "")
@@ -88,5 +99,8 @@ def write(root: Path, values: dict) -> dict:
     stored.update(fields)
     path = Path(root) / FILE
     from core.plugin_files import atomic_write
-    atomic_write(path, (json.dumps(stored, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+    encoded = (json.dumps(stored, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    if len(encoded)>MAX_BYTES:
+        raise MetadataError('mod.json exceeds the 8 MiB metadata limit')
+    atomic_write(path, encoded)
     return read(root)
