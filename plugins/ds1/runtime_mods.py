@@ -16,6 +16,7 @@ MAGIC = b'LXD1MOD\0'
 VERSION = 1
 FILENAME = 'runtime.lxd'
 MAX_SIZE = 16 * 1024 * 1024
+MAX_TOTAL_SIZE = 64 * 1024 * 1024
 MAX_FIXUPS = 65536
 HEADER = struct.Struct('<8s6I')
 # signed displacement += delta, signed displacement -= delta, RVA += delta
@@ -132,7 +133,7 @@ def require_data(data: bytes) -> bytes:
     return bytes(result)
 
 
-def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes]) -> bytes | None:
+def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes | dict]) -> bytes | None:
     """Place loader-owned support beyond each mod's fixed code allocation.
 
     Compiling each contribution independently must not assign shared menu
@@ -145,7 +146,8 @@ def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes]) -> byt
     blocks = [rva for kind, rva, _, _ in support['records'] if kind == patches.BLOCK]
     base = blocks[0] if blocks else 0
     occupied = []
-    for data in modules:
+    for entry in modules:
+        data = entry['data'] if isinstance(entry,dict) else entry
         module = inspect(data)
         module_ranges = [(rva,rva+size) for kind,rva,size,_ in module['records'] if kind == patches.HOOK]
         module_ranges += [(rva,rva+size) for rva,size in module['claims']]
@@ -155,7 +157,8 @@ def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes]) -> byt
             if any(low < other_high and other_low < high for low,high in shared_ranges
                    for other_low,other_high in module_ranges):
                 raise patches.PatchError(f"{spec['owner']}: shared native properties conflict with a prebuilt mod",
-                                         folders=[spec['folder']] if spec.get('folder') else [])
+                                         folders=patches._folders(spec) or
+                                         ([entry['folder']] if isinstance(entry,dict) else []))
         occupied.extend((rva, rva+size) for kind, rva, size, _ in module['records']
                         if kind == patches.BLOCK and module['fixed'])
     if blocks and not support['fixed']:

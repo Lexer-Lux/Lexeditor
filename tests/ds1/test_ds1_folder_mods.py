@@ -73,8 +73,9 @@ def test_shared_support_links_beyond_independently_built_fixed_mod(vanilla):
     assert hook[1]+5+struct.unpack_from('<i',hook[3],hook[2]+1)[0] == block[1]+4
 
 
-def test_standalone_cache_tracks_fixed_allocations_and_ignores_broken_native_siblings(vanilla,tmp_path):
+def test_standalone_cache_tracks_fixed_allocations_and_attributes_broken_native_siblings(vanilla,tmp_path):
     from plugins.ds1 import standalone_runtime
+    from core.mod_builds import ModBuildError
     folder = tmp_path/'fixed'
     folder.mkdir()
     row = {'path':folder,'id':'fixed','name':'Fixed'}
@@ -85,8 +86,11 @@ def test_standalone_cache_tracks_fixed_allocations_and_ignores_broken_native_sib
     assert standalone_runtime._identity([row],tmp_path,[]) != baseline
     assert len(standalone_runtime._modules([row])) == 1
     (folder/'runtime.lxd').write_bytes(b'Broken native module')
-    assert standalone_runtime._modules([row]) == []
-    assert standalone_runtime._identity([row],tmp_path,[]) == baseline
+    for operation in (lambda:standalone_runtime._modules([row]),
+                      lambda:standalone_runtime._identity([row],tmp_path,[])):
+        with pytest.raises(ModBuildError) as caught:
+            operation()
+        assert caught.value.folders == (folder.resolve(),)
 
 
 @pytest.mark.skipif(os.name != 'nt', reason='Windows pre-entry event')

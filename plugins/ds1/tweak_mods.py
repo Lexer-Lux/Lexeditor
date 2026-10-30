@@ -564,7 +564,10 @@ def build_specs(root: Path | None = None, game_root: Path | None = None, *, cach
         dim = menu_dim.patch_spec(dims)
     except ValueError as error:
         raise TweakError(str(error), folders=[spec["folder"] for spec in dims]) from error
-    return specs + support + ([exe_patches.validate(dim, menu_dim.OWNER)] if dim else [])
+    aggregate = exe_patches.validate(dim, menu_dim.OWNER) if dim else None
+    if aggregate is not None:
+        aggregate['folders'] = list(dict.fromkeys(spec['folder'] for spec in dims))
+    return specs + support + ([aggregate] if aggregate is not None else [])
 
 
 def layout_specs(root: Path | None = None) -> list[dict]:
@@ -1500,6 +1503,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
         exe_patches._layout(original, specs)
         from . import runtime_mods
         module_writes, module_hashes, modules = [], {}, []
+        module_bytes = 0
         for row in tweak_rows(root):
             if not row['enabled']:
                 continue
@@ -1528,12 +1532,18 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
                 from . import mod_loader
                 requires_data = bool(mod_loader.content_files(folder, row['name'])) or any(
                     built_files(folder, kind) for kind in BUILT_FOLDERS[1:])
-                after = runtime_mods.build(original, owned, requires_data=requires_data)
+                try:
+                    after = runtime_mods.build(original, owned, requires_data=requires_data)
+                except exe_patches.PatchError as error:
+                    raise TweakError(f"{row['name']}: {error}",folders=[folder]) from error
                 if before != after:
                     module_writes.append({'path': str(target), 'before': before, 'after': after})
             if after is not None:
+                module_bytes += len(after)
+                if module_bytes > runtime_mods.MAX_TOTAL_SIZE:
+                    raise TweakError('Enabled native modules exceed their combined size limit',folders=[folder])
                 module_hashes[str(target)] = _sha(after)
-                modules.append(after)
+                modules.append({'folder':str(folder),'data':after})
         patch = runtime_mods.shared_patch(original, [spec for spec in specs if not spec.get('folder') or spec.get('shared')], modules)
         # Prebuilt mods have no source description to feed the old combined
         # composer. Check their actual compiled claims together with sources.

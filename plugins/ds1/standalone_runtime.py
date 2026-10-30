@@ -79,14 +79,21 @@ def _requires_data(folder):
 def _modules(rows):
     from . import runtime_mods
     modules = []
+    total = 0
     for row in rows:
         try:
-            with (row['path']/runtime_mods.FILENAME).open('rb') as stream:
-                header = stream.read(runtime_mods.HEADER.size)
-            if len(header) == runtime_mods.HEADER.size:
-                modules.append(runtime_mods.read(row['path']))
-        except (OSError,ValueError):
-            pass  # The native scanner diagnoses/skips this module independently.
+            path = tweak_mods.checked(row['path']/runtime_mods.FILENAME)
+            if not path.exists():
+                continue
+            if path.stat().st_size > runtime_mods.MAX_SIZE:
+                raise ValueError('The native module exceeds its size limit')
+            data = runtime_mods.read(row['path'])
+            total += len(data)
+            if total > runtime_mods.MAX_TOTAL_SIZE:
+                raise ValueError('Enabled native modules exceed their combined size limit')
+            modules.append({'folder':str(row['path']),'data':data})
+        except (OSError,ValueError) as error:
+            raise ModBuildError([row['path']],f"{row['name']}: {error}") from error
     return modules
 
 
@@ -127,8 +134,16 @@ def _identity(rows, game, targets):
             value = _stamp(path)
         stamped.append([str(path),value])
     from . import runtime_mods
-    allocations = [[rva,size] for data in _modules(rows) if runtime_mods.inspect(data)['fixed']
-                   for kind,rva,size,_ in runtime_mods.inspect(data)['records'] if kind == exe_patches.BLOCK]
+    allocations = []
+    shared = bool(project) or any(tweak_mods.built_files(row['path'],kind)
+                                  for row in rows for kind in (menu_dim.FOLDER,'native-support'))
+    for entry in _modules(rows):
+        module = runtime_mods.inspect(entry['data'])
+        allocations.extend([rva,size] for kind,rva,size,_ in module['records']
+                           if kind == exe_patches.BLOCK and module['fixed'])
+        if shared:
+            allocations.append([entry['folder'],module['claims'],
+                                [[rva,size] for kind,rva,size,_ in module['records'] if kind == exe_patches.HOOK]])
     payload = [mod_loader._composition_revision().hex(), contributors, project, warning, stamped, allocations]
     return hashlib.sha256(json.dumps(payload,separators=(',',':')).encode()).hexdigest()
 
@@ -142,6 +157,7 @@ def _specs(rows, kind, validate):
 
 def prepare(game, rows, roots=()):
     from . import native_support
+    modules = _modules(rows)
     data = []
     for row in rows:
         try:
@@ -185,6 +201,8 @@ def prepare(game, rows, roots=()):
     # runs here. Ordinary mod machine code stays in each runtime.lxd.
     dim_patch = menu_dim.patch_spec(dims)
     support = [exe_patches.validate(dim_patch,menu_dim.OWNER)] if dim_patch else []
+    if support:
+        support[0]['folders'] = list(dict.fromkeys(spec['folder'] for spec in dims))
     support.extend(_specs(rows,native_support.FOLDER,native_support.validate))
     record, _warning = tweak_mods.runtime_record(game)
     libraries = [*roots,*(row['path'].parent for row in rows)]
@@ -195,7 +213,12 @@ def prepare(game, rows, roots=()):
     if support:
         executable = deployment.vanilla_source(game,Path(exe_patches.EXECUTABLE)).read_bytes()
         from . import runtime_mods
-        patch = runtime_mods.shared_patch(executable,support,_modules(rows)) or b''
+        try:
+            patch = runtime_mods.shared_patch(executable,support,modules) or b''
+        except exe_patches.PatchError as error:
+            if not error.folders:
+                raise
+            raise ModBuildError(error.folders,str(error)) from error
     else:
         patch = b''
     return data, composition, files, patch, record
@@ -239,20 +262,30 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
     game = tweak_mods.checked(Path(game)).resolve()
     report_path = tweak_mods.checked(game/REPORT)
     record_path = tweak_mods.checked(game/tweak_mods.RUNTIME_RECORD)
-    rows = discover(roots,game)
-    prior = {}
-    try:
-        if report_path.stat().st_size <= MAX_REPORT:
-            prior = json.loads(report_path.read_text(encoding='utf-8'))
-        if type(prior) is not dict:
-            prior = {}
-        if prior.get('signature') == _identity(rows,game,prior.get('targets',[])):
-            return {**prior,'reused':True}
-    except (ValueError,OSError,TypeError):
-        pass  # A disposable report never blocks loading or triggers code execution.
     disabled = []
     with tweak_mods.locked(game):
         before_write()
+        rows = discover(roots,game)
+        try:
+            raw = tweak_mods._bounded_file(report_path,MAX_REPORT,cache=True)
+            prior = json.loads(raw) if isinstance(raw,bytes) else None
+            valid = type(prior) is dict and prior.get('version') == 1
+            for key in ('targets','loaded','warnings','conflicts'):
+                values = prior.get(key) if valid else None
+                valid = valid and type(values) is list and all(type(value) is str for value in values)
+            failures = prior.get('disabled') if valid else None
+            valid = valid and type(failures) is list and all(type(row) is dict and all(
+                type(row.get(key)) is str for key in ('id','name','error')) for row in failures)
+            if valid and prior.get('signature') == _identity(rows,game,prior['targets']):
+                enabled = {row['id'] for row in rows}
+                remaining = [row for row in failures if row['id'] not in enabled]
+                if remaining != failures:
+                    prior['disabled'] = remaining
+                    before_write()
+                    atomic_write(report_path,(json.dumps(prior,indent=2)+'\n').encode())
+                return {**prior,'reused':True}
+        except (ValueError,OSError,TypeError,RecursionError):
+            pass  # A disposable report never blocks loading or triggers code execution.
         _record, warning = tweak_mods.runtime_record(game)
         while True:
             try:
@@ -268,6 +301,7 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
                     raise
                 for row in rows:
                     if row['path'].resolve() in failed:
+                        before_write()
                         mods_service.set_enabled(row['path'],False)
                         disabled.append({'id':row['id'],'name':row['name'],'error':str(error)})
                 rows = [row for row in rows if row['path'].resolve() not in failed]
@@ -286,9 +320,11 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
         except Exception:
             tweak_mods._undo(game,done,before_write=before_write)
             raise
+        before_write()
         atomic_write(game/tweak_mods.RUNTIME_PATCH,patch)
         if record is not None:
             record['patchSha256'] = hashlib.sha256(patch).hexdigest()
+            before_write()
             atomic_write(record_path,(json.dumps(record,indent=2)+'\n').encode())
         targets = [str(path) for path in composition.files] + [str(item['managed'].relative) for item in files]
         targets += [tweak_mods.RUNTIME_PATCH]
@@ -304,6 +340,7 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
         raw = (json.dumps(report,indent=2)+'\n').encode()
         if len(raw) > MAX_REPORT:
             raise ValueError('The loader report exceeds its limit')
+        before_write()
         atomic_write(report_path,raw)
         return report
 

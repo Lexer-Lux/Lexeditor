@@ -244,6 +244,11 @@ def _checked_pe(vanilla: bytes, expected_size: int, expected_hash: str):
     return _Pe(vanilla)
 
 
+def _folders(spec):
+    return list(dict.fromkeys([*([spec['folder']] if spec.get('folder') else []),
+                               *spec.get('folders', [])]))
+
+
 def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
     """Where every island goes and what every hook writes, for the vanilla build.
 
@@ -266,13 +271,15 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
     while last["raw"] + base - last["rva"] < len(vanilla):
         base += ISLAND_ALIGNMENT
     islands = [island for spec in patches for island in spec["islands"]]
-    identities = [(island["owner"], island["name"]) for island in islands]
+    owners = {id(island): spec for spec in patches for island in spec['islands']}
+    identities = [id(island) for island in islands]
     if len(identities) != len(set(identities)):
         raise PatchError("Two native patches share an owner and island name")
     placed, cursor = [], base
     for island in sorted((item for item in islands if item["rva"] is not None), key=lambda item: item["rva"]):
         if island["rva"] < cursor:
-            raise PatchError(f"{island['owner']}: island {island['name']} overlaps another tweak's code")
+            raise PatchError(f"{island['owner']}: island {island['name']} overlaps another tweak's code",
+                             folders=_folders(owners[id(island)]))
         placed.append((island["rva"], island))
         cursor = island["rva"] + len(island["code"])
     for island in (item for item in islands if item["rva"] is None):
@@ -280,7 +287,12 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
         placed.append((rva, island))
         cursor = rva + len(island["code"])
     placed.sort(key=lambda item: item[0])
-    addresses = {(island["owner"], island["name"]): rva for rva, island in placed}
+    # Refuse sparse, far-away fixed addresses before allocating the code span.
+    if cursor-base > 16*1024*1024:
+        island = placed[-1][1]
+        raise PatchError('Native code exceeds the runtime size limit',
+                         folders=_folders(owners[id(island)]))
+    addresses = {id(island): rva for rva, island in placed}
 
     codes = []
     for rva, island in placed:
@@ -294,32 +306,34 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
     claimed: list[tuple[int, int, str]] = []
     hooks = []
     for spec in patches:
+        local = {island['name']: addresses[id(island)] for island in spec['islands']}
         for hook in spec["hooks"]:
             rva, original = hook["rva"], hook["original"]
             for low, high, owner in claimed:
                 if rva < high and low < rva + len(original):
-                    raise PatchError(f"{hook['owner']} and {owner} both patch the instruction at {rva:X}")
+                    raise PatchError(f"{hook['owner']} and {owner} both patch the instruction at {rva:X}",
+                                     folders=_folders(spec))
             claimed.append((rva, rva + len(original), hook["owner"]))
             at = pe.offset(rva, len(original))
             if vanilla[at:at + len(original)] != original:
                 raise PatchError(f"{hook['owner']}: the instruction at {rva:X} does not match this build",
-                                 folders=[spec['folder']] if spec.get('folder') else [])
+                                 folders=_folders(spec))
             kind = hook["replacement"]
             if kind[0] == "bytes":
                 replacement = kind[1]
             else:
                 _kind, opcode, name, offset = kind
-                target = addresses[(hook["owner"], name)] + offset
+                target = local[name] + offset
                 replacement = bytes((opcode,)) + _rel32(rva + 5, target)
             replacement = bytearray(replacement)
             for displacement, name, offset in hook.get("relocations", []):
-                target = addresses[(hook["owner"], name)] + offset
+                target = local[name] + offset
                 replacement[displacement:displacement + 4] = _rel32(
                     rva + displacement + 4, target)
             hooks.append((rva, original, bytes(replacement) + hook["pad"]))
 
     growth = []
-    owned: list[tuple[int, int, str]] = []
+    owned: list[tuple[int, int, dict]] = []
     for spec in patches:
         tails = []
         for name, minimum in spec["sectionVirtualSize"].items():
@@ -327,7 +341,7 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
             following = next((item for item in pe.sections if item["rva"] > (section or {}).get("rva", -1)), None)
             if section is None or following is None or not section["vsize"] <= minimum <= following["rva"] - section["rva"]:
                 raise PatchError(f"{spec['owner']}: cannot grow {name} to {minimum:X}",
-                                 folders=[spec['folder']] if spec.get('folder') else [])
+                                 folders=_folders(spec))
             growth.append((section, minimum))
             if minimum > section["vsize"]:
                 tails.append((section["rva"] + section["vsize"], section["rva"] + minimum))
@@ -335,12 +349,13 @@ def _layout(vanilla: bytes, specs: list[dict]) -> dict | None:
         for low, high in ranges:
             if not any(start <= low and high <= end for start, end in tails):
                 raise PatchError(f"{spec['owner']}: state at {low:X} is outside the sections it grows",
-                                 folders=[spec['folder']] if spec.get('folder') else [])
-            for other_low, other_high, owner in owned:
-                if owner != spec["owner"] and low < other_high and other_low < high:
-                    raise PatchError(f"{spec['owner']} and {owner} both keep state at "
-                                     f"{max(low, other_low):X}")
-        owned.extend((low, high, spec["owner"]) for low, high in ranges)
+                                 folders=_folders(spec))
+            for other_low, other_high, other in owned:
+                same_mod = spec.get('folder') and spec.get('folder') == other.get('folder')
+                if not same_mod and low < other_high and other_low < high:
+                    raise PatchError(f"{spec['owner']} and {other['owner']} both keep state at "
+                                     f"{max(low, other_low):X}", folders=_folders(spec))
+        owned.extend((low, high, spec) for low, high in ranges)
     return {"pe": pe, "base": base, "cursor": cursor, "codes": codes,
             "functions": functions, "hooks": hooks, "growth": growth, "placed": placed}
 
