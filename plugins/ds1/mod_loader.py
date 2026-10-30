@@ -258,11 +258,59 @@ def build(game_root: Path, library_root: Path, project_root: Path | None = None,
     return compose_installed(game_root, mods, menu_files=menu_files), mods
 
 
+def normalize_collisions(game_root: Path, mods: list[Mod]) -> list[Mod]:
+    """Loose authoring members enter the same portable archive composer."""
+    from . import collision_edits
+    from .collision_write import CollisionDocument
+    from core.mod_builds import ModBuildError
+    destinations = {target[0] for mod in mods for relative in mod.files
+                    if (target := collision_archive.loose_for(relative)) is not None}
+    if not destinations:
+        return mods
+    originals = vanilla_files(game_root,frozenset(destinations))
+    archives = {header:collision_archive.CollisionArchive(*(originals[path] for path in collision_archive.pair(header)))
+                for header in destinations if all(path in originals for path in collision_archive.pair(header))}
+    result = []
+    for mod in mods:
+        files,edits = dict(mod.files),dict(mod.edits)
+        try:
+            for relative,raw in mod.files.items():
+                target = collision_archive.loose_for(relative)
+                if target is None:
+                    continue
+                header,prefix = target
+                if any(path in files for path in collision_archive.pair(header)):
+                    raise ValueError('A collision member cannot also declare its complete raw archive')
+                if header not in archives:
+                    raise ValueError(f'{relative}: no installed collision archive for this member')
+                archive = archives[header]
+                matches = [name for name in archive.members if name == prefix or name.startswith(prefix+'a')]
+                if len(matches) != 1:
+                    raise ValueError(f'{relative}: no unique installed collision member')
+                name = matches[0]
+                prior = edits.get(header,{'kind':'collision','members':[]})
+                if prior.get('kind') != 'collision' or any(row['name'] == name for row in prior['members']):
+                    raise ValueError(f'{relative}: duplicate collision record contribution')
+                spec = collision_edits.create_state(CollisionDocument(archive.member(name)),CollisionDocument(raw))
+                members = list(prior['members'])
+                if spec is not None:
+                    entry = archive.members[name]
+                    members.append({'name':name,'id':entry['id'],'path':entry['name'],'edits':spec})
+                if members:
+                    edits[header] = {'kind':'collision','members':members}
+                files.pop(relative)
+        except Exception as error:
+            raise ModBuildError([mod.folder],f'{mod.name}: {error}') from error
+        result.append(Mod(mod.name,mod.folder,files,edits))
+    return result
+
+
 def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False, cache_root=None,
                       menu_files=None) -> Composition:
     """Load every mod's original assets before composing the enabled set."""
     if menu_files is not None and conflicts_only:
         raise ValueError('Conflict-only composition cannot mutate a deployment plan')
+    mods = normalize_collisions(game_root,mods)
     paths = frozenset(target for mod in mods for name in (mod.files.keys()|mod.edits.keys())
                       for target in collision_archive.pair(name))
     originals = vanilla_files(game_root, paths)
@@ -348,6 +396,7 @@ def materialize_mod(mod: Mod, originals: dict) -> Mod:
     from . import record_edits, collision_edits
     from core.mod_builds import ModBuildError
     files = dict(mod.files)
+    retained = {}
     try:
         for relative,spec in mod.edits.items():
             group = collision_archive.pair(relative)
@@ -356,8 +405,10 @@ def materialize_mod(mod: Mod, originals: dict) -> Mod:
             if collision_edits.supported(relative):
                 if any(target not in originals for target in group):
                     raise ValueError('The installed split collision baseline is missing')
-                payloads = collision_edits.materialize(*(originals[target] for target in group), spec)
-                files.update(zip(group, payloads))
+                archive = collision_archive.CollisionArchive(*(originals[target] for target in group))
+                for name,member in collision_edits.member_specs(archive,spec).items():
+                    collision_edits.open_member(archive.member(name),member)
+                retained[relative] = spec
             else:
                 files[relative] = record_edits.materialize(relative,originals.get(relative),spec)
     except Exception as error:
@@ -369,7 +420,7 @@ def materialize_mod(mod: Mod, originals: dict) -> Mod:
             elif originals.get(relative) is not None:
                 record_edits.validate_original(relative,originals[relative])
         raise ModBuildError([mod.folder],f'{mod.name}: {error}') from error
-    return Mod(mod.name,mod.folder,files)
+    return Mod(mod.name,mod.folder,files,retained)
 
 
 @lru_cache(maxsize=1)
@@ -548,13 +599,18 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool
     """
     files, conflicts = {}, []
     headers = {collision_archive.header_for(relative)
-               for relative in list(vanilla) + [path for mod in mods for path in mod.files]}
+               for relative in list(vanilla) + [path for mod in mods for path in mod.files.keys()|mod.edits.keys()]}
     for header in sorted(path for path in headers if path is not None):
         pair = collision_archive.pair(header)
         if any(relative not in vanilla for relative in pair):
             raise ValueError(f'{header}: the installed split collision pair is missing')
         variants = []
         for mod in mods:
+            if header in mod.edits:
+                if any(relative in mod.files for relative in pair):
+                    raise ValueError(f'{mod.name}: duplicate raw archive and collision records')
+                variants.append((mod.name,None,None,mod.edits[header]))
+                continue
             if not any(relative in mod.files for relative in pair):
                 continue
             if not all(relative in mod.files for relative in pair):

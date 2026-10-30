@@ -234,6 +234,15 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
                 originals = mod_loader.vanilla_files(Path(game_root),frozenset(declared))
                 mod_loader.materialize_mod(mod_loader.Mod(row['name'],folder,{},declared),originals)
     from . import collision_archive
+    portable_loose = {relative for relative,_path in contributions if collision_archive.loose_for(relative) is not None}
+    if portable_loose:
+        if game_root is None:
+            raise ValueError('Locate the installed game to export collision member records')
+        collision_files = {relative:mod_loader._read_data(path,relative) for relative,path in contributions
+                           if relative in portable_loose or collision_archive.header_for(relative) is not None}
+        normalized = mod_loader.normalize_collisions(Path(game_root),[
+            mod_loader.Mod(row['name'],folder,collision_files,portable)])[0]
+        portable = normalized.edits
     portable_targets = {target for relative in portable for target in collision_archive.pair(relative)}
     if any(relative in portable_targets for relative,_path in contributions):
         raise ValueError('The mod contains duplicate archive and record contributions')
@@ -281,10 +290,10 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
             output.parent.mkdir(parents=True,exist_ok=True)
             output.write_bytes(rules)
         if portable:
-            (target/record_edits.FILENAME).write_bytes(existing_records if not archives and existing_records is not None
+            (target/record_edits.FILENAME).write_bytes(existing_records if not archives and not portable_loose and existing_records is not None
                                                      else record_edits.encode(portable))
         for relative, source in contributions:
-            if relative in portable_targets or relative == record_edits.FILENAME:
+            if relative in portable_targets or relative in portable_loose or relative == record_edits.FILENAME:
                 continue
             relative = relative_path(relative.as_posix())
             output = target/relative

@@ -61,6 +61,15 @@ class CollisionStore:
             raise FormatError('Invalid collision table')
         return (*parts[1:4], int(parts[4]))
 
+    def _reserve(self, size, keep=None):
+        if size > MAX_OPEN_BYTES:
+            raise FormatError('This collision archive exceeds the editor memory limit')
+        while sum(unit['size'] for unit in self.units.values())+size > MAX_OPEN_BYTES:
+            unused = next((key for key,unit in self.units.items() if key != keep and not self._dirty(unit)),None)
+            if unused is None:
+                raise FormatError('Save or discard collision edits before opening more collision archives')
+            del self.units[unused]
+
     def _unit(self, header):
         if header in self.units:
             self.units.move_to_end(header)
@@ -95,13 +104,7 @@ class CollisionStore:
         archive = collision_archive.CollisionArchive(*(current[p] for p in group))
         recipes = collision_edits.member_specs(archive,spec) if spec is not None else {}
         size = sum(len(data) for data in [*originals.values(),*current.values()])
-        if size > MAX_OPEN_BYTES:
-            raise FormatError('This collision archive exceeds the editor memory limit')
-        while sum(unit['size'] for unit in self.units.values())+size > MAX_OPEN_BYTES:
-            unused = next((key for key, unit in self.units.items() if not self._dirty(unit)),None)
-            if unused is None:
-                raise FormatError('Save or discard collision edits before opening more collision archives')
-            del self.units[unused]
+        self._reserve(size)
         record_hash = _sha(record_bytes)
         unit = {'archive':archive,'originals':originals,'sources':sources,'spec':deepcopy(spec),
                 'raw':raw,'recipes':recipes,'documents':{},'size':size,'record_path':record_path,'record_hash':record_hash}
@@ -121,12 +124,24 @@ class CollisionStore:
         from . import map_collision
         self._header(map_name,model,layer)
         wanted = 'collisionHigh' if layer == 'high' else 'collisionLow'
-        if any(found == wanted and body is None for found,_,body,_ in
-               map_collision.sources(self.game_root,self.project,map_name,model)):
-            raise FormatError('Loose collision files can be previewed; editing them needs loose-file record support')
+        source_info = map_collision.source(self.game_root,self.project,map_name,model,wanted)
+        loose = source_info[0] if source_info is not None and source_info[1] is None else None
         header,unit,member = self._locate(map_name,model,layer)
         if member not in unit['documents']:
             source = unit['archive'].member(member)
+            output = None
+            sources = []
+            if loose is not None:
+                if member in unit['recipes'] or unit['raw']:
+                    raise FormatError('A loose collision member cannot also declare its archive or portable records')
+                source = _read(loose,map_collision.hkx.MAX_FILE)
+                if source is None:
+                    raise FormatError('The loose collision member disappeared')
+                origin = self.project if self.project and loose.is_relative_to(self.project) else self.game_root
+                output = checked(self.project/loose.relative_to(origin)) if self.project else None
+                for path in dict.fromkeys([loose,output] if output is not None else [loose]):
+                    raw = source if path == loose else _read(path,map_collision.hkx.MAX_FILE)
+                    sources.append((path,_sha(raw),map_collision.hkx.MAX_FILE))
             if member in unit['recipes']:
                 document,meshes = collision_edits.open_member(source,unit['recipes'][member])
             else:
@@ -137,9 +152,13 @@ class CollisionStore:
                 raise FormatError('New collision members need archive-directory editing before they can be saved')
             original_source = original_archive.member(member)
             vanilla = document if original_source == document.source else CollisionDocument(original_source)
+            if loose is not None:
+                self._reserve(len(source),header)
+                unit['size'] += len(source)
+                unit['sources'].extend(sources)
             unit['documents'][member] = {'document':document,'baseline':meshes,'working':deepcopy(meshes),
                 'vanilla':[collision_merge._mesh(vanilla,i) for i in range(len(vanilla.meshes))],
-                'vanilla_document':vanilla,'dirty':set()}
+                'vanilla_document':vanilla,'output':output,'dirty':set()}
         return header,unit,member,unit['documents'][member]
 
     def mesh(self, map_name, model, layer, index):
@@ -249,13 +268,20 @@ class CollisionStore:
             try:
                 self._header(map_name,model,layer)
                 wanted = 'collisionHigh' if layer == 'high' else 'collisionLow'
-                source = next((entry for entry in map_collision.sources(self.game_root,self.project,map_name,model)
-                               if entry[0] == wanted),None)
-                if source is not None and source[2] is None:
-                    raw = _read(source[1],map_collision.hkx.MAX_FILE)
-                    if raw is None:
-                        raise FormatError('The collision source disappeared')
-                    previews = map_collision.preview_meshes(raw)
+                source = map_collision.source(self.game_root,self.project,map_name,model,wanted)
+                if source is not None and source[1] is None:
+                    header = self._header(map_name,model,layer)[0]
+                    unit = self.units.get(header)
+                    matches = [state for state in unit['documents'].values() if state['output'] is not None
+                               and state['output'].name == source[0].name] if unit is not None else []
+                    if matches:
+                        state = matches[0]
+                        previews = map_collision.preview_document(state['document'],state['working'])
+                    else:
+                        raw = _read(source[0],map_collision.hkx.MAX_FILE)
+                        if raw is None:
+                            raise FormatError('The collision source disappeared')
+                        previews = map_collision.preview_meshes(raw)
                     result.extend(dict(mesh,layer=wanted) for mesh in previews)
                     continue
                 _,unit,member = self._locate(map_name,model,layer)
@@ -386,11 +412,17 @@ class CollisionStore:
             for name,state in unit['documents'].items():
                 if not state['dirty']:
                     continue
-                if unit['raw']:
+                if unit['raw'] or state['output'] is not None:
                     updates = {index:collision_merge._update(collision_merge._mesh(state['document'],index),after)
                                for index,after in enumerate(state['working'])
                                if collision_merge._mesh(state['document'],index) != after}
-                    members[name] = state['document'].export(updates)
+                    payload = state['document'].export(updates)
+                    if state['output'] is not None:
+                        output = state['output']
+                        outputs[output] = payload
+                        expected[output] = next(stamp for path,stamp,_ in unit['sources'] if path == output)
+                    else:
+                        members[name] = payload
                 else:
                     spec = collision_edits.create_state(state['vanilla_document'],state['document'],state['working'])
                     recipe['members'] = [row for row in recipe['members'] if row['name'] != name]
@@ -398,13 +430,13 @@ class CollisionStore:
                         entry = unit['archive'].members[name]
                         recipe['members'].append({'name':name,'id':entry['id'],'path':entry['name'],'edits':spec})
             group = collision_archive.pair(header)
-            if unit['raw']:
+            if unit['raw'] and members:
                 payloads = unit['archive'].replace(members)
                 for relative,payload in zip(group,payloads):
                     path = checked(self.project/relative)
                     outputs[path] = payload
                     expected[path] = next(stamp for source,stamp,_ in unit['sources'] if source == path)
-            else:
+            elif any(state['dirty'] and state['output'] is None for state in unit['documents'].values()):
                 if recipe['members']:
                     records[header] = recipe
                 else:

@@ -63,16 +63,28 @@ def merge(original, variants, *, conflicts_only=False):
     These ownership boundaries are reported rather than silently discarding
     an earlier mod's incompatible geometry.
     """
+    prepared = []
+    for name,raw in variants:
+        if raw != original:
+            document = CollisionDocument(raw)
+            prepared.append((name,document,[_mesh(document,i) for i in range(len(document.meshes))]))
+    return merge_states(original,prepared,conflicts_only=conflicts_only)
+
+
+def merge_states(original, prepared, *, conflicts_only=False):
+    """Merge validated editable records; compile only the final combined mesh."""
     base = CollisionDocument(original)
     metadata = _metadata(base)
-    prepared = [(name, raw, CollisionDocument(raw)) for name, raw in variants if raw != original]
     if not prepared:
         return original, []
     if any(len(doc.meshes) != len(base.meshes) or _metadata(doc) != metadata or
            any(a['index_field'] != b['index_field'] for a, b in zip(base.meshes, doc.meshes))
-           for _, _, doc in prepared):
+           for _, doc, _ in prepared):
         owners = [name for name, _, _ in prepared]
-        return (original if conflicts_only else prepared[-1][1]), [('Collision physics', owners)] if len(owners) > 1 else []
+        document,values = prepared[-1][1:]
+        updates = {i:_update(_mesh(document,i),value) for i,value in enumerate(values)
+                   if _mesh(document,i) != value}
+        return (original if conflicts_only else document.export(updates)), [('Collision physics', owners)] if len(owners) > 1 else []
     originals = [_mesh(base, i) for i in range(len(base.meshes))]
     current = [{key: [list(row) for row in rows] for key, rows in mesh.items()} for mesh in originals]
     owners, structural, conflicts = {}, {}, {}
@@ -83,9 +95,9 @@ def merge(original, variants, *, conflicts_only=False):
             if name not in values:
                 values.append(name)
 
-    for name, _, document in prepared:
+    for name, document, values in prepared:
         for index, before in enumerate(originals):
-            after = _mesh(document, index)
+            after = values[index]
             if before == after:
                 continue
             label = f'Collision mesh {index+1}'

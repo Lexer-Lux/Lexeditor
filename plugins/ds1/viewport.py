@@ -43,9 +43,16 @@ def resolve_model(game_root, project, map_name, model):
     ('member', binder path, member name), or ('skip', reason)."""
     mtype, name = model['type'], model['name']
     if mtype == 5:
-        from .map_collision import sources
-        found = next(sources(game_root, project, map_name, name), None)
-        return ('collision', found[1]) if found else ('skip', 'no collision file')
+        from .map_collision import source
+        errors = []
+        for layer in ('collisionHigh','collisionLow'):
+            try:
+                found = source(game_root,project,map_name,name,layer)
+                if found is not None:
+                    return 'collision',found[0]
+            except (FormatError,OSError,ValueError) as error:
+                errors.append(str(error))
+        return 'skip','; '.join(errors) or 'no collision file'
     if mtype == 6:
         relative = Path('map') / Path(map_name).stem / (Path(map_name).stem + '.nvmbnd.dcx')
         path = _overlay(project, relative) or Path(game_root) / relative

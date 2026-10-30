@@ -30,6 +30,20 @@ def pair(relative):
     return (header, header.with_suffix('.hkxbdt')) if header is not None else (relative,)
 
 
+def loose_for(relative):
+    """Return the split-archive destination and member prefix of a loose HKX."""
+    relative = Path(relative)
+    if (len(relative.parts) != 3 or relative.parts[0] != 'map'
+            or not re.fullmatch(r'm\d\d_\d\d_\d\d_\d\d',relative.parts[1])):
+        return None
+    match = re.fullmatch(r'([hl][a-zA-Z0-9_]+)\.hkx(?:\.dcx)?',relative.name)
+    if match is None:
+        return None
+    name = match[1]
+    header = relative.parent/(name[0]+relative.parts[1][1:]+'.hkxbhd')
+    return header,name.lower()
+
+
 class CollisionArchive:
     def __init__(self, header, body):
         if (len(header) < 32 or len(header) > MAX_HEADER or header[:4] != b'BHF3'
@@ -98,21 +112,35 @@ class CollisionArchive:
 
 def compose(header, body, variants, *, conflicts_only=False):
     """Combine matching directory members, returning header/body and conflicts."""
+    from . import collision_edits
+    from .collision_write import CollisionDocument
     original = CollisionArchive(header, body)
     archives = []
-    for name, other_header, other_body in variants:
+    for variant in variants:
+        name,other_header,other_body,*records = variant
+        if records:
+            if len(records) != 1 or other_header is not None or other_body is not None:
+                raise FormatError('A collision contribution must declare records or archive bytes')
+            archives.append((name,None,collision_edits.member_specs(original,records[0])))
+            continue
         other = CollisionArchive(other_header, other_body)
         if other.identities() != original.identities():
             raise FormatError(f'{name}: split collision directory identities changed')
-        archives.append((name, other))
+        archives.append((name, other,{}))
     updates, conflicts = {}, []
     for name in original.members:
         baseline = original.member(name)
-        changed = [(owner, archive.member(name)) for owner, archive in archives
-                   if archive.member(name) != baseline]
+        changed = []
+        for owner,archive,records in archives:
+            if name in records:
+                document,values = collision_edits.open_member(baseline,records[name])
+                changed.append((owner,document,values))
+            elif archive is not None and archive.member(name) != baseline:
+                document = CollisionDocument(archive.member(name))
+                changed.append((owner,document,[collision_merge._mesh(document,i) for i in range(len(document.meshes))]))
         if not changed:
             continue
-        output, collisions = collision_merge.merge(baseline, changed, conflicts_only=conflicts_only)
+        output, collisions = collision_merge.merge_states(baseline, changed, conflicts_only=conflicts_only)
         if output != baseline:
             updates[name] = output
         conflicts += [(f'{name}: {part}', owners) for part, owners in collisions]

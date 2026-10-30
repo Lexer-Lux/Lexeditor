@@ -68,7 +68,7 @@ def test_collision_triangles_and_one_broken_layer(monkeypatch, tmp_path):
     integrated = store.model_geometry('m10_02_00_00.msb',{'type':5,'name':'h0000'})
     assert [mesh['layer'] for mesh in integrated['meshes']] == ['collisionHigh']
     assert integrated['meshes'][0]['positions'] == result['meshes'][0]['positions']
-    with pytest.raises(ValueError,match='Loose collision files'):
+    with pytest.raises(ValueError):
         store.collisions.view('m10_02_00_00.msb','h0000','high',0,'vertices')
 
 

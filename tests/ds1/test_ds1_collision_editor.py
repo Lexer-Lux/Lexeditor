@@ -14,7 +14,8 @@ from test_ds1_collision_write import collision_source
 from test_ds1_portable_collisions import HEADER,BODY
 
 
-def test_collision_editor_fields_structure_history_and_preview(collision_source,tmp_path):
+@pytest.mark.parametrize('loose',[False,True])
+def test_collision_editor_fields_structure_history_and_preview(collision_source,tmp_path,loose):
     game,project,store,pair=setup(tmp_path,collision_source)
     for relative,payload in zip((HEADER,BODY),pair):
         low=relative.with_name('l'+relative.name[1:])
@@ -23,6 +24,10 @@ def test_collision_editor_fields_structure_history_and_preview(collision_source,
     (game/RELATIVE).write_bytes(make_archive())
     (game/'map/MapStudio'/MAP).write_bytes(build_msb(models=(('h0000',5),),
         parts=(('collision',5,0,0,None),)))
+    if loose:
+        path=project/HEADER.parent/'h0000.hkx'
+        path.parent.mkdir(parents=True)
+        path.write_bytes(collision_source)
     with DS1Session({'LEXEDITOR_DS1_ROOT':str(game),'LEXEDITOR_DS1_PROJECT':str(project),
                      'LEXEDITOR_DS1_MODS_ROOT':str(tmp_path/'library'),
                      'LEXEDITOR_NO_MOD':'0','LEXEDITOR_MOD_READ_ONLY':'0'}) as session:
@@ -66,7 +71,7 @@ def test_collision_editor_fields_structure_history_and_preview(collision_source,
                 page.wait_for_function('(count)=>state.collision.rows.length===count+1',arg=original)
                 page.evaluate('save()')
                 page.wait_for_function('state.dirty===0')
-                assert (project/record_edits.FILENAME).is_file()
+                assert (project/record_edits.FILENAME).is_file() is (not loose)
                 page.locator('[data-tabstrip-id="faces"]').click()
                 page.wait_for_function('state.row?.id.startsWith("f:")')
                 assert page.get_by_role('button',name='Change Vertex A',exact=True).is_visible()
