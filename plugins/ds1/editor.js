@@ -3994,10 +3994,11 @@ function collisionDetail(){
   const collision=state.collision;
   const row=state.row;
   const noun=collision?.kind==='faces'?'face':'vertex';
+  const derived=collision?.kind==='faces'&&collision.derivedFaces;
   const actions=['add','duplicate','remove'].map(action=>el('button',{type:'button',class:'lex-header-icon',
     'aria-label':`${action[0].toUpperCase()+action.slice(1)} collision ${noun}`,
-    title:`${action[0].toUpperCase()+action.slice(1)} collision ${noun}`,
-    disabled:state.readOnly||state.rowBusy||!!collision?.error||(!row&&action!=='add'),
+    title:derived?collision.faceEditReason:`${action[0].toUpperCase()+action.slice(1)} collision ${noun}`,
+    disabled:state.readOnly||state.rowBusy||derived||!!collision?.error||(!row&&action!=='add'),
     onclick:()=>changeCollisionStructure(action)},
     action==='add'?LexeditorUI.addIcon():action==='duplicate'?LexeditorUI.copyIcon():LexeditorUI.removeIcon()));
   if(!row||!String(row.table).startsWith('CollisionMesh|'))return detailPanel({title:`Collision ${noun}`,actions,
@@ -4008,6 +4009,7 @@ async function changeCollisionStructure(action){
   if(state.readOnly||state.rowBusy)return;
   await edits;
   const collision=state.collision,table=collision.table,kind=collision.kind;
+  if(kind==='faces'&&collision.derivedFaces)return;
   const index=Number(state.row?.id.split(':')[1]||0);
   state.rowBusy=true;shell.refresh();
   try{
@@ -4017,17 +4019,19 @@ async function changeCollisionStructure(action){
     if(action==='remove'){
       if(after[kind].length===1)throw new Error(`Keep at least one ${kind==='vertices'?'vertex':'face'} in a collision mesh. Remove the collision placement to remove it from the map.`);
       if(kind==='vertices'){
-        const connected=after.faces.filter(face=>face.slice(0,3).includes(index)).length;
-        if(connected===after.faces.length)throw new Error('Removing this vertex would leave no faces. Remove the collision placement instead.');
+        const connected=collision.derivedFaces?0:after.faces.filter(face=>face.slice(0,3).includes(index)).length;
+        if(collision.derivedFaces&&after.vertices.length<=3)throw new Error('Keep at least three distinct vertices in a convex collision.');
+        if(!collision.derivedFaces&&connected===after.faces.length)throw new Error('Removing this vertex would leave no faces. Remove the collision placement instead.');
         if(connected&&!await confirmAction({title:'Remove connected faces?',message:`Removing Vertex ${index} also removes ${connected} connected faces.`,confirmLabel:'Remove',cancelLabel:'Cancel'}))return;
         after.vertices.splice(index,1);after.flags.splice(index,1);
-        after.faces=after.faces.filter(face=>!face.slice(0,3).includes(index)).map(face=>face.map((value,i)=>i<3&&value>index?value-1:value));
+        if(!collision.derivedFaces)after.faces=after.faces.filter(face=>!face.slice(0,3).includes(index)).map(face=>face.map((value,i)=>i<3&&value>index?value-1:value));
       }else after.faces.splice(index,1);
       selected=Math.min(index,after[kind].length-1);
     }else{
       selected=after[kind].length;
       if(kind==='vertices'){
-        after.vertices.push(action==='duplicate'?[...after.vertices[index]]:[0,0,0,after.vertices[0][3]]);
+        const center=[0,1,2].map(axis=>after.vertices.reduce((sum,v)=>sum+v[axis],0)/after.vertices.length);
+        after.vertices.push(action==='duplicate'?[...after.vertices[index]]:[...center,after.vertices[0][3]]);
         after.flags.push([...after.flags[action==='duplicate'?index:0]]);
       }else{
         if(action==='add'&&after.vertices.length<3)throw new Error('Add at least three vertices before adding a face.');

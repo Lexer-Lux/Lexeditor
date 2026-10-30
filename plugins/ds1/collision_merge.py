@@ -2,6 +2,7 @@
 import json
 
 from .collision_write import CollisionDocument
+from . import collision_hull
 from .formats import FormatError
 
 
@@ -14,6 +15,7 @@ def _metadata(document):
         'hkpMeshShape::Subpart': {'numVertices','numTriangles'},
         'hkpStorageMeshShape::SubpartStorage': {'vertices','indices16','indices32'},
         'CustomMeshParameter': {'vertexDataBuffer'},
+        'hkpConvexVerticesShape': {'rotatedVertices','numVertices','planeEquations','connectivity','aabbCenter','aabbHalfExtents'},
     }
 
     def strip(value):
@@ -24,12 +26,16 @@ def _metadata(document):
             return [strip(item) for item in value]
         return value
 
-    values = [document.reader.item_objects(1), document._value(document.shape), document._value(document.code)]
+    values = [document.reader.item_objects(1), document._value(document.shape)]
+    if document.code is not None:
+        values.append(document._value(document.code))
     return json.dumps(strip(values), sort_keys=True, separators=(',', ':'))
 
 
 def _mesh(document, index):
     mesh = document.meshes[index]
+    if document.kind == 'convex':
+        return {'vertices':mesh['vertices'],'faces':mesh['faces'],'flags':[[] for _ in mesh['vertices']]}
     material = document._value(document.materials[index])
     stride, flags = material['vertexDataStride'], material['vertexDataBuffer'] or []
     if type(stride) is not int or not 0 <= stride <= 256 or len(flags) != len(mesh['vertices'])*stride:
@@ -103,7 +109,8 @@ def merge_states(original, prepared, *, conflicts_only=False):
             if before == after:
                 continue
             label = f'Collision mesh {index+1}'
-            if any(len(after[key]) != len(before[key]) for key in before):
+            kinds = ('vertices','flags') if base.kind == 'convex' else tuple(before)
+            if any(len(after[key]) != len(before[key]) for key in kinds):
                 previous = [owner for key, owner in owners.items() if key[0] == index]
                 if index in structural:
                     previous.append(structural[index])
@@ -121,7 +128,7 @@ def merge_states(original, prepared, *, conflicts_only=False):
                 current[index] = after
                 structural[index] = name
                 continue
-            for kind in before:
+            for kind in kinds:
                 for row_id, (old, new) in enumerate(zip(before[kind], after[kind])):
                     for component, (old_value, new_value) in enumerate(zip(old, new)):
                         if old_value == new_value:
@@ -132,6 +139,17 @@ def merge_states(original, prepared, *, conflicts_only=False):
                             conflict(f'{label}, {kind} {row_id}:{component}', [previous, name])
                         current[index][kind][row_id][component] = new_value
                         owners[key] = name
+    if base.kind == 'convex':
+        for index,mesh in enumerate(current):
+            try:
+                mesh['faces'] = collision_hull.build(mesh['vertices'])['faces']
+            except FormatError:
+                contributors = [name for name,_,values in prepared if values[index]['vertices'] != originals[index]['vertices']]
+                if len(contributors) < 2:
+                    raise
+                conflict(f'Collision mesh {index+1}',contributors)
+                mesh = next(values[index] for name,_,values in reversed(prepared) if name == contributors[-1])
+                current[index] = mesh
     updates = {i: _update(before, after) for i, (before, after) in enumerate(zip(originals, current))
                if before != after}
     return original if conflicts_only else base.export(updates), list(conflicts.items())

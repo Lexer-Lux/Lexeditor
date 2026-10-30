@@ -3,7 +3,7 @@ import base64
 import hashlib
 import math
 
-from . import collision_archive, collision_merge, hkx
+from . import collision_archive, collision_merge, collision_hull, hkx
 from .collision_write import CollisionDocument
 from .formats import FormatError
 
@@ -66,11 +66,12 @@ def create_state(first, last, values=None):
         # Verify that the writer can represent the metadata carried by this
         # contribution. Geometry is not compiled again just to export it.
         collision_merge._update(old, new)
-        if any(len(old[key]) != len(new[key]) for key in old):
+        kinds = ('vertices','flags') if first.kind == 'convex' else tuple(old)
+        if any(len(old[key]) != len(new[key]) for key in kinds):
             meshes.append({'id':index, 'before':old, 'after':new})
             continue
         fields = []
-        for kind in old:
+        for kind in kinds:
             for row, (a, b) in enumerate(zip(old[kind], new[kind])):
                 for component, (left, right) in enumerate(zip(a, b)):
                     if left != right:
@@ -78,7 +79,7 @@ def create_state(first, last, values=None):
                                        'before':left, 'after':right})
         if len(fields) > MAX_FIELDS:
             raise FormatError('Too many portable collision fields')
-        meshes.append({'id':index, 'counts':[len(old['vertices']), len(old['faces']), len(old['flags'])],
+        meshes.append({'id':index, 'counts':[len(old['vertices']),0 if first.kind == 'convex' else len(old['faces']),len(old['flags'])],
                        'fields':fields})
     return {'kind':'collisionMesh', 'layout':layout, 'meshes':meshes} if meshes else None
 
@@ -138,7 +139,7 @@ def open_member(original, spec):
             new = mesh['after']
         elif (set(mesh) == {'id', 'counts', 'fields'} and type(mesh['counts']) is list
                 and len(mesh['counts']) == 3 and all(type(v) is int for v in mesh['counts'])
-                and mesh['counts'] == [len(old['vertices']), len(old['faces']), len(old['flags'])]
+                and mesh['counts'] == [len(old['vertices']),0 if document.kind == 'convex' else len(old['faces']),len(old['flags'])]
                 and type(mesh['fields']) is list and len(mesh['fields']) <= MAX_FIELDS):
             new = {key:[list(row) for row in rows] for key, rows in old.items()}
             fields = set()
@@ -149,6 +150,8 @@ def open_member(original, spec):
                         or type(field['component']) is not int or not 0 <= field['component'] < len(old[field['kind']][field['row']])):
                     raise FormatError('Invalid portable collision field')
                 key = (field['kind'], field['row'], field['component'])
+                if document.kind == 'convex' and key[0] != 'vertices':
+                    raise FormatError('Convex faces and metadata cannot be authored independently of vertices')
                 if key in fields:
                     raise FormatError('Duplicate portable collision field')
                 fields.add(key)
@@ -161,6 +164,13 @@ def open_member(original, spec):
                 new[key[0]][key[1]][key[2]] = b
         else:
             raise FormatError('Portable collision element counts do not match installed data')
+        if document.kind == 'convex':
+            if any(new['flags']) or any(vertex[3] != 0 for vertex in new['vertices']):
+                raise FormatError('Convex collision has no stored vertex metadata')
+            expected = collision_hull.build(new['vertices'])['faces']
+            if set(mesh) == {'id','before','after'} and new['faces'] != expected:
+                raise FormatError('Convex collision faces must follow their vertices')
+            new = {**new,'faces':expected}
         _validate_mesh(new)
         if old != new:
             collision_merge._update(old, new)

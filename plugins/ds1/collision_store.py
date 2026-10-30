@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import struct
 
-from . import collision_archive, collision_edits, collision_merge, collision_mopp, deployment, record_edits
+from . import collision_archive, collision_edits, collision_hull, collision_merge, collision_mopp, deployment, record_edits
 from .collision_write import CollisionDocument
 from .formats import FormatError
 from .tweak_mods import checked
@@ -15,6 +15,7 @@ from .tweak_mods import checked
 MAX_OPEN_BYTES = 256 * 1024 * 1024
 POSITION_HELP = 'The vertex position inside the collision model. Each placement adds its own position and rotation.'
 METADATA_HELP = 'The purpose of this value is unknown. Keep it unless you know what the game expects.'
+CONVEX_FACE_HELP = 'Convex faces follow the outside of their vertices. Move, add or remove vertices to change these surfaces.'
 
 
 def _sha(data):
@@ -191,7 +192,8 @@ class CollisionStore:
             modified = created or mesh['vertices'][row] != vanilla['vertices'][row] or mesh['flags'][row] != vanilla['flags'][row]
             return {'table':table,'id':f'v:{row}','name':f'Vertex {row}','values':values,'display':{},
                     'created':created,'modified':modified}
-        values = dict(zip(('vertexA','vertexB','vertexC','metadata'),mesh['faces'][row]))
+        keys = ('vertexA','vertexB','vertexC','metadata') if state['document'].meshes[index]['face_metadata'] else ('vertexA','vertexB','vertexC')
+        values = dict(zip(keys,mesh['faces'][row]))
         display = {key:self._vertex_name(mesh,values[key]) for key in ('vertexA','vertexB','vertexC')}
         return {'table':table,'id':f'f:{row}','name':f'Face {row}','values':values,'display':display,
                 'created':created,'modified':created or mesh['faces'][row] != vanilla['faces'][row]}
@@ -202,6 +204,8 @@ class CollisionStore:
         _,_,_,state,mesh = self.mesh(map_name,model,layer,index)
         table = self.table(map_name,model,layer,index)
         return {'table':table,'rows':[self._listed(table,state,index,kind,i) for i in range(len(mesh[kind]))],
+                'derivedFaces':state['document'].kind == 'convex',
+                'faceEditReason':CONVEX_FACE_HELP if state['document'].kind == 'convex' else '',
                 'meshes':[{'id':i,'name':f'Mesh {i+1}','vertices':len(item['vertices']),'faces':len(item['faces'])}
                           for i,item in enumerate(state['working'])]}
 
@@ -245,6 +249,8 @@ class CollisionStore:
                 field.update(label=label,minimum=0,maximum=(1 << bits)-1 if kind == 'faces' else 255,description=METADATA_HELP)
             if key in old_values:
                 field['vanilla'] = old_values[key]
+            if state['document'].kind == 'convex' and kind == 'faces':
+                field.update(editable=False,protectedReason=CONVEX_FACE_HELP)
             fields.append(field)
         points = [mesh['vertices'][row]] if kind == 'vertices' else [mesh['vertices'][i] for i in mesh['faces'][row][:3]]
         transformed = state['document'].transformed_vertices(index,points)
@@ -316,6 +322,10 @@ class CollisionStore:
         state['dirty'] = {key for key in state['dirty'] if key[0] != index}
         before,after = state['baseline'][index],state['working'][index]
         for kind in before:
+            if kind == 'faces' and state['document'].kind == 'convex':
+                continue
+            if kind == 'flags' and not before['flags'][0]:
+                continue
             for row in range(max(len(before[kind]),len(after[kind]))):
                 if row >= min(len(before[kind]),len(after[kind])):
                     state['dirty'].add((index,kind,row))
@@ -346,6 +356,15 @@ class CollisionStore:
                 maximum = min(len(mesh['vertices'])-1,(1 << bits)-1) if component < 3 else (1 << bits)-1
             if type(value) is not int or not 0 <= value <= maximum:
                 raise FormatError('Collision index or metadata is outside its valid range')
+        if state['document'].kind == 'convex':
+            if kind != 'vertices':
+                raise FormatError(CONVEX_FACE_HELP)
+            vertices = [list(v) for v in mesh['vertices']]
+            vertices[row][component] = value
+            faces = collision_hull.build(vertices)['faces']
+            mesh['vertices'],mesh['faces'] = vertices,faces
+            self._recount(state,index)
+            return value
         mesh[kind][row][component] = value
         key = (index,kind,row,component)
         baseline = state['baseline'][index][kind]
@@ -359,6 +378,14 @@ class CollisionStore:
         self.writable()
         map_name,model,layer,index = self.parse_table(table)
         _,_,_,state,_ = self.mesh(map_name,model,layer,index)
+        if state['document'].kind == 'convex':
+            if type(value) is not dict or set(value) != {'vertices','faces','flags'}:
+                raise FormatError('Invalid convex collision state')
+            collision_edits._validate_mesh({**value,'faces':[[0,1,2,0]]})
+            faces = collision_hull.build(value['vertices'])['faces']
+            if value['vertices'] == state['working'][index]['vertices'] and value['faces'] != faces:
+                raise FormatError(CONVEX_FACE_HELP)
+            value = {**value,'faces':faces}
         collision_edits._validate_mesh(value)
         value = deepcopy(value)
         for vertex in value['vertices']:

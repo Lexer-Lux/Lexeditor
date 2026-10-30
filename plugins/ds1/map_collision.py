@@ -60,7 +60,8 @@ def preview_meshes(source):
     data = inflate(source) if source[:4] == b'DCX\0' else bytes(source)
     entries = hkx._peek_tables(data)
     names = [item['type'].name for item in entries if item['type'] is not None]
-    if sum(names.count(name) for name in ('CustomParamStorageExtendedMeshShape','CustomParamStorageMeshShape')) != 1 or names.count('hkpMoppCode') != 1:
+    convex = names.count('hkpConvexVerticesShape') == 1
+    if not convex and (sum(names.count(name) for name in ('CustomParamStorageExtendedMeshShape','CustomParamStorageMeshShape')) != 1 or names.count('hkpMoppCode') != 1):
         return meshes(source)
     document = CollisionDocument(source)
     return preview_document(document,document.meshes)

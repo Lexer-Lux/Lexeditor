@@ -160,9 +160,10 @@ def build_tag0(extra_data=0):
             tbod += _pack(_size) + _pack(4) + bytes([len(spec)])
             for fname, off, ftype in spec:
                 tbod += _pack(fields.index(fname)) + _pack(0) + _pack(off) + _pack(TIDS[ftype])
-        elif tag == 'vec4':
+        elif tag in ('vec4','fixed'):
             _size, sub = entry[2], entry[3]
-            tbod += _pack(TIDS[name]) + _pack(0) + _pack(11) + _pack(0x428)
+            count = entry[4] if tag == 'fixed' else 4
+            tbod += _pack(TIDS[name]) + _pack(0) + _pack(11) + _pack((count << 8)|0x28)
             tbod += _pack(TIDS[sub]) + _pack(_size) + _pack(4)
         elif tag == 'prim':
             _size, info = entry[2], entry[3]

@@ -2,8 +2,13 @@
 import math
 import struct
 
-from . import collision_mopp, hkx, hkx_write
+from . import collision_hull, collision_mopp, hkx, hkx_write
 from .formats import FormatError, deflate, inflate
+
+
+def _finite_vector(value, size):
+    return (isinstance(value,(list,tuple)) and len(value) == size
+            and all(type(v) in (int,float) and math.isfinite(v) for v in value))
 
 
 class CollisionDocument:
@@ -16,12 +21,36 @@ class CollisionDocument:
         self.reader = hkx._TagReader(self.data, 0, [], self.entries)
         self.patches, self.replacements = [], {}
         shapes = [entry for entry in self.entries if entry['type'] is not None
-                  and entry['type'].name in ('CustomParamStorageExtendedMeshShape','CustomParamStorageMeshShape')]
+                  and entry['type'].name in ('CustomParamStorageExtendedMeshShape','CustomParamStorageMeshShape','hkpConvexVerticesShape')]
         codes = [entry for entry in self.entries if entry['type'] is not None
                  and entry['type'].name == 'hkpMoppCode']
-        if len(shapes) != 1 or len(codes) != 1:
+        if len(shapes) != 1:
             raise FormatError('Collision editing needs one supported mesh and its spatial index')
         self.shape = (shapes[0]['type'], shapes[0]['pos'])
+        if self.shape[0].name == 'hkpConvexVerticesShape':
+            self.kind,self.code = 'convex',None
+            self.storage,self.parts,self.materials = [],[],[]
+            values = self._value(self.shape)
+            if not {'radius','aabbCenter','aabbHalfExtents','planeEquations','rotatedVertices','numVertices','connectivity'} <= values.keys():
+                raise FormatError('Convex collision is missing its geometry metadata')
+            if (type(values['radius']) not in (int,float) or not math.isfinite(values['radius']) or values['radius'] < 0
+                    or any(not _finite_vector(values[key],4) for key in ('aabbCenter','aabbHalfExtents'))
+                    or any(v < 0 for v in values['aabbHalfExtents'][:3])
+                    or not isinstance(values['planeEquations'],list) or not values['planeEquations']
+                    or any(not _finite_vector(plane,4) or sum(v*v for v in plane[:3]) == 0 for plane in values['planeEquations'])):
+                raise FormatError('Convex collision has invalid planes or bounds')
+            matrices,count = values['rotatedVertices'],values['numVertices']
+            if (type(count) is not int or not 3 <= count <= collision_hull.MAX_POINTS
+                    or not isinstance(matrices,list) or len(matrices) != (count+3)//4
+                    or any(not _finite_vector(matrix,12) for matrix in matrices)):
+                raise FormatError('Convex collision has invalid packed vertices')
+            vertices = [[matrix[axis*4+i] for axis in range(3)]+[0.]
+                        for matrix in matrices for i in range(4)][:count]
+            hull = collision_hull.build(vertices)
+            self.meshes = [{'vertices':vertices,'faces':hull['faces'],'index_field':'indices32','face_metadata':False}]
+            return
+        if len(codes) != 1:
+            raise FormatError('Collision editing needs one supported mesh and its spatial index')
         self.kind = 'extended' if self.shape[0].name == 'CustomParamStorageExtendedMeshShape' else 'mesh'
         self.code = (codes[0]['type'], codes[0]['pos'])
         self.storage = self._objects(self.shape, 'meshstorage' if self.kind == 'extended' else 'storage')
@@ -49,8 +78,7 @@ class CollisionDocument:
                 if (descriptor['vertexStriding'] != 12 or descriptor['indexStriding'] != 3*width
                         or descriptor['flipAlternateTriangles'] != 0):
                     raise FormatError('Collision mesh has an unsupported triangle stride')
-            if (not vertices or any(len(vertex) != 4 or any(type(value) not in (int,float)
-                    or not math.isfinite(value) for value in vertex) for vertex in vertices) or len(indices) % stride):
+            if not vertices or any(not _finite_vector(vertex,4) for vertex in vertices) or len(indices) % stride:
                 raise FormatError('Collision mesh has invalid triangle storage')
             if any(type(value) is not int or not 0 <= value < len(vertices)
                    for at in range(0,len(indices),stride) for value in indices[at:at+3]):
@@ -107,6 +135,23 @@ class CollisionDocument:
             raise FormatError('Added collision elements need an existing element to copy metadata from')
         return found
 
+    def _bounds(self, groups, padding=0.):
+        center = list(self._value(self._field(self.shape,'aabbCenter')))
+        half = list(self._value(self._field(self.shape,'aabbHalfExtents')))
+        for axis in range(3):
+            low = min(point[axis] for points in groups for point in points)
+            high = max(point[axis] for points in groups for point in points)
+            center[axis] = collision_mopp._float32((high+low)/2)
+            wanted = max(high-center[axis],center[axis]-low)+padding
+            half[axis] = collision_mopp._float32(wanted)
+            if half[axis] < wanted:
+                bits = struct.unpack('<I',struct.pack('<f',half[axis]))[0]+1
+                half[axis] = struct.unpack('<f',struct.pack('<I',bits))[0]
+                if not math.isfinite(half[axis]):
+                    raise FormatError('Collision bounds exceed the supported range')
+        self._patch(self.shape,'aabbCenter',center)
+        self._patch(self.shape,'aabbHalfExtents',half)
+
     def export(self, updates):
         """updates maps mesh indices to vertices/faces and metadata source IDs.
 
@@ -118,6 +163,8 @@ class CollisionDocument:
         if any(type(i) is not int or not 0 <= i < len(self.meshes) for i in updates):
             raise FormatError('Unknown collision mesh')
         self.patches, self.replacements = [], {}
+        if self.kind == 'convex':
+            return self._export_convex(updates[0])
         welding = self._value(self._field(self.shape, 'weldingInfo'))
         if welding:
             raise FormatError('This collision uses welded edges that need regeneration before editing')
@@ -204,13 +251,8 @@ class CollisionDocument:
         code, offset = collision_mopp.build(world, radius=radius, subpart_bits=bits)
         self._array(self.code, 'data', code, len(code))
         self._patch(self._field(self.code, 'info'), 'offset', offset)
-        for name, vector in ((('aabbCenter', [0]*4), ('aabbHalfExtents', [0]*4)) if self.kind == 'extended' else ()):
-            for axis in range(3):
-                low = min(point[axis] for vertices, _ in world for point in vertices)
-                high = max(point[axis] for vertices, _ in world for point in vertices)
-                vector[axis] = (high+low)/2 if name == 'aabbCenter' else (high-low)/2+radius
-            self._patch(self.shape, name, vector)
         if self.kind == 'extended':
+            self._bounds([vertices for vertices,_ in world],radius)
             self._patch(self.shape, 'cachedNumChildShapes', sum(len(faces) for _, faces in final))
         result = hkx_write.replace_items(self.data, self.replacements, self.patches)
         # Read the edited geometry before handing it to any project writer.
@@ -219,6 +261,8 @@ class CollisionDocument:
 
     def transformed_vertices(self, index, vertices):
         """The same subpart transform for drawing and collision compilation."""
+        if self.kind == 'convex':
+            return [tuple(vertex[:3]) for vertex in vertices]
         if self.kind == 'mesh':
             scale = self._value(self._field(self.shape,'scaling'))
             if len(scale) != 4 or any(not math.isfinite(value) for value in scale):
@@ -239,3 +283,31 @@ class CollisionDocument:
                            y+qw*ty+qz*tx-qx*tz+translation[1],
                            z+qw*tz+qx*ty-qy*tx+translation[2]))
         return points
+
+    def _export_convex(self, update):
+        vertices = [[collision_mopp._float32(v) for v in row[:3]]+[0.]
+                    for row in update.get('vertices',self.meshes[0]['vertices'])]
+        hull = collision_hull.build(vertices)
+        if 'faces' in update and update['faces'] != [face[:3] for face in hull['faces']]:
+            raise FormatError('Convex collision faces follow their vertices')
+        if any(update.get('face_tags',())) or any(any(row) for row in update.get('vertex_flags',())):
+            raise FormatError('This convex collision has no vertex or face metadata')
+        packed = []
+        for at in range(0,len(vertices),4):
+            group = vertices[at:at+4]
+            group += [group[-1]]*(4-len(group))
+            packed.extend(v[axis] for axis in range(3) for v in group)
+        self._array(self.shape,'rotatedVertices',struct.pack('<'+str(len(packed))+'f',*packed),(len(vertices)+3)//4)
+        planes = [value for plane in hull['planes'] for value in plane]
+        self._array(self.shape,'planeEquations',struct.pack('<'+str(len(planes))+'f',*planes),len(hull['planes']))
+        self._patch(self.shape,'numVertices',len(vertices))
+        self._bounds([vertices])
+        # Connectivity is an optional derived cache, not a second editable
+        # topology. Let the game rebuild it instead of retaining stale edges.
+        kind,at = self._field(self.shape,'connectivity')
+        if kind.kind != hkx.PTR:
+            raise FormatError('Convex collision has an unsupported connectivity field')
+        self.patches.append((at,bytes(kind.resolve_size())))
+        raw = hkx_write.replace_items(self.data,self.replacements,self.patches)
+        CollisionDocument(raw)
+        return deflate(self.source,raw) if self.source[:4] == b'DCX\0' else raw
