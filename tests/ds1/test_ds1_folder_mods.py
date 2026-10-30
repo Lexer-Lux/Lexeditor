@@ -592,9 +592,12 @@ def test_standalone_data_merger_combines_records_and_disables_only_broken_mod(tm
 
 @pytest.mark.skipif(os.name != 'nt', reason='Windows private runtime')
 def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path):
-    from plugins.ds1 import runtime_package,record_edits
+    from plugins.ds1 import runtime_package,record_edits,esd,formats
     from dataclasses import replace
     from test_ds1_editor_failure_boundaries import event_fixture
+    from copy import deepcopy
+    from test_ds1_talk_composition import fixture as talk_fixture
+    from test_ds1_menu_scripts import archive as talk_archive
     from plugins.ds1.store import RELATIVE
     from ds1_fixture import make_archive
     supplied = os.environ.get('LEXEDITOR_TEST_LOADER_PACKAGE')
@@ -612,6 +615,13 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
                        emevd.Event(identity,(emevd.Instruction(2003,1,b'new'),))))
     (game/event_path).parent.mkdir(parents=True)
     (game/event_path).write_bytes(emevd.write(add_event(2000)))
+    talk_base = talk_fixture()
+    talk_original = talk_archive({'bonfire.esd':talk_base.to_bytes(),'keep.bin':b'original'})
+    talk_path = Path('script/talk/test.talkesdbnd.dcx')
+    foreign_talk = deepcopy(talk_base)
+    foreign_talk.state_groups[1][0].conditions[0].target_state = 0
+    (game/talk_path).parent.mkdir(parents=True)
+    (game/talk_path).write_bytes(talk_archive({'bonfire.esd':foreign_talk.to_bytes(),'keep.bin':b'foreign'}))
     from plugins.ds1.formats import ItemDocument
     for mod_id,row_id,price in [('first',100,12),('second',101,24),('broken',102,36)]:
         folder = library/mod_id
@@ -625,14 +635,25 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
         else:
             portable = record_edits.create(RELATIVE,make_archive(),document.export())
             event = record_edits.create(event_path,emevd.write(event_base),emevd.write(add_event(row_id+901)))
-            (folder/record_edits.FILENAME).write_bytes(record_edits.encode({RELATIVE:portable,event_path:event}))
+            authored_talk = deepcopy(talk_base)
+            if row_id==100:
+                authored_talk.state_groups[1][1].entry_commands[0].args[0] = esd.assemble('1')
+            else:
+                authored_talk.state_groups[1][0].conditions[0].evaluator = esd.assemble('f23() == 12')
+            talk = record_edits.create(talk_path,talk_original,
+                talk_archive({'bonfire.esd':authored_talk.to_bytes(),'keep.bin':b'original'}))
+            encoded = record_edits.encode({RELATIVE:portable,event_path:event,talk_path:talk})
+            if not encoded.startswith(record_edits.PACKED_MAGIC):
+                encoded = record_edits.PACKED.pack(record_edits.PACKED_MAGIC,len(encoded))+record_edits.zlib.compress(encoded)
+            (folder/record_edits.FILENAME).write_bytes(encoded)
         (folder/'script').mkdir()
         (folder/'script/tweak.py').write_text('raise RuntimeError("Players never run builders")')
     foreign = ItemDocument(make_archive())
     foreign.edit('EquipParamGoods',100,'iconId',77)
     (game/RELATIVE).write_bytes(foreign.export())
     runtime = package/'lexeditor-runtime'
-    env = {**os.environ,'PYTHONHOME':str(tmp_path/'Not installed'),'PYTHONPATH':str(tmp_path/'No editor')}
+    env = {**os.environ,'PYTHONHOME':str(tmp_path/'Not installed'),'PYTHONPATH':str(tmp_path/'No editor'),
+           'LOCALAPPDATA':str(tmp_path/'private cache')}
     import ctypes
     from ctypes import wintypes
     kernel = ctypes.WinDLL('kernel32',use_last_error=True)
@@ -656,6 +677,15 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     assert merged.value('EquipParamGoods',101,'sellValue') == 24
     assert merged.value('EquipParamGoods',100,'iconId') == 77
     assert {event.id for event in emevd.read((game/event_path).read_bytes()).events} == {0,100,1001,1002,2000}
+    talk_plain = formats.inflate((game/talk_path).read_bytes())
+    owned = formats.members(talk_plain)
+    member = owned['bonfire.esd']
+    combined_talk = esd.parse(talk_plain[member.offset:member.offset+member.size])
+    assert combined_talk.state_groups[1][1].entry_commands[0].args[0] == esd.assemble('1')
+    assert combined_talk.state_groups[1][0].conditions[0].evaluator == esd.assemble('f23() == 12')
+    assert combined_talk.state_groups[1][0].conditions[0].target_state == 0
+    member = owned['keep.bin']
+    assert talk_plain[member.offset:member.offset+member.size] == b'foreign'
 
 
 def test_standalone_menu_failure_disables_only_its_owner(tmp_path, monkeypatch):

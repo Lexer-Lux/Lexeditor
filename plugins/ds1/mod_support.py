@@ -98,8 +98,8 @@ class Ds1ModAdapter:
 
     @staticmethod
     def _report_path() -> Path:
-        from core.runtime_bootstrap import user_data_dir
-        return user_data_dir() / "cache/ds1/mod-conflicts.json"
+        from . import composition_cache
+        return composition_cache.user_root()/'mod-conflicts.json'
 
     def attach_context(self, *, project_root=None, library_root=None, game_root=None) -> None:
         values = {"projectRoot": project_root, "libraryRoot": library_root, "gameRoot": game_root}

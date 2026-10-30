@@ -145,7 +145,9 @@ def prepare(game, rows):
                 raise ModBuildError([row['path']],f"{row['name']}: required prebuilt data is missing; rebuild or reinstall this mod")
         except (ValueError,OSError) as error:
             raise ModBuildError([row['path']],f"{row['name']}: {error}") from error
-    composition = mod_loader.compose_installed(game,data)
+    from . import composition_cache
+    cache_root = composition_cache.user_root()
+    composition = mod_loader.compose_installed(game,data,cache_root=cache_root)
     layouts = _specs(rows,'layout',menu_layout.validate)
     scripts = _specs(rows,'esd',menu_scripts.validate)
     dims = _specs(rows,menu_dim.FOLDER,menu_dim.validate)
@@ -159,7 +161,7 @@ def prepare(game, rows):
         current, manifest = tweak_mods._installed(game,managed,'restore it before applying mods')
         original = tweak_mods._original(game,current,manifest,managed)
         try:
-            after = tweak_mods._compose_menu(original,specs,managed,None,current=current,manifest=manifest)
+            after = tweak_mods._compose_menu(original,specs,managed,cache_root,current=current,manifest=manifest)
         except ValueError as error:
             folders = getattr(error,'folders',())
             if not folders:

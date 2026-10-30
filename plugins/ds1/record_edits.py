@@ -1,28 +1,33 @@
 """Portable record contributions, rebased through the existing archive adapters.
 
-The release stores only changed PARAM rows, FMG entries and EMEVD events, with
-their old values as anchors. Materialization preserves unrelated installed fields and
-feeds ordinary archives into the same composer used by the editor.
+The release stores changed PARAM rows, FMG entries, EMEVD events and ESD
+states/members, with old values as anchors. Materialization preserves unrelated
+installed data and feeds ordinary archives into the editor's shared composer.
 """
 import json
 import struct
 import base64
 import hashlib
+import zlib
 from functools import lru_cache
 from pathlib import Path
 
 from core.mod_library import relative_path
-from . import formats, texts
+from . import formats, texts, script_edits, binder_edits
 
 FILENAME = Path('records.lxd')
 LIMIT = 64 * 1024 * 1024
+DECODED_LIMIT = 256 * 1024 * 1024
+PACKED = struct.Struct('<8sI')
+PACKED_MAGIC = b'LXD1REC\0'
 MAX_ROWS = 100000
 
 
 def supports(relative):
     from .mod_loader import FILES
     from . import emevd
-    return relative in FILES or emevd.is_event_file(relative)
+    return (relative in FILES or emevd.is_event_file(relative)
+            or script_edits.supported(relative) or binder_edits.supported(relative))
 
 
 @lru_cache(maxsize=128)
@@ -53,14 +58,31 @@ def read(path):
 def encode(files):
     raw = json.dumps({'version':1,'files':{str(key).replace('\\','/'):value for key,value in files.items()}},
                      ensure_ascii=False,separators=(',',':'),allow_nan=False).encode('utf-8')
-    if len(raw) > LIMIT:
-        raise ValueError('The record contributions exceed 64 MiB')
-    return raw
+    if len(raw) > DECODED_LIMIT:
+        raise ValueError('The decoded record contributions exceed 256 MiB')
+    packed = PACKED.pack(PACKED_MAGIC,len(raw))+zlib.compress(raw,6) if len(raw)>65536 else raw
+    if len(packed)>LIMIT:
+        raise ValueError('The packed record contributions exceed 64 MiB')
+    return packed
 
 
 def decode(raw):
     if len(raw) > LIMIT:
         raise ValueError('The record contributions exceed 64 MiB')
+    if raw.startswith(PACKED_MAGIC):
+        if len(raw)<PACKED.size:
+            raise ValueError('The packed record header is incomplete')
+        _magic,size = PACKED.unpack_from(raw)
+        if size>DECODED_LIMIT:
+            raise ValueError('The decoded record contributions exceed 256 MiB')
+        try:
+            decoder = zlib.decompressobj()
+            unpacked = decoder.decompress(raw[PACKED.size:],size+1)
+        except zlib.error as error:
+            raise ValueError('The packed record contributions are damaged') from error
+        if (len(unpacked)!=size or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail):
+            raise ValueError('The packed record contribution lengths do not match')
+        raw = unpacked
     def unique(pairs):
         result = {}
         for key,value in pairs:
@@ -68,7 +90,9 @@ def decode(raw):
                 raise ValueError('Duplicate record contribution key')
             result[key] = value
         return result
-    value = json.loads(raw,object_pairs_hook=unique)
+    def invalid_constant(_value):
+        raise ValueError('Non-finite numbers are not portable record data')
+    value = json.loads(raw,object_pairs_hook=unique,parse_constant=invalid_constant)
     if (type(value) is not dict or set(value) != {'version','files'}
             or type(value['version']) is not int or value['version'] != 1
             or type(value['files']) is not dict or len(value['files']) > 128):
@@ -107,6 +131,10 @@ def validate_original(relative,original):
     from . import emevd,mod_loader
     if emevd.is_event_file(relative):
         _event_document(original)
+    elif script_edits.supported(relative):
+        script_edits.validate_original(original)
+    elif binder_edits.supported(relative):
+        binder_edits.validate_original(original)
     elif relative == mod_loader.RELATIVE:
         _plain,entries = _entries(original)
         for entry in entries:
@@ -122,6 +150,10 @@ def create(relative,before,after):
     from . import emevd
     if emevd.is_event_file(relative):
         return _create_events(before,after)
+    if script_edits.supported(relative):
+        return script_edits.create(before,after)
+    if binder_edits.supported(relative):
+        return binder_edits.create(before,after)
     if relative == mod_loader.RELATIVE:
         _base,originals = _entries(before)
         _changed,modified = _entries(after)
@@ -202,6 +234,10 @@ def materialize(relative,original,spec):
     from . import emevd
     if emevd.is_event_file(relative):
         return _materialize_events(original,spec)
+    if script_edits.supported(relative):
+        return script_edits.materialize(original,spec,talk_options=relative.parts[0].lower()!='chr')
+    if binder_edits.supported(relative):
+        return binder_edits.materialize(original,spec)
     kind = 'params' if relative == mod_loader.RELATIVE else 'texts'
     if (type(spec) is not dict or set(spec) != {'kind','tables'} or spec['kind'] != kind
             or type(spec['tables']) is not list or len(spec['tables']) > 4096):
@@ -310,9 +346,22 @@ def _event_document(data):
 
 
 def describe(files):
-    """Identity-level changes already carried by portable event records."""
+    """Identity-level changes already carried by portable script/event records."""
     changes = []
     for relative,spec in files.items():
+        if spec.get('kind') == 'esd':
+            changes += script_edits.describe(spec,f'ESD ({relative.name})')
+            continue
+        if spec.get('kind') == 'binder':
+            for member in spec['members']:
+                after = member['after']
+                name = member['name'].replace('\\','/').rsplit('/',1)[-1]
+                if after is not None and after.get('kind') == 'esd':
+                    changes += script_edits.describe(after['edits'],f'{relative.name}/{name}')
+                else:
+                    changes.append({'table':relative.name,'id':member['id'],'label':name,
+                        'fields':['Archive member'],'added':member['beforeHash'] is None,'removed':after is None})
+            continue
         if spec.get('kind') != 'events':
             continue
         for change in _changes(spec.get('rows')):

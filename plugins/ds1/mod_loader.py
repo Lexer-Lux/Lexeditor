@@ -45,7 +45,7 @@ import zlib
 
 from plugins.ds3.formats import DS3FormatError, ParamView
 
-from . import assets, texts, emevd
+from . import assets, texts, emevd, composition_cache
 from .formats import FormatError, MAX_ARCHIVE, TABLES, deflate, inflate, members, pack, schema
 from .msb import MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError
 from .store import MARKER, RELATIVE
@@ -244,11 +244,12 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
     """Load every mod's original assets before composing the enabled set."""
     paths = frozenset(name for mod in mods for name in (mod.files.keys()|mod.edits.keys()))
     originals = vanilla_files(game_root, paths)
-    mods = [materialize_mod(mod,originals) for mod in mods]
     files, conflicts = {}, []
     for relative in sorted(paths):
-        selected = [Mod(mod.name, mod.folder, {relative: mod.files[relative]})
-                    for mod in mods if relative in mod.files]
+        selected = [Mod(mod.name,mod.folder,
+                        {relative:mod.files[relative]} if relative in mod.files else {},
+                        {relative:mod.edits[relative]} if relative in mod.edits else {})
+                    for mod in mods if relative in mod.files or relative in mod.edits]
         try:
             result = _compose_file(relative, originals.get(relative), selected, conflicts_only, cache_root)
         except Exception as error:
@@ -307,7 +308,7 @@ def _composition_revision():
                Path(__file__).parents[1] / 'ds3/formats.py',
                *(path for path in METADATA.rglob('*') if path.suffix in ('.xml', '.json'))]
     for path in sorted(sources):
-        digest.update(str(path).encode('utf-8'))
+        digest.update(path.relative_to(Path(__file__).parents[2]).as_posix().encode('utf-8'))
         digest.update(path.read_bytes())
     return digest.digest()
 
@@ -320,10 +321,28 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
     """
     global _compose_cache_bytes
     digest = sha256()
-    for blob in [bytes([original is not None]), original or b''] + [
-            blob for mod in mods for blob in (mod.name.encode('utf-8'), mod.files[relative])]:
-        digest.update(len(blob).to_bytes(8, 'little'))
+    def chunk(blob):
+        digest.update(len(blob).to_bytes(8,'little'))
         digest.update(blob)
+    chunk(bytes([original is not None]))
+    chunk(original or b'')
+    for mod in mods:
+        chunk(mod.name.encode('utf-8'))
+        if relative in mod.edits:
+            if relative in mod.files:
+                from core.mod_builds import ModBuildError
+                raise ModBuildError([mod.folder],f'{mod.name}: duplicate archive and record contributions')
+            try:
+                encoded = json.dumps(mod.edits[relative],sort_keys=True,
+                                     separators=(',',':'),allow_nan=False).encode('utf-8')
+            except (ValueError,TypeError,RecursionError) as error:
+                from core.mod_builds import ModBuildError
+                raise ModBuildError([mod.folder],f'{mod.name}: invalid portable records ({error})') from error
+            chunk(b'portable-records')
+            chunk(encoded)
+            del encoded
+        else:
+            chunk(mod.files[relative])
     key = (relative, conflicts_only, digest.digest())
     with _compose_cache_lock:
         cached = _compose_cache.get(key)
@@ -332,7 +351,6 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
     remember = cached is None
     disk_key = None
     if cached is None and cache_root is not None and not conflicts_only:
-        from . import composition_cache
         try:
             disk_key = sha256(_composition_revision() + relative.as_posix().encode('utf-8') + digest.digest()).digest()
             payload = composition_cache.load(cache_root, disk_key)
@@ -352,7 +370,9 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
         except Exception:
             pass
     if cached is None:
-        result = compose({relative: original} if original is not None else {}, mods,
+        originals = {relative:original} if original is not None else {}
+        prepared = [materialize_mod(mod,originals) if mod.edits else mod for mod in mods]
+        result = compose(originals, prepared,
                          conflicts_only=conflicts_only)
         data = result.files.get(relative)
         rows = tuple((c.file, c.part, tuple(c.mods)) for c in result.conflicts)
@@ -374,7 +394,7 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
                 _compose_cache_bytes -= previous[2]
             _compose_cache[key] = cached
             _compose_cache_bytes += cached[2]
-            while _compose_cache_bytes > _COMPOSE_CACHE_LIMIT or len(_compose_cache) > 64:
+            while _compose_cache_bytes > _COMPOSE_CACHE_LIMIT or len(_compose_cache) > composition_cache.ENTRIES:
                 _, evicted = _compose_cache.popitem(last=False)
                 _compose_cache_bytes -= evicted[2]
     data, rows, _ = cached

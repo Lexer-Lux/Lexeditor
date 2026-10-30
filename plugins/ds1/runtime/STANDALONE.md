@@ -50,7 +50,15 @@ Event archives also carry only changed EMEVD event records. Their unchanged
 string/link pools are anchored, independent constructor additions use the
 existing event merger, and foreign records and appended pools are preserved.
 Changes requiring relocation of opaque string arguments are refused at export.
-The format is bounded, versioned data and cannot execute a builder.
+Loose ESDs and talk/menu script binders carry changed states, commands,
+conditions and member records. They use the existing structural ESD merger;
+unrelated installed states, members and file metadata survive. Missing anchors,
+conflicting changes or dangling final transitions refuse that mod before writes.
+These changes also appear in the shared Records view.
+
+Large record files use a bounded compressed envelope (64 MiB stored, 256 MiB
+decoded); older JSON record files remain readable. This is versioned data and
+cannot execute a builder.
 
 Prepare the common loader package separately:
 
@@ -87,6 +95,13 @@ Runtime logs and composition reports are bounded. `lexeditor-ds1-load.json`
 records data preparation and disabled mods; `lexeditor-ds1-patch.log` records
 native loading. Data-dependent native modules do not load if preparation fails.
 
+Editor and standalone composition share the bounded archive cache. A cache
+hit skips portable-record materialization and archive rebuilding. Disk holds
+at most 512 outputs and 512 MiB of payload; the memory cache stays at 128 MiB.
+Corrupt, oversized or incompatible disposable databases are recreated. A busy
+database is left alone, and cache failures fall back to normal composition.
+Source identity is independent of where the same engine is installed.
+
 Declarative layout and menu-command edits can start from another author's
 structurally valid installed menu. Its exact bytes become the preserved
 baseline, verified by the ownership journal; disabling these edits restores
@@ -96,5 +111,5 @@ never overwritten. An unowned backup that disagrees with the installed file
 also needs reconciliation before either copy can be replaced.
 
 This implements the current drop-in/install/adopt workflow. Older issue #954's
-C-only port and rebasing the remaining map/character/script archive contributions over unrelated whole-file mods
+C-only port and rebasing the remaining map/character archive contributions over unrelated whole-file mods
 are separate requirements; this implementation does not claim those completed.

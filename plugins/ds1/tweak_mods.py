@@ -424,9 +424,7 @@ class BuildContext:
                     return None
                 mods = mod_loader.active_mods(self._library_root or mods_root(), only=frozenset({mod_loader.RELATIVE}))
                 original = source.read_bytes()
-                mods = [mod_loader.materialize_mod(mod,{mod_loader.RELATIVE:original}) for mod in mods]
-                selected = [mod_loader.Mod(mod.name, mod.folder, {mod_loader.RELATIVE: mod.files[mod_loader.RELATIVE]})
-                            for mod in mods if mod_loader.RELATIVE in mod.files]
+                selected = mods  # active_mods already filtered both archives and edits to GameParam.
                 combined = mod_loader._compose_file(mod_loader.RELATIVE, original, selected, False, self._cache_root)
                 self._params = combined.files.get(mod_loader.RELATIVE, original)
             except script_mods.ModBuildError:
