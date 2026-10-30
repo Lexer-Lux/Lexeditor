@@ -2257,7 +2257,8 @@ async function duplicateRow(kind){
   if(kind==="message")return duplicateMessage();
   if(state.rowBusy||!state.row)return;
   const placement=kind==="placement"||kind==="light";
-  state.rowBusy=true;render();
+  state.rowBusy=true;
+  if(state.tab==="maps")refreshMapsDetail();else render();
   try{
     const result=placement?await api("/api/placements/add",{map:state.row.table,id:state.row.id})
       :await api("/api/rows/add",{table:state.row.table,id:state.row.id});
@@ -2282,7 +2283,8 @@ async function removeRow(kind){
     message:(placement?"The placement leaves the map. Its bytes stay in the file, unused."
       :"The record leaves its table. Anything that points at it will point at nothing.")+impact,
     confirmLabel:"Remove",cancelLabel:"Cancel"}))return;
-  state.rowBusy=true;render();
+  state.rowBusy=true;
+  if(state.tab==="maps")refreshMapsDetail();else render();
   try{
     const result=placement?await api("/api/placements/remove",{map:state.row.table,id:state.row.id})
       :await api("/api/rows/remove",{table:state.row.table,id:state.row.id});

@@ -332,7 +332,7 @@ class MsbDocument:
                           if event['type'] == MESSAGE_EVENT}
 
     def placements(self):
-        """Enemy, object and player-start parts in file order."""
+        """Map instances, regions and supported events in file order."""
         result = []
         for part in self.parts:
             if part['type'] not in PLACEMENT_TYPES:
@@ -355,20 +355,11 @@ class MsbDocument:
         return result
 
     def view_parts(self):
-        """Every part with its model, for the viewport. Collision and
-        navigation geometry is world-baked Havok data, so those parts
-        carry counts, never meshes."""
+        """Every part and region, with the geometry data needed by the viewport."""
         result = []
         for part in self.parts:
             model = self.models[part['model']]
-            if part['type'] in TYPE_LABELS:
-                kind = TYPE_LABELS[part['type']]
-            elif part['type'] in (5, 11):
-                kind = 'Collision'
-            elif part['type'] == 8:
-                kind = 'Navigation'
-            else:
-                kind = 'Map piece' if part['type'] == 0 else 'Part'
+            kind = TYPE_LABELS[part['type']]
             result.append({'id': part['id'], 'type': part['type'], 'kind': kind,
                            'name': part['name'], 'model': model['name'],
                            'pos': tuple(part['pos']), 'rot': tuple(part['rot']),

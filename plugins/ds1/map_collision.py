@@ -79,8 +79,10 @@ def sources(game_root, project, map_name, model_name):
                 yield layer, header, body, name
 
 
-@functools.lru_cache(maxsize=128)
+@functools.lru_cache(maxsize=32)
 def _directory(path, stamp):
+    if stamp[1] > 2*1024*1024:
+        raise FormatError('Collision archive directory is too large')
     return bhf.parse_bhf(Path(path).read_bytes(), suffix='.hkx')
 
 
@@ -89,6 +91,8 @@ def geometry(game_root, project, map_name, model_name):
     for layer, header, body, name in sources(game_root, project, map_name, model_name):
         try:
             if body is None:
+                if header.stat().st_size > hkx.MAX_FILE:
+                    raise FormatError('Collision file is too large')
                 raw = header.read_bytes()
             else:
                 stat = header.stat()

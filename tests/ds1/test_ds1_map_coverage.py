@@ -83,6 +83,7 @@ def test_create_all_supported_event_kinds_and_light_lifecycle():
     clone = msb_events.duplicate(doc, ('event0', light['seq']))
     doc.edit_light(('light', int(clone['key'].split(':')[1])), 'posX', 42.)
     assert doc.read_light(('light', int(clone['key'].split(':')[1])))['fields'][0]['value'] == 42
+    assert doc.read_light(('light', light['seq']))['fields'][0]['value'] == 1
     msb_events.remove(doc, ('event0', int(clone['key'].split(':')[1])))
     assert len(MsbDocument(doc.export()).lights()) == 1
 
@@ -198,6 +199,14 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path):
                 control.fill('10')
                 control.press('Tab')
                 page.wait_for_function('state.pending===0 && state.row.fields.find(f=>f.key==="width").value===10')
+                page.evaluate('fieldHistory.undo()')
+                page.wait_for_function('state.pending===0 && state.row.fields.find(f=>f.key==="width").value===5')
+                created = page.evaluate('api("/api/placements/create",{map:"m10_02_00_00.msb",model:"@event:0",pos:[0,1,0],rot:[0,0,0]})')
+                page.evaluate('(id)=>reloadViewport("m10_02_00_00.msb",id)', created['row']['id'])
+                page.wait_for_function('state.row?.kind==="Light" && state.selected.endsWith("light:0")')
+                page.locator('[data-row-action="duplicate"][data-row-kind="light"]').click()
+                page.wait_for_function('!state.rowBusy')
+                assert page.evaluate('state.row?.id') == 'light:1', page.evaluate('({selected:state.selected,row:state.row,body:document.body.innerText.slice(-1800)})')
                 assert not errors, errors
             finally:
                 browser.close()

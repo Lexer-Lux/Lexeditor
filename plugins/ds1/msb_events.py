@@ -131,6 +131,11 @@ def duplicate(doc, key):
     etype = item['type']
     common = bytearray(doc.plain[item['ahead']:item['ahead']+16])
     struct.pack_into('<i', common, 8, -1)
+    if etype == 0:
+        point = doc.points[item['point']]
+        region = doc.add_region(('region', point['index']))
+        index = next(i for i, point in enumerate(doc.points) if point['index'] == region['partId'])
+        struct.pack_into('<i', common, 4, index)
     return insert(doc, etype, item['name'], common,
                   bytes(doc.plain[item['bhead']:item['bhead']+SIZES[etype]]))
 

@@ -918,6 +918,8 @@ def model_geometry(game_root, project, map_name, model, known=None):
         resolved = resolve_model(game_root, project, map_name, model)
         if resolved[0] == 'skip':
             raise FlverError(resolved[1])
+        if Path(resolved[1]).stat().st_size > MAX_GEOMETRY:
+            raise FlverError('Navigation binder is too large')
         plain = inflate(Path(resolved[1]).read_bytes())
         entries = members(plain)
         lookup = entries if isinstance(entries, dict) else {entry.name: entry for entry in entries}
@@ -1229,7 +1231,10 @@ def map_view(mapstore, map_name):
     doc = mapstore.get(map_name)
     models = {}
     for model in doc.models:
-        resolved = resolve_model(mapstore.game_root, mapstore.project, map_name, model)
+        try:
+            resolved = resolve_model(mapstore.game_root, mapstore.project, map_name, model)
+        except (FormatError, OSError, ValueError) as error:
+            resolved = ('skip', str(error))
         models[model['name']] = {'type': model['type'], 'available': resolved[0] != 'skip',
                                   'reason': '' if resolved[0] != 'skip' else resolved[1]}
     parts = []
