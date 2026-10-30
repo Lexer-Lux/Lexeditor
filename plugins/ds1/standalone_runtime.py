@@ -76,6 +76,20 @@ def _requires_data(folder):
     return magic == MAGIC and version == VERSION and values[-1] == 1
 
 
+def _fixed_modules(rows):
+    from . import runtime_mods
+    modules = []
+    for row in rows:
+        try:
+            with (row['path']/runtime_mods.FILENAME).open('rb') as stream:
+                header = stream.read(runtime_mods.HEADER.size)
+            if len(header) == runtime_mods.HEADER.size and runtime_mods.HEADER.unpack(header)[-2] == 1:
+                modules.append(runtime_mods.read(row['path']))
+        except (OSError,ValueError):
+            pass  # The native scanner diagnoses/skips this module independently.
+    return modules
+
+
 def _identity(rows, game, targets):
     paths, contributors = [], []
     for row in rows:
@@ -105,7 +119,10 @@ def _identity(rows, game, targets):
         else:
             value = _stamp(path)
         stamped.append([str(path),value])
-    payload = [mod_loader._composition_revision().hex(), contributors, project, stamped]
+    from . import runtime_mods
+    allocations = [[rva,size] for data in _fixed_modules(rows)
+                   for kind,rva,size,_ in runtime_mods.inspect(data)['records'] if kind == exe_patches.BLOCK]
+    payload = [mod_loader._composition_revision().hex(), contributors, project, stamped, allocations]
     return hashlib.sha256(json.dumps(payload,separators=(',',':')).encode()).hexdigest()
 
 
@@ -166,9 +183,7 @@ def prepare(game, rows):
     if support:
         executable = deployment.vanilla_source(game,Path(exe_patches.EXECUTABLE)).read_bytes()
         from . import runtime_mods
-        modules = [runtime_mods.read(Path(row['path'])) for row in rows
-                   if (Path(row['path'])/runtime_mods.FILENAME).is_file()]
-        patch = runtime_mods.shared_patch(executable,support,modules) or b''
+        patch = runtime_mods.shared_patch(executable,support,_fixed_modules(rows)) or b''
     else:
         patch = b''
     return data, composition, files, patch, record

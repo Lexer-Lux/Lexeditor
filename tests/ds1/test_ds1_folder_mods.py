@@ -72,6 +72,22 @@ def test_shared_support_links_beyond_independently_built_fixed_mod(vanilla):
     assert hook[1]+5+struct.unpack_from('<i',hook[3],hook[2]+1)[0] == block[1]+4
 
 
+def test_standalone_cache_tracks_fixed_allocations_and_ignores_broken_native_siblings(vanilla,tmp_path):
+    from plugins.ds1 import standalone_runtime
+    folder = tmp_path/'fixed'
+    folder.mkdir()
+    row = {'path':folder,'id':'fixed','name':'Fixed'}
+    baseline = standalone_runtime._identity([],tmp_path,[])
+    fixed_spec = spec()
+    fixed_spec['islands'][0]['rva'] = 0x10000
+    (folder/'runtime.lxd').write_bytes(runtime_mods.build(vanilla,[fixed_spec]))
+    assert standalone_runtime._identity([row],tmp_path,[]) != baseline
+    assert len(standalone_runtime._fixed_modules([row])) == 1
+    (folder/'runtime.lxd').write_bytes(b'Broken native module')
+    assert standalone_runtime._fixed_modules([row]) == []
+    assert standalone_runtime._identity([row],tmp_path,[]) == baseline
+
+
 @pytest.mark.skipif(os.name != 'nt', reason='Windows pre-entry event')
 def test_runtime_writes_require_a_live_pre_entry_window(monkeypatch):
     import ctypes
