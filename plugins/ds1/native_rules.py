@@ -175,21 +175,24 @@ class NativeRules:
                 "native": dict(self.live), "migration": migration}
 
     def row_modified(self, row_id):
-        """Whether this session changed the native rule row."""
+        """Whether an existing rule differs from the game's original values."""
         if row_id >= 1001:
-            saved = {band["id"]: band for band in self.saved["bands"]}
+            original = {band["id"]: band for band in DEFAULTS["bands"]}
             current = next((band for band in self.value["bands"] if band["id"] == row_id - 1000), None)
-            return current is None or saved.get(row_id - 1000) != current
+            return row_id - 1000 in original and original[row_id - 1000] != current
         if row_id in levelup_gains.ROW_IDS.values():
             output = next(name for name, identity in levelup_gains.ROW_IDS.items()
                           if identity == row_id)
-            return self.value["levelupGains"][output] != self.saved["levelupGains"][output]
+            return self.value["levelupGains"][output] != DEFAULTS["levelupGains"][output]
         if row_id == 200:
-            return (self.value["specialLight"] != self.saved["specialLight"]
-                    or self.value["forcedRecovery"] != self.saved["forcedRecovery"])
+            return (self.value["specialLight"] != DEFAULTS["specialLight"]
+                    or self.value["forcedRecovery"] != DEFAULTS["forcedRecovery"])
         if row_id == 0:
-            return self.value["baseRecovery"] != self.saved["baseRecovery"]
+            return self.value["baseRecovery"] != DEFAULTS["baseRecovery"]
         raise ValueError("Unknown native rule identity")
+
+    def row_created(self, row_id):
+        return row_id >= 1001 and not any(band['id'] == row_id-1000 for band in DEFAULTS['bands'])
 
     def list_rows(self, tab):
         if tab == "levelup":
@@ -207,6 +210,7 @@ class NativeRules:
                     label += f" to {upper:g}%"
                 result.append({"id": 1000 + band["id"], "table": "NativeRules",
                                "name": band["name"], "range": label,
+                               "created": self.row_created(1000 + band["id"]),
                                "modified": self.row_modified(1000 + band["id"])})
                 lower = upper
             return result
@@ -219,19 +223,29 @@ class NativeRules:
         raise ValueError("Unknown native-rules tab")
 
     def read_row(self, row_id):
+        row = self._row(row_id,self.value)
+        row['created'] = self.row_created(row_id)
+        row['modified'] = self.row_modified(row_id)
+        original = {} if row['created'] else {field['key']:field['value']
+                                               for field in self._row(row_id,DEFAULTS)['fields']}
+        for field in row['fields']:
+            field['vanilla'] = original.get(field['key'])
+        return row
+
+    def _row(self, row_id, value):
         if type(row_id) is not int:
             raise ValueError("Invalid native rule identity")
         if row_id >= 1001:
-            return encumbrance.row(row_id - 1000, self.value, read_only=self.read_only)
+            return encumbrance.row(row_id - 1000, value, read_only=self.read_only)
         if row_id in levelup_gains.ROW_IDS.values():
             output = next(key for key, identity in levelup_gains.ROW_IDS.items()
                           if identity == row_id)
-            return levelup_gains.row(output, self.value, read_only=self.read_only)
+            return levelup_gains.row(output, value, read_only=self.read_only)
         if row_id == 200:
-            return encumbrance.overrides(self.value, read_only=self.read_only)
+            return encumbrance.overrides(value, read_only=self.read_only)
         if row_id == 0:
             field = encumbrance.number("baseRecovery", "Base regeneration (stamina/second)",
-                self.value["baseRecovery"], 0, 200,
+                value["baseRecovery"], 0, 200,
                 "Sets recovery before active effect bonuses and load penalties. The original rate is 45. Save and Apply to use this value.")
             field["disabled"] = self.read_only
             return {"id": 0, "table": "NativeRules", "name": "Stamina", "fields": [field]}
