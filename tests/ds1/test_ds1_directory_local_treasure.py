@@ -51,11 +51,14 @@ def test_locality_uses_map_events_and_updates_after_an_edit(tmp_path):
     assert {name:(maps/name).read_bytes() for name in originals} == originals
 
 
-def test_treasure_local_toggle_renders_and_tracks_the_open_map(tmp_path):
+def test_treasure_local_toggle_renders_and_tracks_the_open_map(tmp_path,monkeypatch):
     from ds1_fixture import make_archive
     from plugins.ds1.plugin import DS1Session
     from plugins.ds1.store import RELATIVE
     from playwright.sync_api import sync_playwright
+    if os.name=='nt' and 'PLAYWRIGHT_BROWSERS_PATH' not in os.environ:
+        monkeypatch.setenv('PLAYWRIGHT_BROWSERS_PATH',str(Path(os.environ['LOCALAPPDATA'])/'ms-playwright'))
+    monkeypatch.setenv('LOCALAPPDATA',str(tmp_path/'local-app-data'))
     game = tmp_path/'game'
     (game/RELATIVE).parent.mkdir(parents=True)
     (game/RELATIVE).write_bytes(make_archive())
@@ -64,7 +67,7 @@ def test_treasure_local_toggle_renders_and_tracks_the_open_map(tmp_path):
     (game/MAP_DIR/first).write_bytes(map_bytes([activation('explicit',0,1,100)]))
     (game/MAP_DIR/second).write_bytes(map_bytes([activation('inherited',0,1,-1)]))
     session = DS1Session({'LEXEDITOR_DS1_ROOT':str(game),'LEXEDITOR_NO_MOD':'1',
-                          'LEXEDITOR_MOD_READ_ONLY':'1','LEXEDITOR_DS1_MODS':str(tmp_path/'library')})
+                          'LEXEDITOR_MOD_READ_ONLY':'1','LEXEDITOR_DS1_MODS_ROOT':str(tmp_path/'library')})
     session.start()
     errors = []
     try:
