@@ -258,6 +258,20 @@ def test_convex_browser_edits_vertices_and_explains_derived_faces(convex_source,
                     page.screenshot(path=os.environ['LEX_CONVEX_CAPTURE'])
                 page.locator('.ds1-reference-face').first.click()
                 page.wait_for_function('state.collision.kind==="vertices"&&state.row?.id.startsWith("v:")')
+                held=[]
+                page.route('**/api/map/collision?**',lambda route:held.append(route))
+                page.evaluate('window.lateCollision=chooseCollision({kind:"faces"}); undefined')
+                page.wait_for_function('state.collision.loading')
+                page.wait_for_timeout(50)
+                assert held
+                page.evaluate('navigate("items","consumables")')
+                page.wait_for_function('state.tab==="items"&&state.row?.table==="EquipParamGoods"')
+                selected=page.evaluate('state.selected')
+                held[0].continue_()
+                page.evaluate('window.lateCollision')
+                assert page.evaluate('state.tab')=='items'
+                assert page.evaluate('state.selected')==selected
+                assert page.evaluate('state.row.table')=='EquipParamGoods'
                 assert not page.locator('.lex-important-backdrop').count()
                 assert not errors,errors
             finally:

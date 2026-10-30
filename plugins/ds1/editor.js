@@ -473,7 +473,13 @@ async function openCatalog(table,id){
   }catch(error){notify(error);}
 }
 function openRecord(link){
-  if(link.kind==='collisionVertex')return chooseCollision({kind:'vertices',selected:`${link.table}:${link.id}`});
+  if(link.kind==='collisionVertex'){
+    const [,map,model,layer,mesh]=link.table.split('|');
+    const options={model,layer,mesh:Number(mesh),kind:'vertices',selected:`${link.table}:${link.id}`};
+    if(state.tab==='maps'&&state.mapTab==='collision'&&state.mapId===map)return chooseCollision(options);
+    state.mapId=map;state.mapTab='collision';state.collision={...options,rows:[]};
+    return navigate('maps','placements',options.selected);
+  }
   if(link.kind==="catalog"&&link.tab)return navigate(link.tab,link.sub,`${link.table}:${link.id}`);
   if(link.kind==="effect")return openEffect(link);
   if(link.kind==="attack")return navigate("attacks",ATTACK_SUBS[link.table]||"attacks",`${link.table}:${link.id}`);
@@ -3953,6 +3959,7 @@ function mapsStrip(){
 }
 async function loadCollision(options={}){
   const previous=state.collision;
+  const token=navigation,map=state.mapId;
   const models=Object.entries(state.mapView?.models||{}).filter(([,value])=>value.type===5).map(([name])=>name);
   const selectedModel=state.mapView?.parts.find(part=>part.key===state.mapSelected&&part.kind==='Collision')?.model;
   const next={model:previous?.model||selectedModel||models[0],layer:'high',mesh:0,kind:'vertices',
@@ -3960,18 +3967,24 @@ async function loadCollision(options={}){
   if(!models.includes(next.model))next.model=models[0];
   state.collision=next;state.selection=[];
   state.mapCollisionHigh=next.layer==='high';state.mapCollisionLow=next.layer==='low';
-  next.rows=[];next.error='';
-  if(!next.model){next.error='This map has no collision models.';state.row=null;return;}
+  next.rows=[];next.error='';next.loading=true;state.row=null;
+  const current=()=>state.collision===next&&state.tab==='maps'&&state.mapTab==='collision'&&state.mapId===map&&navigation===token;
+  if(!next.model){next.error='This map has no collision models.';next.loading=false;return true;}
   try{
-    const result=await api(`/api/map/collision?map=${encodeURIComponent(state.mapId)}&model=${encodeURIComponent(next.model)}&layer=${next.layer}&mesh=${next.mesh}&kind=${next.kind}`);
-    if(state.collision!==next)return;
+    const result=await api(`/api/map/collision?map=${encodeURIComponent(map)}&model=${encodeURIComponent(next.model)}&layer=${next.layer}&mesh=${next.mesh}&kind=${next.kind}`);
+    if(!current())return false;
     Object.assign(next,result);
     state.selected=next.rows.some(row=>key(row)===(options.selected||state.selected))?(options.selected||state.selected):next.rows[0]?key(next.rows[0]):null;
     await loadDetail();
-  }catch(error){if(state.collision===next){next.error=error.message;state.row=null;}}
+    return current();
+  }catch(error){if(current()){next.error=error.message;state.row=null;return true;}return false;}
+  finally{next.loading=false;}
 }
 async function chooseCollision(options){
-  await edits;await loadCollision(options);
+  await edits;
+  if(state.tab!=='maps'||state.mapTab!=='collision')return;
+  const loaded=loadCollision(options);render();
+  if(!await loaded)return;
   state.mapCollisionHigh=state.collision.layer==='high';state.mapCollisionLow=state.collision.layer==='low';
   viewportCtl?.setCollisionLayers?.(state.mapCollisionHigh,state.mapCollisionLow);
   render();markCollisionPoint(true);
@@ -3986,7 +3999,8 @@ async function refreshCollision(){
   if(state.tab!=='maps'||state.mapTab!=='collision')return;
   const table=state.collision?.table;
   for(const cached of recordRows.keys())if(cached.startsWith(`${table}:`))recordRows.delete(cached);
-  await loadCollision();render();
+  if(!await loadCollision())return;
+  render();
   if(state.collision?.model)await viewportCtl?.reloadCollision?.(state.collision.model);
   markCollisionPoint();
 }
@@ -3994,6 +4008,7 @@ function collisionDetail(){
   const collision=state.collision;
   const row=state.row;
   const noun=collision?.kind==='faces'?'face':'vertex';
+  if(collision?.loading)return detailPanel({title:`Collision ${noun}`,body:[LexeditorUI.loadingPanel({label:'Loading collision records'})]});
   const derived=collision?.kind==='faces'&&collision.derivedFaces;
   const actions=['add','duplicate','remove'].map(action=>el('button',{type:'button',class:'lex-header-icon',
     'aria-label':`${action[0].toUpperCase()+action.slice(1)} collision ${noun}`,
@@ -4068,7 +4083,7 @@ function renderCollision(current){
     search:{key:'ds1-collision-search',value:collision.query||'',label:'Search '+collision.kind,change:value=>{collision.query=value;collision.page=0;render();}},
     sync:next=>{collision.page=next.page;collision.pageSize=next.pageSize;state.selection=next.selection||[];},
     change:next=>{collision.page=next.page;collision.pageSize=next.pageSize;if(next.reason==='pins')view.refreshMaster();else render();},
-    master:({rows,selected,select})=>columnList({rows,key,selected,
+    master:({rows,selected,select})=>collision.loading?LexeditorUI.loadingPanel({label:'Loading collision records'}):columnList({rows,key,selected,
       columns:[{key:'name',label:'Name',grow:1}],
       decorateRow:(node,row)=>{LexeditorUI.decorateSearchCandidate(node,{type:`ds1-${row.table}`,value:row.id,label:row.name});return node;},
       select:async(row,event)=>{await edits;state.selected=key(row);await loadDetail();select(row,event);markCollisionPoint(true);shell.refresh();}}),
