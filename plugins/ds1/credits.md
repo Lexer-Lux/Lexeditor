@@ -224,3 +224,13 @@ FSB4 bank inventory (magic, stream count, 80-byte sample headers) was
 measured by read-only inspection of the installed banks; no FMOD code or
 documentation is copied. Stream payloads proved out as padded MPEG Layer III, mostly MPEG-1 with MPEG-2 in the menu bank (see `plugins/ds1/fsb.py`), extracted without copying any decoder. Bitmap-to-webfont conversion
 is not integrated yet, so headings use an engraved serif fallback. Menu UI events map from proved FEV event paths (`/frpg_main/CURSOL_MOVE` and siblings) to shell sound slots; exit/save have no proved source and stay silent.
+
+Map collision hit-filter names and MSB1 region/event field meanings were
+checked against Soulstruct's DS1 format definitions (Grimrukh, GPL-3.0):
+https://github.com/Grimrukh/soulstruct/tree/main/src/soulstruct/darksouls1ptde/maps
+Collision triangle storage was checked against soulstruct-havok's
+`fromsoft/shared/map_collision.py`; the editor reads it using its existing
+TAG0 type reader. Navigation triangle layout was checked against
+SoulsFormats `Formats/NVM.cs` (JKAnderson, MIT):
+https://github.com/JKAnderson/SoulsFormats/blob/master/SoulsFormats/Formats/NVM.cs
+No upstream implementation code or game geometry is redistributed.

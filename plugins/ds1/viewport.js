@@ -1,11 +1,11 @@
 "use strict";
 // 3D map view. Geometries are shared across placements; each part only
 // adds a transform. Clicking a placement selects it, the gizmo drags it,
-// and editor.js commits the move. Collision and navigation geometry is baked
-// in world space in the Havok packfiles, which this version does not decode,
-// so those parts are counted, never drawn. Mounted by editor.js, which owns
-// the page and the edit bar. Map lights draw as small marker
-// octahedra; see the lights loop below.
+// and editor.js commits the move. Collision meshes load lazily when the
+// reader shows a layer. Regions use their actual shapes and dimensions.
+// Mounted by editor.js, which owns the page
+// and the edit bar. Map lights draw as small marker octahedra; see the
+// lights loop below.
 window.Ds1Viewport = (() => {
   let session = 0;
   const DEG = Math.PI / 180;
@@ -209,16 +209,21 @@ window.Ds1Viewport = (() => {
       }
       return matCache.get(key);
     };
-    // Collision and navigation parts have no model to load and no honest
-    // drawing: their geometry is world-baked Havok data. Skipped, not drawn.
-    const isMarker = part => part.kind === "Collision" || part.kind === "Navigation";
+    const isCollision = part => part.kind === "Collision" || part.kind === "Connect collision";
+    const isNavigation = part => part.kind === "Navigation";
     const wanted = [];
+    const collisionWanted = [];
+    const navigationWanted = [];
     for (const part of view.parts) {
-      if (isMarker(part)) continue;
       const info = view.models[part.model];
-      if (info && info.available) wanted.push(part.model);
+      if (!info || !info.available) continue;
+      if (isCollision(part)) collisionWanted.push(part.model);
+      else if (isNavigation(part)) navigationWanted.push(part.model);
+      else wanted.push(part.model);
     }
     const unique = [...new Set(wanted)];
+    const collisionUnique = [...new Set(collisionWanted)];
+    const navigationUnique = [...new Set(navigationWanted)];
     // Progressive loading: geometry streams in batches and each batch
     // renders as it arrives, so the view is usable before the whole
     // map has loaded. The canvas mounts on the first batch (the
@@ -253,14 +258,96 @@ window.Ds1Viewport = (() => {
     let canvasOn = false, fullyLoaded = false, userMoved = false, progress = null;
     controls.addEventListener("start", () => { userMoved = true; });
     controls.addEventListener("change", requestRender);
-    const MOVABLE = new Set([1, 2, 4, 9, 10]);
+    const MOVABLE = new Set([0, 1, 2, 4, 5, 8, 9, 10, 11, "region"]);
     const place = (group, part) => {
       group.position.set(part.pos[0], part.pos[1], part.pos[2]);
       group.rotation.set(part.rot[0] * DEG, part.rot[1] * DEG, part.rot[2] * DEG, ORDER);
       group.scale.set(part.scale[0], part.scale[1], part.scale[2]);
       group.userData.part = {key: part.key, name: part.name, kind: part.kind, model: part.model,
-        movable: MOVABLE.has(Number(String(part.key).split(":")[0]))};
+        movable: MOVABLE.has(String(part.key).split(":")[0] === "region" ? "region" : Number(String(part.key).split(":")[0]))};
     };
+    let showHigh = hooks.collision?.high === true;
+    let showLow = hooks.collision?.low === true;
+    let showNavigation = hooks.navigation === true, showRegions = hooks.regions === true;
+    let collisionLoading = null;
+    const overlayAttempted = new Set();
+    const collisionMats = new Map();
+    const collisionMaterial = (hitFilter, layer) => {
+      const cacheKey = `${hitFilter ?? "x"}:${layer}`;
+      if (!collisionMats.has(cacheKey)) {
+        const color = hitFilter === 15 ? 0xe5484d : hitFilter === 14 ? 0xf76b15
+          : hitFilter === 13 ? 0x8e4ec6 : layer === "navigation" ? 0x6699ff : 0x12a594;
+        collisionMats.set(cacheKey, new THREE.MeshStandardMaterial({color, roughness: 0.9, metalness: 0,
+          side: THREE.DoubleSide, transparent: true, opacity: 0.45, depthWrite: false}));
+      }
+      return collisionMats.get(cacheKey);
+    };
+    function applyCollisionVisibility() {
+      for (const placed of groups.values()) {
+        if (placed.userData.part?.kind === "Region") { placed.visible = showRegions; continue; }
+        let hasCollision = false, anyVisible = false;
+        for (const mesh of placed.children) {
+          const layer = mesh.userData ? mesh.userData.collisionLayer : null;
+          if (!layer) continue;
+          hasCollision = true;
+          mesh.visible = layer === "navigation" ? showNavigation : layer === "collisionHigh" ? showHigh : showLow;
+          if (mesh.visible) anyVisible = true;
+        }
+        if (hasCollision) placed.visible = anyVisible;
+      }
+      requestRender();
+    }
+    function loadCollision() {
+      if (collisionLoading) return collisionLoading.then(() => loadCollision());
+      const wanted = [...(showHigh || showLow ? collisionUnique : []), ...(showNavigation ? navigationUnique : [])]
+        .filter(name => !overlayAttempted.has(name));
+      if (!wanted.length) { applyCollisionVisibility(); return Promise.resolve(true); }
+      collisionLoading = (async () => {
+        try {
+          for (let at = 0; at < wanted.length; at += BATCH) {
+            const names = wanted.slice(at, at+BATCH);
+            if (!await fetchBatch(names)) return false;
+            names.forEach(name => overlayAttempted.add(name));
+          }
+          applyCollisionVisibility();
+          return true;
+        } catch (error) {
+          LexeditorUI.showToast(error.message || String(error), {tone: "warning"});
+          return false;
+        } finally {
+          collisionLoading = null;
+        }
+      })();
+      return collisionLoading;
+    }
+    function drawRegion(group, part) {
+        for (const child of group.children) { child.geometry?.dispose(); child.material?.dispose(); }
+        group.clear();
+        const d = part.dimensions || {}, shape = part.shape;
+        const radius = Math.max(d.radius || 0, 0.02), height = Math.max(d.height || 0, 0.02);
+        const width = Math.max(d.width || 0, 0.02), depth = Math.max(d.depth || 0, 0.02);
+        let geometry;
+        if (shape === 1) { geometry = new THREE.CircleGeometry(radius, 24); geometry.rotateX(-Math.PI/2); }
+        else if (shape === 2) geometry = new THREE.SphereGeometry(radius, 12, 8);
+        else if (shape === 3) { geometry = new THREE.CylinderGeometry(radius,radius,height,16); geometry.translate(0,height/2,0); }
+        else if (shape === 4) { geometry = new THREE.PlaneGeometry(width,depth); geometry.rotateX(-Math.PI/2); }
+        else if (shape === 5) { geometry = new THREE.BoxGeometry(width,height,depth); geometry.translate(0,height/2,0); }
+        else geometry = new THREE.OctahedronGeometry(0.2);
+        const edges = new THREE.EdgesGeometry(geometry);
+        geometry.dispose();
+        const material = new THREE.LineBasicMaterial({color:0xf2c166});
+        group.add(new THREE.LineSegments(edges,material));
+        group.visible = showRegions;
+    }
+    for (const part of view.parts) {
+      if (!isCollision(part) && !isNavigation(part) && part.kind !== "Region") continue;
+      if (groups.has(part.key)) continue;
+      const empty = new THREE.Group();
+      place(empty, part);
+      if (part.kind === "Region") drawRegion(empty, part);
+      root.add(empty);
+      groups.set(part.key, empty);
+    }
     const frameCamera = () => {
       requestRender();
       if (box.isEmpty()) return;
@@ -318,7 +405,7 @@ window.Ds1Viewport = (() => {
       const group = selected ? groups.get(selected) : null;
       if (group && group.userData.part.movable) gizmo.attach(group);
       else gizmo.detach();
-      if (group) {
+      if (group && group.children.length) {
         highlight.setFromObject(group);
         highlight.visible = true;
       } else highlight.visible = false;
@@ -337,13 +424,13 @@ window.Ds1Viewport = (() => {
     gizmo.addEventListener("objectChange", () => {
       if (!selected) return;
       const group = groups.get(selected);
-      highlight.setFromObject(group);
+      if (group.children.length) highlight.setFromObject(group);
       requestRender();
     });
     const snapBack = (group, back, backRot) => {
       group.position.copy(back);
       if (backRot) group.rotation.copy(backRot);
-      highlight.setFromObject(group);
+      if (group.children.length) highlight.setFromObject(group);
       requestRender();
     };
     gizmo.addEventListener("mouseUp", () => {
@@ -398,7 +485,15 @@ window.Ds1Viewport = (() => {
       const rect = canvas.getBoundingClientRect();
       pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
       ray.setFromCamera(pointer, camera);
-      const hit = ray.intersectObjects(root.children.filter(obj => obj.visible), true)[0];
+      const hits = ray.intersectObjects(root.children.filter(obj => obj.visible), true);
+      const hit = hits.find(entry => {
+        let node = entry.object;
+        while (node && node !== root) {
+          if (!node.visible) return false;
+          node = node.parent;
+        }
+        return true;
+      });
       let group = hit ? hit.object : null;
       while (group && !group.userData.part) group = group.parent;
       const key = group ? group.userData.part.key : null;
@@ -425,26 +520,53 @@ window.Ds1Viewport = (() => {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.position.set(pos[0], pos[1], pos[2]);
-        if (key === selected) highlight.setFromObject(group);
+        if (key === selected && group.children.length) highlight.setFromObject(group);
         requestRender();
       },
       turnTo(key, rot) {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.rotation.set(rot[0] * DEG, rot[1] * DEG, rot[2] * DEG);
-        if (key === selected) highlight.setFromObject(group);
+        if (key === selected && group.children.length) highlight.setFromObject(group);
         requestRender();
       },
       scaleTo(key, scale) {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.scale.set(scale[0], scale[1], scale[2]);
-        if (key === selected) highlight.setFromObject(group);
+        if (key === selected && group.children.length) highlight.setFromObject(group);
         requestRender();
       },
       setGizmoMode(mode) {
         gizmoMode = mode === "rotate" ? "rotate" : "translate";
         gizmo.setMode(gizmoMode);
+        requestRender();
+      },
+      setCollisionLayers(high, low) {
+        showHigh = high === true;
+        showLow = low === true;
+        if (showHigh || showLow) loadCollision();
+        else applyCollisionVisibility();
+      },
+      setMapOverlays(navigation, regions) {
+        showNavigation = navigation === true;
+        showRegions = regions === true;
+        if (showNavigation) loadCollision();
+        applyCollisionVisibility();
+      },
+      updateRegion(key, shape, dimensions) {
+        const group = groups.get(key);
+        if (!group || group.userData.part.kind !== "Region") return;
+        drawRegion(group, {shape, dimensions});
+        if (key === selected) highlight.setFromObject(group);
+        requestRender();
+      },
+      updateCollision(key, hitFilter) {
+        const group = groups.get(key);
+        if (!group) return;
+        for (const mesh of group.children) {
+          if (mesh.userData.collisionLayer) mesh.material = collisionMaterial(hitFilter, mesh.userData.collisionLayer);
+        }
         requestRender();
       },
       aim() { return [controls.target.x, controls.target.y, controls.target.z]; },
@@ -466,9 +588,13 @@ window.Ds1Viewport = (() => {
       if (progress) progress.remove();
       delete host.dataset.ready;
       for (const geos of geometries.values()) for (const entry of geos) entry.geo.dispose();
+      for (const group of groups.values()) if (group.userData.part?.kind === "Region") {
+        for (const child of group.children) { child.geometry?.dispose(); child.material?.dispose(); }
+      }
       front.dispose();
       double.dispose();
       effect.dispose();
+      for (const mat of collisionMats.values()) mat.dispose();
       for (const item of disposable) item.dispose();
       highlight.dispose();
       lightGeo.dispose();
@@ -534,12 +660,15 @@ window.Ds1Viewport = (() => {
         geometries.set(name, data.meshes.map(mesh => {
           const geo = new THREE.BufferGeometry();
           geo.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
-          geo.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
+          if (mesh.normals) geo.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
           if (mesh.uv) geo.setAttribute("uv", new THREE.BufferAttribute(f32(mesh.uv), 2));
           if (mesh.uv1) geo.setAttribute("uv1", new THREE.BufferAttribute(f32(mesh.uv1), 2));
           geo.setIndex(new THREE.BufferAttribute(u32(mesh.indices), 1));
+          if (!mesh.normals) geo.computeVertexNormals();
           geo.computeBoundingSphere();
           geo.computeBoundingBox();
+          if (mesh.layer === "collisionHigh" || mesh.layer === "collisionLow" || mesh.layer === "navigation")
+            return {geo, collisionLayer: mesh.layer, mat: null};
           const entry = {geo, sky: isSky(mesh), fx: isEffect(mesh), cull: mesh.cull !== false};
           entry.mat = materialFor(mesh, data.textures, entry.fx, isWater(mesh), isCutout(mesh));
           return entry;
@@ -547,9 +676,31 @@ window.Ds1Viewport = (() => {
       }
       const names = new Set(batch.map(([name]) => name));
       for (const part of view.parts) {
-        if (isMarker(part) || groups.has(part.key)) continue;
         const geos = geometries.get(part.model);
         if (!geos || !names.has(part.model)) continue;
+        if (isCollision(part) || isNavigation(part)) {
+          let group = groups.get(part.key);
+          if (!group) {
+            group = new THREE.Group();
+            place(group, part);
+            root.add(group);
+            groups.set(part.key, group);
+          } else {
+            if (group.userData.collisionFilled) continue;
+            place(group, part);
+          }
+          for (const entry of geos) {
+            if (!entry.collisionLayer) continue;
+            const mesh = new THREE.Mesh(entry.geo, collisionMaterial(part.hitFilter, entry.collisionLayer));
+            mesh.userData.collisionLayer = entry.collisionLayer;
+            mesh.visible = entry.collisionLayer === "navigation" ? showNavigation : entry.collisionLayer === "collisionHigh" ? showHigh : showLow;
+            group.add(mesh);
+          }
+          group.userData.collisionFilled = true;
+          group.updateWorldMatrix(true, true);
+          continue;
+        }
+        if (groups.has(part.key)) continue;
         const group = new THREE.Group();
         place(group, part);
         for (const entry of geos) {
@@ -575,24 +726,29 @@ window.Ds1Viewport = (() => {
         skyDiag = Math.max(skyDiag, mesh.userData.worldBox.getSize(new THREE.Vector3()).length());
       // Keep the growing scene framed unless the reader already took
       // the camera; the final frame still matches a full load exactly.
-      if (!userMoved) frameCamera();
+      // Lazy collision never reframes and never joins the framing box.
+      if (!fullyLoaded && !userMoved) frameCamera();
+      applyCollisionVisibility();
       requestRender();
       return true;
     };
     // One request per batch of models instead of one per model; each
     // batch renders as it arrives. Texture blobs ride the shared
     // content-id store as before, so repeats cross the wire once.
-    for (let at = 0; at < unique.length; at += BATCH) {
-      if (mine !== session || !host.isConnected) { stop(host); return null; }
-      const names = unique.slice(at, at + BATCH);
+    async function fetchBatch(names) {
+      if (mine !== session || !host.isConnected) return false;
       const known = [...seenIds].join(",");
       const response = await fetch(`/api/map/geometries?map=${encodeURIComponent(mapId)}&models=${names.map(encodeURIComponent).join(",")}` + (known ? `&known=${encodeURIComponent(known)}` : ""));
       const data = await response.json();
-      if (!response.ok || data.error) { stop(host); throw new Error(data.error || response.statusText); }
+      if (!response.ok || data.error) throw new Error(data.error || response.statusText);
       const batch = [];
       for (const name of names) {
         const item = (data.items || {})[name];
-        if (!item || item.error) continue;
+        if (!item || item.error) {
+          LexeditorUI.showToast(`${name}: ${item?.error || "No geometry returned"}`, {tone:"warning"});
+          continue;
+        }
+        if (item.notes?.length) LexeditorUI.showToast(`${name}: ${item.notes.join("; ")}`, {tone:"warning"});
         for (const [tex, digest] of Object.entries(item.texture_ids || {})) {
           if (item.textures && item.textures[tex]) {
             pngById.set(digest, item.textures[tex]);
@@ -605,11 +761,16 @@ window.Ds1Viewport = (() => {
         item.textures = rebuilt;
         batch.push([name, item]);
       }
-      if (!await ingest(batch)) { stop(host); return null; }
+      return ingest(batch);
+    }
+    for (let at = 0; at < unique.length; at += BATCH) {
+      if (!await fetchBatch(unique.slice(at, at+BATCH))) { stop(host); return null; }
       showProgress(Math.min(at + BATCH, unique.length), unique.length);
     }
     if (mine !== session || !host.isConnected) { stop(host); return null; }
     mountCanvas();
+    if (showHigh || showLow || showNavigation) await loadCollision();
+    if (mine !== session || !host.isConnected) { stop(host); return null; }
     // The final frame matches a full load exactly unless the reader
     // already orbited the partial view; then their camera stands.
     if (!userMoved) frameCamera();

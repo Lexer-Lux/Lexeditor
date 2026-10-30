@@ -24,15 +24,24 @@ ENEMY_READ = 20
 ENEMY_TYPES = frozenset({2, 10})
 PLAYER_TYPE = 4
 OBJECT_TYPES = frozenset({1, 9})
-PLACEMENT_TYPES = ENEMY_TYPES | OBJECT_TYPES | frozenset({PLAYER_TYPE})
+PLACEMENT_TYPES = frozenset({0, 1, 2, 4, 5, 8, 9, 10, 11})
 KNOWN_PART_TYPES = frozenset({0, 1, 2, 4, 5, 8, 9, 10, 11})
 KNOWN_MODEL_TYPES = frozenset({0, 1, 2, 4, 5, 6})
-TYPE_LABELS = {2: 'Enemy', 10: 'Dummy enemy', 4: 'Player', 1: 'Object', 9: 'Object'}
+TYPE_LABELS = {0: 'Map piece', 2: 'Enemy', 10: 'Dummy enemy', 4: 'Player',
+               1: 'Object', 9: 'Object', 5: 'Collision', 8: 'Navigation', 11: 'Connect collision'}
 # Type-data blob sizes from the SoulsTemplates Part.bt layout: enemy
 # carries think/NPC/talk IDs plus patrol and animation fields (0x40),
 # object carries collision and animation fields (0x18), player is four
 # zero ints (0x10). Verified by reading every installed map file.
-TYPE_DATA_SIZES = {2: 0x40, 10: 0x40, 1: 0x18, 9: 0x18, 4: 0x10}
+TYPE_DATA_SIZES = {0: 8, 2: 0x40, 10: 0x40, 1: 0x18, 9: 0x18,
+                   4: 0x10, 5: 0x50, 8: 0x20, 11: 0x10}
+# MSB1 collision behavior, independently of the surface's material.
+HIT_FILTERS = {str(i): label for i, label in enumerate((
+    'Solid (no foot IK)', 'Solid 1', 'Solid 2', 'Solid 3', 'Solid 4', 'Solid 5',
+    'Solid 6', 'Solid 7', 'Normal', 'Water A', 'Unknown 10', 'NPCs only A',
+    'Unknown 12', 'Death camera', 'Lethal fall', 'Kill plane', 'Water B',
+    'Group switch', 'Unknown 18', 'NPCs only B', 'Level exit A', 'Slide',
+    'Fall protection', 'Level exit B'))}
 EVENT_HEADER = 28
 POINT_HEADER = 60
 LIGHT_EVENT = 0
@@ -90,6 +99,9 @@ FLOAT_FIELDS = {key: offset for key, offset in
                  ('rotX', 0x20), ('rotY', 0x24), ('rotZ', 0x28),
                  ('scaleX', 0x2c), ('scaleY', 0x30), ('scaleZ', 0x34))}
 LIGHT_POINT_OFFSETS = {'posX': 0x10, 'posY': 0x14, 'posZ': 0x18}
+REGION_SHAPES = {0: ('Point', ()), 1: ('Circle', ('radius',)),
+                 2: ('Sphere', ('radius',)), 3: ('Cylinder', ('radius', 'height')),
+                 4: ('Rectangle', ('width', 'depth')), 5: ('Box', ('width', 'depth', 'height'))}
 LIGHT_FIELDS = {
     'posX': ('Position X', 'Position', ''),
     'posY': ('Position Y', 'Position', ''),
@@ -165,7 +177,7 @@ def _check_type_blob(ptype, blob):
         rest = (struct.unpack_from('<h', blob, 0x0E)[0], struct.unpack_from('<i', blob, 0x10)[0])
         if zeros != (0, 0, 0) or rest[0] not in (-1, 0) or rest[1] not in (-1, 0):
             raise MsbError('That object stores values this version does not understand')
-    elif blob[:16] != bytes(16):
+    elif ptype == PLAYER_TYPE and blob[:16] != bytes(16):
         raise MsbError('That player start stores values this version does not understand')
 
 
@@ -216,8 +228,19 @@ def _point(data, off):
         raise MsbError('A map point entry has an unsupported kind')
     pos = struct.unpack_from('<3f', data, off + 0x10)
     name, ns, ne = _cstr(data, off + POINT_HEADER, 'A map point name')
+    shape = words[3]
+    if shape not in REGION_SHAPES:
+        raise MsbError('A region has an unsupported shape')
+    dimensions = REGION_SHAPES[shape][1]
+    shape_at, entity_at = off + words[12], off + words[13]
+    if not 0 <= shape_at <= len(data) - 4 * len(dimensions) or not 0 <= entity_at <= len(data)-4:
+        raise MsbError('A region has invalid shape or entity data')
     return {'index': words[2], 'type': words[1], 'name': name,
-            'pos': pos, 'base': off, 'spans': [(ns, ne)]}
+            'pos': pos, 'rot': struct.unpack_from('<3f', data, off + 28),
+            'shape': shape, 'dimensions': dict(zip(dimensions, struct.unpack_from('<%df' % len(dimensions), data, shape_at))),
+            'shape_at': shape_at, 'entity_at': entity_at,
+            'entityId': struct.unpack_from('<i', data, entity_at)[0],
+            'base': off, 'spans': [(ns, ne)]}
 
 
 def _event(data, off, nparts, npoints):
@@ -235,7 +258,7 @@ def _event(data, off, nparts, npoints):
              'area': area, 'point': point, 'flag': flag,
              'spans': [(off, off + EVENT_HEADER), (ns, ne)]}
     if etype == LIGHT_EVENT:
-        if not 0 <= part < nparts or not 0 <= area < nparts:
+        if not -1 <= area < nparts:
             raise MsbError('A light points outside the part list')
         if not 0 <= point < npoints or last != 0:
             raise MsbError('A light points outside the point list')
@@ -291,6 +314,8 @@ class MsbDocument:
             point = _point(self.plain, off)
             self.points.append(point)
             self._strings.extend(point['spans'])
+        if len({point['index'] for point in self.points}) != len(self.points):
+            raise MsbError('Map region identities are not unique')
         self.events = []
         seen_events = set()
         for off in params[1]['offsets']:
@@ -319,7 +344,14 @@ class MsbDocument:
                      'scale': tuple(part['scale'])}
             if part['type'] in ENEMY_TYPES:
                 entry.update(think=part['think'], npc=part['npc'])
+            if part['type'] == 5:
+                entry['hitFilter'] = self.plain[part['type_data']]
             result.append(entry)
+        result.extend({'partId': point['index'], 'type': 'region', 'kind': 'Region',
+                       'name': point['name'], 'model': '', 'pos': tuple(point['pos']),
+                       'rot': tuple(point['rot']), 'scale': (1, 1, 1)} for point in self.points)
+        from . import msb_events
+        result.extend(msb_events.placements(self))
         return result
 
     def view_parts(self):
@@ -341,6 +373,12 @@ class MsbDocument:
                            'name': part['name'], 'model': model['name'],
                            'pos': tuple(part['pos']), 'rot': tuple(part['rot']),
                            'scale': tuple(part['scale'])})
+            if part['type'] == 5:
+                result[-1]['hitFilter'] = self.plain[part['type_data']]
+        result.extend({'id': point['index'], 'type': 'region', 'kind': 'Region',
+                       'name': point['name'], 'model': '', 'pos': tuple(point['pos']),
+                       'rot': tuple(point['rot']), 'scale': (1, 1, 1),
+                       'shape': point['shape'], 'dimensions': dict(point['dimensions'])} for point in self.points)
         return result
 
     def lights(self):
@@ -365,8 +403,8 @@ class MsbDocument:
                            'name': event['name'], 'pos': tuple(point['pos']),
                            'point': event['point'], 'preset': event['preset'],
                            'flag': event['flag'],
-                           'part': self.parts[event['part']]['name'],
-                           'areaPart': self.parts[event['area']]['name'],
+                           'part': self.parts[event['area']]['name'] if event['area'] >= 0 else None,
+                           'areaPart': self.parts[event['area']]['name'] if event['area'] >= 0 else None,
                            'sharers': sharers})
         return result
 
@@ -557,6 +595,12 @@ class MsbDocument:
             if part['type'] in ENEMY_TYPES:
                 units.append(((part['type'], part['id']), 'npcId', part['type_data'] + 12,
                               4, PLACEMENT_FIELDS['npcId'][0], part['name']))
+            if part['type'] == 5:
+                for field, offset, size, label in (
+                        ('hitFilter', 0, 1, 'Collision behavior'),
+                        ('startsDisabled', 0x26, 1, 'Starts disabled')):
+                    units.append(((part['type'], part['id']), field,
+                                  part['type_data'] + offset, size, label, part['name']))
         for (_etype, seq), event in sorted(self._messages.items()):
             name = event['name']
             units.append((('message', seq), 'text', event['bhead'], 4,
@@ -570,7 +614,97 @@ class MsbDocument:
                 for field, offset in LIGHT_POINT_OFFSETS.items():
                     units.append((('message', seq), field, point['base'] + offset, 4,
                                   LIGHT_FIELDS[field][0], name))
-        return units
+        for point in self.points:
+            for field, address, dtype, label in self._region_fields(point):
+                units.append((('region', point['index']), field, address,
+                              struct.calcsize('<' + dtype), label, point['name']))
+        from . import msb_events
+        for event in self.events:
+            if event['type'] in msb_events.SPECS:
+                for field, address, dtype, _ref in msb_events.fields(event):
+                    units.append(((f"event{event['type']}", event['seq']), field, address,
+                                  struct.calcsize('<'+dtype), msb_events.label(field), event['name']))
+        # Shared coordinates remain one fact across region/message views.
+        return list({(unit[2], unit[3]): unit for unit in units}.values())
+
+    def _region(self, key):
+        point = next((point for point in self.points if point['index'] == key[1]), None)
+        if point is None:
+            raise MsbError('Select a region')
+        return point
+
+    def _region_fields(self, point):
+        for field, offset in FLOAT_FIELDS.items():
+            if field.startswith('scale'):
+                continue
+            # Region translation starts four bytes before a part's translation.
+            yield field, point['base'] + offset - 4, 'f', PLACEMENT_FIELDS[field][0]
+        for index, field in enumerate(REGION_SHAPES[point['shape']][1]):
+            yield field, point['shape_at'] + 4*index, 'f', field.capitalize()
+        yield 'entityId', point['entity_at'], 'i', 'Entity ID'
+
+    def read_region(self, key):
+        point = self._region(key)
+        fields = [{'key': 'shapeType', 'label': 'Shape', 'description': '', 'group': 'Shape',
+                   'dtype': 's32', 'value': point['shape'], 'type': 'enum',
+                   'enum': {str(k): v[0] for k, v in REGION_SHAPES.items()}, 'editable': True,
+                   'minimum': 0, 'maximum': 5,
+                   'vanilla': None if tuple(key) in self.added else struct.unpack_from('<i', self.original, point['base']+12)[0]}]
+        for field, address, dtype, label in self._region_fields(point):
+            value = struct.unpack_from('<' + dtype, self.plain, address)[0]
+            original = None if tuple(key) in self.added or address+4 > len(self.original) else struct.unpack_from('<' + dtype, self.original, address)[0]
+            fields.append({'key': field, 'label': label, 'description': '',
+                           'group': 'Position' if field.startswith('pos') else 'Rotation' if field.startswith('rot') else 'Shape',
+                           'dtype': 'f32' if dtype == 'f' else 's32', 'value': value,
+                           'vanilla': original, 'type': 'number', 'enum': {}, 'editable': True,
+                           'minimum': 0 if field in point['dimensions'] else None, 'maximum': None})
+        return {'partId': point['index'], 'type': 'region', 'kind': 'Region',
+                'name': point['name'], 'model': REGION_SHAPES[point['shape']][0], 'think': None,
+                'fields': fields}
+
+    def edit_region(self, key, field, value):
+        point = self._region(key)
+        if field == 'shapeType':
+            if type(value) is not int or value not in REGION_SHAPES:
+                raise MsbError('Select a region shape')
+            if point['shape'] == value:
+                return self.read_region(key)
+            dimensions = [point['dimensions'].get(name, 1.0) for name in REGION_SHAPES[value][1]]
+            shape_at = len(self.plain)
+            self.plain += struct.pack('<%df' % len(dimensions), *dimensions)
+            struct.pack_into('<i', self.plain, point['base']+12, value)
+            struct.pack_into('<i', self.plain, point['base']+48, shape_at-point['base'])
+            point.update(_point(self.plain, point['base']))
+            self.dirty.add((tuple(key), field))
+            self.dirty = {unit for unit in self.dirty if unit[0] != tuple(key)
+                          or unit[1] == 'shapeType' or unit[1] in {spec[0] for spec in self._region_fields(point)}}
+            return self.read_region(key)
+        spec = next((item for item in self._region_fields(point) if item[0] == field), None)
+        if spec is None:
+            raise MsbError('This region field is protected')
+        _, address, dtype, _ = spec
+        if dtype == 'f':
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise MsbError('Enter a finite number')
+            if field in point['dimensions'] and value < 0:
+                raise MsbError('Region dimensions cannot be negative')
+        elif type(value) is not int or not -(2**31) <= value < 2**31:
+            raise MsbError('Enter a whole entity ID')
+        try:
+            encoded = struct.pack('<' + dtype, value)
+        except (OverflowError, struct.error):
+            raise MsbError('That value is outside the map format range') from None
+        if dtype == 'f' and not math.isfinite(struct.unpack('<f', encoded)[0]):
+            raise MsbError('That value is outside the map format range')
+        self._write(address, 4, encoded)
+        refreshed = _point(self.plain, point['base'])
+        point.update(refreshed)
+        unit = (tuple(key), field)
+        if tuple(key) not in self.added and encoded == self.original[address:address+4]:
+            self.dirty.discard(unit)
+        else:
+            self.dirty.add(unit)
+        return self.read_region(key)
 
     def _write(self, start, size, payload):
         end = start + size
@@ -583,6 +717,11 @@ class MsbDocument:
         """Change one placement field. part_key is the (type, id) identity
         from placements(). npc_ids, when given, is the set of NpcParam
         row IDs a placement may point at."""
+        if part_key[0] == 'region':
+            return self.edit_region(part_key, field, value)
+        if str(part_key[0]).startswith('event'):
+            from . import msb_events
+            return msb_events.edit(self, part_key, field, value)
         part = self._by_id.get(tuple(part_key) if isinstance(part_key, list) else part_key)
         if part is None or part['type'] not in PLACEMENT_TYPES:
             raise MsbError('Select an enemy, object or player-start placement')
@@ -608,6 +747,16 @@ class MsbDocument:
                 part['rot'] = tuple(target)
             else:
                 part['scale'] = tuple(target)
+        elif field in ('hitFilter', 'startsDisabled') and part['type'] == 5:
+            if field == 'hitFilter':
+                if type(value) is not int or str(value) not in HIT_FILTERS:
+                    raise MsbError('Select a collision behavior')
+                offset = 0
+            else:
+                if type(value) is not bool:
+                    raise MsbError('Starts disabled must be on or off')
+                offset = 0x26
+            self._write(part['type_data'] + offset, 1, bytes([value]))
         elif field == 'npcId':
             if part['type'] not in ENEMY_TYPES:
                 raise MsbError('Only enemy placements name an enemy')
@@ -633,6 +782,9 @@ class MsbDocument:
         return self.read_placement((part['type'], part['id']))
 
     def _readback(self, part, field):
+        if field in ('hitFilter', 'startsDisabled') and part['type'] == 5:
+            value = self.plain[part['type_data'] + (0 if field == 'hitFilter' else 0x26)]
+            return bool(value) if field == 'startsDisabled' else value
         if field in FLOAT_FIELDS:
             return struct.unpack_from('<f', self.plain, part['base'] + FLOAT_FIELDS[field])[0]
         return struct.unpack_from('<i', self.plain, part['type_data'] + 12)[0]
@@ -640,11 +792,19 @@ class MsbDocument:
     def _original_value(self, part, field):
         if (part['type'], part['id']) in self.added:
             return None
+        if field in ('hitFilter', 'startsDisabled') and part['type'] == 5:
+            value = self.original[part['type_data'] + (0 if field == 'hitFilter' else 0x26)]
+            return bool(value) if field == 'startsDisabled' else value
         if field in FLOAT_FIELDS:
             return struct.unpack_from('<f', self.original, part['base'] + FLOAT_FIELDS[field])[0]
         return struct.unpack_from('<i', self.original, part['type_data'] + 12)[0]
 
     def read_placement(self, part_key):
+        if part_key[0] == 'region':
+            return self.read_region(part_key)
+        if str(part_key[0]).startswith('event'):
+            from . import msb_events
+            return msb_events.read(self, part_key)
         part = self._by_id.get(tuple(part_key) if isinstance(part_key, list) else part_key)
         if part is None or part['type'] not in PLACEMENT_TYPES:
             raise MsbError('Select an enemy, object or player-start placement')
@@ -670,6 +830,13 @@ class MsbDocument:
                            'dtype': 's32', 'value': part['npc'], 'type': 'number',
                            'minimum': None, 'maximum': None,
                            'enum': {}, 'editable': True, 'vanilla': self._original_value(part, 'npcId')})
+        if part['type'] == 5:
+            for key, label in (('hitFilter', 'Collision behavior'), ('startsDisabled', 'Starts disabled')):
+                fields.append({'key': key, 'label': label, 'description': '', 'group': 'Collision',
+                               'dtype': 'u8', 'type': 'bool' if key == 'startsDisabled' else 'enum',
+                               'value': self._readback(part, key), 'minimum': 0, 'maximum': 23 if key == 'hitFilter' else 1,
+                               'enum': HIT_FILTERS if key == 'hitFilter' else {}, 'editable': True,
+                               'vanilla': self._original_value(part, key)})
         return {'partId': part['id'], 'type': part['type'], 'kind': TYPE_LABELS[part['type']],
                 'name': part['name'], 'model': self.models[part['model']]['name'],
                 'think': part['think'], 'fields': fields}
@@ -689,6 +856,8 @@ class MsbDocument:
         return struct.unpack_from('<i', self.plain, event['bhead'])[0]
 
     def _light_original(self, event, field):
+        if ('light', event['seq']) in self.added:
+            return None
         if field in LIGHT_POINT_OFFSETS:
             point = self.points[event['point']]
             return struct.unpack_from(
@@ -711,7 +880,7 @@ class MsbDocument:
                            'value': round(self._light_readback(event, key), 3), 'type': 'number',
                            'minimum': None, 'maximum': None,
                            'enum': {}, 'editable': True,
-                           'vanilla': round(raw_vanilla, 3)})
+                           'vanilla': None if raw_vanilla is None else round(raw_vanilla, 3)})
         label, group, description = LIGHT_FIELDS['preset']
         fields.append({'key': 'preset', 'label': label, 'description': description,
                        'group': group, 'dtype': 's32',
@@ -722,8 +891,8 @@ class MsbDocument:
         return {'key': f"light:{event['seq']}", 'kind': 'Light',
                 'preset': event['preset'],
                 'name': event['name'], 'point': point['name'],
-                'part': self.parts[event['part']]['name'],
-                'areaPart': self.parts[event['area']]['name'],
+                'part': self.parts[event['area']]['name'] if event['area'] >= 0 else None,
+                'areaPart': self.parts[event['area']]['name'] if event['area'] >= 0 else None,
                 'fields': fields}
 
     def edit_light(self, light_key, field, value):
@@ -738,7 +907,8 @@ class MsbDocument:
                 raise MsbError('Enter a finite number')
             point = self.points[event['point']]
             start = point['base'] + LIGHT_POINT_OFFSETS[field]
-            saved = struct.unpack_from('<f', self.original, start)[0]
+            saved = (struct.unpack_from('<f', self.original, start)[0]
+                     if start+4 <= len(self.original) else float('nan'))
             if math.isfinite(saved) and float(f'{float(value):.7g}') == float(f'{saved:.7g}'):
                 value = saved
             self._write(start, 4, struct.pack('<f', value))
@@ -839,6 +1009,9 @@ class MsbDocument:
         for point in self.points:
             if point['base'] >= at:
                 point['base'] += delta
+            for field in ('shape_at', 'entity_at'):
+                if field in point and point[field] >= at:
+                    point[field] += delta
             point['spans'] = [(low + delta, high + delta) if low >= at else (low, high)
                               for low, high in point['spans']]
         for event in self.events:
@@ -935,7 +1108,7 @@ class MsbDocument:
             t_padded += -t_padded % 4
             t_ahead = 60 + t_padded
             header = bytearray(self.plain[template['base']:template['base'] + 60])
-            struct.pack_into('<i', header, 8, len(self.points))
+            struct.pack_into('<i', header, 8, max(point['index'] for point in self.points)+1)
             struct.pack_into('<3f', header, 16, *pos)
             ints = list(struct.unpack_from('<8i', header, 28))
             rebase = {t_ahead: ahead,
@@ -952,8 +1125,7 @@ class MsbDocument:
         base = len(self.plain)
         self.plain += bytes(header) + padded + bytes(tail)
         self._relocate_param(2, extra=[base])
-        point = {'name': name, 'index': len(self.points), 'type': 0, 'pos': tuple(pos),
-                 'base': base, 'spans': [(base + 60, base + 60 + len(name_bytes))]}
+        point = _point(self.plain, base)
         self.points.append(point)
         self._strings.append((base + 60, base + 60 + len(name_bytes)))
         return len(self.points) - 1
@@ -1072,6 +1244,11 @@ class MsbDocument:
     def add_placement(self, part_key):
         """Duplicate a placement: fresh identity and name, its own entity,
         appended last. The copy starts where its source stands."""
+        if part_key[0] == 'region':
+            return self.add_region(part_key)
+        if str(part_key[0]).startswith('event'):
+            from . import msb_events
+            return msb_events.duplicate(self, part_key)
         part = self._by_id.get(tuple(part_key) if isinstance(part_key, list) else part_key)
         if part is None or part['type'] not in PLACEMENT_TYPES:
             raise MsbError('Select an enemy, object or player-start placement')
@@ -1124,6 +1301,7 @@ class MsbDocument:
         if ptype in ENEMY_TYPES:
             new['spans'].append((tabs_at, tabs_at + ENEMY_READ))
         self.parts.append(new)
+        self._model_counts()
         self._by_id[(ptype, new_id)] = new
         self._strings.extend(new['spans'][1:3])
         self.added.add((ptype, new_id))
@@ -1137,6 +1315,19 @@ class MsbDocument:
         sibling paths, entities and type data stay model-correct. The
         copy takes the given transform, a fresh identity and a fresh
         entity; a pasted enemy also takes the copied enemy identity."""
+        if str(model_name).startswith('@region:'):
+            try:
+                shape = int(model_name.split(':', 1)[1])
+            except ValueError:
+                raise MsbError('Select a region shape') from None
+            return self.add_region(shape=shape, pos=pos)
+        if str(model_name).startswith('@event:'):
+            from . import msb_events
+            try:
+                etype = int(model_name.split(':', 1)[1])
+            except ValueError:
+                raise MsbError('Select a map event kind') from None
+            return msb_events.create(self, etype, pos)
         index = next((num for num, model in enumerate(self.models)
                       if model['name'] == model_name), None)
         if index is None:
@@ -1163,19 +1354,122 @@ class MsbDocument:
     def remove_placement(self, part_key):
         """Drop a placement from the directory. Its bytes stay orphaned."""
         key = tuple(part_key) if isinstance(part_key, list) else part_key
+        if key[0] == 'region':
+            return self.remove_region(key)
+        if str(key[0]).startswith('event'):
+            from . import msb_events
+            return msb_events.remove(self, key)
         part = self._by_id.get(key)
         if part is None or part['type'] not in PLACEMENT_TYPES:
             raise MsbError('Select an enemy, object or player-start placement')
         if part['type'] == PLAYER_TYPE:
             raise MsbError('The player start cannot be removed')
+        self._remap_part_references(part)
         self._relocate_parts(drop=[part['base']])
         del self._by_id[key]
         self.parts.remove(part)
+        self._model_counts()
         self.added.discard(key)
         self.dirty = {entry for entry in self.dirty if entry[0] != key}
         self.removed.append({'type': part['type'], 'id': part['id'], 'name': part['name'],
                              'kind': TYPE_LABELS[part['type']]})
         return {'type': part['type'], 'id': part['id'], 'name': part['name']}
+
+    def _model_counts(self):
+        for index, model in enumerate(self.models):
+            count = sum(part['model'] == index for part in self.parts)
+            struct.pack_into('<i', self.plain, model['spans'][0][0]+16, count)
+
+    def _remap_part_references(self, removed):
+        """Part list indices differ from stable (type,id) identities."""
+        gone = self.parts.index(removed)
+        if removed['type'] == 5:
+            collisions = [part for part in self.parts if part['type'] == 5]
+            collision_index = collisions.index(removed)
+            if any(struct.unpack_from('<i', self.plain, part['type_data'])[0] == collision_index
+                   for part in self.parts if part['type'] == 11):
+                raise MsbError('Remove the connected collision that uses this collision first')
+        slots = [event['ahead'] for event in self.events]
+        for event in self.events:
+            if event['type'] in (4, 7):
+                slots.append(event['bhead'] + 4)
+            elif event['type'] == 5:
+                slots.extend(event['bhead'] + 64 + 4*i for i in range(32))
+        for part in self.parts:
+            if part['type'] in ENEMY_TYPES:
+                slots.append(part['type_data'] + 28)
+            elif part['type'] in OBJECT_TYPES:
+                slots.append(part['type_data'] + 4)
+            elif part['type'] == 11 and removed['type'] == 5:
+                at = part['type_data']
+                value = struct.unpack_from('<i', self.plain, at)[0]
+                if value > collision_index:
+                    struct.pack_into('<i', self.plain, at, value - 1)
+        for at in slots:
+            value = struct.unpack_from('<i', self.plain, at)[0]
+            if value >= gone:
+                struct.pack_into('<i', self.plain, at, -1 if value == gone else value-1)
+        for event in self.events:
+            event['area'] = struct.unpack_from('<i', self.plain, event['ahead'])[0]
+
+    def add_region(self, key=None, shape=5, pos=(0, 0, 0)):
+        if key is not None:
+            source = self._region(key)
+        else:
+            if type(shape) is not int or shape not in REGION_SHAPES:
+                raise MsbError('Select a region shape')
+            if len(pos) != 3 or any(type(v) not in (int, float) or not math.isfinite(v) for v in pos):
+                raise MsbError('A region needs a finite position')
+            source = {'name': REGION_SHAPES[shape][0], 'shape': shape, 'pos': pos,
+                      'rot': (0, 0, 0), 'dimensions': {field: 1.0 for field in REGION_SHAPES[shape][1]}}
+        identity = max((point['index'] for point in self.points), default=-1) + 1
+        name = f"{source['name']}_{identity}"
+        names = {point['name'] for point in self.points}
+        while name in names:
+            name += '_copy'
+        encoded = name.encode('shift_jis') + b'\0'
+        encoded += bytes(-len(encoded) % 4)
+        shape_data = struct.pack('<%df' % len(source['dimensions']), *source['dimensions'].values())
+        base = len(self.plain)
+        shape_at = POINT_HEADER + len(encoded) + 8
+        header = struct.pack('<4i6f5i', POINT_HEADER, 0, identity, source['shape'],
+                             *source['pos'], *source['rot'], shape_at-8, shape_at-4,
+                             shape_at, shape_at+len(shape_data), 0)
+        self.plain += header + encoded + bytes(8) + shape_data + struct.pack('<i', -1)
+        self._relocate_param(2, extra=[base])
+        point = _point(self.plain, base)
+        self.points.append(point)
+        self._strings.extend(point['spans'])
+        self.added.add(('region', identity))
+        self.dirty.add((('region', identity), 'posX'))
+        return self.read_region(('region', identity))
+
+    def remove_region(self, key):
+        point = self._region(key)
+        gone = self.points.index(point)
+        if any(event['type'] == LIGHT_EVENT and event['point'] == gone for event in self.events):
+            raise MsbError('This region positions a light; move that light to another region before removing it')
+        slots = [(event['ahead']+4, 'i') for event in self.events]
+        for event in self.events:
+            if event['type'] in (8, 10):
+                slots.append((event['bhead'], 'i'))
+            elif event['type'] == 5:
+                slots.extend((event['bhead'] + 48 + 4*i, 'i') for i in range(4))
+        for part in self.parts:
+            if part['type'] in ENEMY_TYPES:
+                slots.extend((part['type_data'] + 40 + 2*i, 'h') for i in range(8))
+        for at, dtype in slots:
+            value = struct.unpack_from('<'+dtype, self.plain, at)[0]
+            if value >= gone:
+                struct.pack_into('<'+dtype, self.plain, at, -1 if value == gone else value-1)
+        for event in self.events:
+            event['point'] = struct.unpack_from('<i', self.plain, event['ahead']+4)[0]
+        self._relocate_param(2, drop=[point['base']])
+        self.points.remove(point)
+        self.added.discard(tuple(key))
+        self.dirty = {entry for entry in self.dirty if entry[0] != tuple(key)}
+        self.removed.append({'type': 'region', 'id': key[1], 'name': point['name'], 'kind': 'Region'})
+        return {'type': 'region', 'id': key[1], 'name': point['name']}
 
     def export(self):
         return bytes(self.plain)

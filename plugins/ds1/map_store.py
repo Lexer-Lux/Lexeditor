@@ -24,6 +24,8 @@ def parse_key(key):
     """A placement identity from its "type:id" form."""
     try:
         ptype, pid = str(key).split(":")
+        if ptype == 'region' or re.fullmatch(r'event(?:[1-9]|1[0-2])', ptype):
+            return ptype, int(pid)
         return int(ptype), int(pid)
     except (TypeError, ValueError) as error:
         raise MsbError("Select an enemy or player-start placement") from error
@@ -456,6 +458,13 @@ class MapStore:
                   "who": who,
                   "mapNames": [self.display_name(map_name)]}
         display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
+        if 'hitFilter' in placement:
+            values['hitFilter'] = placement['hitFilter']
+        if placement['type'] == 'region' or str(placement['type']).startswith('event') or placement['type'] == 5:
+            for field in self.get(map_name).read_placement((placement['type'], placement['partId']))['fields']:
+                values[field['key']] = field['value']
+                if field['enum']:
+                    display[field['key']] = field['enum'].get(str(field['value']), str(field['value']))
         modified = self.get(map_name).placement_modified((placement["type"], placement["partId"]))
         return {"id": f"{placement['type']}:{placement['partId']}", "table": map_name,
                 "name": who,
@@ -638,6 +647,10 @@ class MapStore:
 
     def add_placement(self, map_name, key):
         self.writable()
+        if str(key).startswith('light:'):
+            from . import msb_events
+            row = msb_events.duplicate(self.get(map_name), ('event0', int(str(key).split(':')[1])))
+            return self.read(map_name, row['key'])
         if str(key).startswith("message:"):
             row = self.get(map_name).add_message(
                 ("message", int(str(key).split(":")[1])))
@@ -650,11 +663,14 @@ class MapStore:
         self.writable()
         row = self.get(map_name).create_placement(model, pos, rot, npc)
         self._npc_models = None
-        return self.read(map_name, f"{row['type']}:{row['partId']}")
+        return self.read(map_name, row.get('key') or f"{row['type']}:{row['partId']}")
 
     def remove_placement(self, map_name, key):
         self.writable()
         self._npc_models = None
+        if str(key).startswith('light:'):
+            from . import msb_events
+            return msb_events.remove(self.get(map_name), ('event0', int(str(key).split(':')[1])))
         if str(key).startswith("message:"):
             return self.get(map_name).remove_message(
                 ("message", int(str(key).split(":")[1])))
@@ -669,6 +685,8 @@ class MapStore:
         changes = []
         for map_name, document in self.docs.items():
             known = {(part["type"], part["id"]): part["name"] for part in document.parts}
+            known.update({('region', point['index']): point['name'] for point in document.points})
+            known.update({(f"event{event['type']}", event['seq']): event['name'] for event in document.events})
             for (ptype, pid), field in sorted(document.dirty, key=str):
                 if ptype == "message":
                     row = document.read_message((ptype, pid))
