@@ -955,7 +955,9 @@ class Handler(PluginRequestHandler):
                     MAPSTORE.validate_save()
                     TAESTORE.validate_save()
                     result = STORE.save()
-                    MAPSTORE.save()
+                    saved_maps = MAPSTORE.save()
+                    if saved_maps.get('recordsChanged'):
+                        STORE.load()
                     TAESTORE.save()
                     RULES.save()
                     SKILLS.save()

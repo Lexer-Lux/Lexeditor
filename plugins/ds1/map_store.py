@@ -248,11 +248,26 @@ class MapStore:
         if source.stat().st_size > MAX_MAP:
             raise ValueError("The map file is too large.")
         raw = source.read_bytes()
+        source_hash = hashlib.sha256(raw).hexdigest()
+        from . import record_edits
+        records = (self.item_store.portable_specs or {} if self.item_store is not None
+                   and self.item_store.document is not None else self._record_specs())
+        portable = records.get(MAP_DIR/map_name)
+        if portable is not None:
+            if output is not None and output.exists():
+                raise ValueError('A mod cannot contain both a map archive and record edits for the same target')
+            raw = record_edits.materialize(MAP_DIR/map_name,raw,portable)
         self.docs[map_name] = MsbDocument(raw, map_name)
         self.hashes[map_name] = {"source": source, "output": output, "vanilla": vanilla,
-                                 "source_hash": hashlib.sha256(raw).hexdigest(),
+                                 "source_hash": source_hash, 'record_spec':portable,
                                  "vanilla_hash": digest(vanilla),
                                  "output_hash": digest(output) if output else None}
+
+    def _record_specs(self):
+        from . import record_edits
+        from .tweak_mods import checked
+        path = checked(self.project/record_edits.FILENAME) if self.project else None
+        return record_edits.decode(record_edits.read(path)) if path is not None and path.is_file() else {}
 
     def get(self, map_name):
         if map_name not in self.maps():
@@ -775,8 +790,11 @@ class MapStore:
     def validate_save(self):
         from .tweak_mods import checked
         self.writable()
+        records = self._record_specs()
         for map_name, document in self.docs.items():
             entry = self.hashes[map_name]
+            if records.get(MAP_DIR/map_name) != entry['record_spec']:
+                raise ValueError('The mod map records changed outside Lexeditor. Reopen it before saving.')
             vanilla = deployment.vanilla_source(self.game_root, MAP_DIR / map_name)
             for path in (entry["source"], vanilla, entry["output"]):
                 if path is not None:
@@ -790,6 +808,8 @@ class MapStore:
     def save(self):
         self.validate_save()
         from .tweak_mods import checked
+        from . import record_edits
+        records, records_changed = self._record_specs(), False
         for map_name, document in self.docs.items():
             if not document.dirty_count:
                 continue
@@ -799,13 +819,21 @@ class MapStore:
                 raise ValueError("The output path leaves the mod project or enters the installed game.")
             payload = document.export()
             MsbDocument(payload, map_name)
+            relative = MAP_DIR/map_name
+            if self.hashes[map_name]['record_spec'] is not None:
+                original = deployment.vanilla_source(self.game_root,relative).read_bytes()
+                records[relative] = record_edits.create(relative,original,payload)
+                records_changed = True
+                continue
             output.parent.mkdir(parents=True, exist_ok=True)
             atomic_write(output, payload)
+        if records_changed:
+            atomic_write(checked(self.project/record_edits.FILENAME),record_edits.encode(records))
         self.docs = {}
         self.vanilla_docs = {}
         self.hashes = {}
         self._npc_models = None
-        return {"saved": True, "dirtyCount": 0}
+        return {"saved": True, "dirtyCount": 0, 'recordsChanged':records_changed}
 
     def discard(self):
         self.docs = {}

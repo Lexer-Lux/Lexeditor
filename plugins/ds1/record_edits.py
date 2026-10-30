@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from core.mod_library import relative_path
-from . import formats, texts, script_edits, binder_edits
+from . import formats, texts, script_edits, binder_edits, map_edits
 
 FILENAME = Path('records.lxd')
 LIMIT = 64 * 1024 * 1024
@@ -27,7 +27,7 @@ def supports(relative):
     from .mod_loader import FILES
     from . import emevd
     return (relative in FILES or emevd.is_event_file(relative)
-            or script_edits.supported(relative) or binder_edits.supported(relative))
+            or script_edits.supported(relative) or binder_edits.supported(relative) or map_edits.supported(relative))
 
 
 @lru_cache(maxsize=128)
@@ -129,7 +129,9 @@ def _header(data):
 def validate_original(relative,original):
     """Diagnose a failed rebase without blaming a mod for damaged game data."""
     from . import emevd,mod_loader
-    if emevd.is_event_file(relative):
+    if map_edits.supported(relative):
+        map_edits.MsbDocument(original,relative.name)
+    elif emevd.is_event_file(relative):
         _event_document(original)
     elif script_edits.supported(relative):
         script_edits.validate_original(original)
@@ -148,6 +150,8 @@ def validate_original(relative,original):
 def create(relative,before,after):
     from . import mod_loader
     from . import emevd
+    if map_edits.supported(relative):
+        return map_edits.create(relative,before,after)
     if emevd.is_event_file(relative):
         return _create_events(before,after)
     if script_edits.supported(relative):
@@ -232,6 +236,8 @@ def materialize(relative,original,spec):
     if original is None:
         raise ValueError(f'{relative}: the installed baseline is missing')
     from . import emevd
+    if map_edits.supported(relative):
+        return map_edits.materialize(relative,original,spec)
     if emevd.is_event_file(relative):
         return _materialize_events(original,spec)
     if script_edits.supported(relative):
