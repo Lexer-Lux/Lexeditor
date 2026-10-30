@@ -161,8 +161,20 @@ class Ds1ModAdapter:
     def _ordered_mods(self, mods):
         from core import mods_service
         wanted = {Path(path).resolve() for path in mods}
-        return [(row["name"], Path(row["path"])) for row in mods_service.library_rows(self._library())
-                if Path(row["path"]).resolve() in wanted and (Path(row["path"]) / MARKER).is_file()]
+        # Native-only mods do not change the installed data recipe. Including
+        # their empty content stamp made every native toggle re-merge archives.
+        ordered = []
+        for row in mods_service.library_rows(self._library()):
+            folder = Path(row['path'])
+            if folder.resolve() not in wanted:
+                continue
+            try:
+                if mod_loader.content_files(folder, row['name']):
+                    ordered.append((row['name'], folder))
+            except Exception as error:
+                from core.mod_builds import ModBuildError
+                raise ModBuildError([folder], f"{row['name']}: {error}") from error
+        return ordered
 
     def conflicts(self, mods: list[Path], game_root: Path) -> dict[str, list[str]]:
         """Each switched-on mod's clashes with another one, by mod folder.

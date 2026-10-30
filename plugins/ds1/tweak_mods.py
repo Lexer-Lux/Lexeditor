@@ -738,7 +738,7 @@ def _manifest(game_root: Path, managed: Managed = EXECUTABLE) -> dict:
         raise TweakError(damaged)
     keys = {"sha256", "mods"} | ({"project"} if data["version"] == 2 else set())
     pending = data.get("pending")
-    if pending is not None and (type(pending) is not dict or set(pending) != keys
+    if pending is not None and (type(pending) is not dict or set(pending) - {"inputs"} != keys
                                 or not _digest(pending["sha256"]) or not _mod_names(pending["mods"])):
         raise TweakError(damaged)
     if data["version"] == 2:
@@ -774,11 +774,12 @@ def _current_manifest(current: bytes, manifest: dict, managed: Managed = EXECUTA
     pending = manifest.get("pending")
     if pending and _sha(current) == pending["sha256"]:
         return {"version": 2, "sha256": pending["sha256"], "mods": list(pending["mods"]),
-                "project": pending.get("project"), "pending": None}
+                "project": pending.get("project"), "inputs": pending.get("inputs"), "pending": None}
     vanilla = managed.vanilla(current)
     return {"version": 2, "sha256": _sha(current),
             "mods": [] if vanilla else list(manifest.get("mods", [])),
             "project": None if vanilla else manifest.get("project"),
+            "inputs": None if vanilla else manifest.get("inputs"),
             "pending": None}
 
 
@@ -790,16 +791,16 @@ def _save_manifest(game_root: Path, value: dict, managed: Managed = EXECUTABLE) 
 
 
 def _finish_manifest(game_root: Path, current: bytes, mods: list[str], project=None,
-                     managed: Managed = EXECUTABLE) -> None:
+                     managed: Managed = EXECUTABLE, *, inputs=None) -> None:
     if managed.vanilla(current) and not mods and project is None:
         checked(managed.manifest(game_root)).unlink(missing_ok=True)
     else:
         _save_manifest(game_root, {"version": 2, "sha256": _sha(current), "mods": list(mods),
-                                   "project": project, "pending": None}, managed)
+                                   "project": project, "inputs": inputs, "pending": None}, managed)
 
 
 def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
-           managed: Managed = EXECUTABLE, project=None) -> None:
+           managed: Managed = EXECUTABLE, project=None, *, inputs=None) -> None:
     """Journal one expected-image replacement; keep the original plus the latest intent."""
     game_root = checked(Path(game_root))
     live = checked(managed.live(game_root))
@@ -810,6 +811,8 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
     original = _original(game_root, before, old, managed)
     project = _project(project)
     desired = {"sha256": _sha(after), "mods": list(mods), "project": project}
+    if inputs is not None:
+        desired['inputs'] = inputs
     journal = {**_current_manifest(before, old, managed), "pending": desired}
     # Check the bound before creating a backup or replacing anything.
     if len(json.dumps(journal, allow_nan=False).encode("utf-8")) > MAX_MANIFEST - 1024:
@@ -837,7 +840,7 @@ def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
         _put(game_root, live, after)
     if _read(live, managed) != after:
         raise TweakError(f"{managed.label.capitalize()} verification failed; the original and pending intent were kept")
-    _finish_manifest(game_root, after, mods, project, managed)
+    _finish_manifest(game_root, after, mods, project, managed, inputs=inputs)
 
 
 def _installed(game_root: Path, managed: Managed, action: str) -> tuple[bytes, dict]:
@@ -1051,17 +1054,31 @@ def _menu_cache_value(value):
     raise TypeError(f'Unsupported menu cache value: {type(value).__name__}')
 
 
-def _compose_menu(original, specs, managed, cache_root):
+def _menu_identity(original, specs, managed):
+    try:
+        from .mod_loader import _composition_revision
+        kind = 'layout' if managed == LAYOUT else ESD_ARCHIVE[managed]
+        return _sha(json.dumps([_composition_revision().hex(), kind, managed.relative, _sha(original), specs],
+                              sort_keys=True, separators=(',', ':'), default=_menu_cache_value).encode('utf-8'))
+    except (OSError, TypeError, ValueError):
+        return None  # Optional recipe metadata cannot prevent composition.
+
+
+
+def _compose_menu(original, specs, managed, cache_root, *, current=None, manifest=None):
     """Reuse unchanged layout/menu-script archives with the same bounded output cache."""
+    identity = _menu_identity(original, specs, managed)
+    # The journal already verifies which bytes are installed. Remember their
+    # recipe there, so eviction from the disposable archive cache cannot force
+    # an unchanged menu through decompression, composition and compression.
+    if identity is not None and current is not None and manifest is not None and _owned(current, manifest, managed):
+        if _current_manifest(current, manifest, managed).get('inputs') == identity:
+            return current
     key = None
-    if cache_root is not None:
+    if cache_root is not None and identity is not None:
         from . import composition_cache
         try:
-            from .mod_loader import _composition_revision
-            kind = 'layout' if managed == LAYOUT else ESD_ARCHIVE[managed]
-            key = _sha(json.dumps([_composition_revision().hex(), kind, managed.relative, _sha(original), specs],
-                                  sort_keys=True, separators=(',', ':'), default=_menu_cache_value)
-                       .encode('utf-8')).encode('ascii')
+            key = identity.encode('ascii')
             cached = composition_cache.load(cache_root, key)
             if cached is not None:
                 return cached
@@ -1129,10 +1146,11 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
         layout_current, layout_manifest = _installed(game_root, LAYOUT, "restore it before applying tweaks")
         layout_original = _original(game_root, layout_current, layout_manifest, LAYOUT)
         try:
-            layout_after = _compose_menu(layout_original, layout, LAYOUT, cache_root)
+            layout_after = _compose_menu(layout_original, layout, LAYOUT, cache_root, current=layout_current, manifest=layout_manifest)
         except ValueError as error:
             raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
         files.append({"managed": LAYOUT, "before": layout_current, "after": layout_after,
+                      "inputs": _menu_identity(layout_original, layout, LAYOUT),
                       "mods": _changes(layout) if layout_after != layout_original else [], "project": None,
                       "previous": _current_manifest(layout_current, layout_manifest, LAYOUT)})
         menu_timings.append({'file': LAYOUT.relative, 'seconds': perf_counter() - menu_started})
@@ -1144,10 +1162,11 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
             esd_current, esd_manifest = _installed(game_root, managed, "restore it before applying tweaks")
             esd_original = _original(game_root, esd_current, esd_manifest, managed)
             try:
-                esd_after = _compose_menu(esd_original, targeted, managed, cache_root)
+                esd_after = _compose_menu(esd_original, targeted, managed, cache_root, current=esd_current, manifest=esd_manifest)
             except ValueError as error:
                 raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
             files.append({"managed": managed, "before": esd_current, "after": esd_after,
+                          "inputs": _menu_identity(esd_original, targeted, managed),
                           "mods": _changes(targeted) if esd_after != esd_original else [], "project": None,
                           "previous": _current_manifest(esd_current, esd_manifest, managed)})
             menu_timings.append({'file': managed.relative, 'seconds': perf_counter() - menu_started})
@@ -1183,7 +1202,7 @@ def _undo(game_root: Path, done: list[dict]) -> None:
                 if current != item['after']:
                     raise TweakError(f'The {managed.label} changed during rollback')
                 _write(game_root, item["after"], item["before"], previous.get("mods", []),
-                       managed, project=previous.get("project"))
+                       managed, project=previous.get("project"), inputs=previous.get("inputs"))
         except Exception as error:
             errors.append(str(error))
     if errors:
@@ -1201,7 +1220,7 @@ def commit(game_root: Path, plan: dict) -> None:
         for item in plan["files"]:
             done.append(item)
             _write(game_root, item["before"], item["after"], item["mods"], item["managed"],
-                   project=item["project"])
+                   project=item["project"], inputs=item.get("inputs"))
         runtime = plan["runtime"]
         # Counted before it starts: a failure between its files must be taken
         # back too, not only a finished install.

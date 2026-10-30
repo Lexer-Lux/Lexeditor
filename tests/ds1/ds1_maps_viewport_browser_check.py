@@ -54,10 +54,19 @@ def main():
                     page.wait_for_selector('[data-maps-dir] [data-dir-local]', timeout=30000)
                     toggle = page.locator('[data-dir-local]')
                     assert toggle.count() == 1
-                    mode = page.evaluate("getComputedStyle(document.querySelector('[data-dir-local] > span')).writingMode")
-                    assert mode == 'horizontal-tb', mode
-                    box = toggle.bounding_box()
-                    assert box['height'] < 50, box
+                    # Loading the directory can replace the row between
+                    # separate style and box reads. Measure one visible row
+                    # atomically instead of dereferencing a detached box.
+                    measured = page.wait_for_function("""() => {
+                      const node = document.querySelector('[data-dir-local]');
+                      if (!node) return null;
+                      const box = node.getBoundingClientRect();
+                      if (!box.width || !box.height) return null;
+                      return {height: box.height,
+                        mode: getComputedStyle(node.querySelector(':scope > span')).writingMode};
+                    }""", timeout=30000).json_value()
+                    assert measured['mode'] == 'horizontal-tb', measured
+                    assert measured['height'] < 50, measured
                     if output:
                         page.screenshot(path=str(output / 'maps-viewport.png'))
                     assert not errors, errors
