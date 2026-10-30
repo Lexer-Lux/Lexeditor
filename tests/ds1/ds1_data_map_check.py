@@ -52,7 +52,9 @@ def main():
             curves_missing = 'CalcCorrectGraph.param' not in members
             asset_rows=sum(1 for top in assets.ASSET_ROOTS if (game/top).is_dir())
             assert asset_rows>0
-            assert len({row['id'] for row in rows})==len(rows)==len(members)+5+10+1+3+asset_rows+effects_missing+curves_missing+1
+            assert len({row['id'] for row in rows})==len(rows)==len(members)+5+10+1+3+asset_rows+effects_missing+curves_missing+2
+            skills = next(row for row in rows if row['id']=='weapon-skills')
+            assert skills['openable'] and skills['target']=='items' and skills['sub']=='ashes-of-war'
             assert {row['id'] for row in rows if row['id'].startswith('assets:')}=={'assets:'+top for top in assets.ASSET_ROOTS if (game/top).is_dir()}
             from plugins.ds1.data_map import ASSET_TARGETS
             for row in rows:

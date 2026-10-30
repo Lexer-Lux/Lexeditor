@@ -63,7 +63,7 @@ def test_text_tab_state_and_label_roundtrip(tmp_path):
     try:
         session.start()
         state = request('/api/state')
-        assert [tab['id'] for tab in state['tabs']] == [tab for tab, _, _ in SUBTABS]
+        assert [tab['id'] for tab in state['tabs']] == [tab for tab, _, _ in SUBTABS] + ['ashes-of-war']
         assert state['textTabs'] == [{'id': 'menu-labels', 'label': 'Menu labels',
                                       'table': 'MenuText', 'count': 3},
                                      {'id': 'fmg-menu-text', 'label': 'Menu text',

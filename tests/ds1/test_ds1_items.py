@@ -105,7 +105,7 @@ def test_service_edit_save_and_reload(tmp_path):
         with urlopen(req) as reply: return json.load(reply)
     try:
         session.start()
-        assert [tab['id'] for tab in request('/api/state')['tabs']] == [tab for tab, _, _ in SUBTABS]
+        assert [tab['id'] for tab in request('/api/state')['tabs']] == [tab for tab, _, _ in SUBTABS] + ['ashes-of-war']
         assert request('/api/edit', {'table': 'EquipParamGoods', 'id': 100, 'field': 'sellValue', 'value': 42})['dirtyCount'] == 1
         assert request('/api/save', {})['saved']
         request('/api/discard', {})

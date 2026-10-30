@@ -255,7 +255,7 @@ def test_mod_activation_deploys_the_current_script_build(monkeypatch, tmp_path):
     monkeypatch.setattr(tweak_mods, 'locked', lambda game: nullcontext())
     def prepare(game, library, **kwargs):
         generated.write_bytes(b'current settings')
-        return {}
+        return {'files': []}
     monkeypatch.setattr(tweak_mods, 'prepare', prepare)
     monkeypatch.setattr(tweak_mods, 'commit', lambda game, plan: None)
     monkeypatch.setattr(adapter, '_mods', lambda paths: [
