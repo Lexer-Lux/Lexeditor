@@ -36,7 +36,7 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 PACKAGE = HERE / "package"
-SOURCES = ("lexeditor_ds1_loader.c", "lexeditor_ds1_loader.h", "lexeditor_ds1_mods.c")
+SOURCES = ("lexeditor_ds1_loader.c", "lexeditor_ds1_loader.h", "lexeditor_ds1_mods.c", "lexeditor_ds1_chain.c")
 DEBUG_SOURCES = SOURCES + ("lexeditor_ds1_debug.c",)
 DEBUG_PACKAGE = PACKAGE / "debug"
 ONLINE_PACKAGE = PACKAGE / "online"

@@ -25,7 +25,8 @@
  * still during the game's opening logos, before a save can be loaded.
  *
  * DirectInput8Create, the one function the game imports from dinput8.dll,
- * is forwarded to the system's own dinput8.dll.
+ * is forwarded to dinput8.chain.dll when the player preserved another proxy
+ * there, otherwise to the system's own dinput8.dll.
  *
  * A game whose code a mod changed must never reach FromSoftware's servers or
  * other players: their anti-cheat may ban the account. So whenever the patch
@@ -647,31 +648,14 @@ static void apply_from_file(void)
     write_log(message);
 }
 
-typedef HRESULT(WINAPI *create_t)(HINSTANCE, DWORD, REFIID, LPVOID *, LPUNKNOWN);
-
-__declspec(dllexport) HRESULT WINAPI DirectInput8Create(HINSTANCE instance, DWORD version, REFIID iid, LPVOID *out, LPUNKNOWN outer)
-{
-    static create_t create;
-    if (!create) {
-        wchar_t path[MAX_PATH];
-        UINT length = GetSystemDirectoryW(path, MAX_PATH);
-        if (!length || length > MAX_PATH - 14)
-            return E_FAIL;
-        wcscat(path, L"\\dinput8.dll");
-        HMODULE system = LoadLibraryW(path);
-        create = system ? (create_t)GetProcAddress(system, "DirectInput8Create") : NULL;
-        if (!create)
-            return E_FAIL;
-    }
-    return create(instance, version, iid, out, outer);
-}
+#include "lexeditor_ds1_chain.c"
 
 #ifdef LX_DEBUG_BUILD
 /* The debug loader (lexeditor_ds1_debug.c) blocks the network, switches
  * Arxan off, and then applies the tweaks. */
 void lx_debug_start(void);
 void lx_debug_log(const char *text) { write_log(text); }
-void lx_debug_apply(void) { lx_data_ready=lx_prepare_data(); apply_from_file(); lx_load_mod_folders(); }
+void lx_debug_apply(void) { lx_data_ready=lx_prepare_data(); lx_chain_start(); apply_from_file(); lx_load_mod_folders(); }
 #endif
 
 #ifndef LX_DEBUG_BUILD
@@ -681,6 +665,7 @@ static DWORD WINAPI start_mods(void *ignored)
     /* Data preparation needs the pre-entry-point dearxan callback supplied
      * by the online/debug package. The basic proxy loads native-only mods. */
     lx_data_ready=0;
+    lx_chain_start();
     apply_from_file();
     lx_load_mod_folders();
     return 0;

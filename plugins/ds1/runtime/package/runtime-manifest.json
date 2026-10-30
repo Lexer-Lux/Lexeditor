@@ -1,7 +1,7 @@
 {
   "file": "dinput8.dll",
-  "sha256": "1f9c2e3ee494d8c7fc11e6aaf2ba76f587713b32e7471228c61ced6a8167f219",
-  "size": 97280,
-  "sourceSha256": "6cae663dac64e18f540598a235acecf5c27ef29764dbed5749f21efd574693ef",
+  "sha256": "055bf76e44caf4462e0e6a48011e694839c66db8121640e336d0a6b40f16bc1d",
+  "size": 98816,
+  "sourceSha256": "22da36e2f29a279258580213d958d29e79da1819766cd9f1a04cd1564030dd13",
   "compiler": "zig 0.17.0"
 }

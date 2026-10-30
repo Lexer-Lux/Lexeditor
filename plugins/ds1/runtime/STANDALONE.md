@@ -5,6 +5,13 @@ each prebuilt mod folder in that directory or its `mods` subfolder. Steam still
 starts the game. The editor is optional, and no mod builder runs on the player's
 machine.
 
+If another mod already installed `dinput8.dll`, rename that other loader to
+`dinput8.chain.dll` before extracting this package. The loader loads that DLL
+before game entry and forwards its input calls, or uses system input when the
+proxy has no input export. An unreadable, damaged or oversized chain is logged
+and left on disk; system input remains available. Never overwrite an existing
+chain, and do not rename Lexeditor's own loader into that slot.
+
 The loader also reads the existing shared library, normally
 `Documents/Mods/ds1`. Lexeditor writes its chosen location to
 `lexeditor-ds1.ini`; it does not create a second managed library. On startup the
@@ -69,5 +76,5 @@ records data preparation and disabled mods; `lexeditor-ds1-patch.log` records
 native loading. Data-dependent native modules do not load if preparation fails.
 
 This implements the current drop-in/install/adopt workflow. Older issue #954's
-C-only port, foreign-loader chaining and rebasing over unrelated whole-file mods
+C-only port and rebasing over unrelated whole-file mods
 are separate requirements; this implementation does not claim those completed.

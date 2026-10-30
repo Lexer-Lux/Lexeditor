@@ -73,6 +73,8 @@ def package(destination: Path) -> Path:
     shutil.copy2(ROOT/'plugins/ds1/credits.md',destination/'Loader-credits.txt')
     (destination/'README.txt').write_text(
         'Extract these files beside DarkSoulsRemastered.exe.\n'
+        'If another mod already supplies dinput8.dll, preserve it as dinput8.chain.dll before extracting.\n'
+        'Do not overwrite an existing dinput8.chain.dll or rename this loader into that slot.\n'
         'Place each downloaded mod folder in the same game directory, or its mods subfolder.\n'
         'Start the game through Steam. Prebuilt data mods combine automatically.\n'
         'Lexeditor, Python installations and compilers are not required.\n'

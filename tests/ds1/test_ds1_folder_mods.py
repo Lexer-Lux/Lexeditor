@@ -342,6 +342,47 @@ def test_competing_mod_hook_workers_install_and_repair_without_freezing(tmp_path
     assert 'installed=24 repaired=22 protection=RX responsive=1' in result.stdout
 
 
+@pytest.mark.skipif(os.name != 'nt', reason='Windows input proxy chaining')
+def test_foreign_input_proxy_loads_once_and_broken_chain_preserves_system_input(tmp_path):
+    from test_ds1_runtime_loader import build_module
+    build = build_module()
+    try:
+        vcvars = build.find_vcvars()
+    except SystemExit:
+        pytest.skip('MSVC is not installed')
+    source = Path(__file__).with_name('chain_loader_harness.c')
+    fixture = source.with_name('chain_loader_fixture.c')
+    executable = tmp_path/'chain-harness.exe'
+    valid = tmp_path/'valid.dll'
+    no_export = tmp_path/'no-export.dll'
+    batch = tmp_path/'build-chain.bat'
+    batch.write_text(f'@echo off\ncall "{vcvars}" >nul\nif errorlevel 1 exit /b %errorlevel%\n'
+        f'cl /nologo /O1 /std:c17 /D_CRT_SECURE_NO_WARNINGS "{source}" /Fe:"{executable}" /Fo:"{tmp_path / "harness.obj"}"\n'
+        'if errorlevel 1 exit /b %errorlevel%\n'
+        f'cl /nologo /O1 /LD /std:c17 "{fixture}" /Fe:"{valid}" /Fo:"{tmp_path / "fixture.obj"}"\n'
+        'if errorlevel 1 exit /b %errorlevel%\n'
+        f'cl /nologo /O1 /LD /std:c17 /DLX_WITHOUT_INPUT_EXPORT "{fixture}" /Fe:"{no_export}" /Fo:"{tmp_path / "no-export.obj"}"\n')
+    subprocess.run(['cmd','/c',str(batch)],cwd=tmp_path,check=True,capture_output=True)
+    folder = tmp_path/'game with spaces 中文'
+    folder.mkdir()
+    chain = folder/'dinput8.chain.dll'
+    def run(mode):
+        result = subprocess.run([str(executable),str(folder),mode],capture_output=True,text=True,timeout=10)
+        assert result.returncode == 0,result
+        return result.stdout
+    assert 'system=1' in run('system')
+    chain.write_bytes(valid.read_bytes())
+    result = run('chain')
+    assert 'chain=42' in result and result.count('forwarding its input calls') == 1
+    chain.write_bytes(no_export.read_bytes())
+    result = run('system')
+    assert 'without an input export' in result and 'system=1' in result
+    chain.write_bytes(b'Damaged DLL')
+    result = run('system')
+    assert 'Could not load dinput8.chain.dll' in result and 'system=1' in result
+    assert chain.read_bytes() == b'Damaged DLL'
+
+
 def test_standalone_discovery_and_adoption_preserve_one_mod_copy(tmp_path):
     from core.standalone_mods import adopt
     from plugins.ds1.mod_support import Ds1ModAdapter

@@ -1092,7 +1092,8 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
         return
     if state["foreignDll"]:
         raise TweakError(f"Another mod's {RUNTIME_DLL} is in the game folder. Lexeditor's loader needs that name; "
-                         "remove or rename the other file, then Apply again. Nothing was changed.")
+                         "preserve the other loader as dinput8.chain.dll, then Apply again. "
+                         "Do not replace an existing chained loader. Nothing was changed.")
     loader = loader_bytes(online=True)
     record = {"version": 1, "mods": list(mods), "project": _project(project),
               "patchSha256": _sha(patch), "dllSha256": _sha(loader),
