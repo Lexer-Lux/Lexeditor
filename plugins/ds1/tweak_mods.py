@@ -1683,6 +1683,8 @@ def commit(game_root: Path, plan: dict) -> None:
 
 def rollback(game_root: Path, plan: dict) -> None:
     runtime = plan["runtime"]
+    if 'receipt' not in runtime:
+        return  # Preparation did not commit installed files.
     _undo(game_root, [*plan['files'], *[{**item,'module':True} for item in runtime.get('moduleWrites',[])],
                      {'runtime':runtime['receipt']}])
 
