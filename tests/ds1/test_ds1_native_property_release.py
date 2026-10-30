@@ -139,6 +139,20 @@ def test_old_global_project_recipe_retires_when_its_library_mod_is_disabled(proj
     assert (game/tweak_mods.RUNTIME_PATCH).read_bytes() == b''
 
 
+def test_reuse_cannot_hide_native_source_changes_after_successful_loading(project,tmp_path):
+    game,_library,mod,_rules,original = project
+    exported = runtime_mods.write_release(mod,tmp_path/'release',original,game_root=game)
+    assert standalone_runtime._run(game,[exported.parent],lambda:None)['loaded'] == ['native-editor']
+    assert standalone_runtime._run(game,[exported.parent],lambda:None)['reused']
+    source = exported/native_rules.SETTINGS_FILE
+    content = json.loads(source.read_bytes());content['rules']['baseRecovery'] = 72
+    source.write_text(json.dumps(content))
+    report = standalone_runtime._run(game,[exported.parent],lambda:None)
+    assert [row['id'] for row in report['disabled']] == ['native-editor']
+    assert not report['loaded']
+    assert (game/tweak_mods.RUNTIME_PATCH).read_bytes() == b''
+
+
 def test_apply_uses_library_switch_instead_of_a_hidden_global_project(project):
     game,_library,mod,rules,_original = project
     store = ItemStore(game,mod,False);store.save()

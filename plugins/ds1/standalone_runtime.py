@@ -91,12 +91,16 @@ def _modules(rows):
 
 
 def _identity(rows, game, targets):
+    from . import native_rules
     paths, contributors = [], []
     for row in rows:
         folder = row['path']
         inputs = [path for _, path in mod_loader.content_files(folder,row['name'])]
         for kind in tweak_mods.BUILT_FOLDERS[1:]:
             inputs.extend(tweak_mods.built_files(folder,kind))
+        source = tweak_mods.checked(folder/native_rules.SETTINGS_FILE)
+        if source.exists():
+            inputs.append(source)
         requires_data = _requires_data(folder)
         if inputs or requires_data:
             contributors.append([str(folder),row['id'],row['name'],mod_requires.declared(folder),requires_data])
@@ -111,7 +115,9 @@ def _identity(rows, game, targets):
     project = record.get('project') if record else None
     stamped = []
     for path in paths:
-        if path == game/tweak_mods.RUNTIME_PATCH and path.is_file():
+        if path.name == native_rules.SETTINGS_FILE:
+            value = native_rules.digest(native_rules._read_optional(path,native_rules.SETTINGS_LIMIT))
+        elif path == game/tweak_mods.RUNTIME_PATCH and path.is_file():
             with path.open('rb') as stream:
                 data = stream.read(tweak_mods.MAX_RUNTIME+1)
             if len(data) > tweak_mods.MAX_RUNTIME:
