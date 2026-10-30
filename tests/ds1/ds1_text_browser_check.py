@@ -64,7 +64,7 @@ def main():
                     page.wait_for_function('state.tab === "text" && state.rows.length === 3 && !state.error')
                     # State lands before the rows render; the shared list can
                     # begin with a blank filler, so wait for the expected row.
-                    page.get_by_text('Fire defense label', exact=True).wait_for()
+                    page.locator('.lex-column-list').get_by_text('Fire defense label', exact=True).wait_for()
                     subs = page.locator('[data-subtab]').evaluate_all(
                         'nodes => nodes.map(node => node.getAttribute("data-subtab"))')
                     assert subs == ['fmg-dialogue', 'menu-labels', 'fmg-menu-text'], subs
