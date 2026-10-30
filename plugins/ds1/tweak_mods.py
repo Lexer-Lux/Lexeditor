@@ -728,7 +728,7 @@ def _move_aside(game_root: Path, live: Path, error: Exception) -> None:
     Windows can pin a loaded DLL or data file after a crash. The executable
     is excluded from this writer and is never moved aside.
     """
-    if live.name.casefold() == exe_patches.EXECUTABLE.casefold():
+    if live.suffix.casefold() == '.exe':
         raise TweakError('Lexeditor never moves a game executable') from error
     _clear_moved_aside(game_root)
     limit = MAX_LOCKED_SMALL if live.is_file() and live.stat().st_size <= SMALL_FILE else MAX_LOCKED
@@ -761,7 +761,7 @@ def _clear_moved_aside(game_root: Path) -> None:
 
 def _put(game_root: Path, path: Path, data: bytes) -> None:
     """Write a game-folder file, moving a pinned old copy aside first."""
-    if path.name.casefold() == exe_patches.EXECUTABLE.casefold():
+    if path.suffix.casefold() == '.exe':
         raise TweakError('Lexeditor never writes a game executable')
     try:
         atomic_write(path, data)
@@ -772,7 +772,7 @@ def _put(game_root: Path, path: Path, data: bytes) -> None:
 
 def _remove(game_root: Path, path: Path) -> None:
     """Delete a game-folder file, or move it aside when it is pinned."""
-    if path.name.casefold() == exe_patches.EXECUTABLE.casefold():
+    if path.suffix.casefold() == '.exe':
         raise TweakError('Lexeditor never deletes a game executable')
     try:
         path.unlink(missing_ok=True)
@@ -938,7 +938,7 @@ def _finish_manifest(game_root: Path, current: bytes, mods: list[str], project=N
 def _write(game_root: Path, before: bytes, after: bytes, mods: list[str],
            managed: Managed = EXECUTABLE, project=None, *, inputs=None, before_write=None) -> None:
     """Journal one expected-image replacement; keep the original plus the latest intent."""
-    if Path(managed.relative).name.casefold() == exe_patches.EXECUTABLE.casefold():
+    if Path(managed.relative).suffix.casefold() == '.exe':
         raise TweakError('Lexeditor never writes a game executable')
     game_root = checked(Path(game_root))
     live = checked(managed.live(game_root))
@@ -1448,6 +1448,8 @@ def _undo(game_root: Path, done: list[dict], *, before_write=None) -> None:
                     _put(game_root, config, previous['config'])
             else:
                 managed = item['managed']
+                if Path(managed.relative).suffix.casefold() == '.exe':
+                    continue  # Obsolete entries are outside this rollback writer's domain.
                 current = _read(managed.live(game_root), managed)
                 if current == item['before']:
                     continue
