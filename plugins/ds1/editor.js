@@ -4769,7 +4769,7 @@ async function refreshProjectData(){
     if(!result.refreshed)return;
     attackPreviews.clear();recordRows.clear();textLabelPreviews.clear();fieldHistory.clear();
     await refreshState();
-    if(!document.querySelector('#main .lex-mods-page'))await navigate(state.tab,state.sub);
+    if(!shell.isModsOpen())await navigate(state.tab,state.sub);
   }catch(error){
     modProjectRefreshPending=false;
     modProjectFiles=[];
@@ -4794,7 +4794,7 @@ async function pollModChanges(){
       modProjectFiles=modProjectFiles===null||!Array.isArray(result.projectFiles)?null:[...new Set([...modProjectFiles,...result.projectFiles])];
       if(modProjectFiles&&(modProjectFiles.length>128||new TextEncoder().encode(JSON.stringify(modProjectFiles)).length>48000))modProjectFiles=null;
     }
-    if(!document.body.inert&&!state.pending&&!document.querySelector('.lex-dialog-backdrop')){
+    if(!document.body.inert&&!state.pending&&!document.querySelector('[aria-modal="true"]')){
       state.tweaksNeedRebuild=!!result.tweaksNeedRebuild&&ignoredModRevision!==modRevision;
       shell.refresh();
       if(modProjectRefreshPending&&!state.dirty&&!state.bandForm&&!state.taeForm&&!state.assetUpload
@@ -4804,7 +4804,7 @@ async function pollModChanges(){
     if(modRefreshPending){
       modRefreshPending=false;
       await shell.refreshMods();
-      if(state.tab==="tweaks"&&!document.querySelector('#main .lex-mods-page')&&!document.querySelector('#main input:focus,#main select:focus,#main textarea:focus')){
+      if(state.tab==="tweaks"&&!shell.isModsOpen()&&!document.querySelector('#main input:focus,#main select:focus,#main textarea:focus')){
         await loadTweaks();render();
       }
     }

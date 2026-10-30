@@ -11496,6 +11496,7 @@ ${contents.path}`});
       header, nav, context, settings, help, info, github, restart, githubWorkspace: () => githubWorkspace,
       save, game, undo, redo, minimize, maximize, close, history, navigationHistory, refresh,
       refreshMods: () => mods.refresh({invalidateContents:true}),
+      isModsOpen: () => mods.isOpen(),
     };
   };
 
@@ -16718,6 +16719,7 @@ ${contents.path}`});
           if (result?.updated && main?.isConnected) { await load(); draw(); }
         }).catch(() => {});
       },
+      isOpen: () => !!main?.isConnected,
       hide() { main = null; },
       importDrop: transfer => importDrop(transfer),
     };
