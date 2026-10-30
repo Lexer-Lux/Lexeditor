@@ -210,7 +210,7 @@ class CollisionStore:
                      'step':1,'dtype':'u32','description':''}
             if key.startswith('pos'):
                 field.update(label=f'Position {key[-1]}',minimum=-3.4028234663852886e38,maximum=3.4028234663852886e38,
-                             step=.01,dtype='f32',description=POSITION_HELP)
+                             step='any',dtype='f32',description=POSITION_HELP)
             elif key.startswith('vertex'):
                 label = self._vertex_name(mesh,value)
                 choices = {str(value):label}

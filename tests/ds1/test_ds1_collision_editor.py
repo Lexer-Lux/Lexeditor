@@ -49,7 +49,8 @@ def test_collision_editor_fields_structure_history_and_preview(collision_source,
                 page.locator('[data-lex-auto-pin]').first.click()
                 assert page.locator('.lex-barrel-grid').inner_text().count('1, 0, 0') >= 1
                 assert page.evaluate('document.querySelector("[data-viewport-host] canvas")===collisionCanvas')
-                page.evaluate('commit(state.row,state.row.fields.find(f=>f.key==="posX"),4,null)')
+                page.locator('[data-field-key="posX"]').fill('4')
+                page.locator('[data-field-key="posX"]').press('Tab')
                 page.wait_for_function('state.pending===0&&state.row?.values.posX===4')
                 assert page.evaluate('document.querySelector("[data-viewport-host] canvas")===collisionCanvas')
                 page.evaluate('fieldHistory.undo()')

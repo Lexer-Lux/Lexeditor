@@ -785,7 +785,9 @@ function commit(row,field,value,control,beforeOverride){
 }
 function describePinnedCell(propertyKey){
   const vector={Position:'pos',Rotation:'rot',Scale:'scale'}[propertyKey];
-  if(vector)return {label:propertyKey,render:row=>['X','Y','Z'].map(axis=>row.values?.[vector+axis]).filter(value=>value!==undefined).map(value=>LexeditorUI.formatNumber(value)).join(', ')};
+  if(vector)return {label:propertyKey,render:row=>{
+    const values=['X','Y','Z'].map(axis=>row.values?.[vector+axis]).filter(value=>value!==undefined);
+    return values.map(value=>LexeditorUI.formatNumber(value,{maximumSignificantDigits:7})).join(', ');}};
   if(propertyKey==="icon")return{editable:false,label:"",sortable:false,
     width:"var(--lex-fitted-row-height,36px)",
     render:row=>state.tab==="textures"?textureIconCell(row):recordIconCell(row)};
