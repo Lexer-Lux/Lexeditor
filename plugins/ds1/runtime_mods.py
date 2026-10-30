@@ -135,14 +135,13 @@ def write_release(folder: Path, destination: Path, vanilla: bytes) -> Path:
         raise ValueError('The mod needs a valid ID')
     if mod_id.casefold() in set(assets.ASSET_ROOTS) | {'param','paramdef','mods'}:
         raise ValueError('The mod ID must not use a reserved game folder name')
-    source = tweak_mods.checked(folder/'native'/f'{mod_id}.json')
-    spec = patches.validate(json.loads(source.read_text(encoding='utf-8')), metadata.get('name') or mod_id) if source.is_file() else None
+    row = {'path':str(folder),'id':mod_id,'name':metadata.get('name') or mod_id}
+    specs = tweak_mods._built([row],'native',patches.validate)
     contributions = list(mod_loader.content_files(folder,metadata.get('name') or mod_id))
-    for kind in ('layout','esd',menu_dim.FOLDER):
-        path = tweak_mods.checked(folder/kind/f'{mod_id}.json')
-        if path.is_file():
+    for kind in tweak_mods.BUILT_FOLDERS[1:]:
+        for path in tweak_mods.built_files(folder,kind):
             contributions.append((path.relative_to(folder),path))
-    payload = build(vanilla, [spec], requires_data=bool(contributions)) if spec else None
+    payload = build(vanilla, specs, requires_data=bool(contributions)) if specs else None
     if payload is None:
         if not contributions:
             raise ValueError('This mod has no built contributions to export')

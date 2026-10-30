@@ -1350,22 +1350,14 @@ def loaded_files(folder: Path):
             continue
     try:
         from core import script_mods as _scripts
-        if _scripts.is_script_mod(folder):
+        from .tweak_mods import BUILT_FOLDERS, built_files
+        scripted = _scripts.is_script_mod(folder)
+        if scripted:
             for _rel in _scripts.consumed_files(folder):
                 found.add(_rel.as_posix().casefold())
-            try:
-                _meta = json.loads((folder / "mod.json").read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                _meta = {}
-            _mid = str(_meta.get("id") or folder.name) if isinstance(_meta, dict) else folder.name
-            from .menu_dim import FOLDER as _dim
-            for _dirname in ("native", "layout", "esd", _dim):
-                _candidate = folder / _dirname / f"{_mid}.json"
-                try:
-                    _is_file = _candidate.is_file()
-                except OSError:
-                    continue
-                if _is_file:
+        if scripted or (folder/'runtime.lxd').is_file():
+            for _dirname in BUILT_FOLDERS if scripted else BUILT_FOLDERS[1:]:
+                for _candidate in built_files(folder,_dirname):
                     found.add(_candidate.relative_to(folder).as_posix().casefold())
     except (OSError, ValueError):
         pass

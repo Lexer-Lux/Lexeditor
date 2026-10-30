@@ -68,10 +68,8 @@ def _identity(rows, game, targets):
     for row in rows:
         folder = row['path']
         inputs = [path for _, path in mod_loader.content_files(folder,row['name'])]
-        for kind in ('layout','esd',menu_dim.FOLDER):
-            path = folder/kind/f"{row['id']}.json"
-            if path.is_file():
-                inputs.append(path)
+        for kind in tweak_mods.BUILT_FOLDERS[1:]:
+            inputs.extend(tweak_mods.built_files(folder,kind))
         if inputs:
             contributors.append([str(folder),row['id'],row['name'],mod_requires.declared(folder)])
             paths.extend(inputs)
@@ -98,20 +96,10 @@ def _identity(rows, game, targets):
 
 
 def _specs(rows, kind, validate):
-    result = []
-    for row in rows:
-        path = tweak_mods.checked(row['path']/kind/f"{row['id']}.json")
-        if not path.is_file():
-            continue
-        try:
-            if path.stat().st_size > MAX_REPORT:
-                raise ValueError('The prebuilt contribution is too large')
-            spec = validate(json.loads(path.read_text(encoding='utf-8')),row['name'])
-            spec['folder'] = str(row['path'])
-            result.append(spec)
-        except (ValueError,OSError) as error:
-            raise ModBuildError([row['path']],f"{row['name']}: {error}") from error
-    return result
+    try:
+        return tweak_mods._built([{**row,'path':str(row['path'])} for row in rows],kind,validate)
+    except tweak_mods.TweakError as error:
+        raise ModBuildError(error.folders,str(error)) from error
 
 
 def prepare(game, rows):
@@ -254,7 +242,7 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
         targets += [tweak_mods.RUNTIME_PATCH]
         data_folders = {mod.folder.resolve() for mod in data}
         for row in rows:
-            if any((row['path']/kind/f"{row['id']}.json").is_file() for kind in ('layout','esd',menu_dim.FOLDER)):
+            if any(tweak_mods.built_files(row['path'],kind) for kind in tweak_mods.BUILT_FOLDERS[1:]):
                 data_folders.add(row['path'].resolve())
         report = {'version':1,'loaded':[row['id'] for row in rows if row['path'].resolve() in data_folders],
                   'disabled':disabled,'targets':targets,

@@ -520,16 +520,36 @@ def esd_specs(root: Path | None = None) -> list[dict]:
     return _built([row for row in tweak_rows(root) if row["enabled"]], "esd", menu_scripts.validate)
 
 
+BUILT_FOLDERS = ('native', 'layout', 'esd', menu_dim.FOLDER)
+MAX_BUILT_COMPONENTS = 64
+MAX_BUILT_COMPONENT_BYTES = 16 * 1024 * 1024
+
+
+def built_files(root: Path, kind: str) -> list[Path]:
+    """The bounded component files consumed by building and runtime loading."""
+    if kind not in BUILT_FOLDERS:
+        raise TweakError('Unknown built component folder')
+    directory = checked(Path(root)/kind)
+    if not directory.exists():
+        return []
+    files = sorted(directory.glob('*.json'))
+    if len(files) > MAX_BUILT_COMPONENTS:
+        raise TweakError(f'{kind} has more than {MAX_BUILT_COMPONENTS} patch components')
+    for path in files:
+        checked(path)
+        if not path.is_file() or path.stat().st_size > MAX_BUILT_COMPONENT_BYTES:
+            raise TweakError(f'{kind}/{path.name} is not a bounded patch file')
+    return files
+
+
 def _built(rows: list[dict], folder: str, check) -> list[dict]:
     specs = []
     for row in rows:
         try:
-            target = checked(Path(row["path"]) / folder / f"{row['id']}.json")
-            if not target.is_file():
-                continue  # A tweak with nothing to patch here at its current settings.
-            spec = check(json.loads(target.read_text(encoding="utf-8")), row["name"])
-            spec["folder"] = row["path"]
-            specs.append(spec)
+            for target in built_files(Path(row['path']), folder):
+                spec = check(json.loads(target.read_text(encoding="utf-8")), row["name"])
+                spec["folder"] = row["path"]
+                specs.append(spec)
         except Exception as error:
             raise TweakError(f"{row['name']}: {error}", folders=[row['path']]) from error
     return specs
@@ -1210,7 +1230,7 @@ def prepare(game_root: Path, root: Path | None = None, *, project=_KEEP_PROJECT,
                 owned = [spec for spec in native if spec.get('folder') == row['path']]
                 from . import mod_loader
                 requires_data = bool(mod_loader.content_files(folder, row['name'])) or any(
-                    (folder/kind/f"{row['id']}.json").is_file() for kind in ('layout','esd',menu_dim.FOLDER))
+                    built_files(folder, kind) for kind in BUILT_FOLDERS[1:])
                 after = runtime_mods.build(original, owned, requires_data=requires_data)
                 if before != after:
                     module_writes.append({'path': str(target), 'before': before, 'after': after})

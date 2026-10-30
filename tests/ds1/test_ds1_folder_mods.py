@@ -96,12 +96,15 @@ def test_export_contains_a_prebuilt_mod_without_developer_files(vanilla, tmp_pat
     (source/'mod.json').write_text(json.dumps({'id':'example','name':'Example','script':{'version':1},'enabled':False}))
     raw = {'version':1,'hooks':[{'rva':HOOK_A,'original':'e800000000','bytes':'9090909090'}]}
     (source/'native/example.json').write_text(json.dumps(raw))
+    (source/'native/second-component.json').write_text(json.dumps({'version':1,
+        'hooks':[{'rva':HOOK_B,'original':'488d1500000000','bytes':'90909090909090'}]}))
     (source/'research.md').write_text('Development notes')
     output = runtime_mods.write_release(source, tmp_path/'release', vanilla)
     assert {file.name for file in output.iterdir()} == {'mod.json','runtime.lxd'}
     metadata = json.loads((output/'mod.json').read_text())
     assert metadata['enabled'] is True and 'script' not in metadata
-    assert runtime_mods.inspect((output/'runtime.lxd').read_bytes())['records']
+    records = runtime_mods.inspect((output/'runtime.lxd').read_bytes())['records']
+    assert {row[1] for row in records if row[0] == exe_patches.HOOK} == {HOOK_A, HOOK_B}
     for unsafe in ('map','mods','../escape',r'nested\mod','CON','native:'):
         (source/'mod.json').write_text(json.dumps({'id':unsafe,'name':'Example'}))
         with pytest.raises(ValueError):
@@ -121,8 +124,8 @@ def test_files_report_marks_build_inputs_and_matching_payloads(tmp_path):
     (folder/'mod.json').write_text(json.dumps({'id':'example','name':'Example','script':{'version':1}}))
     loaded = set(loaded_files(folder))
     assert {'mod.json','script/tweak.py','script/native_patch.py','settings.json','settings.schema.json',
-            'native/example.json','runtime.lxd'} <= loaded
-    assert not loaded & {'tests/test_mod.py','script/__pycache__/tweak.pyc','native/unrelated.json'}
+            'native/example.json','native/unrelated.json','runtime.lxd'} <= loaded
+    assert not loaded & {'tests/test_mod.py','script/__pycache__/tweak.pyc'}
 
 
 def test_watcher_notifies_after_burst_and_keeps_multiple_clients_current(tmp_path):
