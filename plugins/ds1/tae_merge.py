@@ -5,6 +5,8 @@ geometry descriptors stay unchanged. Other structural edits refuse,
 so the caller can report a whole-member conflict rather than discard data.
 """
 from bisect import bisect_right
+import base64
+import hashlib
 import struct
 
 from .tae import TaeDocument, TaeError, EVENT_TYPES, MAX_FILE, _wstring
@@ -76,6 +78,100 @@ def _records(data):
     return doc, records, spans
 
 
+def _record_hash(record):
+    if record is None:
+        return None
+    metadata,pool,events = record
+    sections = [metadata,pool,*[(*times,payload) for times,payload in events]]
+    digest = hashlib.sha256()
+    digest.update(struct.pack('<I',len(sections)))
+    for section in sections:
+        digest.update(struct.pack('<I',len(section)))
+        for data in section:
+            digest.update(struct.pack('<I',len(data)))
+            digest.update(data)
+    return digest.hexdigest()
+
+
+def _metadata_hash(data):
+    """Container identity without relocatable directories or record counts."""
+    try:
+        header = bytearray(data[:144])
+        for start,end in ((12,16),(84,96),(100,108)):
+            header[start:end] = bytes(end-start)
+        names = struct.unpack_from('<I',data,148)[0]
+        if not 152 <= names <= len(data)-16:
+            raise TaeError('Animation container names are not supported')
+        skeleton,sib = struct.unpack_from('<2I',data,names)
+        labels = tuple((_wstring(data,at,'Animation container name') if at else '').encode('utf-16-le')
+                       for at in (skeleton,sib))
+        metadata = bytes(header)+data[144:148]+data[names+8:names+16]
+        digest = hashlib.sha256(metadata)
+        for label in labels:
+            digest.update(struct.pack('<I',len(label))+label)
+        return digest.hexdigest()
+    except struct.error as error:
+        raise TaeError('Animation container metadata is incomplete') from error
+
+
+def create_edits(before,after):
+    """Anchor changed animation IDs, excluding every untouched record."""
+    # Composition validates supported structural changes and normalizes the
+    # empty-name sentinel when an author appended animations.
+    normalized,_ = compose(before,[('release',after)])
+    _old,original,_ = _records(before)
+    _new,changed,_ = _records(normalized)
+    metadata = _metadata_hash(before)
+    if _metadata_hash(normalized) != metadata:
+        raise TaeError('Animation container metadata changed')
+    rows = [{'id':key,'before':_record_hash(original.get(key))}
+            for key in sorted(changed) if changed[key] != original.get(key)]
+    return {'kind':'tae','metadata':metadata,'source':base64.b64encode(normalized).decode('ascii'),'rows':rows}
+
+
+def edit_rows(spec):
+    """Bounded record identities for both loading and the Mods change list."""
+    if (type(spec) is not dict or set(spec) != {'kind','metadata','source','rows'} or spec['kind'] != 'tae'
+            or type(spec['source']) is not str or len(spec['source']) > 4*((MAX_FILE+2)//3)
+            or type(spec['rows']) is not list or len(spec['rows'])>10000):
+        raise TaeError('Invalid portable animation contribution')
+    seen = set()
+    for row in spec['rows']:
+        if (type(row) is not dict or set(row) != {'id','before'} or type(row['id']) is not int
+                or not 0 <= row['id'] < 2**32 or row['id'] in seen):
+            raise TaeError('Invalid portable animation record')
+        seen.add(row['id'])
+        before = row['before']
+        if before is not None and (type(before) is not str or len(before)!=64
+                or any(char not in '0123456789abcdef' for char in before)):
+            raise TaeError('Invalid portable animation anchor')
+    return spec['rows']
+
+
+def apply_edits(original,spec):
+    """Rebase only declared animation records through the composition writer."""
+    rows = edit_rows(spec)
+    source = base64.b64decode(spec['source'],validate=True)
+    if len(source)>MAX_FILE:
+        raise TaeError('Portable animation source exceeds its size limit')
+    base,current,_ = _records(original)
+    modified,records,_ = _records(source)
+    if _metadata_hash(original) != spec['metadata'] or _metadata_hash(source) != spec['metadata']:
+        raise TaeError('Animation container metadata conflicts with installed data')
+    animations = {anim['id']:anim for anim in modified.anims}
+    winners = {}
+    for row in rows:
+        if row['id'] not in records:
+            raise TaeError('Invalid portable animation record')
+        key,before = row['id'],row['before']
+        after = _record_hash(records[key])
+        if _record_hash(current.get(key)) not in (before,after):
+            raise TaeError(f'Animation {key}: conflicts with installed data')
+        if current.get(key) != records[key]:
+            winners[key] = source,animations[key],records[key]
+    return _write_records(original,base,current,winners)
+
+
 def compose(vanilla, mods):
     """Return bytes and (animation label, conflicting owners) pairs."""
     base, original, spans = _records(vanilla)
@@ -116,6 +212,13 @@ def compose(vanilla, mods):
             owners[key] = name
     if not winners:
         return vanilla, []
+    return _write_records(vanilla,base,original,winners), [(f'animation {key}', names) for key, names in conflicts.items()]
+
+
+def _write_records(vanilla, base, original, winners):
+    """Replay selected records through the same writer used by composition."""
+    if not winners:
+        return vanilla
     result = bytearray(vanilla)
     for anim in base.anims:
         file = struct.unpack_from('<I', vanilla, anim['offset']+24)[0]
@@ -173,4 +276,4 @@ def compose(vanilla, mods):
     expected = original | {key: chosen[2] for key, chosen in winners.items()}
     if records != expected:
         raise TaeError('Combined animation records failed verification')
-    return bytes(result), [(f'animation {key}', names) for key, names in conflicts.items()]
+    return bytes(result)

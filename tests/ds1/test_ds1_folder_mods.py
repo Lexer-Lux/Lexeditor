@@ -653,6 +653,10 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     from test_ds1_menu_scripts import archive as talk_archive
     from plugins.ds1.store import RELATIVE
     from ds1_fixture import make_archive
+    from test_ds1_map_merge import MAP,VANILLA as MAP_BASE,ENEMY,PLAYER,edited as map_edit,value as map_value
+    from test_ds1_tae_record_merge import variants,added
+    from tae_fixture import build_anibnd
+    from plugins.ds1 import tae_merge
     supplied = os.environ.get('LEXEDITOR_TEST_LOADER_PACKAGE')
     package = Path(supplied) if supplied else runtime_package.package(tmp_path/'Loader package')
     game = tmp_path/'standalone game'
@@ -660,6 +664,13 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     (game/RELATIVE).parent.mkdir(parents=True)
     (game/RELATIVE).write_bytes(make_archive())
     library.mkdir()
+    (game/MAP).parent.mkdir(parents=True)
+    (game/MAP).write_bytes(map_edit((ENEMY,'npcId',120100)))
+    animation_base,animation_a,animation_b=variants()
+    character=Path('chr/c1200.anibnd.dcx')
+    (game/character).parent.mkdir()
+    foreign_animation,_=tae_merge.compose(animation_base,[('foreign',added(animation_base,key=3500))])
+    (game/character).write_bytes(build_anibnd({'a87.tae':foreign_animation}))
     emevd,event_base,call = event_fixture()
     event_path = Path('event/common.emevd')
     def add_event(identity):
@@ -695,7 +706,12 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
                 authored_talk.state_groups[1][0].conditions[0].evaluator = esd.assemble('f23() == 12')
             talk = record_edits.create(talk_path,talk_original,
                 talk_archive({'bonfire.esd':authored_talk.to_bytes(),'keep.bin':b'original'}))
-            encoded = record_edits.encode({RELATIVE:portable,event_path:event,talk_path:talk})
+            map_spec=record_edits.create(MAP,MAP_BASE,map_edit(
+                (ENEMY,'posX',10.) if row_id==100 else (PLAYER,'posZ',20.)))
+            animation_spec=record_edits.create(character,build_anibnd({'a87.tae':animation_base}),
+                build_anibnd({'a87.tae':animation_a if row_id==100 else animation_b}))
+            encoded = record_edits.encode({RELATIVE:portable,event_path:event,talk_path:talk,
+                                           MAP:map_spec,character:animation_spec})
             if not encoded.startswith(record_edits.PACKED_MAGIC):
                 encoded = record_edits.PACKED.pack(record_edits.PACKED_MAGIC,len(encoded))+record_edits.zlib.compress(encoded)
             (folder/record_edits.FILENAME).write_bytes(encoded)
@@ -729,6 +745,15 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     assert merged.value('EquipParamGoods',100,'sellValue') == 12
     assert merged.value('EquipParamGoods',101,'sellValue') == 24
     assert merged.value('EquipParamGoods',100,'iconId') == 77
+    map_payload=(game/MAP).read_bytes()
+    assert map_value(map_payload,ENEMY,'npcId')==120100
+    assert map_value(map_payload,ENEMY,'posX')==10.
+    assert map_value(map_payload,PLAYER,'posZ')==20.
+    animation_plain=formats.inflate((game/character).read_bytes())
+    animation_member=next(entry for name,entry in formats.members(animation_plain).items() if name.endswith('.tae'))
+    animation_records=tae_merge._records(animation_plain[animation_member.offset:animation_member.offset+animation_member.size])[1]
+    assert animation_records==tae_merge._records(animation_a)[1] | {
+        3301:tae_merge._records(animation_b)[1][3301],3500:tae_merge._records(foreign_animation)[1][3500]}
     assert {event.id for event in emevd.read((game/event_path).read_bytes()).events} == {0,100,1001,1002,2000}
     talk_plain = formats.inflate((game/talk_path).read_bytes())
     owned = formats.members(talk_plain)

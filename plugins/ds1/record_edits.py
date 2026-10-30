@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from core.mod_library import relative_path
-from . import formats, texts, script_edits, binder_edits, map_edits
+from . import formats, texts, script_edits, binder_edits, map_edits, tae_merge
 
 FILENAME = Path('records.lxd')
 LIMIT = 64 * 1024 * 1024
@@ -53,6 +53,13 @@ def read(path):
     if len(raw) > LIMIT:
         raise ValueError('The record contributions grew beyond 64 MiB')
     return raw
+
+
+def project_specs(project):
+    """The one current portable declaration shared by the project editors."""
+    from .tweak_mods import checked
+    path = checked(project/FILENAME) if project is not None else None
+    return decode(read(path)) if path is not None and path.is_file() else {}
 
 
 def encode(files):
@@ -364,6 +371,11 @@ def describe(files):
                 name = member['name'].replace('\\','/').rsplit('/',1)[-1]
                 if after is not None and after.get('kind') == 'esd':
                     changes += script_edits.describe(after['edits'],f'{relative.name}/{name}')
+                elif after is not None and after.get('kind') == 'tae':
+                    for row in tae_merge.edit_rows(after['edits']):
+                        changes.append({'table':f'{relative.name}/{name}','id':row['id'],
+                            'label':f"Animation {row['id']}",'fields':['Animation events'],
+                            'added':row['before'] is None,'removed':False})
                 else:
                     changes.append({'table':relative.name,'id':member['id'],'label':name,
                         'fields':['Archive member'],'added':member['beforeHash'] is None,'removed':after is None})

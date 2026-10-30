@@ -149,8 +149,9 @@ def test_directory_growth_keeps_independent_animation_records_and_native_member_
     assert [len(anim['events']) for anim in TaeDocument(entry.data).anims] == [3,1]
 
 
-def test_exported_folder_mods_merge_animation_records_without_author_builders(game,tmp_path):
-    from plugins.ds1 import runtime_mods,standalone_runtime
+def test_exported_folder_mods_merge_animation_records_without_author_builders(game,tmp_path,monkeypatch):
+    from plugins.ds1 import runtime_mods,standalone_runtime,composition_cache
+    monkeypatch.setattr(composition_cache,'user_root',lambda:tmp_path/'cache')
     root,library,_built = game
     vanilla,a,b = variants()
     relative = Path('chr/c0000.anibnd.dcx')

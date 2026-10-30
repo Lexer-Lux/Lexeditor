@@ -7,7 +7,7 @@ from pathlib import Path
 
 from core.plugin_files import atomic_write
 
-from . import deployment
+from . import deployment, record_edits
 from .formats import FormatError
 from .msb import ENEMY_TYPES, MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError, PLAYER_TYPE
 from .store import MARKER, digest
@@ -254,9 +254,9 @@ class MapStore:
             raise ValueError("The map file is too large.")
         raw = source.read_bytes()
         source_hash = hashlib.sha256(raw).hexdigest()
-        from . import record_edits
-        records = (self.item_store.portable_specs or {} if self.item_store is not None
-                   and self.item_store.document is not None else self._record_specs())
+        records = getattr(self.item_store,'portable_specs',None)
+        if records is None:
+            records = record_edits.project_specs(self.project)
         portable = records.get(MAP_DIR/map_name)
         if portable is not None:
             if output is not None and output.exists():
@@ -267,12 +267,6 @@ class MapStore:
                                  "source_hash": source_hash, 'record_spec':portable,
                                  "vanilla_hash": digest(vanilla),
                                  "output_hash": digest(output) if output else None}
-
-    def _record_specs(self):
-        from . import record_edits
-        from .tweak_mods import checked
-        path = checked(self.project/record_edits.FILENAME) if self.project else None
-        return record_edits.decode(record_edits.read(path)) if path is not None and path.is_file() else {}
 
     def get(self, map_name):
         if map_name not in self.maps():
@@ -796,7 +790,7 @@ class MapStore:
     def validate_save(self):
         from .tweak_mods import checked
         self.writable()
-        records = self._record_specs()
+        records = record_edits.project_specs(self.project)
         for map_name, document in self.docs.items():
             entry = self.hashes[map_name]
             if records.get(MAP_DIR/map_name) != entry['record_spec']:
@@ -814,8 +808,7 @@ class MapStore:
     def save(self):
         self.validate_save()
         from .tweak_mods import checked
-        from . import record_edits
-        records, records_changed = self._record_specs(), False
+        records, records_changed = record_edits.project_specs(self.project), False
         for map_name, document in self.docs.items():
             if not document.dirty_count:
                 continue

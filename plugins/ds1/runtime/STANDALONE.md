@@ -84,6 +84,11 @@ Independent placement, region and event fields preserve unrelated installed
 edits. Structural changes retain an exact whole-map anchor and refuse a
 different installed baseline. Imported maps remain editable and save into the
 same portable record file as item changes.
+Character animation binders retain only changed member contributions. Supported
+TAE event changes are anchored by animation ID and replayed with the same writer
+as editor composition. Untouched animations, added foreign animations and other
+binder members survive. Unsupported descriptor changes keep an exact member
+anchor and refuse conflicting installed data. Imported animations remain editable.
 Event archives also carry only changed EMEVD event records. Their unchanged
 string/link pools are anchored, independent constructor additions use the
 existing event merger, and foreign records and appended pools are preserved.
@@ -162,6 +167,6 @@ Later edits to a file already managed by the loader are kept and reported,
 never overwritten. An unowned backup that disagrees with the installed file
 also needs reconciliation before either copy can be replaced.
 
-This implements the current drop-in/install/adopt workflow. Older issue #954's
-C-only port and rebasing the remaining map/character archive contributions over unrelated whole-file mods
-are separate requirements; this implementation does not claim those completed.
+The native loader is C. Data composition uses the editor's existing format
+adapters through the bundled private runtime. Players install the prebuilt
+package; they do not compile the data merger or run author build scripts.
