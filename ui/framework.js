@@ -11753,7 +11753,7 @@ ${contents.path}`});
     // the suffix re-attaches, so the two never diverge.
     const suffix = described?.unit ?? "";
     return {
-      key: `pin:${entry.key}`, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label", "data-lex-label-key": labelKey,
+      key: `pin:${entry.key}`, labelKey, label: entry.icon ? () => element("span", {class: "lex-pinned-header-label", "data-lex-label-key": labelKey,
         // The kind rides along so a game can swap the generic glyph for
         // its own art, the way DS1 label art replaces field glyphs.
         "data-lex-icon": entry.icon}, typeGlyph(entry.icon), shown() + suffix) : shown() + suffix, sortable: described?.sortable !== false,
@@ -12385,7 +12385,7 @@ ${contents.path}`});
       const active = sortable && sortState.key === column.key;
       // A plain name is the property's name, and reads as the developer last
       // named it, here as in the record's field.
-      const labelKey = typeof column.label === "string" && column.label ? fieldLabelKey(column.label) : null;
+      const labelKey = column.labelKey || (typeof column.label === "string" && column.label ? fieldLabelKey(column.label) : null);
       const label = element("span", {class: "header-label", ...(labelKey ? {"data-lex-label-key": labelKey} : {})},
         active ? element("span", {
           class: `lex-sort-indicator ${sortState.dir > 0 ? "ascending" : "descending"}`,
