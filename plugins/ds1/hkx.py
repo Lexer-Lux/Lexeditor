@@ -331,9 +331,6 @@ class _TagReader:
             found = []
             for num in range(entry['count']):
                 off = entry['pos'] + num * entry['type'].resolve_size()
-                if entry['array'] and (entry['type'].name == 'hkStringPtr'
-                                       or entry['type'].kind == PTR):
-                    off = entry['pos'] + num * 4
                 found.append(self._value(entry['type'], off, 0)[0])
             self.cache[at] = found
         return self.cache[at]
@@ -342,9 +339,6 @@ class _TagReader:
         at, off = _i32(self.data, off)
         if not 0 <= at < len(self.items):
             raise HkxError('A Havok item index is out of range')
-        # The target reads as an array from here on, which changes how
-        # pointer-sized elements stride.
-        self.items[at]['array'] = True
         if at == 0:
             return None, off
         return self.item_objects(at), off
@@ -441,7 +435,7 @@ def _items(data, section, data_off, data_end, types):
         if count < 0:
             raise HkxError('A Havok item count is out of range')
         if at == 0:
-            found.append({'type': None, 'pos': 0, 'count': 0, 'array': False})
+            found.append({'type': None, 'pos': 0, 'count': 0})
         else:
             if not 1 <= at <= len(types):
                 raise HkxError('A Havok item names no type')
@@ -449,8 +443,7 @@ def _items(data, section, data_off, data_end, types):
             extent = count * kind.resolve_size()
             if extent > MAX_ITEM_BYTES or pos + extent > data_end - data_off:
                 raise HkxError('A Havok item runs past its data')
-            found.append({'type': kind, 'pos': pos + data_off,
-                          'count': count, 'array': False})
+            found.append({'type': kind, 'pos': pos + data_off, 'count': count})
     return found
 
 
@@ -562,7 +555,7 @@ def _peek_element(data, entries, ref, num):
     """One element's (type, address): pointer slots hop per element."""
     node_type, pos, _count = ref
     if node_type.kind == PTR:
-        at, _ = _i32(data, pos + num * 4)
+        at, _ = _i32(data, pos + num * node_type.resolve_size())
         if at == 0:
             return None
         if not 0 <= at < len(entries):
