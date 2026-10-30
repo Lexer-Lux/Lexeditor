@@ -184,7 +184,8 @@ def test_save_reload_in_private_project_leaves_game_untouched(tmp_path):
     assert loaded.get(name).points[0]['dimensions']['width'] == 20
 
 
-def test_map_layers_and_edits_in_rendered_editor(tmp_path):
+@pytest.mark.parametrize('read_only', [False, True])
+def test_map_layers_and_edits_in_rendered_editor(tmp_path, read_only):
     import base64
     import json
     import os
@@ -210,7 +211,8 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path):
     errors, requests, held = [], [], []
     delayed = [False]
     session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
-                          'LEXEDITOR_NO_MOD': '0', 'LEXEDITOR_MOD_READ_ONLY': '0'})
+                          'LEXEDITOR_NO_MOD': '1' if read_only else '0',
+                          'LEXEDITOR_MOD_READ_ONLY': '1' if read_only else '0'})
     session.start()
     try:
         with sync_playwright() as play:
@@ -277,6 +279,10 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path):
                 screenshot = os.environ.get('LEXEDITOR_MAP_REVIEW_SCREENSHOT')
                 if screenshot:
                     page.screenshot(path=screenshot)
+                if read_only:
+                    assert page.locator('[data-field-key="startsDisabled"]:visible').is_disabled()
+                    assert not errors, errors
+                    return
                 page.evaluate('selectPlacement("m10_02_00_00.msb:region:0",false)')
                 page.wait_for_selector('[data-field-key="width"]:visible')
                 control = page.locator('[data-field-key="width"]:visible')
