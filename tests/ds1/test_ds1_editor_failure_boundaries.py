@@ -762,7 +762,7 @@ def test_full_activation_recovers_broken_script_and_corrupt_caches(game, tmp_pat
 
 def test_failed_rollback_is_reported_and_remaining_files_are_attempted(tmp_path, monkeypatch):
     from types import SimpleNamespace
-    managed = SimpleNamespace(label='fixture', live=lambda game: game / 'file')
+    managed = SimpleNamespace(relative='menu/file', label='fixture', live=lambda game: game / 'file')
     monkeypatch.setattr(tweak_mods, '_read', lambda *args: b'after')
     restored = []
     def write(*args, **kwargs):

@@ -59,7 +59,11 @@ def test_any_unsaved_unit_defers_refresh_without_touching_existing_state(tmp_pat
 
 def test_unchanged_project_keeps_existing_objects(tmp_path):
     old = stores(tmp_path)
+    assert not project_refresh.changed(*old)
     assert project_refresh.refresh(*old) is None
+    change(old[0],43)
+    assert project_refresh.changed(*old)
+    assert old[0].get().value('EquipParamGoods',100,'sellValue') == 42
 
 
 def test_builder_notification_does_not_read_archives(tmp_path,monkeypatch):
@@ -67,6 +71,7 @@ def test_builder_notification_does_not_read_archives(tmp_path,monkeypatch):
     def forbidden(*_):
         pytest.fail('A builder notification must not hash loaded game archives')
     monkeypatch.setattr(project_refresh,'_changed',forbidden)
+    assert not project_refresh.changed(*old,paths=['script/tweak.py'])
     assert project_refresh.refresh(*old,paths=['script/tweak.py']) is None
 
 
@@ -154,6 +159,18 @@ def test_browser_watcher_refreshes_clean_data_and_preserves_unsaved_edit(tmp_pat
                 page.wait_for_function(value+'===42')
                 page.locator('.lex-tabbed-panel [data-subtab]').filter(has_text='Value').first.click()
                 page.wait_for_function('modRevision>=0&&!modPollBusy')
+                # Source-only notifications must not interrupt a click or lock
+                # an unchanged view while checking for new generated data.
+                assert page.evaluate('''async()=>{
+                    const original=LexeditorUI.setEditorBusy;
+                    let locks=0;
+                    LexeditorUI.setEditorBusy=(...args)=>{locks++;return original(...args)};
+                    try{
+                        modProjectFiles=['script/tweak.py'];modProjectRefreshPending=true;
+                        await refreshProjectData();
+                        return locks===0&&!modProjectRefreshPending&&!document.body.inert;
+                    }finally{LexeditorUI.setEditorBusy=original}
+                }''')
                 # A different tool updates the currently open release's data.
                 before = page.evaluate('modRevision')
                 change(ItemStore(game,mod,False),43)

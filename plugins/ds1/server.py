@@ -63,9 +63,11 @@ NATIVE_TABS = {"encumbrance", "encumbrance-overrides", "levelup", "misc"}
 UPLOAD_BODY_LIMIT = 2100000
 
 
-def _refresh_project(paths=None):
+def _refresh_project(paths=None, check_only=False):
     global STORE, RULES, MAPSTORE, TAESTORE, SKILLS
     from . import project_refresh
+    if type(check_only) is not bool:
+        raise ValueError('Unsupported project refresh mode')
     if paths is not None:
         from core.mod_library import relative_path
         if type(paths) is not list or len(paths) > 128 or any(type(path) is not str or len(path)>4096 for path in paths):
@@ -74,6 +76,8 @@ def _refresh_project(paths=None):
     dirty = (STORE.document.dirty_count if STORE.document is not None else 0)
     if dirty or RULES.dirty_count or MAPSTORE.dirty_count or TAESTORE.dirty_count or SKILLS.dirty_count:
         return {'refreshed': False, 'deferred': True}
+    if check_only:
+        return {'changed': project_refresh.changed(STORE,RULES,MAPSTORE,TAESTORE,SKILLS,paths), 'deferred':False}
     fresh = project_refresh.refresh(STORE, RULES, MAPSTORE, TAESTORE, SKILLS, paths)
     if fresh is not None:
         STORE, RULES, MAPSTORE, TAESTORE, SKILLS = fresh
@@ -804,7 +808,7 @@ class Handler(PluginRequestHandler):
             if not isinstance(payload, dict): raise ValueError('Expected an object')
             with LOCK:
                 if path == '/api/project-refresh':
-                    self.send_json(_refresh_project(payload.get('files')))
+                    self.send_json(_refresh_project(payload.get('files'),payload.get('checkOnly',False)))
                     return
                 elif path == '/api/edit':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))

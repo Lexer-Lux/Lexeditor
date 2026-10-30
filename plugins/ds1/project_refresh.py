@@ -53,6 +53,12 @@ def _sources(items, rules, maps, animations, skills, paths=None):
         or relative.startswith(name+'/') for name in wanted)]
 
 
+def changed(items, rules, maps, animations, skills, paths=None):
+    """A read-only probe; unchanged notifications must not lock the editor."""
+    return items.project is not None and any(
+        _changed(*source) for source in _sources(items,rules,maps,animations,skills,paths))
+
+
 def refresh(items, rules, maps, animations, skills, paths=None):
     """Return replacement stores, or None. Caller holds the session lock.
 

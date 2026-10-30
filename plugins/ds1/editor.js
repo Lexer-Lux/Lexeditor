@@ -4752,8 +4752,14 @@ async function boot(){
 let modRevision=0, ignoredModRevision=null, modRefreshPending=false, modProjectRefreshPending=false, modPollTimer=null, modPollBusy=false, modPollStopped=false;
 let modProjectFiles=[];
 async function refreshProjectData(){
-  state.pending++;LexeditorUI.setEditorBusy('project-refresh','Refreshing mod files');
+  let locked=false;
   try{
+    const probe=await api('/api/project-refresh',{files:modProjectFiles,checkOnly:true});
+    if(probe.deferred)return;
+    if(!probe.changed){modProjectRefreshPending=false;modProjectFiles=[];return;}
+    if(document.body.inert||state.pending||state.dirty||state.rowBusy||state.bandForm||state.taeForm||state.assetUpload
+       ||document.querySelector('input:focus,select:focus,textarea:focus'))return;
+    locked=true;state.pending++;LexeditorUI.setEditorBusy('project-refresh','Refreshing mod files');
     const result=await api('/api/project-refresh',{files:modProjectFiles});
     modProjectRefreshPending=!!result.deferred;
     if(!result.deferred)modProjectFiles=[];
@@ -4766,7 +4772,7 @@ async function refreshProjectData(){
     modProjectFiles=[];
     LexeditorUI.showToast(`Could not refresh the view after mod files changed: ${error.message}`,{tone:'warning'});
   }finally{
-    state.pending--;LexeditorUI.setEditorBusy('project-refresh',null);shell.refresh();
+    if(locked){state.pending--;LexeditorUI.setEditorBusy('project-refresh',null);shell.refresh();}
   }
 }
 async function pollModChanges(){
