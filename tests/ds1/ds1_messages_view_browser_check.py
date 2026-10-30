@@ -75,7 +75,7 @@ def main():
                     page.wait_for_selector('[data-tabstrip-id="messages"]')
                     tabs = page.locator('[data-tabstrip-id]').evaluate_all(
                         'nodes=>nodes.map(n=>n.dataset.tabstripId)')
-                    assert tabs == ['maps', 'placements', 'lights', 'messages'], tabs
+                    assert tabs == ['maps', 'placements', 'lights', 'messages', 'collision'], tabs
                     page.locator('[data-tabstrip-id="messages"]').click()
                     page.wait_for_function('state.mapTab==="messages"')
                     if page.evaluate('state.mapView.messages===undefined'):
