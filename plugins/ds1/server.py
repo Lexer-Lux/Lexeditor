@@ -63,6 +63,36 @@ NATIVE_TABS = {"encumbrance", "encumbrance-overrides", "levelup", "misc"}
 UPLOAD_BODY_LIMIT = 2100000
 
 
+def _refresh_project(paths=None):
+    global STORE, RULES, MAPSTORE, TAESTORE, SKILLS
+    from . import project_refresh
+    if paths is not None:
+        from core.mod_library import relative_path
+        if type(paths) is not list or len(paths) > 128 or any(type(path) is not str or len(path)>4096 for path in paths):
+            raise ValueError('Unsupported project refresh paths')
+        paths = [relative_path(path).as_posix() for path in paths]
+    dirty = (STORE.document.dirty_count if STORE.document is not None else 0)
+    if dirty or RULES.dirty_count or MAPSTORE.dirty_count or TAESTORE.dirty_count or SKILLS.dirty_count:
+        return {'refreshed': False, 'deferred': True}
+    fresh = project_refresh.refresh(STORE, RULES, MAPSTORE, TAESTORE, SKILLS, paths)
+    if fresh is not None:
+        STORE, RULES, MAPSTORE, TAESTORE, SKILLS = fresh
+    return {'refreshed': fresh is not None, 'deferred': False}
+
+
+def _project_paths(snapshot):
+    if STORE.project is None:
+        return []
+    paths = []
+    for path in snapshot.get('paths', ['*']):
+        folder, separator, relative = path.partition('/')
+        if folder == '*' or folder.casefold() == STORE.project.name.casefold():
+            if not separator:
+                return None  # Directory replacement, overflow, or initial resync.
+            paths.append(relative)
+    return paths if len(paths) <= 128 and len(json.dumps(paths)) < 32000 else None
+
+
 def _asset_target(relative, side):
     """The file the game would load: the mod's override, else the installed file."""
     relative = assets.check_relative(relative)
@@ -300,6 +330,10 @@ class Handler(PluginRequestHandler):
                     flag = cached_flag
                 self.send_json({"revision": snap["revision"],
                                 "changed": snap["changed"],
+                                "projectChanged": STORE.project is not None and any(
+                                    name == '*' or name.casefold() == STORE.project.name.casefold()
+                                    for name in snap['changed']),
+                                "projectFiles": _project_paths(snap),
                                 "status": snap['status'],
                                 "tweaksNeedRebuild": flag})
             except (ValueError, OSError, RuntimeError) as error:
@@ -756,7 +790,7 @@ class Handler(PluginRequestHandler):
         path = urlparse(self.path).path
         try:
             if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/tae/add', '/api/tae/remove', '/api/rows/add', '/api/rows/remove', '/api/placements/add', '/api/placements/remove', '/api/placements/create', '/api/assets/upload', '/api/assets/remove', '/api/deployment/apply', '/api/deployment/disable',
-                            '/api/tweaks/save', '/api/tweaks/restore', '/api/annotation-help'):
+                            '/api/tweaks/save', '/api/tweaks/restore', '/api/annotation-help', '/api/project-refresh'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
@@ -769,7 +803,10 @@ class Handler(PluginRequestHandler):
             payload = json.loads(self.rfile.read(length))
             if not isinstance(payload, dict): raise ValueError('Expected an object')
             with LOCK:
-                if path == '/api/edit':
+                if path == '/api/project-refresh':
+                    self.send_json(_refresh_project(payload.get('files')))
+                    return
+                elif path == '/api/edit':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))
                     extra = {}
                     if payload.get('table') == SKILL_TABLE:

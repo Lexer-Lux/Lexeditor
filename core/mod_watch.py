@@ -2,8 +2,9 @@
 
 One watcher per canonical library root, shared through a bounded registry.
 The Save rebuild badge polls it instead of re-hashing the whole library or
-rebuilding on every request: only changed folder names and a revision cross
-the wire, and the expensive staleness check runs only when the revision moves.
+rebuilding on every request. Snapshots retain bounded changed-file paths as
+well as folder names, so an open project can refresh just its affected data.
+The expensive staleness check runs only when the revision moves.
 
 Windows watches with ReadDirectoryChangesW on a daemon thread; other systems
 fall back to throttled metadata polling (stat only, never byte hashing).
@@ -65,7 +66,7 @@ def _canonical(root) -> str:
 
 
 class ModWatcher:
-    """Changed top-level folders under one library root, with a revision.
+    """Changed paths and top-level folders under one root, with a revision.
 
     snapshot(since) is non-destructive, so any number of polling clients can
     share one watcher. notify() is the test hook and the exact entry point the
@@ -107,10 +108,10 @@ class ModWatcher:
         leaf = parts[-1].lower()
         if leaf.startswith("~") or leaf.endswith(_IGNORE_SUFFIXES):
             return
-        self._record_many((parts[0],))
+        self._record_many(('/'.join(parts),) if len(text) <= 4096 and '..' not in parts else ('*',))
 
     def snapshot(self, since=0) -> dict:
-        """{'revision', 'changed', 'status'} without consuming anything."""
+        """{'revision', 'changed', 'paths', 'status'} without consuming anything."""
         try:
             since = max(0, int(since))
         except (TypeError, ValueError):
@@ -123,9 +124,10 @@ class ModWatcher:
                 self._pending.clear()
                 while len(self._changed) > MAX_TRACKED_MODS:
                     del self._changed[min(self._changed, key=self._changed.get)]
+                    self._changed['*'] = self._revision
             return {"revision": self._revision,
-                    "changed": sorted(name for name, rev in self._changed.items()
-                                      if rev > since),
+                    "changed": sorted({name.split('/')[0] for name, rev in self._changed.items() if rev > since}),
+                    "paths": sorted(name for name, rev in self._changed.items() if rev > since),
                     "status": self._status}
 
     def close(self) -> None:

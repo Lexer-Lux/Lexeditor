@@ -174,6 +174,7 @@ def test_watcher_notifies_after_burst_and_keeps_multiple_clients_current(tmp_pat
         time.sleep(COALESCE_SEC + .03)
         first = watcher.snapshot(0)
         assert 'example' in first['changed']
+        assert 'example/script/tweak.py' in first['paths']
         watcher.notify('other/native/other.json')
         assert watcher.snapshot(first['revision'])['revision'] == first['revision']
         time.sleep(COALESCE_SEC + .03)
@@ -207,10 +208,28 @@ def test_real_directory_changes_detect_edits_without_restart(tmp_path):
         while time.monotonic()<deadline:
             current = watcher.snapshot(before)
             if current['revision'] > before and 'example' in current['changed']:
+                assert 'example/script/tweak.py' in current['paths']
                 break
             time.sleep(.05)
         else:
             pytest.fail(watcher.snapshot(before))
+    finally:
+        watcher.close()
+
+
+def test_watcher_path_eviction_signals_resync_instead_of_losing_changes(tmp_path):
+    from core.mod_watch import ModWatcher, COALESCE_SEC, MAX_TRACKED_MODS
+    watcher = ModWatcher(str(tmp_path))
+    try:
+        for index in range(MAX_TRACKED_MODS):
+            watcher.notify(f'example/data/{index}.bin')
+        time.sleep(COALESCE_SEC + .03)
+        before = watcher.snapshot()['revision']
+        watcher.notify('example/data/another.bin')
+        time.sleep(COALESCE_SEC + .03)
+        current = watcher.snapshot(before)
+        assert '*' in current['paths'] and '*' in current['changed']
+        assert len(watcher._changed) <= MAX_TRACKED_MODS
     finally:
         watcher.close()
 

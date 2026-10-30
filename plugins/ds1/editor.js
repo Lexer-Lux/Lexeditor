@@ -4749,8 +4749,28 @@ async function boot(){
   finally{document.body.dataset.ds1Ready=state.error?"error":"true";await LexeditorUI.finishPluginLoading();}
 }
 // Directory notifications do the detection; this request reads a revision.
-// Refresh library metadata without reloading the edited project or its history.
-let modRevision=0, ignoredModRevision=null, modRefreshPending=false, modPollTimer=null, modPollBusy=false, modPollStopped=false;
+// Clean project data follows external edits. Unsaved edits and focused inputs
+// defer replacement; history only resets when a new disk baseline was loaded.
+let modRevision=0, ignoredModRevision=null, modRefreshPending=false, modProjectRefreshPending=false, modPollTimer=null, modPollBusy=false, modPollStopped=false;
+let modProjectFiles=[];
+async function refreshProjectData(){
+  state.pending++;LexeditorUI.setEditorBusy('project-refresh','Refreshing mod files');
+  try{
+    const result=await api('/api/project-refresh',{files:modProjectFiles});
+    modProjectRefreshPending=!!result.deferred;
+    if(!result.deferred)modProjectFiles=[];
+    if(!result.refreshed)return;
+    attackPreviews.clear();recordRows.clear();textLabelPreviews.clear();fieldHistory.clear();
+    await refreshState();
+    if(!document.querySelector('#main .lex-mods-page'))await navigate(state.tab,state.sub);
+  }catch(error){
+    modProjectRefreshPending=false;
+    modProjectFiles=[];
+    LexeditorUI.showToast(`Could not refresh the view after mod files changed: ${error.message}`,{tone:'warning'});
+  }finally{
+    state.pending--;LexeditorUI.setEditorBusy('project-refresh',null);shell.refresh();
+  }
+}
 async function pollModChanges(){
   if(modPollBusy||modPollStopped)return;
   modPollBusy=true;
@@ -4761,9 +4781,18 @@ async function pollModChanges(){
     const changed=result.revision!==modRevision;
     modRevision=result.revision;
     modRefreshPending ||= changed;
+    if(result.projectChanged){
+      modProjectRefreshPending=true;
+      modProjectFiles=modProjectFiles===null||!Array.isArray(result.projectFiles)?null:[...new Set([...modProjectFiles,...result.projectFiles])];
+      if(modProjectFiles&&(modProjectFiles.length>128||new TextEncoder().encode(JSON.stringify(modProjectFiles)).length>48000))modProjectFiles=null;
+    }
     if(!document.body.inert&&!state.pending&&!document.querySelector('.lex-dialog-backdrop')){
       state.tweaksNeedRebuild=!!result.tweaksNeedRebuild&&ignoredModRevision!==modRevision;
       shell.refresh();
+      if(modProjectRefreshPending&&!state.dirty&&!state.bandForm&&!state.taeForm&&!state.assetUpload
+         &&!fieldHistory.applying&&!document.querySelector('input:focus,select:focus,textarea:focus')){
+        await refreshProjectData();
+      }
     if(modRefreshPending){
       modRefreshPending=false;
       await shell.refreshMods();

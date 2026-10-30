@@ -22,6 +22,14 @@ to one mod and are not offered for a move.
 
 ## Author builds
 
+The editor watches mod files without restarting. A changed build input updates
+rebuild status; changed records, maps, animation data or settings refresh a clean
+project after the current control loses focus. Unsaved edits defer replacement.
+All replacement data validates before the session swaps stores; damaged files
+leave its current data intact. Notifications identify affected paths, so a
+builder edit does not hash unrelated archives, and unchanged decoded animation
+and map documents are retained.
+
 Save/build the mod in Lexeditor, select it in Mods, then use **Export for
 players** in its detail header. The ZIP contains the common loader and its
 private runtime, plus `mods/<id>/` with that mod's prebuilt contributions.
