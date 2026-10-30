@@ -65,6 +65,7 @@ def _evaluate(root, settings, context):
             raise script_mods.ScriptModError(result['error'], folders=result.get('folders', ()))
         outputs = {name: base64.b64decode(data, validate=True) for name, data in result['outputs'].items()}
         context._inputs = result['inputs']
+        context._build_cacheable = result.get('cacheable',False)
         if params_path.is_file():
             if params_path.stat().st_size > RESULT_LIMIT:
                 raise script_mods.ScriptModError('Build parameter snapshot exceeds the 128 MiB limit')
@@ -84,6 +85,13 @@ def main():
     except OSError as error:
         Path(request['result']).write_text(json.dumps({'infrastructureError': str(error)}), encoding='utf-8')
         return
+    from core.build_dependencies import BuildDependencies
+    roots = [Path(request['root'])/'script',*[Path(path)/'script' for path in request['enabled'].values()]]
+    with BuildDependencies(roots) as dependencies:
+        _build(request,dependencies)
+
+
+def _build(request, dependencies):
     from .tweak_mods import BuildContext
     context = BuildContext({name: Path(path) for name, path in request['enabled'].items()},
                            Path(request['game']) if request['game'] else None,
@@ -96,6 +104,8 @@ def main():
         context._params = params_path.read_bytes()
     try:
         outputs = script_mods.execute_script(Path(request['root']), request['settings'], context)
+        for path,digest in dependencies.inputs().items():
+            context._remember('python',path,digest)
         if not isinstance(outputs, dict):
             raise script_mods.ScriptModError('build() must return {path: contents}')
         encoded = {}
@@ -108,7 +118,7 @@ def main():
             if total > RESULT_LIMIT * 3 // 4 - 65536:
                 raise script_mods.ScriptModError('Build output exceeds the 128 MiB limit')
             encoded[name] = base64.b64encode(data).decode('ascii')
-        result = {'outputs': encoded, 'inputs': context._inputs}
+        result = {'outputs': encoded, 'inputs': context._inputs, 'cacheable':dependencies.complete}
         if context._params is not None and not params_path.exists():
             if len(context._params) > RESULT_LIMIT:
                 raise script_mods.ScriptModError('Build parameter snapshot exceeds the 128 MiB limit')

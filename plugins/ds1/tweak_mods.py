@@ -27,11 +27,14 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 import hashlib
+import inspect
 import json
+import keyword
 import os
 from pathlib import Path
 from time import perf_counter
 import stat
+import sys
 import struct
 from typing import Callable
 
@@ -396,6 +399,8 @@ class BuildContext:
         self._inputs = {}
         self._source_hashes = {}
         self._building_source = None
+        self._building_root = None
+        self._module_sources = {}
 
     def _remember(self, kind, name, value):
         token = _sha(json.dumps(value, sort_keys=True, separators=(',', ':')).encode('utf-8'))
@@ -421,7 +426,8 @@ class BuildContext:
         try:
             manifest = json.loads((root / script_mods.MANIFEST_FILE).read_text('utf-8'))
             record = manifest.get('build')
-            if (not isinstance(record, dict) or record.get('compiler') != _script_compiler_revision()
+            if (not isinstance(record, dict) or not record.get('cacheable',True)
+                    or record.get('compiler') != _script_compiler_revision()
                     or record.get('source') != script_mods.source_fingerprint(root)
                     or record.get('game') != str(self.game_root)
                     or record.get('originals') != self._originals(outputs)):
@@ -440,8 +446,13 @@ class BuildContext:
                     elif kind == 'module':
                         dependency = self._enabled.get(name)
                         self._remember('module', name, script_mods.source_fingerprint(dependency) if dependency else None)
+                    elif kind == 'contributors':
+                        self._contributor_sources(name)
                     elif kind == 'file':
                         self.game_file(name)
+                    elif kind == 'python':
+                        from core.build_dependencies import fingerprint
+                        self._remember('python',name,fingerprint(name))
                     elif kind == 'params':
                         self.game_params()
                     else:
@@ -452,6 +463,8 @@ class BuildContext:
 
     def begin_build(self, root):
         self._inputs = {}
+        self._build_cacheable = True
+        self._building_root = Path(root).resolve()
         self._building_source = None
         try:
             self._building_source = script_mods.source_fingerprint(root)
@@ -464,7 +477,8 @@ class BuildContext:
 
     def build_record(self, root, outputs):
         return {'source': self._building_source, 'compiler': _script_compiler_revision(),
-                'game': str(self.game_root), 'originals': self._originals(outputs), 'inputs': self._inputs}
+                'game': str(self.game_root), 'originals': self._originals(outputs), 'inputs': self._inputs,
+                'cacheable':getattr(self,'_build_cacheable',False)}
 
     def game_file(self, relative: str | Path) -> bytes:
         """Verified pristine game bytes, with their hash recorded as a build input."""
@@ -487,6 +501,8 @@ class BuildContext:
             data = _original(game_root, _read(managed.live(game_root), managed),
                              _manifest(game_root, managed), managed)
         else:
+            # Deployment covers structured files and supported assets;
+            # native-managed files use their own journals.
             checked(deployment._backup_path(game_root, path))
             checked(deployment._marker_path(game_root, path))
             source = checked(deployment.vanilla_source(game_root, path))
@@ -551,16 +567,69 @@ class BuildContext:
         if root is None:
             raise TweakError(f"{mod_id} must be enabled before reading its build module")
         try:
-            self._remember('module', mod_id, script_mods.source_fingerprint(root))
-            return script_mods.import_module(root, name)
+            source = self._remember('module', mod_id, script_mods.source_fingerprint(root))
+            return self._current_module(root,name,source)
         except BaseException as error:
             raise TweakError(f'{mod_id}: {error}', folders=[root]) from error
+
+    def _current_module(self, root, name, source):
+        root = Path(root).resolve()
+        package_name = script_mods._package_name(root)
+        package = sys.modules.get(package_name)
+        # Keep the executing package's module state; refresh other packages
+        # only when their content identity changes.
+        if root != self._building_root or package is None:
+            if package is None or self._module_sources.get(root) != (source,package):
+                script_mods.load_script(root)
+                package = sys.modules[package_name]
+                self._module_sources[root] = (source,package)
+        return package if name == '__init__' else script_mods.import_module(root,name)
+
+    def _contributor_sources(self, module_name):
+        if (not isinstance(module_name,str) or not module_name.isascii()
+                or not module_name.isidentifier() or keyword.iskeyword(module_name)):
+            raise TweakError('A contributor module name must be a single Python identifier')
+        sources = []
+        for mod_id, root in self._enabled.items():
+            try:
+                root = checked(Path(root))
+                if checked(root/script_mods.SCRIPT_FOLDER/f'{module_name}.py').is_file():
+                    sources.append((mod_id,str(root.resolve()),script_mods.source_fingerprint(root)))
+            except (OSError,ValueError) as error:
+                raise TweakError(f'{mod_id}: {error}',folders=[root]) from error
+        return self._remember('contributors',module_name,sources)
+
+    def contributors(self, module_name: str) -> tuple:
+        """Enabled (mod_id, module) pairs for a named script module, in load order.
+
+        Cache replay checks the complete set without executing providers.
+        """
+        result = []
+        for mod_id,root,source in self._contributor_sources(module_name):
+            try:
+                result.append((mod_id,self._current_module(Path(root),module_name,source)))
+            except BaseException as error:
+                raise TweakError(f'{mod_id}: {error}',folders=[root]) from error
+        return tuple(result)
 
 
 @lru_cache(maxsize=1)
 def _script_compiler_revision():
+    from core import build_dependencies
+    from . import script_worker
+    sources = [inspect.getsource(BuildContext).encode(),sys.version.encode(),
+               *(Path(module.__file__).read_bytes() for module in (script_mods,script_worker,build_dependencies))]
+    return _sha(b'\0'.join(sources))
+
+
+@lru_cache(maxsize=1)
+def _installation_revision():
+    """Link/deploy changes can require Apply while author outputs stay cached."""
     from .mod_loader import _composition_revision
-    return _sha(_composition_revision() + Path(script_mods.__file__).read_bytes() + Path(__file__).read_bytes())
+    sources = [_composition_revision(),Path(__file__).read_bytes(),
+               *(Path(package/'runtime-manifest.json').read_bytes()
+                 for package in (LOADER_PACKAGE,LOADER_PACKAGE/'debug',LOADER_PACKAGE/'online'))]
+    return _sha(b'\0'.join(sources))
 
 
 def build_specs(root: Path | None = None, game_root: Path | None = None, *, cache_root=None, timings=None, original=None) -> list[dict]:
@@ -716,7 +785,22 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
     the script.
     """
     folder = Path(folder)
-    parts = {"source": script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision()}
+    parts = {"source": script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision(),
+             'installationEngine':_installation_revision()}
+    try:
+        manifest = script_mods._read_json(folder / script_mods.MANIFEST_FILE) or {}
+        record = manifest.get('build') or {}
+        dependencies = (record.get('inputs') or {}).get('python',{})
+        from core import build_dependencies
+        if (type(dependencies) is not dict or len(dependencies)>build_dependencies.MAX_INPUTS
+                or any(type(name) is not str or not _digest(value) for name,value in dependencies.items())):
+            raise ValueError('Invalid compiler dependency record')
+        parts['python'] = dict(dependencies) if produced else {
+            name:_sha(json.dumps(build_dependencies.fingerprint(name),sort_keys=True,separators=(',',':')).encode())
+            for name in dependencies}
+    except (script_mods.ScriptModError,OSError,ValueError,TypeError,AttributeError,RuntimeError):
+        parts['python'] = None  # An invalid optional cache requests a rebuild.
+        record = {}
     from . import native_rules, native_support
     parts['nativeRules'] = native_rules.digest(native_rules._read_optional(folder/native_rules.SETTINGS_FILE,native_rules.SETTINGS_LIMIT))
     parts['nativeSupport'] = {path.name:_sha(read_built(path)) for path in built_files(folder,native_support.FOLDER)}
@@ -725,8 +809,6 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
         checked(folder/runtime_mods.FILENAME)
         parts['prebuilt'] = _sha(runtime_mods.read(folder))
     if produced:
-        manifest = script_mods._read_json(folder / script_mods.MANIFEST_FILE) or {}
-        record = manifest.get('build') or {}
         # Record the source actually used, so an edit by another chat during
         # the build stays stale instead of being stamped as already installed.
         parts['source'] = record.get('source', parts['source'])
