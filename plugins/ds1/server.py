@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import base64
 import binascii
 import json
+import logging
 import os
 from pathlib import Path
 import threading
@@ -226,8 +227,11 @@ def _tweaks_flag() -> bool:
     """Whether the installed tweaks differ from the library (Save rebuilds them)."""
     try:
         return bool(tweak_mods.needs_rebuild(STORE.game_root).get("needed"))
-    except (ValueError, OSError, RuntimeError):
-        return False
+    except Exception:
+        # Freshness is optional request metadata, never a gate on record data.
+        # An unreadable status cannot prove that the installed build is current.
+        logging.getLogger(__name__).warning('Could not check mod build freshness', exc_info=True)
+        return True
 
 
 _MOD_CHANGES_LOCK = threading.Lock()

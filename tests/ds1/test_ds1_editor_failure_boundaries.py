@@ -710,6 +710,27 @@ def test_saved_project_survives_unexpected_deployment_error(tmp_path, monkeypatc
     assert result == {'tweaksNeedRebuild': True, 'tweaksError': 'bytes cannot serialize'}
 
 
+def test_optional_build_status_failure_still_returns_the_requested_records(monkeypatch, caplog):
+    from types import SimpleNamespace
+    from plugins.ds1 import server
+    rows = [{'id':1,'table':'Magic','name':'Example','values':{}}]
+    document = SimpleNamespace(list_rows=lambda _:rows,dirty_count=0,pending_changes=lambda:[])
+    monkeypatch.setattr(server,'STORE',SimpleNamespace(get=lambda:document,game_root=None))
+    other = SimpleNamespace(dirty_count=0,pending_changes=lambda:[],snapshot=lambda:{})
+    for name in ('RULES','MAPSTORE','TAESTORE','SKILLS'):
+        monkeypatch.setattr(server,name,other)
+    monkeypatch.setattr(server,'_warm_icon_table',lambda:None)
+    def unavailable(*_):
+        raise AttributeError('Older interpreter lacks a filesystem method')
+    monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
+    replies = []
+    server.Handler.do_GET(SimpleNamespace(path='/api/table?tab=spells',
+        send_json=lambda value,status=200:replies.append((status,json.loads(json.dumps(value))))))
+    assert replies[0][0] == 200 and replies[0][1]['rows'] == rows
+    assert replies[0][1]['tweaksNeedRebuild'] is True
+    assert 'Older interpreter' in caplog.text
+
+
 def test_bad_archive_is_attributed_but_bad_vanilla_is_not(tmp_path, monkeypatch):
     from ds1_fixture import make_archive
     relative = mod_loader.RELATIVE
