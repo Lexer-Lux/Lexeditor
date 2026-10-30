@@ -43,16 +43,22 @@ def _validate_mesh(mesh):
         raise FormatError('Portable collision face points outside its vertices')
 
 
-def _create_member(before, after):
-    first, last = CollisionDocument(before), CollisionDocument(after)
+def create_state(first, last, values=None):
+    """Record editable geometry directly; ordinary author saves do not compile."""
+    values = values if values is not None else [collision_merge._mesh(last,i) for i in range(len(last.meshes))]
+    if len(values) != len(last.meshes):
+        raise FormatError('Collision mesh states do not match their physics metadata')
     layout = _layout(first)
     if (len(first.meshes) != len(last.meshes) or layout != _layout(last)
             or any(a['index_field'] != b['index_field'] for a, b in zip(first.meshes, last.meshes))):
-        return {'kind':'collisionRaw', 'beforeHash':_hash(before),
+        updates = {i:collision_merge._update(collision_merge._mesh(last,i),mesh)
+                   for i,mesh in enumerate(values) if collision_merge._mesh(last,i) != mesh}
+        after = last.export(updates)
+        return {'kind':'collisionRaw', 'beforeHash':_hash(first.source),
                 'after':base64.b64encode(after).decode('ascii')}
     meshes = []
     for index in range(len(first.meshes)):
-        old, new = collision_merge._mesh(first, index), collision_merge._mesh(last, index)
+        old, new = collision_merge._mesh(first, index), values[index]
         _validate_mesh(old)
         _validate_mesh(new)
         if old == new:
@@ -87,13 +93,14 @@ def create(before_header, before_body, after_header, after_body):
         a, b = before.member(name), after.member(name)
         if a == b:
             continue
-        edits = _create_member(a, b)
+        edits = create_state(CollisionDocument(a),CollisionDocument(b))
         if edits is not None:
             members.append({'name':name, 'id':row['id'], 'path':row['name'], 'edits':edits})
     return {'kind':'collision', 'members':members}
 
 
-def _materialize_member(original, spec):
+def open_member(original, spec):
+    """Validate/rebase portable edits into editable records without compiling."""
     document = CollisionDocument(original)
     if type(spec) is not dict:
         raise FormatError('Invalid portable collision member')
@@ -106,22 +113,23 @@ def _materialize_member(original, spec):
         after = base64.b64decode(spec['after'], validate=True)
         if len(after) > hkx.MAX_FILE:
             raise FormatError('Portable collision physics is too large')
-        CollisionDocument(after)
+        after_document = CollisionDocument(after)
         if _hash(original) not in (spec['beforeHash'], _hash(after)):
             raise FormatError('Collision physics conflicts with installed data')
-        return after
+        return after_document,[collision_merge._mesh(after_document,i) for i in range(len(after_document.meshes))]
     if (set(spec) != {'kind', 'layout', 'meshes'} or spec['kind'] != 'collisionMesh'
             or spec['layout'] != _layout(document) or type(spec['meshes']) is not list
             or len(spec['meshes']) > len(document.meshes)):
         raise FormatError('Portable collision layout does not match installed data')
-    updates, seen = {}, set()
+    values = [collision_merge._mesh(document,i) for i in range(len(document.meshes))]
+    seen = set()
     for mesh in spec['meshes']:
         if (type(mesh) is not dict or type(mesh.get('id')) is not int or mesh['id'] in seen
                 or not 0 <= mesh['id'] < len(document.meshes)):
             raise FormatError('Invalid portable collision mesh identity')
         index = mesh['id']
         seen.add(index)
-        old = collision_merge._mesh(document, index)
+        old = values[index]
         if set(mesh) == {'id', 'before', 'after'}:
             _validate_mesh(mesh['before'])
             _validate_mesh(mesh['after'])
@@ -155,12 +163,13 @@ def _materialize_member(original, spec):
             raise FormatError('Portable collision element counts do not match installed data')
         _validate_mesh(new)
         if old != new:
-            updates[index] = collision_merge._update(old, new)
-    return document.export(updates)
+            collision_merge._update(old, new)
+            values[index] = new
+    return document,values
 
 
-def materialize(header, body, spec):
-    archive = collision_archive.CollisionArchive(header, body)
+def member_specs(archive, spec):
+    """One validated identity index shared by editing and deployment."""
     if (type(spec) is not dict or set(spec) != {'kind','members'} or spec['kind'] != 'collision'
             or type(spec['members']) is not list or len(spec['members']) > collision_archive.MAX_MEMBERS):
         raise FormatError('Invalid portable split collision contribution')
@@ -173,7 +182,18 @@ def materialize(header, body, spec):
         row = archive.members[member['name']]
         if type(member['id']) is not int or member['id'] != row['id'] or member['path'] != row['name']:
             raise FormatError('Portable collision directory identity does not match installed data')
-        updates[member['name']] = _materialize_member(archive.member(member['name']), member['edits'])
+        updates[member['name']] = member['edits']
+    return updates
+
+
+def materialize(header, body, spec):
+    archive = collision_archive.CollisionArchive(header, body)
+    updates = {}
+    for name,member in member_specs(archive,spec).items():
+        document,values = open_member(archive.member(name),member)
+        edits = {i:collision_merge._update(collision_merge._mesh(document,i),mesh)
+                 for i,mesh in enumerate(values) if collision_merge._mesh(document,i) != mesh}
+        updates[name] = document.export(edits)
     return archive.replace(updates)
 
 

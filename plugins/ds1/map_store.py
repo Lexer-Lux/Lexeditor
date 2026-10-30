@@ -5,7 +5,7 @@ import hashlib
 import re
 from pathlib import Path
 
-from core.plugin_files import atomic_write
+from core.plugin_files import atomic_write_group
 
 from . import deployment, record_edits
 from .formats import FormatError
@@ -138,6 +138,8 @@ class MapStore:
         self.vanilla_docs = {}
         self.hashes = {}
         self._npc_models = None
+        from .collision_store import CollisionStore
+        self.collisions = CollisionStore(self.game_root,self.project,self.writable)
 
     def writable(self):
         if self.read_only:
@@ -747,7 +749,7 @@ class MapStore:
 
     @property
     def dirty_count(self):
-        return sum(document.dirty_count for document in self.docs.values())
+        return sum(document.dirty_count for document in self.docs.values()) + self.collisions.dirty_count
 
     def pending_changes(self):
         _ids, names, _types = self._npc()
@@ -785,7 +787,7 @@ class MapStore:
             for gone in document.removed:
                 changes.append({"label": f"{map_name} {gone['name']}, {gone['kind']} (removed)",
                                 "before": f"{gone['type']}:{gone['id']}", "after": "removed"})
-        return changes
+        return changes + self.collisions.pending_changes()
 
     def validate_save(self):
         from .tweak_mods import checked
@@ -803,12 +805,16 @@ class MapStore:
                 raise ValueError("The map changed outside Lexeditor. Reopen it before saving.")
             if digest(entry["output"]) != entry["output_hash"]:
                 raise ValueError("The mod map changed outside Lexeditor. Reopen it before saving.")
+        self.collisions.validate_save()
         return True
 
     def save(self):
         self.validate_save()
         from .tweak_mods import checked
-        records, records_changed = record_edits.project_specs(self.project), False
+        records_path = checked(self.project/record_edits.FILENAME)
+        records_raw = record_edits.read(records_path) if records_path.is_file() else None
+        records = record_edits.decode(records_raw) if records_raw is not None else {}
+        outputs,expected,records_changed = self.collisions.prepare_save(records)
         for map_name, document in self.docs.items():
             if not document.dirty_count:
                 continue
@@ -824,14 +830,17 @@ class MapStore:
                 records[relative] = record_edits.create(relative,original,payload)
                 records_changed = True
                 continue
-            output.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write(output, payload)
+            outputs[output] = payload
+            expected[output] = self.hashes[map_name]['output_hash']
         if records_changed:
-            atomic_write(checked(self.project/record_edits.FILENAME),record_edits.encode(records))
+            outputs[records_path] = record_edits.encode(records)
+            expected[records_path] = hashlib.sha256(records_raw).hexdigest() if records_raw is not None else None
+        atomic_write_group(outputs,expected)
         self.docs = {}
         self.vanilla_docs = {}
         self.hashes = {}
         self._npc_models = None
+        self.collisions.discard()
         return {"saved": True, "dirtyCount": 0, 'recordsChanged':records_changed}
 
     def discard(self):
@@ -839,4 +848,5 @@ class MapStore:
         self.vanilla_docs = {}
         self.hashes = {}
         self._npc_models = None
+        self.collisions.discard()
         return {"discarded": True}

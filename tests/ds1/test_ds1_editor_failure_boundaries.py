@@ -242,11 +242,12 @@ def test_combined_parameter_reads_reuse_archive_cache_and_skip_other_assets(tmp_
     assert len(calls) == 2
 
 
-def test_editor_only_source_changes_do_not_invalidate_archive_outputs(monkeypatch):
+@pytest.mark.parametrize('editor_source', ['server.py','map_store.py','collision_store.py'])
+def test_editor_only_source_changes_do_not_invalidate_archive_outputs(monkeypatch,editor_source):
     mod_loader._composition_revision.cache_clear()
     baseline = mod_loader._composition_revision()
     read = Path.read_bytes
-    changed = {'name': 'server.py'}
+    changed = {'name': editor_source}
     def edited(path):
         contents = read(path)
         return contents + b'\n# source edit' if path.parent == Path(mod_loader.__file__).parent and path.name == changed['name'] else contents

@@ -40,6 +40,7 @@ def _sources(items, rules, maps, animations, skills, paths=None):
     for store,limit in ((maps,MAX_MAP),(animations,MAX_BINDER)):
         for entry in store.hashes.values():
             sources.extend((entry[name],entry[f'{name}_hash'],limit) for name in ('source','output'))
+    sources.extend(maps.collisions.sources())
     sources.append((items.project/native_rules.SETTINGS_FILE,rules.saved_hash,native_rules.SETTINGS_LIMIT))
     if rules.legacy is not None:
         sources.append((items.project/native_rules.LEGACY_FILE,rules.legacy['sha256'],native_rules.SETTINGS_LIMIT))
@@ -92,6 +93,15 @@ def refresh(items, rules, maps, animations, skills, paths=None):
             if any((entry[key],entry[f'{key}_hash'],limit) in changed for key in ('source','output')):
                 target.docs.pop(name)
                 target.get(name)
+    for header,unit in maps.collisions.units.items():
+        sources = [*unit['sources'],(unit['record_path'],unit['record_hash'],record_edits.LIMIT)]
+        if not any(source in changed for source in sources):
+            fresh_maps.collisions.units[header] = unit
+            continue
+        for member in unit['documents']:
+            layer = 'high' if header.name.startswith('h') else 'low'
+            model = 'h'+member[1:]
+            fresh_maps.collisions._document(header.parent.name+'.msb',model,layer)
     if any(_changed(*source) for source in _sources(fresh,fresh_rules,fresh_maps,fresh_animations,fresh_skills,paths)):
         raise ValueError('The mod changed again while its files were being refreshed; current editor data was kept')
     return fresh,fresh_rules,fresh_maps,fresh_animations,fresh_skills
