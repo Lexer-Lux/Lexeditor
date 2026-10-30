@@ -148,11 +148,11 @@ def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes]) -> byt
     return result
 
 
-def write_release(folder: Path, destination: Path, vanilla: bytes) -> Path:
+def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root: Path | None = None) -> Path:
     """Export built contributions without developer files or local paths."""
     from core import mod_metadata, mod_requires, script_mods
     from core.mod_library import relative_path
-    from . import assets, menu_dim, mod_loader, tweak_mods
+    from . import assets, menu_dim, mod_loader, tweak_mods, record_edits
     folder, destination = Path(folder), Path(destination)
     tweak_mods.checked(folder)
     metadata = json.loads((folder/'mod.json').read_text(encoding='utf-8'))
@@ -178,6 +178,26 @@ def write_release(folder: Path, destination: Path, vanilla: bytes) -> Path:
     for kind in tweak_mods.BUILT_FOLDERS[1:]:
         for path in tweak_mods.built_files(folder,kind):
             contributions.append((path.relative_to(folder),path))
+    portable = {}
+    existing_records = None
+    for relative,path in contributions:
+        if relative == record_edits.FILENAME:
+            existing_records = record_edits.read(path)
+            declared = record_edits.decode(existing_records)
+            if game_root is not None:
+                originals = mod_loader.vanilla_files(Path(game_root),frozenset(declared))
+                mod_loader.materialize_mod(mod_loader.Mod(row['name'],folder,{},declared),originals)
+    archives = [(relative,path) for relative,path in contributions if relative in mod_loader.FILES]
+    if archives:
+        if game_root is None:
+            raise ValueError('Locate the installed game to export portable record edits')
+        originals = mod_loader.vanilla_files(Path(game_root),frozenset(relative for relative,_path in archives))
+        for relative,path in archives:
+            if relative not in originals:
+                raise ValueError(f'{relative}: the export baseline is missing')
+            portable[relative] = record_edits.create(relative,originals[relative],path.read_bytes())
+        if any(relative == record_edits.FILENAME for relative,_path in contributions):
+            raise ValueError('The mod contains duplicate archive and record contributions')
     payload = read(folder) if prebuilt else build(vanilla, specs, requires_data=bool(contributions)) if specs else None
     if payload is not None and inspect(payload)['requiresData'] and not contributions:
         raise ValueError('This prebuilt mod is missing its required data; rebuild or reinstall it before exporting')
@@ -200,11 +220,15 @@ def write_release(folder: Path, destination: Path, vanilla: bytes) -> Path:
             raise ValueError('The release metadata exceeds the loader size limit')
         (target/'mod.json').write_bytes(encoded)
         (target/FILENAME).write_bytes(payload)
+        if portable:
+            (target/record_edits.FILENAME).write_bytes(record_edits.encode(portable))
         for relative, source in contributions:
+            if relative in portable:
+                continue
             relative = relative_path(relative.as_posix())
             output = target/relative
             output.parent.mkdir(parents=True,exist_ok=True)
-            output.write_bytes(source.read_bytes())
+            output.write_bytes(existing_records if relative == record_edits.FILENAME else source.read_bytes())
     except Exception:
         import shutil
         if target.resolve().parent != destination.resolve():

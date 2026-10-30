@@ -40,6 +40,14 @@ payload. Tests, research notes, builder source, bytecode caches and local build
 journals stay out. Dependencies from metadata and the settings schema remain
 declared in the exported metadata.
 
+Parameter and item/menu text contributions use `records.lxd`: only changed
+rows and text entries, with their old values as anchors. They preserve other
+installed fields and records instead of treating a complete archive as this
+mod's intent. A mismatching field or missing record identifies that mod and
+prevents its partial deployment. Imported releases use those same records in
+the editor, including added/edited markers; saving keeps the portable format.
+The format is bounded, versioned data and cannot execute a builder.
+
 Prepare the common loader package separately:
 
     python tools/package_ds1_loader.py --plan
@@ -84,5 +92,5 @@ never overwritten. An unowned backup that disagrees with the installed file
 also needs reconciliation before either copy can be replaced.
 
 This implements the current drop-in/install/adopt workflow. Older issue #954's
-C-only port and rebasing full archive contributions over unrelated whole-file mods
+C-only port and rebasing the remaining map/character/event archive contributions over unrelated whole-file mods
 are separate requirements; this implementation does not claim those completed.

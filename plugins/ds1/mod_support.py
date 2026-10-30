@@ -79,7 +79,7 @@ class Ds1ModAdapter:
             raise OSError('There is not enough free space to export this mod and its loader')
         with tempfile.TemporaryDirectory(prefix='.lexeditor-export-',dir=destination.parent) as temporary:
             staged = Path(temporary)
-            exported = runtime_mods.write_release(folder,staged/'mods',vanilla)
+            exported = runtime_mods.write_release(folder,staged/'mods',vanilla,game_root=game_root)
             package = runtime_package.package(staged/'package')
             (staged/'mods').rename(package/'mods')
             archive = Path(shutil.make_archive(str(staged/'release'),'zip',package))
@@ -174,7 +174,7 @@ class Ds1ModAdapter:
         for row in mods_service.library_rows(self._library()):
             if Path(row["path"]).resolve() in wanted:
                 mod = mod_loader.read_mod(Path(row["path"]), row["name"])
-                if mod is not None and mod.files:
+                if mod is not None and (mod.files or mod.edits):
                     mods.append(mod)
         return mods
 
@@ -305,6 +305,10 @@ class Ds1ModAdapter:
         # The main pack can be derived from a layout plus split TPFs without
         # any mod carrying it. It is still part of the installed pair.
         paths = {key for _folder, _name, stamped in content for key, *_stat in stamped}
+        from . import record_edits
+        if record_edits.FILENAME.as_posix() in paths:
+            paths.remove(record_edits.FILENAME.as_posix())
+            paths.update(path.as_posix() for path in mod_loader.FILES)
         if (game_root/'menu/menu.tpf.dcx').is_file():
             paths.add('menu/menu.tpf.dcx')
         for relative in sorted(paths):

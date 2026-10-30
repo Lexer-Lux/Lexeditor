@@ -138,7 +138,7 @@ def prepare(game, rows):
     for row in rows:
         try:
             mod = mod_loader.read_mod(row['path'],row['name'])
-            if mod is not None and mod.files:
+            if mod is not None and (mod.files or mod.edits):
                 data.append(mod)
             elif _requires_data(row['path']) and not any(
                     tweak_mods.built_files(row['path'],kind) for kind in tweak_mods.BUILT_FOLDERS[1:]):

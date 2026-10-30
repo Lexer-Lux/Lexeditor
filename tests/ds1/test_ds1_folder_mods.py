@@ -592,7 +592,7 @@ def test_standalone_data_merger_combines_records_and_disables_only_broken_mod(tm
 
 @pytest.mark.skipif(os.name != 'nt', reason='Windows private runtime')
 def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path):
-    from plugins.ds1 import runtime_package
+    from plugins.ds1 import runtime_package,record_edits
     from plugins.ds1.store import RELATIVE
     from ds1_fixture import make_archive
     supplied = os.environ.get('LEXEDITOR_TEST_LOADER_PACKAGE')
@@ -610,9 +610,16 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
         (folder/'runtime.lxd').write_bytes(binary_module(0x1000,42))
         document = ItemDocument(make_archive())
         document.edit('EquipParamGoods',row_id,'sellValue',price)
-        (folder/RELATIVE).write_bytes(document.export() if mod_id != 'broken' else b'Broken data')
+        if mod_id == 'broken':
+            (folder/RELATIVE).write_bytes(b'Broken data')
+        else:
+            portable = record_edits.create(RELATIVE,make_archive(),document.export())
+            (folder/record_edits.FILENAME).write_bytes(record_edits.encode({RELATIVE:portable}))
         (folder/'script').mkdir()
         (folder/'script/tweak.py').write_text('raise RuntimeError("Players never run builders")')
+    foreign = ItemDocument(make_archive())
+    foreign.edit('EquipParamGoods',100,'iconId',77)
+    (game/RELATIVE).write_bytes(foreign.export())
     runtime = package/'lexeditor-runtime'
     env = {**os.environ,'PYTHONHOME':str(tmp_path/'Not installed'),'PYTHONPATH':str(tmp_path/'No editor')}
     import ctypes
@@ -636,6 +643,7 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     merged = ItemDocument((game/RELATIVE).read_bytes())
     assert merged.value('EquipParamGoods',100,'sellValue') == 12
     assert merged.value('EquipParamGoods',101,'sellValue') == 24
+    assert merged.value('EquipParamGoods',100,'iconId') == 77
 
 
 def test_standalone_menu_failure_disables_only_its_owner(tmp_path, monkeypatch):

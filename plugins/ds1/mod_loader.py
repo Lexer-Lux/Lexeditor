@@ -75,6 +75,7 @@ class Mod:
     name: str
     folder: Path
     files: dict[Path, bytes]
+    edits: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -115,6 +116,12 @@ def content_files(folder: Path, name: str, *, only=None) -> list[tuple[Path, Pat
     from .tweak_mods import checked
     folder = checked(Path(folder))
     found = []
+    from . import record_edits
+    records = checked(folder/record_edits.FILENAME)
+    if records.is_file():
+        if records.stat().st_size > record_edits.LIMIT:
+            raise ValueError(f'{name}: record contributions are too large')
+        found.append((record_edits.FILENAME,records))
     for relative in FILES:
         if only is not None and relative not in only:
             continue
@@ -166,13 +173,22 @@ def read_mod(folder: Path, name: str, *, only=None) -> Mod | None:
     if not (folder / MARKER).is_file() and not (folder/'mod.json').is_file():
         return None
     files = {}
+    edits = {}
     try:
+        from . import record_edits
         for key, path in content_files(folder, name, only=only):
-            files[key] = path.read_bytes()
+            if key == record_edits.FILENAME:
+                edits = record_edits.decode(record_edits.read(path))
+                if only is not None:
+                    edits = {key:spec for key,spec in edits.items() if key in only}
+            else:
+                files[key] = path.read_bytes()
+        if files.keys() & edits.keys():
+            raise ValueError('A mod cannot declare both an archive and record edits for the same target')
     except Exception as error:
         from core.mod_builds import ModBuildError
         raise ModBuildError([folder], f'{name}: {error}') from error
-    return Mod(name, folder, files)
+    return Mod(name, folder, files, edits)
 
 
 def active_mods(library_root: Path, project_root: Path | None = None, *, only=None) -> list[Mod]:
@@ -189,12 +205,12 @@ def active_mods(library_root: Path, project_root: Path | None = None, *, only=No
         if not row["enabled"] and folder != (Path(project_root).resolve() if project_root else None):
             continue
         mod = read_mod(folder, row["name"], only=only)
-        if mod is not None and mod.files:
+        if mod is not None and (mod.files or mod.edits):
             mods.append(mod)
             seen.add(folder)
     if project_root is not None and Path(project_root).resolve() not in seen:
         mod = read_mod(Path(project_root), Path(project_root).name, only=only)
-        if mod is not None and mod.files:
+        if mod is not None and (mod.files or mod.edits):
             mods.append(mod)
     return mods
 
@@ -226,8 +242,9 @@ def build(game_root: Path, library_root: Path, project_root: Path | None = None)
 
 def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False, cache_root=None) -> Composition:
     """Load every mod's original assets before composing the enabled set."""
-    paths = frozenset(name for mod in mods for name in mod.files)
+    paths = frozenset(name for mod in mods for name in (mod.files.keys()|mod.edits.keys()))
     originals = vanilla_files(game_root, paths)
+    mods = [materialize_mod(mod,originals) for mod in mods]
     files, conflicts = {}, []
     for relative in sorted(paths):
         selected = [Mod(mod.name, mod.folder, {relative: mod.files[relative]})
@@ -256,6 +273,21 @@ def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool 
         files.update(result.files)
         conflicts.extend(result.conflicts)
     return Composition(files, conflicts)
+
+
+def materialize_mod(mod: Mod, originals: dict) -> Mod:
+    """Resolve portable edits against the actual baseline before composing."""
+    from . import record_edits
+    from core.mod_builds import ModBuildError
+    files = dict(mod.files)
+    try:
+        for relative,spec in mod.edits.items():
+            if relative in files:
+                raise ValueError('Duplicate archive and record contributions')
+            files[relative] = record_edits.materialize(relative,originals.get(relative),spec)
+    except Exception as error:
+        raise ModBuildError([mod.folder],f'{mod.name}: {error}') from error
+    return Mod(mod.name,mod.folder,files)
 
 
 @lru_cache(maxsize=1)
@@ -585,24 +617,31 @@ def _table_rows(payload: bytes, size: int) -> list[tuple[int, bytes | None, byte
 
 
 def _standard_tail(payload: bytes, size: int, rows: list) -> bytes | None:
-    """The bytes after the names when the table has the game's own layout."""
+    """Preserve the tail of a contiguous PARAM, including tool-added names.
+
+    Shipped tables rebuild exactly. Other writers can leave padding or orphan
+    names; retain that entire trailing region when normalizing their directory.
+    """
     count = len(rows)
     data_start = _HEADER + _STRIDE * count
     data_end = data_start + size * count
+    strings = struct.unpack_from('<I',payload,0)[0]
     if (not count or struct.unpack_from("<H", payload, 4)[0] != data_start
-            or struct.unpack_from("<I", payload, 0)[0] != (data_end + 15) // 16 * 16):
+            or not data_end <= strings <= len(payload)):
         return None
     terminator = 2 if payload[0x2E] & 1 else 1
     cursor = data_end
+    standard = strings == (data_end+15)//16*16
     for index in range(count):
         _id, offset, name_offset = struct.unpack_from("<iII", payload, _HEADER + _STRIDE * index)
         if offset != data_start + index * size:
             return None
         if name_offset:
-            if name_offset != cursor:
+            if name_offset < data_end:
                 return None
+            standard = standard and name_offset == cursor
             cursor += len(rows[index][1]) + terminator
-    return payload[cursor:]
+    return payload[cursor:] if standard else payload[data_end:]
 
 
 def _write_table(header: bytes, size: int, rows: list, tail: bytes) -> bytes:
@@ -1306,8 +1345,14 @@ def describe_changes(folder: Path, game_root: Path | None):
         notes.append('Locate the game to compare records against vanilla.')
         return {'changes': changes, 'truncated': False, 'note': ' '.join(notes)}
     game_root = Path(game_root)
+    from . import record_edits
+    portable = {}
+    if (folder/record_edits.FILENAME).is_file():
+        mod = read_mod(folder,folder.name)
+        originals = vanilla_files(game_root,frozenset(mod.edits))
+        portable = materialize_mod(mod,originals).files
     mod_params = folder / RELATIVE
-    params = (mod_params.read_bytes() if mod_params.is_file() else None, None)
+    params = (portable.get(RELATIVE,mod_params.read_bytes() if mod_params.is_file() else None), None)
     if params[0] is not None:
         params = (params[0], _vanilla_bytes(game_root, RELATIVE, notes,
                                           "parameter archive"))
@@ -1332,14 +1377,15 @@ def describe_changes(folder: Path, game_root: Path | None):
     for relative, document in ((texts.RELATIVE, texts.TextDocument),
                                (texts.MENU_RELATIVE, texts.MenuDocument)):
         mod_file = folder / relative
-        if not mod_file.is_file():
+        if not mod_file.is_file() and relative not in portable:
             continue
         what = "menu text" if document is texts.MenuDocument else "item text"
         base_bytes = _vanilla_bytes(game_root, relative, notes, what)
         if base_bytes is None:
             continue
         try:
-            mine, base = document(mod_file.read_bytes()), document(base_bytes)
+            mine = document(portable[relative] if relative in portable else mod_file.read_bytes())
+            base = document(base_bytes)
         except FormatError as error:
             notes.append(f'{relative.name} cannot be read ({error})')
             continue

@@ -51,24 +51,38 @@ class ItemStore:
 
     def load(self):
         if not self.read_only: self.writable()
+        from . import mod_loader,record_edits
+        self.records_path = self.project/record_edits.FILENAME if self.project else None
+        from .tweak_mods import checked
+        records = (record_edits.read(checked(self.records_path))
+                   if self.records_path is not None and checked(self.records_path).exists() else None)
+        self.records_hash = hashlib.sha256(records).hexdigest() if records is not None else None
+        self.portable = {}
+        self.portable_specs = None
+        if self.records_hash is not None:
+            self.portable_specs = record_edits.decode(records)
+            if any((self.project/relative).exists() for relative in self.portable_specs):
+                raise ValueError('A mod cannot contain both archives and record edits for the same target')
+            mod = mod_loader.Mod(self.project.name,self.project,{},self.portable_specs)
+            originals = mod_loader.vanilla_files(self.game_root,frozenset(mod.edits))
+            self.portable = mod_loader.materialize_mod(mod,originals).files
         vanilla = self._vanilla_path()
         source = self.output if self.output and self.output.is_file() else vanilla
-        from .tweak_mods import checked
         checked(source)
         if source.stat().st_size > MAX_ARCHIVE:
             raise ValueError('The parameter archive is too large.')
-        raw = source.read_bytes()
+        raw = self.portable[RELATIVE] if RELATIVE in self.portable else source.read_bytes()
         document = ItemDocument(raw)
         self.source = source
         self.vanilla = vanilla
-        self.source_hash = hashlib.sha256(raw).hexdigest()
+        self.source_hash = digest(source) if RELATIVE in self.portable else hashlib.sha256(raw).hexdigest()
         self.vanilla_hash = digest(vanilla)
         self.output_hash = digest(self.output) if self.output else None
         self._load_texts(document)
         self._load_menu_texts(document)
         # A mod's saved archive is not vanilla: read the game's own once, for
         # each field's vanilla value.
-        document.vanilla_document = ItemDocument(vanilla.read_bytes()) if source != vanilla else None
+        document.vanilla_document = ItemDocument(vanilla.read_bytes()) if source != vanilla or RELATIVE in self.portable else None
         self.document = document
         return document
 
@@ -84,11 +98,12 @@ class ItemStore:
         self.text_source = source if source and source.is_file() else None
         self.text_hash = digest(self.text_source) if self.text_source else None
         self.text_output_hash = digest(self.text_output) if self.text_output else None
-        document.texts = texts.TextDocument(self.text_source.read_bytes()) if self.text_source else None
+        raw = (self.portable[texts.RELATIVE] if texts.RELATIVE in self.portable else self.text_source.read_bytes()) if self.text_source else None
+        document.texts = texts.TextDocument(raw) if raw is not None else None
         # A mod's saved names are not vanilla: keep the game's own beside
         # them, so changed rows stay marked after a save and reload.
         document.vanilla_texts = (texts.TextDocument(vanilla.read_bytes())
-                                  if vanilla is not None and vanilla.is_file() and source != vanilla
+                                  if vanilla is not None and vanilla.is_file() and (source != vanilla or texts.RELATIVE in self.portable)
                                   else None)
 
     def _load_menu_texts(self, document):
@@ -102,9 +117,10 @@ class ItemStore:
         self.menu_source = source if source and source.is_file() else None
         self.menu_hash = digest(self.menu_source) if self.menu_source else None
         self.menu_output_hash = digest(self.menu_output) if self.menu_output else None
-        document.menu_texts = texts.MenuDocument(self.menu_source.read_bytes()) if self.menu_source else None
+        raw = (self.portable[texts.MENU_RELATIVE] if texts.MENU_RELATIVE in self.portable else self.menu_source.read_bytes()) if self.menu_source else None
+        document.menu_texts = texts.MenuDocument(raw) if raw is not None else None
         document.vanilla_menu_texts = (texts.MenuDocument(vanilla.read_bytes())
-                                       if vanilla is not None and vanilla.is_file() and source != vanilla
+                                       if vanilla is not None and vanilla.is_file() and (source != vanilla or texts.MENU_RELATIVE in self.portable)
                                        else None)
 
     def get(self):
@@ -159,6 +175,12 @@ class ItemStore:
         from .tweak_mods import checked
         self.writable()
         document = self.get()
+        if self.records_path is not None:
+            from . import record_edits
+            current = (hashlib.sha256(record_edits.read(checked(self.records_path))).hexdigest()
+                       if checked(self.records_path).exists() else None)
+            if current != self.records_hash:
+                raise ValueError('The mod record edits changed outside Lexeditor. Reopen it before saving.')
         for path in (self.source, self._vanilla_path(), self.output):
             if path is not None:
                 checked(path)
@@ -182,10 +204,20 @@ class ItemStore:
         ItemDocument(payload)
         # Text is written only once the mod has changed some; until then the
         # mod carries no text archive and the game keeps its own.
-        names = document.texts.export() if document.texts and (document.texts.dirty or self.text_output.is_file()) else None
+        names = document.texts.export() if document.texts and (document.texts.dirty or self.text_output.is_file() or texts.RELATIVE in self.portable) else None
         if names is not None: texts.TextDocument(names)
-        menu = document.menu_texts.export() if document.menu_texts and (document.menu_texts.dirty or document.menu_texts.dirty_texts or self.menu_output.is_file()) else None
+        menu = document.menu_texts.export() if document.menu_texts and (document.menu_texts.dirty or document.menu_texts.dirty_texts or self.menu_output.is_file() or texts.MENU_RELATIVE in self.portable) else None
         if menu is not None: texts.MenuDocument(menu)
+        if self.portable_specs is not None:
+            from . import deployment,record_edits
+            specs = dict(self.portable_specs)
+            for relative,raw in ((RELATIVE,payload),(texts.RELATIVE,names),(texts.MENU_RELATIVE,menu)):
+                if raw is not None:
+                    original = deployment.vanilla_source(self.game_root,relative).read_bytes()
+                    specs[relative] = record_edits.create(relative,original,raw)
+            atomic_write(self.records_path,record_edits.encode(specs))
+            self.load()
+            return {'saved':True,'path':str(self.records_path),'dirtyCount':0}
         atomic_write(self.output, payload)
         if names is not None: atomic_write(self.text_output, names)
         if menu is not None: atomic_write(self.menu_output, menu)

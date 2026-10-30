@@ -19,7 +19,7 @@ if args.output.suffix.lower() == '.zip':
         parser.error('The release ZIP already exists')
     args.output.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='lex-ds1-release-') as temporary:
-        folder = runtime_mods.write_release(args.mod,Path(temporary),vanilla)
+        folder = runtime_mods.write_release(args.mod,Path(temporary),vanilla,game_root=args.game)
         shutil.make_archive(str(args.output.with_suffix('')),'zip',folder.parent,folder.name)
 else:
-    print(runtime_mods.write_release(args.mod,args.output,vanilla))
+    print(runtime_mods.write_release(args.mod,args.output,vanilla,game_root=args.game))
