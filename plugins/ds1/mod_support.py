@@ -504,7 +504,12 @@ class Ds1ModAdapter:
         if game_root is None:
             return {'changes': [], 'loaded': loaded, 'truncated': False,
                     'note': 'Locate the game to compare records against vanilla.'}
-        result = mod_loader.describe_changes(Path(folder), Path(game_root))
+        try:
+            result = mod_loader.describe_changes(Path(folder), Path(game_root))
+        except Exception as error:
+            # Record comparison is optional. Its failure cannot erase the
+            # independently known build/load inputs beside it in Files.
+            return {'changes':[], 'loaded':loaded, 'truncated':False, 'note':str(error)}
         result['loaded'] = loaded
         return result
 

@@ -155,20 +155,34 @@ def test_files_report_marks_build_inputs_and_matching_payloads(tmp_path):
     folder = tmp_path/'example'
     for name in ('script/__init__.py','script/tweak.py','script/native_patch.py','script/code.S',
                  'script/__pycache__/tweak.pyc','tests/test_mod.py','native/example.json','native/unrelated.json',
-                 'settings.json','settings.schema.json','runtime.lxd'):
+                 'settings.json','settings.schema.json','runtime.lxd','.lexeditor-generated.json'):
         path = folder/name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('{}')
     (folder/'mod.json').write_text(json.dumps({'id':'example','name':'Example','script':{'version':1}}))
     loaded = set(loaded_files(folder))
     assert {'mod.json','script/tweak.py','script/native_patch.py','settings.json','settings.schema.json',
-            'native/example.json','native/unrelated.json','runtime.lxd'} <= loaded
+            'native/example.json','native/unrelated.json','runtime.lxd','.lexeditor-generated.json'} <= loaded
     assert not loaded & {'tests/test_mod.py','script/__pycache__/tweak.pyc'}
     from plugins.ds1 import mod_loader
     # A filtered reader still returns a mod with no matching files. Library
     # composition excludes that empty contribution without changing the API.
     assert mod_loader.read_mod(folder,'Example').files == {}
     assert mod_loader.active_mods(tmp_path,folder) == []
+
+
+def test_bad_record_comparison_does_not_erase_known_file_usage(tmp_path,monkeypatch):
+    from plugins.ds1 import mod_loader
+    from plugins.ds1.mod_support import Ds1ModAdapter
+    folder=tmp_path/'mod';folder.mkdir()
+    (folder/'mod.json').write_text('{"name":"Example"}')
+    (folder/'runtime.lxd').write_bytes(b'prebuilt')
+    def broken(*_):
+        raise ValueError('Record comparison failed')
+    monkeypatch.setattr(mod_loader,'describe_changes',broken)
+    result=Ds1ModAdapter().describe_changes(folder,tmp_path/'game')
+    assert result['changes']==[] and result['note']=='Record comparison failed'
+    assert {'mod.json','runtime.lxd'} <= set(result['loaded'])
 
 
 def test_watcher_notifies_after_burst_and_keeps_multiple_clients_current(tmp_path):
@@ -828,8 +842,9 @@ def test_adoption_prompt_and_used_files_render_without_changing_selection(tmp_pa
             assert not dialog.get_by_role('checkbox',name='Other',exact=True).is_checked()
             assert 'Some mods could not be moved' not in dialog.inner_text()
             dialog.get_by_role('button',name='Later',exact=True).click()
-            page.evaluate('''()=>{window.__modContents={changes:[],canDescribe:true,files:[
+            page.evaluate('''()=>{window.__modContents={changes:[],canDescribe:true,note:'Record comparison failed',files:[
               {relative:'mod.json',sizeLabel:'10 B',loaded:true},
+              {relative:'.lexeditor-generated.json',sizeLabel:'1 KB',loaded:true},
               {relative:'native/example.json',sizeLabel:'1 KB',loaded:true},
               {relative:'script/tweak.py',sizeLabel:'1 KB',loaded:true},
               {relative:'tests/test_mod.py',sizeLabel:'1 KB',loaded:false}]}}''')
@@ -841,6 +856,7 @@ def test_adoption_prompt_and_used_files_render_without_changing_selection(tmp_pa
             used = page.locator('.lex-mod-file-loaded').all_text_contents()
             assert any('native/example.json' in row for row in used)
             assert any('script/tweak.py' in row for row in used)
+            assert any('.lexeditor-generated.json' in row for row in used)
             assert not any('tests/test_mod.py' in row for row in used)
             screenshot = os.environ.get('LEXEDITOR_USED_FILES_SCREENSHOT')
             if screenshot:

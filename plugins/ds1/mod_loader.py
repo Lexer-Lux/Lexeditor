@@ -49,6 +49,7 @@ from .formats import FormatError, MAX_ARCHIVE, TABLES, deflate, inflate, members
 from .msb import MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError
 from .store import MARKER, RELATIVE
 from .tae_store import CHR_DIR, MAX_BINDER
+from .mod_usage import loaded_files
 
 FILES = (RELATIVE, texts.RELATIVE, texts.MENU_RELATIVE)
 MAX_MAP_FILES = 64
@@ -361,7 +362,7 @@ def _composition_revision():
     # Request handling, script transport, cache I/O and native tweak planning
     # cannot change an archive composed from these already-built input bytes.
     unrelated = {'server.py', 'script_worker.py', 'plugin.py', 'mod_support.py',
-                 'tweak_mods.py', 'composition_cache.py', 'project_refresh.py'}
+                 'tweak_mods.py', 'composition_cache.py', 'project_refresh.py', 'mod_usage.py'}
     sources = [*(path for path in Path(__file__).parent.glob('*.py') if path.name not in unrelated),
                Path(__file__).parents[1] / 'ds3/formats.py',
                *(path for path in METADATA.rglob('*') if path.suffix in ('.xml', '.json'))]
@@ -1497,41 +1498,3 @@ def describe_changes(folder: Path, game_root: Path | None):
     truncated = total > CHANGE_LIMIT
     return {'changes': changes[:CHANGE_LIMIT], 'truncated': truncated,
             'total': total, 'note': ' '.join(notes)}
-
-
-def loaded_files(folder: Path):
-    """Mod-folder-relative files the loader reads, casefolded for matching."""
-    from .tweak_mods import checked
-    folder = checked(Path(folder))
-    try:
-        pairs = content_files(folder, folder.name)
-    except (ValueError, OSError):
-        pairs = []
-    found = {'mod.json'} if (folder/'mod.json').is_file() else set()
-    for _key, disk in pairs:
-        try:
-            found.add(disk.relative_to(folder).as_posix().casefold())
-        except ValueError:
-            continue
-    try:
-        from core import script_mods as _scripts
-        from .tweak_mods import BUILT_FOLDERS, built_files
-        scripted = _scripts.is_script_mod(folder)
-        if scripted:
-            for _rel in _scripts.consumed_files(folder):
-                found.add(_rel.as_posix().casefold())
-        from . import native_rules, native_support
-        if (folder/native_rules.SETTINGS_FILE).is_file():
-            found.add(native_rules.SETTINGS_FILE.casefold())
-        if scripted or (folder/'runtime.lxd').is_file() or (folder/native_support.FOLDER).is_dir():
-            for _dirname in BUILT_FOLDERS if scripted else BUILT_FOLDERS[1:]:
-                for _candidate in built_files(folder,_dirname):
-                    found.add(_candidate.relative_to(folder).as_posix().casefold())
-    except (OSError, ValueError):
-        pass
-    try:
-        if (folder / "runtime.lxd").is_file():
-            found.add("runtime.lxd")
-    except OSError:
-        pass
-    return sorted(found)

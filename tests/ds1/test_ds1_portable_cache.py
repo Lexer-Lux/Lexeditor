@@ -114,6 +114,8 @@ def test_editor_and_packaged_engine_share_semantic_cache_revision(tmp_path,monke
     try:
         expected = revision(first)
         assert revision(second) == expected
+        (second/'plugins/ds1/mod_usage.py').write_text('changed Files usage reporting')
+        assert revision(second) == expected
         (second/'plugins/ds1/mod_loader.py').write_text('changed composer')
         assert revision(second) != expected
     finally:

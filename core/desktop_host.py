@@ -1890,7 +1890,12 @@ class HostApi:
         game = self._installations.snapshot(plugin_id).get('root') or None
         try:
             reported = describe(folder, Path(game) if game else None)
-            if not isinstance(reported, dict) or not isinstance(reported.get('changes', []), list):
+            if not isinstance(reported, dict):
+                raise ValueError('The record report is invalid')
+            loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}
+            for entry in result['files']:
+                entry['loaded'] = entry['relative'].casefold() in loaded
+            if not isinstance(reported.get('changes', []), list):
                 raise ValueError('The record report is invalid')
             # A derived description is never allowed to fail serialization of
             # the host response, including the Files tab beside these records.
@@ -1899,7 +1904,6 @@ class HostApi:
             if any(not isinstance(row, dict) for row in changes):
                 raise ValueError('The record report has invalid rows')
             total = int(reported.get('total', len(changes)))
-            loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}
         except Exception as error:
             result['note'] = str(error)
             return result
@@ -1908,8 +1912,6 @@ class HostApi:
         result['totalChanges'] = total
         if reported.get('note'):
             result['note'] = reported['note']
-        for entry in result['files']:
-            entry['loaded'] = entry['relative'].casefold() in loaded
         return result
 
     def save_mod_details(self, plugin_id: str, path: str, details: dict) -> dict:
