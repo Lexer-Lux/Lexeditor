@@ -54,6 +54,29 @@ def meshes(source):
     return result
 
 
+def preview_meshes(source):
+    """Apply extended-mesh transforms while retaining older storage previews."""
+    from .collision_write import CollisionDocument
+    data = inflate(source) if source[:4] == b'DCX\0' else bytes(source)
+    entries = hkx._peek_tables(data)
+    names = [item['type'].name for item in entries if item['type'] is not None]
+    if names.count('CustomParamStorageExtendedMeshShape') != 1 or names.count('hkpMoppCode') != 1:
+        return meshes(source)
+    document = CollisionDocument(source)
+    return preview_document(document,document.meshes)
+
+
+def preview_document(document, values):
+    result = []
+    for index,mesh in enumerate(values):
+        vertices = document.transformed_vertices(index,mesh['vertices'])
+        result.append({'positions':_encode([v for row in vertices for v in row],'f'),
+            'indices':_encode([v for face in mesh['faces'] for v in face[:3]],'I'),
+            'normals':'','verts':len(vertices),'tris':len(mesh['faces']),'cull':False,'mat_def':'',
+            'name':f'Collision {index+1}'})
+    return result
+
+
 def sources(game_root, project, map_name, model_name):
     """High and low share one MSB instance, but have separate files."""
     if not re.fullmatch(r'h[A-Za-z0-9_]+', model_name):
@@ -105,7 +128,7 @@ def geometry(game_root, project, map_name, model_name):
                     raise FormatError(f'{header.name} has no unique member for {name}')
                 offset, size = directory[candidates[0]]
                 raw = bhf.read_member(body, offset, size)
-            result.extend(dict(mesh, layer=layer) for mesh in meshes(raw))
+            result.extend(dict(mesh, layer=layer) for mesh in preview_meshes(raw))
         except (FormatError, OSError, ValueError, IndexError, TypeError, struct.error, RecursionError) as error:
             notes.append(f'{layer}: {error}')
     found = {mesh['layer'] for mesh in result}

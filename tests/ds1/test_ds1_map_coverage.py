@@ -62,6 +62,14 @@ def test_collision_triangles_and_one_broken_layer(monkeypatch, tmp_path):
     result = map_collision.geometry(tmp_path, None, 'm10_02_00_00.msb', 'h0000')
     assert [mesh['layer'] for mesh in result['meshes']] == ['collisionHigh']
     assert len(result['notes']) == 1 and result['notes'][0].startswith('collisionLow:')
+    # The integrated editor preview must retain loose and older storage
+    # variants even when the authoring writer cannot modify that shape.
+    store = MapStore(tmp_path,None,True)
+    integrated = store.model_geometry('m10_02_00_00.msb',{'type':5,'name':'h0000'})
+    assert [mesh['layer'] for mesh in integrated['meshes']] == ['collisionHigh']
+    assert integrated['meshes'][0]['positions'] == result['meshes'][0]['positions']
+    with pytest.raises(ValueError,match='Loose collision files'):
+        store.collisions.view('m10_02_00_00.msb','h0000','high',0,'vertices')
 
 
 def test_navigation_binary_geometry_validates_indices():

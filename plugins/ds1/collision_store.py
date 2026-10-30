@@ -118,6 +118,12 @@ class CollisionStore:
         return header,unit,matches[0]
 
     def _document(self, map_name, model, layer):
+        from . import map_collision
+        self._header(map_name,model,layer)
+        wanted = 'collisionHigh' if layer == 'high' else 'collisionLow'
+        if any(found == wanted and body is None for found,_,body,_ in
+               map_collision.sources(self.game_root,self.project,map_name,model)):
+            raise FormatError('Loose collision files can be previewed; editing them needs loose-file record support')
         header,unit,member = self._locate(map_name,model,layer)
         if member not in unit['documents']:
             source = unit['archive'].member(member)
@@ -241,6 +247,17 @@ class CollisionStore:
         result,notes = [],[]
         for layer in ('high','low'):
             try:
+                self._header(map_name,model,layer)
+                wanted = 'collisionHigh' if layer == 'high' else 'collisionLow'
+                source = next((entry for entry in map_collision.sources(self.game_root,self.project,map_name,model)
+                               if entry[0] == wanted),None)
+                if source is not None and source[2] is None:
+                    raw = _read(source[1],map_collision.hkx.MAX_FILE)
+                    if raw is None:
+                        raise FormatError('The collision source disappeared')
+                    previews = map_collision.preview_meshes(raw)
+                    result.extend(dict(mesh,layer=wanted) for mesh in previews)
+                    continue
                 _,unit,member = self._locate(map_name,model,layer)
                 if member in unit['documents'] or member in unit['recipes']:
                     _,_,_,state = self._document(map_name,model,layer)
@@ -250,14 +267,10 @@ class CollisionStore:
                     # collision model. Untouched geometry is decoded only for
                     # this response; selected/portable records own the cache.
                     source = unit['archive'].member(member)
-                    document = CollisionDocument(source)
-                    meshes = document.meshes
-                for index,mesh in enumerate(meshes):
-                    vertices = document.transformed_vertices(index,mesh['vertices'])
-                    result.append({'positions':map_collision._encode([v for row in vertices for v in row],'f'),
-                        'indices':map_collision._encode([v for face in mesh['faces'] for v in face[:3]],'I'),
-                        'normals':'','verts':len(vertices),'tris':len(mesh['faces']),'cull':False,'mat_def':'',
-                        'name':f'Collision {index+1}','layer':'collisionHigh' if layer == 'high' else 'collisionLow'})
+                    previews = map_collision.preview_meshes(source)
+                    result.extend(dict(mesh,layer=wanted) for mesh in previews)
+                    continue
+                result.extend(dict(mesh,layer=wanted) for mesh in map_collision.preview_document(document,meshes))
             except (FormatError,OSError,ValueError,OverflowError,struct.error,KeyError,TypeError,IndexError,RecursionError) as error:
                 notes.append(f'{layer} collision: {error}')
         return {'meshes':result,'notes':notes}

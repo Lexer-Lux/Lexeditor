@@ -189,6 +189,7 @@ def test_collision_record_fields_references_and_saved_provenance(collision_sourc
     row = store.collisions.read_row(view['table'],'f:0')
     assert all(link['name'].startswith('Vertex ') and link['resolved'] for link in row['recordLinks'])
     assert {field['key'] for field in row['fields']} == {'vertexA','vertexB','vertexC','metadata'}
+    assert all(field['dtype'] and isinstance(field['description'],str) for field in row['fields'])
     store.collisions.edit_row(view['table'],'v:0','posX',2)
     assert '2, 0, 0' in store.collisions.read_row(view['table'],'f:0')['recordLinks'][0]['name']
     snapshot = store.collisions.snapshot(view['table'])
