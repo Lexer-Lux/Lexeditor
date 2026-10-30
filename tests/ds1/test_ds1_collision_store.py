@@ -1,6 +1,11 @@
 """Map collision edits remain unsaved, undoable, stale-safe and retryable."""
 from copy import deepcopy
+import base64
+import io
 import json
+import struct
+from types import SimpleNamespace
+from urllib.parse import urlencode
 
 import pytest
 
@@ -176,3 +181,100 @@ def test_external_collision_refresh_is_atomic_and_defers_for_unsaved_edits(colli
     write_pair(project,pair)
     assert project_refresh.refresh(*fresh) is None
     assert mesh(fresh[2])['vertices'][0][0] == 4
+
+
+def test_collision_record_fields_references_and_saved_provenance(collision_source,tmp_path):
+    game,project,store,_pair = setup(tmp_path,collision_source)
+    view = store.collisions.view(MAP,'h0000','high',0,'faces')
+    row = store.collisions.read_row(view['table'],'f:0')
+    assert all(link['name'].startswith('Vertex ') and link['resolved'] for link in row['recordLinks'])
+    assert {field['key'] for field in row['fields']} == {'vertexA','vertexB','vertexC','metadata'}
+    store.collisions.edit_row(view['table'],'v:0','posX',2)
+    assert '2, 0, 0' in store.collisions.read_row(view['table'],'f:0')['recordLinks'][0]['name']
+    snapshot = store.collisions.snapshot(view['table'])
+    snapshot['vertices'].append([1,1,1,0])
+    snapshot['flags'].append([17])
+    store.collisions.replace_mesh(view['table'],snapshot)
+    store.save()
+    reopened = MapStore(game,project,False)
+    rows = reopened.collisions.view(MAP,'h0000','high',0,'vertices')['rows']
+    assert rows[-1]['created'] and rows[-1]['modified']
+    assert rows[0]['modified'] and not rows[0]['created']
+
+
+def test_preview_does_not_cache_editable_copies_and_tracks_unsaved_positions(collision_source,tmp_path,monkeypatch):
+    _game,_project,store,_pair = setup(tmp_path,collision_source)
+    first = store.collisions.geometry(MAP,'h0000')
+    assert first['meshes'][0]['layer'] == 'collisionHigh'
+    assert not next(iter(store.collisions.units.values()))['documents']
+    store.collisions.edit_row(table(store),'v:0','posX',2)
+
+    def forbidden(*args,**kwargs):
+        raise AssertionError('Drawing must not rebuild physics')
+
+    monkeypatch.setattr(CollisionDocument,'export',forbidden)
+    changed = store.collisions.geometry(MAP,'h0000')
+    positions = base64.b64decode(changed['meshes'][0]['positions'])
+    values = struct.unpack('<'+str(len(positions)//4)+'f',positions)
+    assert values[0] == 2
+
+
+def test_collision_http_routes_and_bad_requests_keep_editor_usable(collision_source,tmp_path,monkeypatch):
+    from plugins.ds1 import server
+    from test_ds1_project_refresh import stores
+    items,rules,maps,animations,skills = stores(tmp_path)
+    write_pair(items.game_root,split_fixture(collision_source))
+    for name,value in [('STORE',items),('RULES',rules),('MAPSTORE',maps),('TAESTORE',animations),('SKILLS',skills)]:
+        monkeypatch.setattr(server,name,value)
+    monkeypatch.setattr(server,'_warm_icon_table',lambda:None)
+    replies = []
+
+    def request(path,payload=None):
+        raw = json.dumps(payload).encode() if payload is not None else b''
+        handler = SimpleNamespace(path=path,headers={'Content-Length':str(len(raw))},rfile=io.BytesIO(raw),
+                                  send_json=lambda value,status=200:replies.append((status,value)))
+        (server.Handler.do_POST if payload is not None else server.Handler.do_GET)(handler)
+        return replies[-1]
+
+    status,view = request('/api/map/collision?'+urlencode({'map':MAP,'model':'h0000','layer':'high','kind':'vertices'}))
+    assert status == 200 and len(view['rows']) == 3
+    status,row = request('/api/row?'+urlencode({'table':view['table'],'id':'f:0'}))
+    assert status == 200 and row['row']['recordLinks']
+    status,edited = request('/api/edit',{'table':view['table'],'id':'v:0','field':'posX','value':2})
+    assert status == 200 and edited['values']['posX'] == 2 and edited['dirtyCount'] == 1
+    status,snapshot = request('/api/map/collision/state?'+urlencode({'table':view['table']}))
+    assert status == 200
+    snapshot['mesh']['vertices'][0][0] = 3
+    status,_ = request('/api/map/collision/state',{'table':view['table'],'mesh':snapshot['mesh']})
+    assert status == 200 and mesh(maps)['vertices'][0][0] == 3
+    status,_ = request('/api/edit',{'table':view['table'],'id':'f:0','field':'vertexA','value':999})
+    assert status == 400
+    assert request('/api/row?'+urlencode({'table':view['table'],'id':'v:0'}))[0] == 200
+    original = split_fixture(collision_source)
+    document = CollisionDocument(collision_source)
+    _kind,at = document._field(document.storage[0],'indices16')
+    indices, = struct.unpack_from('<i',document.data,at)
+    damaged = bytearray(collision_source)
+    struct.pack_into('<h',damaged,document.entries[indices]['pos'],999)
+    archive = collision_archive.CollisionArchive(*original)
+    write_pair(items.game_root,archive.replace({'h0000a10':bytes(damaged)}))
+    maps.collisions.discard()
+    status,error = request('/api/map/collision?'+urlencode({'map':MAP,'model':'h0000','kind':'vertices'}))
+    assert status == 400 and 'outside its vertices' in error['error']
+    assert request('/api/row?table=EquipParamGoods&id=100')[0] == 200
+
+
+def test_collision_duplicate_cannot_block_unrelated_parameter_editor(collision_source,tmp_path):
+    from test_ds1_project_refresh import stores
+    from test_ds1_portable_collisions import changed_pair,files
+    items,_rules,maps,_animations,_skills = stores(tmp_path)
+    pair = split_fixture(collision_source)
+    write_pair(items.game_root,pair)
+    write_pair(items.project,pair)
+    specs = record_edits.project_specs(items.project)
+    specs.update(record_edits.create_group(files(pair),files(changed_pair(pair,x=2))))
+    (items.project/record_edits.FILENAME).write_bytes(record_edits.encode(specs))
+    items.load()
+    assert items.get().value('EquipParamGoods',100,'sellValue') == 42
+    with pytest.raises(ValueError,match='both raw archives and portable records'):
+        maps.collisions.view(MAP,'h0000','high',0,'vertices')

@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urlparse
 
 from core import mod_watch
 from core.plugin_http import PluginRequestHandler
-from . import assets, deployment, data_map, fsb, icons, scripts, shops, theme
+from . import assets, deployment, data_map, fsb, icons, scripts, shops, theme, record_edits
 from . import anim
 from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore, parse_key
@@ -361,6 +361,7 @@ class Handler(PluginRequestHandler):
         if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/behaviors', '/api/shop', '/api/data-map', '/api/assets',
                     '/api/world/locate',
                     '/api/map/view', '/api/map/geometry', '/api/map/geometries',
+                    '/api/map/collision', '/api/map/collision/state',
                     '/api/chr/view', '/api/chr/geometry',
                     '/api/parts/view', '/api/parts/geometry',
                     '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme', '/api/theme/sfx',
@@ -424,14 +425,18 @@ class Handler(PluginRequestHandler):
                             else {'map': None, 'key': None}
                     elif path == '/api/map/view':
                         result = viewport.map_view(MAPSTORE, query.get('map', [''])[0])
+                    elif path == '/api/map/collision':
+                        result = MAPSTORE.collisions.view(query.get('map',[''])[0],query.get('model',[''])[0],
+                            query.get('layer',['high'])[0],int(query.get('mesh',['0'])[0]),query.get('kind',['vertices'])[0])
+                    elif path == '/api/map/collision/state':
+                        result = {'mesh':MAPSTORE.collisions.snapshot(query.get('table',[''])[0])}
                     elif path == '/api/map/geometry':
                         document = MAPSTORE.get(query.get('map', [''])[0])
                         model = next((entry for entry in document.models
                                       if entry['name'] == query.get('model', [''])[0]), None)
                         if model is None:
                             raise MsbError('Unknown map model')
-                        result = viewport.model_geometry(
-                            MAPSTORE.game_root, MAPSTORE.project, document.map_name, model,
+                        result = MAPSTORE.model_geometry(document.map_name,model,
                             frozenset(filter(None, query.get('known', [''])[0].split(','))) or None)
                     elif path == '/api/map/geometries':
                         # One request per progressive batch instead of one per
@@ -451,9 +456,7 @@ class Handler(PluginRequestHandler):
                                 items[name] = {'error': 'Unknown map model'}
                                 continue
                             try:
-                                payload = viewport.model_geometry(
-                                    MAPSTORE.game_root, MAPSTORE.project, document.map_name,
-                                    model, frozenset(seen) or None)
+                                payload = MAPSTORE.model_geometry(document.map_name,model, frozenset(seen) or None)
                             except (FormatError, OSError, ValueError) as error:
                                 items[name] = {'error': str(error)}
                                 continue
@@ -636,7 +639,9 @@ class Handler(PluginRequestHandler):
                                         MAPSTORE.describe_treasure(row['name'], stems, links.get(row['id'], [])))
                     else:
                         table = query.get('table', [''])[0]
-                        if table.endswith('.msb'):
+                        if table.startswith('CollisionMesh|'):
+                            result = {'row':MAPSTORE.collisions.read_row(table,query.get('id',[''])[0])}
+                        elif table.endswith('.msb'):
                             result = {'row': MAPSTORE.read(table, query.get('id', [''])[0])}
                         elif table.endswith('.anibnd.dcx'):
                             result = {'row': TAESTORE.read(table, query.get('id', [''])[0])}
@@ -810,14 +815,16 @@ class Handler(PluginRequestHandler):
         path = urlparse(self.path).path
         try:
             if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/tae/add', '/api/tae/remove', '/api/rows/add', '/api/rows/remove', '/api/placements/add', '/api/placements/remove', '/api/placements/create', '/api/assets/upload', '/api/assets/remove', '/api/deployment/apply', '/api/deployment/disable',
-                            '/api/tweaks/save', '/api/tweaks/restore', '/api/annotation-help', '/api/project-refresh'):
+                            '/api/tweaks/save', '/api/tweaks/restore', '/api/annotation-help', '/api/project-refresh',
+                            '/api/map/collision/state'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
             if origin and origin != f"http://{self.headers.get('Host')}":
                 raise PermissionError('Cross-origin writes are not permitted')
             length = int(self.headers.get('Content-Length', '0'))
-            limit = UPLOAD_BODY_LIMIT if path == '/api/assets/upload' else 65536
+            limit = (UPLOAD_BODY_LIMIT if path == '/api/assets/upload' else
+                     record_edits.LIMIT if path == '/api/map/collision/state' else 65536)
             if not 0 < length <= limit:
                 raise ValueError('Invalid request size')
             payload = json.loads(self.rfile.read(length))
@@ -826,6 +833,11 @@ class Handler(PluginRequestHandler):
                 if path == '/api/project-refresh':
                     self.send_json(_refresh_project(payload.get('files'),payload.get('checkOnly',False)))
                     return
+                elif path == '/api/map/collision/state':
+                    if set(payload) != {'table','mesh'}:
+                        raise ValueError('Unsupported collision state operation')
+                    MAPSTORE.collisions.replace_mesh(payload['table'],payload['mesh'])
+                    result = {'updated':True}
                 elif path == '/api/edit':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))
                     extra = {}
@@ -841,6 +853,9 @@ class Handler(PluginRequestHandler):
                     elif payload.get('table') == 'NativeRules':
                         row = RULES.edit_row(payload.get('id'), payload.get('field'), payload.get('value'))
                         extra = {'modified': RULES.row_modified(payload.get('id'))}
+                    elif str(payload.get('table','')).startswith('CollisionMesh|'):
+                        row = MAPSTORE.collisions.edit_row(payload['table'],payload.get('id'),payload.get('field'),payload.get('value'))
+                        extra = {'values':row['values'],'display':row['display'],'modified':row['modified']}
                     elif str(payload.get('table', '')).endswith('.msb'):
                         row = MAPSTORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
                         values, display, name = MAPSTORE.row_values(

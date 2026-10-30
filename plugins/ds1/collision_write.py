@@ -38,8 +38,12 @@ class CollisionDocument:
                 raise FormatError('Collision mesh has no triangle indices')
             indices = values[index_field]
             vertices = values.get('vertices') or []
-            if not vertices or any(len(vertex) != 4 for vertex in vertices) or len(indices) % 4:
+            if (not vertices or any(len(vertex) != 4 or any(type(value) not in (int,float)
+                    or not math.isfinite(value) for value in vertex) for vertex in vertices) or len(indices) % 4):
                 raise FormatError('Collision mesh has invalid triangle storage')
+            if any(type(value) is not int or not 0 <= value < len(vertices)
+                   for at in range(0,len(indices),4) for value in indices[at:at+3]):
+                raise FormatError('Collision face points outside its vertices')
             self.meshes.append({'vertices': vertices,
                                 'faces': [indices[i:i+4] for i in range(0, len(indices), 4)],
                                 'index_field': index_field})
@@ -175,25 +179,11 @@ class CollisionDocument:
         # FromSoft's map subparts normally use identity transforms. Build
         # bounds from the actual transform too, retaining it in the output.
         world = []
-        for (vertices, faces), part in zip(final, self.parts):
+        for index, ((vertices, faces), part) in enumerate(zip(final, self.parts)):
             values = self._value(part)
-            transform = values['transform']
-            translation, scale, rotation = (transform[key] for key in ('translation', 'scale', 'rotation'))
-            if any(not math.isfinite(value) for vector in (translation, scale, rotation) for value in vector):
-                raise FormatError('Collision has a non-finite subpart transform')
             if any(values.get('extrusion', ())):
                 raise FormatError('This collision uses extruded triangles that need regenerated bounds')
-            qx, qy, qz, qw = rotation
-            if abs(sum(value*value for value in rotation)-1) > 1e-4:
-                raise FormatError('Collision has an invalid subpart rotation')
-            points = []
-            for vertex in vertices:
-                x, y, z = [vertex[i]*scale[i] for i in range(3)]
-                tx, ty, tz = 2*(qy*z-qz*y), 2*(qz*x-qx*z), 2*(qx*y-qy*x)
-                points.append((x+qw*tx+qy*tz-qz*ty+translation[0],
-                               y+qw*ty+qz*tx-qx*tz+translation[1],
-                               z+qw*tz+qx*ty-qy*tx+translation[2]))
-            world.append((points, faces))
+            world.append((self.transformed_vertices(index,vertices), faces))
         radius = self._value(self._field(self.shape, 'triangleRadius'))
         bits = self._value(self._field(self.shape, 'numBitsForSubpartIndex'))
         code, offset = collision_mopp.build(world, radius=radius, subpart_bits=bits)
@@ -210,3 +200,21 @@ class CollisionDocument:
         # Read the edited geometry before handing it to any project writer.
         map_collision.meshes(result)
         return deflate(self.source, result) if self.source[:4] == b'DCX\0' else result
+
+    def transformed_vertices(self, index, vertices):
+        """The same subpart transform for drawing and collision compilation."""
+        transform = self._value(self.parts[index])['transform']
+        translation, scale, rotation = (transform[key] for key in ('translation','scale','rotation'))
+        if any(not math.isfinite(value) for vector in (translation,scale,rotation) for value in vector):
+            raise FormatError('Collision has a non-finite subpart transform')
+        qx,qy,qz,qw = rotation
+        if abs(sum(value*value for value in rotation)-1) > 1e-4:
+            raise FormatError('Collision has an invalid subpart rotation')
+        points = []
+        for vertex in vertices:
+            x,y,z = [vertex[i]*scale[i] for i in range(3)]
+            tx,ty,tz = 2*(qy*z-qz*y),2*(qz*x-qx*z),2*(qx*y-qy*x)
+            points.append((x+qw*tx+qy*tz-qz*ty+translation[0],
+                           y+qw*ty+qz*tx-qx*tz+translation[1],
+                           z+qw*tz+qx*ty-qy*tx+translation[2]))
+        return points

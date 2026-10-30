@@ -14227,6 +14227,8 @@ ${contents.path}`});
       : (typeof options.emptyDetail === "function" ? options.emptyDetail() : options.emptyDetail || element("div", {class: "lex-detail"}));
     let leadingNode = typeof options.leadingPanel === "function" && picked ? options.leadingPanel(picked) : null;
     let trailingNode = typeof options.trailingPanel === "function" && picked ? options.trailingPanel(picked) : null;
+    let middleNode = typeof options.middlePanel === "function" ? options.middlePanel(picked) : options.middlePanel || null;
+    if(middleNode&&(leadingNode||trailingNode))throw new Error("A record list supports one additional panel");
     let masterNodes = [];
     const select = (record,event={}) => {
       const nextSelected = keyOf(record);
@@ -14267,6 +14269,14 @@ ${contents.path}`});
         root.lexReplacePanel(trailingNode, nextTrailing);
         trailingNode = nextTrailing;
         refreshReferences(nextTrailing);
+      }
+      if(middleNode&&typeof options.middlePanel==="function"){
+        const nextMiddle=options.middlePanel(record);
+        if(nextMiddle!==middleNode){
+          root.lexReplacePanel(middleNode,nextMiddle);
+          middleNode=nextMiddle;
+          refreshReferences(nextMiddle);
+        }
       }
       refreshReferences(replacement);
       return true;
@@ -14470,12 +14480,19 @@ ${contents.path}`});
     const barrelGrid = element("div", {
       class: "lex-barrel-grid", style: `--lex-barrels:${masterNodes.length}`,
     }, ...masterNodes);
-    const masterNode = element("div", {class: "lex-barrelled-master"}, barrelGrid);
+    const masterHeader=typeof options.masterHeader==="function"?options.masterHeader():options.masterHeader;
+    const masterNode = element("div", {class: "lex-barrelled-master"}, ...[masterHeader,barrelGrid].filter(Boolean));
     // A fitted master has no vertical scroll range, so its wheel turns pages.
     wheelPages(masterNode, direction => changePage(page + direction));
     const barrelPanelMinimum = Math.max(160, Number(options.minLeft) || 280) * barrels +
       7 * (barrels - 1);
-    const root = leadingNode ? panelLayout([leadingNode, masterNode, detailNode],
+    const root = middleNode ? panelLayout([masterNode,middleNode,detailNode],
+      `lex-list-detail lex-master-detail ${options.className || ""}`,{
+        defaultSizes:options.panelSizes||[25,45,30],
+        minSizes:[barrelPanelMinimum,Math.max(240,Number(options.minMiddle)||280),Math.max(240,Number(options.minRight)||360)],
+        dividerClass:"lex-list-detail-divider",
+        dividerAccessories:[[barrelControl],[columnControl]],
+      }) : leadingNode ? panelLayout([leadingNode, masterNode, detailNode],
       `lex-list-detail lex-master-detail lex-leading-list-detail ${options.className || ""}`, {
         defaultSizes: options.panelSizes || [options.defaultLeadingWidth || 25, 30, 45],
         minSizes: [Math.max(220, Number(options.minLeading) || 300), barrelPanelMinimum, Math.max(240, Number(options.minRight) || 360)],

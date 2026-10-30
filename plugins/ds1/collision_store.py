@@ -5,6 +5,7 @@ import hashlib
 import math
 from pathlib import Path
 import re
+import struct
 
 from . import collision_archive, collision_edits, collision_merge, collision_mopp, deployment, record_edits
 from .collision_write import CollisionDocument
@@ -12,6 +13,8 @@ from .formats import FormatError
 from .tweak_mods import checked
 
 MAX_OPEN_BYTES = 256 * 1024 * 1024
+POSITION_HELP = 'The vertex position inside the collision model. Each placement adds its own position and rotation.'
+METADATA_HELP = 'The purpose of this value is unknown. Keep it unless you know what the game expects.'
 
 
 def _sha(data):
@@ -105,14 +108,17 @@ class CollisionStore:
         self.units[header] = unit
         return unit
 
-    def _document(self, map_name, model, layer):
+    def _locate(self, map_name, model, layer):
         header, prefix = self._header(map_name,model,layer)
         unit = self._unit(header)
         matches = [name for name in unit['archive'].members if name == prefix.lower()
                    or name.startswith(prefix.lower()+'a')]
         if len(matches) != 1:
             raise FormatError(f'No unique {layer} collision member for {model}')
-        member = matches[0]
+        return header,unit,matches[0]
+
+    def _document(self, map_name, model, layer):
+        header,unit,member = self._locate(map_name,model,layer)
         if member not in unit['documents']:
             source = unit['archive'].member(member)
             if member in unit['recipes']:
@@ -135,6 +141,125 @@ class CollisionStore:
         if type(index) is not int or not 0 <= index < len(state['working']):
             raise FormatError('Unknown collision mesh')
         return header,unit,member,state,state['working'][index]
+
+    @staticmethod
+    def _row_id(row_id):
+        parts = str(row_id).split(':')
+        if len(parts) != 2 or parts[0] not in ('v','f') or not parts[1].isdigit():
+            raise FormatError('Invalid collision record identity')
+        return ('vertices' if parts[0] == 'v' else 'faces'),int(parts[1])
+
+    @staticmethod
+    def _vertex_name(mesh, index):
+        position = ', '.join(f'{value:.6g}' for value in mesh['vertices'][index][:3])
+        return f'Vertex {index} ({position})'
+
+    def _listed(self, table, state, index, kind, row):
+        mesh = state['working'][index]
+        if not 0 <= row < len(mesh[kind]):
+            raise FormatError('Unknown collision record')
+        vanilla = state['vanilla'][index] if index < len(state['vanilla']) else None
+        created = vanilla is None or row >= len(vanilla[kind])
+        if kind == 'vertices':
+            values = dict(zip(('posX','posY','posZ'),mesh['vertices'][row][:3]))
+            values.update({f'metadata{i}':value for i,value in enumerate(mesh['flags'][row])})
+            modified = created or mesh['vertices'][row] != vanilla['vertices'][row] or mesh['flags'][row] != vanilla['flags'][row]
+            return {'table':table,'id':f'v:{row}','name':f'Vertex {row}','values':values,'display':{},
+                    'created':created,'modified':modified}
+        values = dict(zip(('vertexA','vertexB','vertexC','metadata'),mesh['faces'][row]))
+        display = {key:self._vertex_name(mesh,values[key]) for key in ('vertexA','vertexB','vertexC')}
+        return {'table':table,'id':f'f:{row}','name':f'Face {row}','values':values,'display':display,
+                'created':created,'modified':created or mesh['faces'][row] != vanilla['faces'][row]}
+
+    def view(self, map_name, model, layer, index, kind):
+        if kind not in ('vertices','faces'):
+            raise FormatError('Choose collision vertices or faces')
+        _,_,_,state,mesh = self.mesh(map_name,model,layer,index)
+        table = self.table(map_name,model,layer,index)
+        return {'table':table,'rows':[self._listed(table,state,index,kind,i) for i in range(len(mesh[kind]))],
+                'meshes':[{'id':i,'name':f'Mesh {i+1}','vertices':len(item['vertices']),'faces':len(item['faces'])}
+                          for i,item in enumerate(state['working'])]}
+
+    def snapshot(self, table):
+        return deepcopy(self.mesh(*self.parse_table(table))[-1])
+
+    def read_row(self, table, row_id):
+        args = self.parse_table(table)
+        _,_,_,state,mesh = self.mesh(*args)
+        index = args[-1]
+        kind,row = self._row_id(row_id)
+        listed = self._listed(table,state,index,kind,row)
+        vanilla = state['vanilla'][index] if index < len(state['vanilla']) else None
+        old_values = {}
+        if vanilla is not None and row < len(vanilla[kind]):
+            if kind == 'vertices':
+                old_values.update(zip(('posX','posY','posZ'),vanilla[kind][row][:3]))
+                old_values.update({f'metadata{i}':v for i,v in enumerate(vanilla['flags'][row])})
+            else:
+                old_values.update(zip(('vertexA','vertexB','vertexC','metadata'),vanilla[kind][row]))
+        fields,links = [],[]
+        bits = {'indices8':8,'indices16':16,'indices32':32}[state['document'].meshes[index]['index_field']]
+        for key,value in listed['values'].items():
+            field = {'key':key,'value':value,'editable':True,'section':'Properties','type':'number','step':1}
+            if key.startswith('pos'):
+                field.update(label=f'Position {key[-1]}',min=-3.4028234663852886e38,max=3.4028234663852886e38,
+                             step=.01,help=POSITION_HELP)
+            elif key.startswith('vertex'):
+                label = self._vertex_name(mesh,value)
+                choices = {str(value):label}
+                if key in old_values and old_values[key] < len(mesh['vertices']):
+                    choices[str(old_values[key])] = self._vertex_name(mesh,old_values[key])
+                field.update(label=f'Vertex {key[-1]}',type='enum',enum=choices)
+                links.append({'field':key,'kind':'collisionVertex','table':table,'id':f'v:{value}',
+                              'name':label,'resolved':True})
+            else:
+                label = 'Face metadata' if kind == 'faces' else f'Vertex metadata {int(key[8:])+1}'
+                field.update(label=label,min=0,max=(1 << bits)-1 if kind == 'faces' else 255,help=METADATA_HELP)
+            if key in old_values:
+                field['vanilla'] = old_values[key]
+            fields.append(field)
+        points = [mesh['vertices'][row]] if kind == 'vertices' else [mesh['vertices'][i] for i in mesh['faces'][row][:3]]
+        transformed = state['document'].transformed_vertices(index,points)
+        center = [sum(point[axis] for point in transformed)/len(transformed) for axis in range(3)]
+        return {**listed,'fields':fields,'recordLinks':links,'previewPosition':center}
+
+    def edit_row(self, table, row_id, field, value):
+        kind,row = self._row_id(row_id)
+        if kind == 'vertices' and field in ('posX','posY','posZ'):
+            self.edit(table,kind,row,('posX','posY','posZ').index(field),value)
+        elif kind == 'vertices' and str(field).startswith('metadata') and str(field)[8:].isdigit():
+            self.edit(table,'flags',row,int(field[8:]),value)
+        elif kind == 'faces' and field in ('vertexA','vertexB','vertexC','metadata'):
+            self.edit(table,kind,row,('vertexA','vertexB','vertexC','metadata').index(field),value)
+        else:
+            raise FormatError('Unknown collision property')
+        return self.read_row(table,row_id)
+
+    def geometry(self, map_name, model):
+        from . import map_collision
+        result,notes = [],[]
+        for layer in ('high','low'):
+            try:
+                _,unit,member = self._locate(map_name,model,layer)
+                if member in unit['documents'] or member in unit['recipes']:
+                    _,_,_,state = self._document(map_name,model,layer)
+                    document,meshes = state['document'],state['working']
+                else:
+                    # A map preview must not create editable copies of every
+                    # collision model. Untouched geometry is decoded only for
+                    # this response; selected/portable records own the cache.
+                    source = unit['archive'].member(member)
+                    document = CollisionDocument(source)
+                    meshes = document.meshes
+                for index,mesh in enumerate(meshes):
+                    vertices = document.transformed_vertices(index,mesh['vertices'])
+                    result.append({'positions':map_collision._encode([v for row in vertices for v in row],'f'),
+                        'indices':map_collision._encode([v for face in mesh['faces'] for v in face[:3]],'I'),
+                        'normals':'','verts':len(vertices),'tris':len(mesh['faces']),'cull':False,'mat_def':'',
+                        'name':f'Collision {index+1}','layer':'collisionHigh' if layer == 'high' else 'collisionLow'})
+            except (FormatError,OSError,ValueError,OverflowError,struct.error,KeyError,TypeError,IndexError,RecursionError) as error:
+                notes.append(f'{layer} collision: {error}')
+        return {'meshes':result,'notes':notes}
 
     @staticmethod
     def _dirty(unit):

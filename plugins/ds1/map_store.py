@@ -277,6 +277,12 @@ class MapStore:
             self._load(map_name)
         return self.docs[map_name]
 
+    def model_geometry(self, map_name, model, known=None):
+        from . import viewport
+        if model['type'] == 5:
+            return self.collisions.geometry(map_name,model['name'])
+        return viewport.model_geometry(self.game_root,self.project,map_name,model,known)
+
     def _vanilla_doc(self, map_name):
         if map_name not in self.vanilla_docs:
             vanilla = deployment.vanilla_source(self.game_root, MAP_DIR / map_name)

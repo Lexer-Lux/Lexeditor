@@ -200,7 +200,7 @@ def test_msb_add_remove_fixture():
 
 def MapStore_pending(document):
     from plugins.ds1.map_store import MapStore
-    store = MapStore.__new__(MapStore)
+    store = MapStore(ROOT,None,True)
     store.docs = {"m10_00_00_00.msb": document}
     store.item_store = None
     return store.pending_changes()
