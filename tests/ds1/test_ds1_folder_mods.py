@@ -102,6 +102,11 @@ def test_export_contains_a_prebuilt_mod_without_developer_files(vanilla, tmp_pat
     metadata = json.loads((output/'mod.json').read_text())
     assert metadata['enabled'] is True and 'script' not in metadata
     assert runtime_mods.inspect((output/'runtime.lxd').read_bytes())['records']
+    for unsafe in ('map','mods','../escape',r'nested\mod','CON','native:'):
+        (source/'mod.json').write_text(json.dumps({'id':unsafe,'name':'Example'}))
+        with pytest.raises(ValueError):
+            runtime_mods.write_release(source,tmp_path/'rejected',vanilla)
+    assert not (tmp_path/'rejected').exists()
 
 
 def test_files_report_marks_build_inputs_and_matching_payloads(tmp_path):
@@ -196,13 +201,29 @@ def binary_module(rva, result, external=False):
 
 
 @pytest.mark.skipif(os.name != 'nt', reason='Native Windows loader')
-def test_native_folder_loader_isolates_broken_disabled_and_conflicting_mods(tmp_path):
+@pytest.mark.parametrize('compiler',['zig','msvc'])
+def test_native_folder_loader_isolates_broken_disabled_and_conflicting_mods(tmp_path, compiler):
     from test_ds1_runtime_loader import build_module
-    zig = build_module().find_zig(None)
     harness = tmp_path/'harness.exe'
-    subprocess.run([zig,'cc','-target','x86_64-windows-gnu','-O1','-o',str(harness),
-                    str(Path(__file__).with_name('folder_mod_harness.c')),'-lshell32'],check=True,
-                   capture_output=True)
+    source = Path(__file__).with_name('folder_mod_harness.c')
+    build = build_module()
+    if compiler == 'zig':
+        try:
+            zig = build.find_zig(None)
+        except SystemExit:
+            pytest.skip('Zig is not installed; MSVC covers native loading on CI')
+        subprocess.run([zig,'cc','-target','x86_64-windows-gnu','-O1','-o',str(harness),
+                        str(source),'-lshell32'],check=True,capture_output=True)
+    else:
+        try:
+            vcvars = build.find_vcvars()
+        except SystemExit:
+            pytest.skip('MSVC is not installed')
+        batch = tmp_path/'build-native.bat'
+        batch.write_text(f'@echo off\ncall "{vcvars}" >nul\nif errorlevel 1 exit /b %errorlevel%\n'
+                         f'cl /nologo /O1 /std:c17 /D_CRT_SECURE_NO_WARNINGS "{source}" '
+                         f'/Fe:"{harness}" /Fo:"{tmp_path / "harness.obj"}" /link shell32.lib\n')
+        subprocess.run(['cmd','/c',str(batch)],cwd=tmp_path,check=True,capture_output=True)
     library = tmp_path/'Global library 中文 with spaces'/'ds1'
     library.mkdir(parents=True)
     engine = Path(__file__).resolve().parents[2]
@@ -229,6 +250,25 @@ def test_native_folder_loader_isolates_broken_disabled_and_conflicting_mods(tmp_
     assert 'broken: Damaged' in result.stdout
     assert 'conflicting: Conflicts' in result.stdout
     assert 'disabled:' not in result.stdout
+    # Empty development folders are not data dependencies of a compiled
+    # native-only module. It can load without the optional data helper.
+    (tmp_path/'first/sfx').mkdir()
+    native_only = subprocess.run([str(harness),str(tmp_path)],capture_output=True,text=True,timeout=20)
+    assert native_only.returncode == 0 and 'results=42,77' in native_only.stdout, native_only
+    provider = library/'data-provider'
+    (provider/RELATIVE).parent.mkdir(parents=True)
+    (provider/'mod.json').write_text(json.dumps({'id':'data-provider','name':'Data provider','enabled':True}))
+    (provider/RELATIVE).write_bytes(make_archive())
+    second = library/'second/mod.json'
+    info = json.loads(second.read_text())
+    second.write_text(json.dumps({**info,'requires':['data-provider']}))
+    prepared = subprocess.run([str(harness),str(tmp_path),'--prepare-data'],capture_output=True,text=True,timeout=20)
+    assert prepared.returncode == 0 and 'results=42,77' in prepared.stdout, prepared
+    # A data-only dependency is satisfied by the merger's verified result,
+    # never by the mere presence of a folder with the right name.
+    unavailable = subprocess.run([str(harness),str(tmp_path)],capture_output=True,text=True,timeout=20)
+    assert unavailable.returncode == 0 and 'results=42,1' in unavailable.stdout, unavailable
+    assert 'second: Missing, failed or cyclic dependency' in unavailable.stdout
 
 
 def test_standalone_discovery_and_adoption_preserve_one_mod_copy(tmp_path):

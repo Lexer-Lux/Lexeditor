@@ -119,7 +119,7 @@ def prepare(game, rows):
     for row in rows:
         try:
             mod = mod_loader.read_mod(row['path'],row['name'])
-            if mod is not None:
+            if mod is not None and mod.files:
                 data.append(mod)
         except (ValueError,OSError) as error:
             raise ModBuildError([row['path']],f"{row['name']}: {error}") from error
@@ -252,7 +252,12 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
             atomic_write(record_path,(json.dumps(record,indent=2)+'\n').encode())
         targets = [str(path) for path in composition.files] + [str(item['managed'].relative) for item in files]
         targets += [tweak_mods.RUNTIME_PATCH]
-        report = {'version':1,'loaded':[row['id'] for row in rows],'disabled':disabled,'targets':targets,
+        data_folders = {mod.folder.resolve() for mod in data}
+        for row in rows:
+            if any((row['path']/kind/f"{row['id']}.json").is_file() for kind in ('layout','esd',menu_dim.FOLDER)):
+                data_folders.add(row['path'].resolve())
+        report = {'version':1,'loaded':[row['id'] for row in rows if row['path'].resolve() in data_folders],
+                  'disabled':disabled,'targets':targets,
                   'conflicts':[str(conflict.part) for conflict in composition.conflicts][:128]}
         report['signature'] = _identity(rows,game,targets)
         raw = (json.dumps(report,indent=2)+'\n').encode()

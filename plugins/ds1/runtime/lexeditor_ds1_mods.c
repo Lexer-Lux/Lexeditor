@@ -430,20 +430,55 @@ static void lx_library_roots(wchar_t roots[3][MAX_PATH * 2])
     swprintf(roots[2], MAX_PATH * 2, L"%ls\\mods", roots[1]);
 }
 
-static int lx_has_data(const wchar_t *folder)
+static char lx_data_ids[LX_MAX_MODS][256];
+static unsigned lx_data_count;
+
+static int lx_read_data_report(void)
 {
-    static const wchar_t *names[] = {L"param",L"msg",L"map",L"chr",L"menu",L"esd",L"layout",L"menu-dim",
-        L"obj",L"parts",L"sfx",L"sound",L"mtd",L"event",L"script\\talk"};
     wchar_t path[MAX_PATH*2];
-    for (unsigned i=0;i<sizeof names/sizeof *names;++i) {
-        if (swprintf(path,MAX_PATH*2,L"%ls\\%ls",folder,names[i]) < 0) continue;
-        DWORD attributes=GetFileAttributesW(path);
-        if (attributes!=INVALID_FILE_ATTRIBUTES && (attributes&FILE_ATTRIBUTE_DIRECTORY)) return 1;
+    folder_file(path,MAX_PATH*2,L"lexeditor-ds1-load.json");
+    size_t size=0;
+    unsigned char *data=lx_read_file(path,1024*1024,&size);
+    lx_data_count=0;
+    if(!data)return 0;
+    lx_json_t json={(char *)data,(char *)data+size,0};
+    unsigned seen=0;
+    int valid=0;
+    if(!lx_take(&json,'{'))goto done;
+    do {
+        char key[256];
+        if(!lx_string(&json,key,sizeof key)||!lx_take(&json,':'))goto done;
+        if(!strcmp(key,"loaded")){
+            if((seen&1)||!lx_take(&json,'['))goto done;
+            seen|=1;
+            if(!lx_take(&json,']')){
+                for(;;){
+                    if(lx_data_count==LX_MAX_MODS||!lx_string(&json,lx_data_ids[lx_data_count],256)||
+                       !lx_data_ids[lx_data_count][0])goto done;
+                    ++lx_data_count;
+                    if(lx_take(&json,']'))break;
+                    if(!lx_take(&json,','))goto done;
+                }
+            }
+        }else if(!strcmp(key,"version")){
+            if((seen&2)||!lx_literal(&json,"1"))goto done;
+            seen|=2;
+        }else if(!strcmp(key,"error")||!lx_value(&json))goto done;
+        if(lx_take(&json,'}')){
+            lx_space(&json);valid=seen==3&&json.at==json.end;break;
+        }
+    }while(lx_take(&json,','));
+done:
+    HeapFree(GetProcessHeap(),0,data);
+    if(!valid)lx_data_count=0;
+    return valid;
+}
+
+static int lx_data_loaded(const char *id)
+{
+    for(unsigned i=0;i<lx_data_count;++i){
+        if(!strcmp(id,lx_data_ids[i]))return 1;
     }
-    if (swprintf(path,MAX_PATH*2,L"%ls\\script\\*.dcx",folder)<0) return 0;
-    WIN32_FIND_DATAW item;
-    HANDLE find=FindFirstFileW(path,&item);
-    if(find!=INVALID_HANDLE_VALUE){FindClose(find);return 1;}
     return 0;
 }
 
@@ -489,8 +524,9 @@ static int lx_prepare_data(void)
     else {TerminateProcess(process.hProcess,0x4c58);WaitForSingleObject(process.hProcess,5000);}
     CloseHandle(process.hThread);CloseHandle(process.hProcess);
     ResetEvent(window);CloseHandle(window);
-    write_log(code==0?"Prebuilt data mods are ready":"Data preparation failed; dependent native mods were skipped. See lexeditor-ds1-load.json.");
-    return code==0;
+    int ready=code==0&&lx_read_data_report();
+    write_log(ready?"Prebuilt data mods are ready":"Data preparation failed; dependent native mods were skipped. See lexeditor-ds1-load.json.");
+    return ready;
 }
 
 static void lx_load_mod_folders(void)
@@ -526,12 +562,11 @@ static void lx_load_mod_folders(void)
         HeapFree(GetProcessHeap(), 0, metadata);
         if (!valid) {lx_mod_log(mod, "Invalid mod.json; skipped"); memset(mod, 0, sizeof *mod); continue;}
         if (!mod->enabled) {memset(mod, 0, sizeof *mod); continue;}
-        mod->needs_data = lx_has_data(mod->folder);
         if (swprintf(path, MAX_PATH * 2, L"%ls\\runtime.lxd", mod->folder) < 0) continue;
         mod->data = lx_read_file(path, MAX_PATCH, &mod->size);
         if (!mod->data) {
             DWORD attributes=GetFileAttributesW(path), error=GetLastError();
-            if(attributes==INVALID_FILE_ATTRIBUTES && error==ERROR_FILE_NOT_FOUND && mod->needs_data && lx_data_ready){
+            if(attributes==INVALID_FILE_ATTRIBUTES && error==ERROR_FILE_NOT_FOUND && lx_data_ready && lx_data_loaded(mod->id)){
                 mod->valid=1;mod->applied=1;++count;
             }
             else memset(mod,0,sizeof *mod);
@@ -559,7 +594,7 @@ static void lx_load_mod_folders(void)
             }
         }
         mod->valid = lx_link_module(mod->data, mod->size, original_base, &checked, &checked_size, message, sizeof message);
-        if (mod->valid && read32(mod->data+28)) mod->needs_data=1;
+        if (mod->valid) mod->needs_data=read32(mod->data+28)!=0;
         if (checked) HeapFree(GetProcessHeap(), 0, checked);
         if (!mod->valid) lx_mod_log(mod, message);
         ++count;

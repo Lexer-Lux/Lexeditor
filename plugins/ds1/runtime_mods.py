@@ -125,17 +125,21 @@ def link(data: bytes, base: int) -> bytes:
 def write_release(folder: Path, destination: Path, vanilla: bytes) -> Path:
     """Export built contributions without developer files or local paths."""
     from core import mod_metadata, mod_requires
-    from . import menu_dim, mod_loader
+    from core.mod_library import relative_path
+    from . import assets, menu_dim, mod_loader, tweak_mods
     folder, destination = Path(folder), Path(destination)
+    tweak_mods.checked(folder)
     metadata = json.loads((folder/'mod.json').read_text(encoding='utf-8'))
     mod_id = str(metadata.get('id') or folder.name)
-    if Path(mod_id).name != mod_id or not mod_id or mod_id in ('.', '..'):
+    if len(relative_path(mod_id).parts) != 1:
         raise ValueError('The mod needs a valid ID')
-    source = folder/'native'/f'{mod_id}.json'
+    if mod_id.casefold() in set(assets.ASSET_ROOTS) | {'param','paramdef','mods'}:
+        raise ValueError('The mod ID must not use a reserved game folder name')
+    source = tweak_mods.checked(folder/'native'/f'{mod_id}.json')
     spec = patches.validate(json.loads(source.read_text(encoding='utf-8')), metadata.get('name') or mod_id) if source.is_file() else None
     contributions = list(mod_loader.content_files(folder,metadata.get('name') or mod_id))
     for kind in ('layout','esd',menu_dim.FOLDER):
-        path = folder/kind/f'{mod_id}.json'
+        path = tweak_mods.checked(folder/kind/f'{mod_id}.json')
         if path.is_file():
             contributions.append((path.relative_to(folder),path))
     payload = build(vanilla, [spec], requires_data=bool(contributions)) if spec else None
@@ -153,10 +157,12 @@ def write_release(folder: Path, destination: Path, vanilla: bytes) -> Path:
         public = {key: metadata[key] for key in (*mod_metadata.FIELDS, 'id', 'version', 'requires') if key in metadata}
         public.update(id=mod_id, name=metadata.get('name') or mod_id, enabled=True, order=metadata.get('order', 1000),
                       requires=mod_requires.needs(folder))
-        (target/'mod.json').write_text(json.dumps(public, indent=2, ensure_ascii=False)+'\n', encoding='utf-8')
+        encoded = (json.dumps(public, indent=2, ensure_ascii=False)+'\n').encode('utf-8')
+        if len(encoded) > 65536:
+            raise ValueError('The release metadata exceeds the loader size limit')
+        (target/'mod.json').write_bytes(encoded)
         (target/FILENAME).write_bytes(payload)
         for relative, source in contributions:
-            from core.mod_library import relative_path
             relative = relative_path(relative.as_posix())
             output = target/relative
             output.parent.mkdir(parents=True,exist_ok=True)
