@@ -135,7 +135,7 @@ class Ds1ModAdapter:
         for row in mods_service.library_rows(self._library()):
             if Path(row["path"]).resolve() in wanted:
                 mod = mod_loader.read_mod(Path(row["path"]), row["name"])
-                if mod is not None:
+                if mod is not None and mod.files:
                     mods.append(mod)
         return mods
 

@@ -172,7 +172,7 @@ def read_mod(folder: Path, name: str, *, only=None) -> Mod | None:
     except Exception as error:
         from core.mod_builds import ModBuildError
         raise ModBuildError([folder], f'{name}: {error}') from error
-    return Mod(name, folder, files) if files else None
+    return Mod(name, folder, files)
 
 
 def active_mods(library_root: Path, project_root: Path | None = None, *, only=None) -> list[Mod]:
@@ -189,12 +189,12 @@ def active_mods(library_root: Path, project_root: Path | None = None, *, only=No
         if not row["enabled"] and folder != (Path(project_root).resolve() if project_root else None):
             continue
         mod = read_mod(folder, row["name"], only=only)
-        if mod is not None:
+        if mod is not None and mod.files:
             mods.append(mod)
             seen.add(folder)
     if project_root is not None and Path(project_root).resolve() not in seen:
         mod = read_mod(Path(project_root), Path(project_root).name, only=only)
-        if mod is not None:
+        if mod is not None and mod.files:
             mods.append(mod)
     return mods
 

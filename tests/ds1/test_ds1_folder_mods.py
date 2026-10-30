@@ -126,6 +126,11 @@ def test_files_report_marks_build_inputs_and_matching_payloads(tmp_path):
     assert {'mod.json','script/tweak.py','script/native_patch.py','settings.json','settings.schema.json',
             'native/example.json','native/unrelated.json','runtime.lxd'} <= loaded
     assert not loaded & {'tests/test_mod.py','script/__pycache__/tweak.pyc'}
+    from plugins.ds1 import mod_loader
+    # A filtered reader still returns a mod with no matching files. Library
+    # composition excludes that empty contribution without changing the API.
+    assert mod_loader.read_mod(folder,'Example').files == {}
+    assert mod_loader.active_mods(tmp_path,folder) == []
 
 
 def test_watcher_notifies_after_burst_and_keeps_multiple_clients_current(tmp_path):
