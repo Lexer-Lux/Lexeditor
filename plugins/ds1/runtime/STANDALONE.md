@@ -79,6 +79,11 @@ installed fields and records instead of treating a complete archive as this
 mod's intent. A mismatching field or missing record identifies that mod and
 prevents its partial deployment. Imported releases use those same records in
 the editor, including added/edited markers; saving keeps the portable format.
+Map releases use the map adapter's editable field spans and baseline anchors.
+Independent placement, region and event fields preserve unrelated installed
+edits. Structural changes retain an exact whole-map anchor and refuse a
+different installed baseline. Imported maps remain editable and save into the
+same portable record file as item changes.
 Event archives also carry only changed EMEVD event records. Their unchanged
 string/link pools are anchored, independent constructor additions use the
 existing event merger, and foreign records and appended pools are preserved.

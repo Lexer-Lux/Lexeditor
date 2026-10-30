@@ -1,7 +1,7 @@
 """Portable record contributions, rebased through the existing archive adapters.
 
-The release stores changed PARAM rows, FMG entries, EMEVD events and ESD
-states/members, with old values as anchors. Materialization preserves unrelated
+The release stores changed PARAM rows, FMG entries, MSB fields, EMEVD events and
+ESD states/members, with old values as anchors. Materialization preserves unrelated
 installed data and feeds ordinary archives into the editor's shared composer.
 """
 import json
