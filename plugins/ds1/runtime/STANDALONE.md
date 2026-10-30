@@ -5,6 +5,20 @@ each prebuilt mod folder in that directory or its `mods` subfolder. Steam still
 starts the game. The editor is optional, and no mod builder runs on the player's
 machine.
 
+Each folder's `mod.json` controls its switch and data priority. Set `enabled`
+to `false` to switch that mod off, or change the integer `order` to adjust its
+data priority. Lower numbers apply first; if two mods change the same field,
+the higher number wins. A missing order is 1000; equal orders sort by mod name.
+Different fields combine, including fields inside the same game archive.
+The loader records data conflicts in `lexeditor-ds1-load.json`.
+
+Native hooks cannot use this field-merging rule. If two modules claim
+incompatible code or hooks, the later conflicting module is skipped and named
+in `lexeditor-ds1-patch.log`; dependencies and fixed-address code also affect
+native loading order. A data priority change cannot make incompatible hooks
+coexist. There is no standalone priority screen; edit `mod.json`, or use
+Lexeditor to manage the folders in its shared library.
+
 The online and debug loaders apply the shared patch only after preparation
 succeeds for this launch. A failed or unavailable helper leaves old shared
 patches inactive while independent native-only folder modules can still load.
