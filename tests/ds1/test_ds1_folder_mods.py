@@ -149,6 +149,10 @@ def test_export_contains_a_prebuilt_mod_without_developer_files(vanilla, tmp_pat
         with pytest.raises(ValueError):
             runtime_mods.write_release(source,tmp_path/'rejected',vanilla)
     assert not (tmp_path/'rejected').exists()
+    (source/'mod.json').unlink()
+    with pytest.raises(FileNotFoundError):
+        runtime_mods.write_release(source,tmp_path/'undeclared',vanilla)
+    assert not (tmp_path/'undeclared').exists()
 
 
 def test_files_report_marks_build_inputs_and_matching_payloads(tmp_path):
