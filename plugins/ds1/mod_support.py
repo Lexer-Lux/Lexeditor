@@ -57,6 +57,45 @@ class Ds1ModAdapter:
     ensure_game_closed = staticmethod(tweak_mods.ensure_game_closed)
     configure_library = staticmethod(tweak_mods.configure_library)
 
+    def export_release(self, folder: Path, game_root: Path, destination: Path) -> dict:
+        """One player ZIP: the saved mod and common standalone loader."""
+        import os
+        import shutil
+        import tempfile
+        from . import runtime_mods, runtime_package
+        from core.mod_library import file_tree
+        destination = Path(destination)
+        if destination.exists():
+            raise ValueError('Choose a new ZIP filename; an existing file will not be replaced')
+        if destination.suffix.lower() != '.zip':
+            raise ValueError('Export the mod to a ZIP file')
+        # Package entirely outside the library/game, then publish exclusively.
+        # Export never executes author scripts or changes installed mods.
+        vanilla = deployment.vanilla_source(Path(game_root),Path(tweak_mods.EXECUTABLE.relative)).read_bytes()
+        files = file_tree(folder)  # Shared mod size/path bounds.
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        required = 2 * (runtime_package.plan()['sourceBytes'] + sum((folder/path).stat().st_size for path in files))
+        if shutil.disk_usage(destination.parent).free < required:
+            raise OSError('There is not enough free space to export this mod and its loader')
+        with tempfile.TemporaryDirectory(prefix='.lexeditor-export-',dir=destination.parent) as temporary:
+            staged = Path(temporary)
+            exported = runtime_mods.write_release(folder,staged/'mods',vanilla)
+            package = runtime_package.package(staged/'package')
+            (staged/'mods').rename(package/'mods')
+            archive = Path(shutil.make_archive(str(staged/'release'),'zip',package))
+            # Another export cannot silently replace a destination created
+            # while packaging. Windows rename fails if that name now exists.
+            with destination.open('xb') as output, archive.open('rb') as source:
+                try:
+                    shutil.copyfileobj(source,output)
+                    output.flush()
+                    os.fsync(output.fileno())
+                except Exception:
+                    output.close()
+                    destination.unlink(missing_ok=True)
+                    raise
+        return {'path':str(destination),'name':exported.name}
+
     @staticmethod
     def _report_path() -> Path:
         from core.runtime_bootstrap import user_data_dir

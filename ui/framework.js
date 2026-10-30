@@ -16279,6 +16279,20 @@ ${contents.path}`});
       const removeTitle = row.lexmod ? "This mod updates automatically, so it cannot be removed from here"
         : `Remove ${row.name} from the library`;
       const openTitle = `Open ${row.name}'s folder`;
+      const exportTitle = `Export ${row.name} for players`;
+      const exportMod = async event => {
+        const control = event.currentTarget;
+        if (document.body.inert) return;
+        try {
+          setEditorBusy(control, "Exporting mod");
+          const result = await callWindow("export_mod", pluginId, row.path);
+          if (result && !result.cancelled) showToast(`Exported ${row.name}`);
+        } catch (error) {
+          failure("Could not export the mod", error);
+        } finally {
+          setEditorBusy(control, null);
+        }
+      };
       // The switch closes the header row, always the rightmost record control.
       const actions = [addButton,
         element("button", {type: "button", class: "lex-header-icon", title: duplicateTitle,
@@ -16289,6 +16303,8 @@ ${contents.path}`});
           "aria-label": openTitle,
           onclick: () => callWindow("open_mod_folder", pluginId, row.path)
             .catch(error => failure("Could not open the folder", error))}, folderIcon()),
+        data?.canExport ? element("button", {type:"button",class:"lex-header-icon",
+          title:exportTitle,"aria-label":exportTitle,onclick:exportMod},saveIcon()) : null,
         // A flagged mod's conflicts and loader alerts ride here as the row's
         // own red "!" (hover lists them): the tab bar below never moves.
         // The switch still closes the row, always the rightmost control.

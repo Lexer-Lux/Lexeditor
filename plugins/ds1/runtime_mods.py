@@ -150,24 +150,35 @@ def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes]) -> byt
 
 def write_release(folder: Path, destination: Path, vanilla: bytes) -> Path:
     """Export built contributions without developer files or local paths."""
-    from core import mod_metadata, mod_requires
+    from core import mod_metadata, mod_requires, script_mods
     from core.mod_library import relative_path
     from . import assets, menu_dim, mod_loader, tweak_mods
     folder, destination = Path(folder), Path(destination)
     tweak_mods.checked(folder)
     metadata = json.loads((folder/'mod.json').read_text(encoding='utf-8'))
+    scripted = script_mods.is_script_mod(folder)
+    if scripted:
+        manifest = script_mods._read_json(folder/script_mods.MANIFEST_FILE) or {}
+        if (not (manifest.get('build') or {}).get('source')
+                or tweak_mods.build_fingerprint(folder) != tweak_mods.build_fingerprint(folder,produced=True)):
+            raise ValueError('Save and build this mod before exporting; its source or settings have changed')
+        for relative, expected in script_mods._generated_files(folder,tweak_mods.ALLOWED_ROOTS).items():
+            path = folder/relative
+            if not path.is_file() or tweak_mods._sha(path.read_bytes()) != expected:
+                raise ValueError('Save and build this mod before exporting; a built file changed or is missing')
     mod_id = str(metadata.get('id') or folder.name)
     if len(relative_path(mod_id).parts) != 1:
         raise ValueError('The mod needs a valid ID')
     if mod_id.casefold() in set(assets.ASSET_ROOTS) | {'param','paramdef','mods'}:
         raise ValueError('The mod ID must not use a reserved game folder name')
     row = {'path':str(folder),'id':mod_id,'name':metadata.get('name') or mod_id}
-    specs = tweak_mods._built([row],'native',patches.validate)
+    prebuilt = not scripted and (folder/FILENAME).is_file()
+    specs = [] if prebuilt else tweak_mods._built([row],'native',patches.validate)
     contributions = list(mod_loader.content_files(folder,metadata.get('name') or mod_id))
     for kind in tweak_mods.BUILT_FOLDERS[1:]:
         for path in tweak_mods.built_files(folder,kind):
             contributions.append((path.relative_to(folder),path))
-    payload = build(vanilla, specs, requires_data=bool(contributions)) if specs else None
+    payload = read(folder) if prebuilt else build(vanilla, specs, requires_data=bool(contributions)) if specs else None
     if payload is None:
         if not contributions:
             raise ValueError('This mod has no built contributions to export')

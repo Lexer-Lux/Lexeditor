@@ -1804,9 +1804,29 @@ class HostApi:
         result = mods_service.overview(root, plugin.lexmod)
         status = self.mod_library_status(plugin_id)
         result = {**result, "root": str(root), "canManage": bool(status.get("canManage")),
-                  "message": status.get("message", "")}
+                  "message": status.get("message", ""),
+                  "canExport": callable(getattr(self._mod_adapter(plugin_id), "export_release", None))}
         self._attach_mod_marks(plugin_id, result)
         return result
+
+    def export_mod(self, plugin_id: str, path: str) -> dict:
+        """Save a player package using this game's exporter, without activation."""
+        import webview
+        from core import mods_service
+        folder = mods_service.checked_mod(self._game_mods(plugin_id),path)
+        export = getattr(self._mod_adapter(plugin_id),'export_release',None)
+        if not callable(export):
+            raise ValueError('Standalone export is not available for this game')
+        game = self._installations.snapshot(plugin_id).get('root')
+        if not game:
+            raise ValueError('Locate the game before exporting its mod')
+        selection = self._bound_window().create_file_dialog(webview.SAVE_DIALOG,
+            save_filename=f'{folder.name}.zip',file_types=('Mod ZIP (*.zip)',),allow_multiple=False)
+        if not selection:
+            return {'cancelled':True}
+        destination = Path(selection[0] if isinstance(selection,(list,tuple)) else selection)
+        with self._mod_library_lock:
+            return export(folder,Path(game),destination)
 
     def _attach_mod_marks(self, plugin_id: str, result: dict) -> None:
         """Mark each mod with its loader's flags: conflicts plus alerts.

@@ -126,7 +126,7 @@ def test_runtime_writes_require_a_live_pre_entry_window(monkeypatch):
 def test_export_contains_a_prebuilt_mod_without_developer_files(vanilla, tmp_path):
     source = tmp_path/'source'
     (source/'native').mkdir(parents=True)
-    (source/'mod.json').write_text(json.dumps({'id':'example','name':'Example','script':{'version':1},'enabled':False}))
+    (source/'mod.json').write_text(json.dumps({'id':'example','name':'Example','enabled':False}))
     raw = {'version':1,'hooks':[{'rva':HOOK_A,'original':'e800000000','bytes':'9090909090'}]}
     (source/'native/example.json').write_text(json.dumps(raw))
     (source/'native/second-component.json').write_text(json.dumps({'version':1,
@@ -393,6 +393,116 @@ def test_editor_build_writes_independent_modules_and_preserves_original_executab
     tweak_mods.commit(game,tweak_mods.prepare(game,library))
     assert not tweak_mods.needs_rebuild(game,library)['needed']
     assert executable.read_bytes() == vanilla
+    # Export uses only the built outputs and refuses to package newer source.
+    release = runtime_mods.write_release(root,tmp_path/'release',vanilla)
+    assert (release/'runtime.lxd').is_file() and not (release/'script').exists()
+    (root/'script/tweak.py').write_text('raise RuntimeError("must never run during export")')
+    with pytest.raises(ValueError,match='Save and build'):
+        runtime_mods.write_release(root,tmp_path/'stale-release',vanilla)
+
+
+def test_player_zip_exports_prebuilt_mod_with_loader_and_declared_dependencies(vanilla,tmp_path,monkeypatch):
+    import zipfile
+    from plugins.ds1 import deployment, runtime_package
+    from plugins.ds1.mod_support import Ds1ModAdapter
+    game = tmp_path/'game'
+    game.mkdir()
+    executable = game/exe_patches.EXECUTABLE
+    executable.write_bytes(vanilla)
+    monkeypatch.setattr(deployment,'vanilla_source',lambda *_:executable)
+    folder = tmp_path/'mod'
+    folder.mkdir()
+    (folder/'mod.json').write_text(json.dumps({'id':'example','name':'Example','requires':['another-mod']}))
+    module = runtime_mods.build(vanilla,[spec()])
+    (folder/'runtime.lxd').write_bytes(module)
+    def package(destination):
+        destination.mkdir()
+        (destination/'dinput8.dll').write_bytes(b'loader')
+        (destination/'lexeditor-runtime').mkdir()
+        (destination/'lexeditor-runtime/pythonw.exe').write_bytes(b'private runtime')
+        return destination
+    monkeypatch.setattr(runtime_package,'package',package)
+    output = tmp_path/'release.zip'
+    adapter = Ds1ModAdapter()
+    result = adapter.export_release(folder,game,output)
+    assert result['path'] == str(output)
+    with zipfile.ZipFile(output) as archive:
+        assert {'dinput8.dll','lexeditor-runtime/pythonw.exe','mods/example/runtime.lxd'} <= set(archive.namelist())
+        assert archive.read('mods/example/runtime.lxd') == module
+        assert json.loads(archive.read('mods/example/mod.json'))['requires'] == ['another-mod']
+    before = output.read_bytes()
+    with pytest.raises(ValueError,match='existing'):
+        adapter.export_release(folder,game,output)
+    assert output.read_bytes() == before
+
+
+def test_shared_export_action_locks_ui_and_recovers_from_failure(tmp_path):
+    from playwright.sync_api import sync_playwright
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'shared'))
+    from test_mods_tab import HOST
+    root = Path(__file__).resolve().parents[2]
+    host = HOST.replace('canManage: true,','canManage: true,canExport:true,').replace(
+        'window.shell = LexeditorUI.mountShell', '''
+      window.exports=[];
+      window.pywebview.api.export_mod=async(...args)=>{
+        exports.push(args);await new Promise(resolve=>setTimeout(resolve,150));
+        if(window.exportError)throw new Error('Save and build this mod before exporting');
+        return {path:'C:/exports/Mine.zip'};
+      };
+      window.shell = LexeditorUI.mountShell''')
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={'width':1400,'height':900})
+            page.route('http://fixture/**',lambda route:route.fulfill(body='<main id="main"></main>',content_type='text/html'))
+            page.goto('http://fixture/')
+            page.add_style_tag(path=str(root/'ui/framework.css'))
+            page.add_script_tag(path=str(root/'ui/framework.js'))
+            page.evaluate(host,{'firstRun':False})
+            page.locator('[data-tab="mods"]').click()
+            button = page.get_by_role('button',name='Export Mine for players',exact=True)
+            button.click()
+            page.wait_for_function('exports.length===1 && document.body.inert')
+            page.wait_for_function('!document.body.inert')
+            assert page.evaluate('exports[0]') == ['game','C:/lib/game/Mine']
+            screenshot = os.environ.get('LEXEDITOR_EXPORT_SCREENSHOT')
+            if screenshot: page.screenshot(path=screenshot)
+            page.evaluate('window.exportError=true')
+            button.click()
+            page.get_by_role('alertdialog',name='Could not export the mod').wait_for()
+            page.wait_for_function('!document.body.inert')
+            assert page.get_by_role('button',name='Close',exact=True).is_enabled()
+        finally:
+            browser.close()
+
+
+def test_export_host_validates_library_selection_and_respects_save_dialog_cancel(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    import threading
+    from core.desktop_host import HostApi
+    folder = tmp_path/'library/example'
+    folder.mkdir(parents=True)
+    (folder/'mod.json').write_text(json.dumps({'name':'Example'}))
+    exports, dialogs = [], []
+    selection = []
+    def choose(*args,**kwargs):
+        dialogs.append((args,kwargs))
+        return selection
+    adapter = SimpleNamespace(export_release=lambda *args:exports.append(args) or {'path':str(args[-1])})
+    host = SimpleNamespace(_game_mods=lambda _:folder.parent,_mod_adapter=lambda _:adapter,
+        _installations=SimpleNamespace(snapshot=lambda _:{'root':str(tmp_path/'game')}),
+        _bound_window=lambda:SimpleNamespace(create_file_dialog=choose),_mod_library_lock=threading.RLock())
+    monkeypatch.setitem(sys.modules,'webview',SimpleNamespace(SAVE_DIALOG='save'))
+    assert HostApi.export_mod(host,'ds1',str(folder)) == {'cancelled':True}
+    assert exports == []
+    destination = tmp_path/'chosen.zip'
+    selection.append(str(destination))
+    assert HostApi.export_mod(host,'ds1',str(folder)) == {'path':str(destination)}
+    assert exports == [(folder,tmp_path/'game',destination)]
+    assert dialogs[-1][1]['save_filename'] == 'example.zip'
+    with pytest.raises(ValueError):
+        HostApi.export_mod(host,'ds1',str(tmp_path/'elsewhere'))
+    assert len(dialogs) == 2
 
 
 def test_standalone_data_merger_combines_records_and_disables_only_broken_mod(tmp_path, monkeypatch):
@@ -447,6 +557,17 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     (game/RELATIVE).parent.mkdir(parents=True)
     (game/RELATIVE).write_bytes(make_archive())
     library.mkdir()
+    from plugins.ds1.formats import ItemDocument
+    for mod_id,row_id,price in [('first',100,12),('second',101,24),('broken',102,36)]:
+        folder = library/mod_id
+        (folder/RELATIVE).parent.mkdir(parents=True)
+        (folder/'mod.json').write_text(json.dumps({'id':mod_id,'name':mod_id,'enabled':True,'script':{'version':1}}))
+        (folder/'runtime.lxd').write_bytes(binary_module(0x1000,42))
+        document = ItemDocument(make_archive())
+        document.edit('EquipParamGoods',row_id,'sellValue',price)
+        (folder/RELATIVE).write_bytes(document.export() if mod_id != 'broken' else b'Broken data')
+        (folder/'script').mkdir()
+        (folder/'script/tweak.py').write_text('raise RuntimeError("Players never run builders")')
     runtime = package/'lexeditor-runtime'
     env = {**os.environ,'PYTHONHOME':str(tmp_path/'Not installed'),'PYTHONPATH':str(tmp_path/'No editor')}
     import ctypes
@@ -465,7 +586,11 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
         kernel.CloseHandle(handle)
     assert result.returncode == 0, result
     report = json.loads((game/'lexeditor-ds1-load.json').read_text())
-    assert report['loaded'] == [] and not report.get('error')
+    assert set(report['loaded']) == {'first','second'} and not report.get('error')
+    assert [row['id'] for row in report['disabled']] == ['broken']
+    merged = ItemDocument((game/RELATIVE).read_bytes())
+    assert merged.value('EquipParamGoods',100,'sellValue') == 12
+    assert merged.value('EquipParamGoods',101,'sellValue') == 24
 
 
 def test_standalone_menu_failure_disables_only_its_owner(tmp_path, monkeypatch):
