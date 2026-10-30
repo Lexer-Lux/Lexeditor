@@ -59,3 +59,36 @@ def test_game_file_read_has_a_size_bound(game,monkeypatch):
     monkeypatch.setattr(assets,'MAX_ASSET_BYTES',8)
     with pytest.raises(tweak_mods.TweakError,match='size'):
         tweak_mods.BuildContext({},root,library).game_file('chr/c0000.anibnd.dcx')
+
+
+def test_small_game_files_do_not_request_the_entire_512_mib_read_limit(game,monkeypatch):
+    from pathlib import Path
+    root,library,_built=game
+    source=root/'chr/c0000.anibnd.dcx';source.parent.mkdir();source.write_bytes(b'small')
+    original=Path.open
+    class Guarded:
+        def __enter__(self):
+            self.stream=original(source,'rb');return self
+        def __exit__(self,*_):
+            self.stream.close()
+        def read(self,size):
+            assert 0<size<=65536,'A tiny input must not allocate the maximum asset buffer'
+            return self.stream.read(size)
+    monkeypatch.setattr(Path,'open',lambda path,*args,**kwargs:Guarded() if path==source else original(path,*args,**kwargs))
+    assert tweak_mods.BuildContext({},root,library).game_file('chr/c0000.anibnd.dcx')==b'small'
+
+
+@pytest.mark.parametrize('replacement',[b'grew past its snapshot',b'x'])
+def test_changing_game_source_never_returns_a_partial_reusable_input(game,monkeypatch,replacement):
+    from pathlib import Path
+    root,library,_built=game
+    source=root/'chr/c0000.anibnd.dcx';source.parent.mkdir();source.write_bytes(b'first')
+    original=Path.open
+    def changed(path,*args,**kwargs):
+        if path==source and args and args[0]=='rb':
+            with original(source,'wb') as stream:
+                stream.write(replacement)
+        return original(path,*args,**kwargs)
+    monkeypatch.setattr(Path,'open',changed)
+    with pytest.raises(tweak_mods.TweakError,match='changed size'):
+        tweak_mods.BuildContext({},root,library).game_file('chr/c0000.anibnd.dcx')

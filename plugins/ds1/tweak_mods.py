@@ -506,10 +506,9 @@ class BuildContext:
             checked(deployment._backup_path(game_root, path))
             checked(deployment._marker_path(game_root, path))
             source = checked(deployment.vanilla_source(game_root, path))
-            with source.open("rb") as stream:
-                data = stream.read(assets.MAX_ASSET_BYTES + 1)
-            if len(data) > assets.MAX_ASSET_BYTES:
-                raise TweakError("The pristine game file exceeds the supported asset size")
+            data = _bounded_file(source,assets.MAX_ASSET_BYTES)
+            if data is None:
+                raise TweakError(f'{path.name}: the pristine game file is missing')
         self._remember('file', path.as_posix(), _sha(data))
         return data
 
@@ -1397,9 +1396,11 @@ def _bounded_file(path: Path, limit: int, *, cache=False):
             raise TweakError(f'{path.name} exceeds its supported size')
         return {'oversized':(stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns)}
     with path.open('rb') as stream:
-        raw = stream.read(limit+1)
+        raw = stream.read(stat.st_size+1)
     if len(raw) > limit:
         raise TweakError(f'{path.name} grew beyond its size limit')
+    if len(raw) != stat.st_size:
+        raise TweakError(f'{path.name} changed size while it was being read')
     return raw
 
 
