@@ -567,6 +567,7 @@ window.Ds1Viewport = (() => {
         for (const mesh of group.children) {
           if (mesh.userData.collisionLayer) mesh.material = collisionMaterial(hitFilter, mesh.userData.collisionLayer);
         }
+        viewModes.bindScene(scene);
         requestRender();
       },
       aim() { return [controls.target.x, controls.target.y, controls.target.z]; },
@@ -729,6 +730,7 @@ window.Ds1Viewport = (() => {
       // Lazy collision never reframes and never joins the framing box.
       if (!fullyLoaded && !userMoved) frameCamera();
       applyCollisionVisibility();
+      viewModes.bindScene(scene);
       requestRender();
       return true;
     };

@@ -242,6 +242,7 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path):
                 page.locator('[data-tab="maps"]').click()
                 page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
                 assert not any('models=h0000' in url or 'models=n0000' in url for url in requests)
+                page.locator('[data-view-mode="wireframe"]').click()
                 page.locator('[data-viewport-host]').hover()
                 page.get_by_role('checkbox', name='High collision', exact=True).check()
                 page.get_by_role('checkbox', name='Low collision', exact=True).check()
@@ -252,6 +253,11 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path):
                     const layers=[];scene.traverse(node=>{if(node.userData.collisionLayer)layers.push(node.userData.collisionLayer)});
                     return ['collisionHigh','collisionLow','navigation'].every(layer=>layers.includes(layer));
                 }''')
+                assert page.evaluate('''() => {
+                    const scene=document.querySelector('[data-viewport-host]')._viewportScene;
+                    let okay=true;scene.traverse(node=>{if(node.userData.collisionLayer&&!node.material.wireframe)okay=false});return okay;
+                }''')
+                page.locator('[data-view-mode="regular"]').click()
                 page.locator('[data-tabstrip-id="placements"]').click()
                 page.evaluate('selectPlacement("m10_02_00_00.msb:5:0",false)')
                 page.wait_for_selector('[data-field-key="hitFilter"]:visible')
