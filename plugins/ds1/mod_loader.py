@@ -349,7 +349,7 @@ def _composition_revision():
     # Request handling, script transport, cache I/O and native tweak planning
     # cannot change an archive composed from these already-built input bytes.
     unrelated = {'server.py', 'script_worker.py', 'plugin.py', 'mod_support.py',
-                 'tweak_mods.py', 'composition_cache.py'}
+                 'tweak_mods.py', 'composition_cache.py', 'project_refresh.py'}
     sources = [*(path for path in Path(__file__).parent.glob('*.py') if path.name not in unrelated),
                Path(__file__).parents[1] / 'ds3/formats.py',
                *(path for path in METADATA.rglob('*') if path.suffix in ('.xml', '.json'))]
