@@ -100,6 +100,27 @@ def test_creation_distinguishes_placement_kinds_sharing_one_model():
     assert doc.export() == before
 
 
+def test_event_parameter_links_use_catalog_names_and_survive_missing_archive(tmp_path):
+    from types import SimpleNamespace
+    from plugins.ds1.formats import FormatError
+    store = MapStore(tmp_path)
+    choices = {'-1': 'None', '100': 'Chest treasure'}
+    store.item_store = SimpleNamespace(get=lambda: SimpleNamespace(link_choices=lambda kind, table: choices))
+    fields = [{'key': 'itemLot1', 'value': 100}, {'key': 'activationParam', 'value': 100}]
+    links = store._event_param_links(fields)
+    assert all(field['type'] == 'enum' and field['enum']['100'] == 'Chest treasure' for field in fields)
+    assert links[0]['kind'] == 'drop' and links[0]['resolved']
+    assert links[1]['tab'] == 'maps' and links[1]['sub'] == 'treasure'
+
+    def broken():
+        raise FormatError('Broken parameter archive')
+
+    store.item_store.get = broken
+    links = store._event_param_links(fields)
+    assert not links[0]['resolved'] and links[0]['name'] == 'Missing record (100)'
+    assert fields[0]['enum'] == {'-1': 'None'}
+
+
 def document():
     return MsbDocument(build_msb(parts=(('piece', 0, 0, 0, None), ('hit', 5, 0, 1, None),
                                          ('nav', 8, 0, 2, None)),
@@ -331,6 +352,17 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path, read_only):
                 page.locator('[data-row-action="duplicate"][data-row-kind="light"]').click()
                 page.wait_for_function('!state.rowBusy')
                 assert page.evaluate('state.row?.id') == 'light:1', page.evaluate('({selected:state.selected,row:state.row,body:document.body.innerText.slice(-1800)})')
+                invasion = page.evaluate('api("/api/placements/create",{map:"m10_02_00_00.msb",model:"@event:12",pos:[0,1,0],rot:[0,0,0]})')
+                invasion_id = invasion['row']['id']
+                edited = page.evaluate('(id)=>api("/api/edit",{table:"m10_02_00_00.msb",id,field:"activationItem",value:100})', invasion_id)
+                page.evaluate('(id)=>reloadViewport("m10_02_00_00.msb",id)', invasion_id)
+                face = page.locator('.ds1-reference-face[data-field-key="activationItem"]')
+                face.wait_for()
+                name = next(link['name'] for link in edited['row']['recordLinks'] if link['field'] == 'activationItem')
+                assert face.inner_text() == name
+                assert face.locator('[data-lex-hoverable]').count() or face.locator('button').count()
+                if screenshot:
+                    page.screenshot(path=screenshot)
                 assert not errors, errors
             finally:
                 browser.close()

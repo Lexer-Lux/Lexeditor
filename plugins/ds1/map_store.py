@@ -19,6 +19,14 @@ from .store import MARKER, digest
 # the shipped Place_name_ table, which holds every map's areas.
 _MAP_AREA = re.compile(r'm(\d{2})_(\d{2})_\d{2}_\d{2}\.msb\Z')
 
+# MSB event fields that point into the parameter archive. Part and region
+# references are already named by the MSB document itself.
+EVENT_PARAM_LINKS = {
+    **{f'itemLot{i}': ('drop', 'ItemLotParam') for i in range(1, 6)},
+    'activationItem': ('goods', 'EquipParamGoods'),
+    'activationParam': ('catalog', 'ObjActParam'),
+}
+
 
 def parse_key(key):
     """A placement identity from its "type:id" form."""
@@ -461,7 +469,9 @@ class MapStore:
         if 'hitFilter' in placement:
             values['hitFilter'] = placement['hitFilter']
         if placement['type'] == 'region' or str(placement['type']).startswith('event') or placement['type'] == 5:
-            for field in self.get(map_name).read_placement((placement['type'], placement['partId']))['fields']:
+            fields = self.get(map_name).read_placement((placement['type'], placement['partId']))['fields']
+            self._event_param_links(fields)
+            for field in fields:
                 values[field['key']] = field['value']
                 if field['enum']:
                     display[field['key']] = field['enum'].get(str(field['value']), str(field['value']))
@@ -555,6 +565,29 @@ class MapStore:
                 pass
         return 'enemies', 'monsters'
 
+    def _event_param_links(self, fields):
+        linked = [field for field in fields if field['key'] in EVENT_PARAM_LINKS]
+        if not linked:
+            return []
+        try:
+            document = self.item_store.get() if self.item_store else None
+        except (OSError, FormatError):
+            document = None
+        links = []
+        for field in linked:
+            kind, table = EVENT_PARAM_LINKS[field['key']]
+            choices = document.link_choices(kind, table) if document else {'-1': 'None'}
+            value = field['value']
+            field.update(type='enum', enum=choices)
+            empty = value < 0 or choices.get(str(value)) == 'None'
+            link = {'kind': kind, 'table': table, 'id': value, 'field': field['key'],
+                    'resolved': not empty and str(value) in choices,
+                    'name': 'None' if empty else choices.get(str(value), f'Missing record ({value})')}
+            if table == 'ObjActParam':
+                link.update(tab='maps', sub='treasure')
+            links.append(link)
+        return links
+
     def read(self, map_name, key):
         if str(key).startswith("message:"):
             return self.read_message(map_name, key)
@@ -578,7 +611,7 @@ class MapStore:
             if item["key"] == "npcId":
                 item["type"] = "enum"
                 item["enum"] = {str(row_id): names[row_id] for row_id in sorted(names)}
-        row["recordLinks"] = []
+        row["recordLinks"] = self._event_param_links(row['fields'])
         if npc is not None:
             tab, sub = self._npc_tab(npc, types)
             row["recordLinks"].append({'kind': 'npc', 'table': 'NpcParam', 'id': npc,

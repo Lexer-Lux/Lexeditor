@@ -463,6 +463,7 @@ async function openCatalog(table,id){
   }catch(error){notify(error);}
 }
 function openRecord(link){
+  if(link.kind==="catalog"&&link.tab)return navigate(link.tab,link.sub,`${link.table}:${link.id}`);
   if(link.kind==="effect")return openEffect(link);
   if(link.kind==="attack")return navigate("attacks",ATTACK_SUBS[link.table]||"attacks",`${link.table}:${link.id}`);
   if(link.kind==="bullet")return navigate("attacks","projectiles",`Bullet:${link.id}`);
@@ -489,6 +490,7 @@ const CATALOG_NOUNS={EquipParamWeapon:"weapon",EquipParamProtector:"armor piece"
 const CATALOG_SUBS={EquipParamWeapon:"weapons",EquipParamProtector:"armor",EquipParamAccessory:"rings",Magic:"spells",EquipParamGoods:"consumables"};
 function linkNoun(link){return link.kind==="catalog"?(CATALOG_NOUNS[link.table]||"record"):link.kind==="stat"?STAT_NOUNS[link.table]:LINK_NOUNS[link.kind]||"record";}
 async function finderTarget(link,value){
+  if(link.kind==="catalog"&&link.tab)return [link.tab,link.sub];
   if(link.kind==="effect")return ["effects","effects-all"];
   if(link.kind==="attack")return ["attacks",ATTACK_SUBS[link.table]||"attacks"];
   if(link.kind==="bullet")return ["attacks","projectiles"];
