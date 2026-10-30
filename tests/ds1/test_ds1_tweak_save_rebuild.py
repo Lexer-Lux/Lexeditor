@@ -196,26 +196,21 @@ def test_the_adapter_flags_the_changed_mod(game, library):
     adapter = Ds1ModAdapter()
     adapter.attach_context(library_root=library, game_root=game)
     tweak_mods.apply(game, library)
-    assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
-        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_OFFLINE],
-        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_OFFLINE]}
+    assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {}
     tweak_mods.save({"alpha": {"values": {"step": 2}}}, library)
     assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
-        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_CHANGED, Ds1ModAdapter.ALERT_OFFLINE],
-        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_OFFLINE]}
+        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_CHANGED]}
 
 
 def test_the_adapter_flags_executable_mods_while_the_loader_is_off(game, library):
     adapter = Ds1ModAdapter()
     adapter.attach_context(library_root=library, game_root=game)
     tweak_mods.apply(game, library)
-    assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
-        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_OFFLINE],
-        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_OFFLINE]}
+    assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {}
     enable_loader(library, False)
     assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
-        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_NEEDS_LOADER, Ds1ModAdapter.ALERT_OFFLINE],
-        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_NEEDS_LOADER, Ds1ModAdapter.ALERT_OFFLINE]}
+        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_NEEDS_LOADER],
+        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_NEEDS_LOADER]}
 
 
 def test_the_adapter_flags_executable_mods_while_the_loader_is_missing(game, library):
@@ -226,8 +221,8 @@ def test_the_adapter_flags_executable_mods_while_the_loader_is_missing(game, lib
     (loader / "mod.json").unlink()
     loader.rmdir()
     assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
-        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_LOADER_MISSING, Ds1ModAdapter.ALERT_OFFLINE],
-        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_LOADER_MISSING, Ds1ModAdapter.ALERT_OFFLINE]}
+        str((library / "Alpha").resolve()): [Ds1ModAdapter.ALERT_LOADER_MISSING],
+        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_LOADER_MISSING]}
 
 
 def _require(library, folder, *needs):
@@ -248,15 +243,11 @@ def test_the_adapter_flags_a_mod_whose_requirement_is_off_or_missing(game, libra
     tweak_mods.apply(game, library)
     _require(library, "Alpha", "beta", "ghost")
     assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
-        str((library / "Alpha").resolve()): ["Requires ghost, which is not installed.",
-                                             Ds1ModAdapter.ALERT_OFFLINE],
-        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_OFFLINE]}
+        str((library / "Alpha").resolve()): ["Requires ghost, which is not installed."]}
     _switch(library, "Beta", False)
     assert adapter.alerts([library / "Alpha", library / "Beta"], game) == {
         str((library / "Alpha").resolve()): ["Requires beta, which is switched off.",
-                                             "Requires ghost, which is not installed.",
-                                             Ds1ModAdapter.ALERT_OFFLINE],
-        str((library / "Beta").resolve()): [Ds1ModAdapter.ALERT_OFFLINE]}
+                                             "Requires ghost, which is not installed."]}
 
 
 def test_build_refuses_an_unmet_mod_requirement(game, library):

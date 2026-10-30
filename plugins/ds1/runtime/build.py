@@ -2,6 +2,7 @@
 
     python plugins/ds1/runtime/build.py [--zig PATH] [--check]
     python plugins/ds1/runtime/build.py --debug --dearxan FOLDER [--check]
+    python plugins/ds1/runtime/build.py --online --dearxan FOLDER [--check]
 
 The debug loader (package/debug/dinput8.dll) is the same loader with
 lexeditor_ds1_debug.c: no network, and Arxan switched off by dearxan
@@ -9,6 +10,10 @@ lexeditor_ds1_debug.c: no network, and Arxan switched off by dearxan
 dearxan ships as an MSVC static library, so this build uses Visual Studio's
 compiler (Build Tools 2022) and the release's include/ and lib/ folders; the
 library itself is not kept in the repository.
+
+The online loader (package/online) uses the same dearxan callback, then installs
+the pinned upstream report filtering and Lexeditor's separate save routing.
+It does not block networking. See ONLINE.md for license and verification limits.
 
 Uses Zig's C compiler (any 0.14 release). The DLL and runtime-manifest.json
 land in plugins/ds1/runtime/package/; the manifest records the hash of the
@@ -20,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -33,13 +39,30 @@ PACKAGE = HERE / "package"
 SOURCES = ("lexeditor_ds1_loader.c", "lexeditor_ds1_loader.h")
 DEBUG_SOURCES = SOURCES + ("lexeditor_ds1_debug.c",)
 DEBUG_PACKAGE = PACKAGE / "debug"
+ONLINE_PACKAGE = PACKAGE / "online"
+OVERHAUL_REVISION = "2a3d8cbe2acee663bef03c7be4f968dbb68f951f"
+ONLINE_SOURCES = DEBUG_SOURCES + (
+    "lexeditor_ds1_online.cpp", "lexeditor_ds1_saves.c",
+    "overhaul/AntiAntiCheat.cpp", "overhaul/AntiAntiCheat.h", "overhaul/AntiAntiCheatASM.asm",
+    "overhaul/GameData.h", "overhaul/SP/memory/injection/asm/x64.h", "overhaul/SOURCE.json",
+)
 DEARXAN = "0.5.6"
+
+
+def supported_game_sha256() -> str:
+    """The editor's executable validator owns the supported build identity."""
+    spec = importlib.util.spec_from_file_location("ds1_build_identity", HERE.parent / "exe_patches.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.VANILLA_SHA256
 
 
 def source_hash(names=SOURCES) -> str:
     digest = hashlib.sha256()
     for name in names:
         digest.update(name.encode() + b"\0" + (HERE / name).read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    if names == ONLINE_SOURCES:
+        digest.update(b"supported-game\0" + supported_game_sha256().encode() + b"\0")
     return digest.hexdigest()
 
 
@@ -84,7 +107,7 @@ def find_vcvars() -> Path:
     raise SystemExit("Visual Studio's C compiler was not found (Build Tools 2022 with the C++ workload).")
 
 
-def build_debug(dearxan: Path, output: Path) -> None:
+def build_debug(dearxan: Path, output: Path, *, online: bool = False) -> None:
     """The debug loader: Microsoft's compiler, dearxan linked in, reproducible (/Brepro)."""
     include, lib = dearxan / "include", dearxan / "lib"
     if not (include / "dearxan.h").is_file() or not (lib / "dearxan.lib").is_file():
@@ -92,11 +115,18 @@ def build_debug(dearxan: Path, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="lex-ds1-debug-"))
     try:
-        for name in DEBUG_SOURCES:
+        for name in ONLINE_SOURCES if online else DEBUG_SOURCES:
+            (work / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(HERE / name, work / name)
         shutil.copy2(include / "dearxan.h", work / "dearxan.h")
-        command = (f'call "{find_vcvars()}" >nul && cl /nologo /O2 /LD /MD /Brepro /DLX_DEBUG_BUILD '
-                   f'/D_CRT_SECURE_NO_WARNINGS lexeditor_ds1_loader.c lexeditor_ds1_debug.c '
+        if online:
+            (work / "lexeditor_ds1_build.h").write_text(
+                f'#define LX_GAME_SHA256 "{supported_game_sha256()}"\n', encoding="ascii")
+        assembly = ('ml64 /nologo /c /FoAntiAntiCheatASM.obj overhaul/AntiAntiCheatASM.asm && ' if online else '')
+        extra = ('/DLX_ONLINE_BUILD /std:c++17 /EHsc /Ioverhaul lexeditor_ds1_saves.c '
+                 'lexeditor_ds1_online.cpp overhaul/AntiAntiCheat.cpp AntiAntiCheatASM.obj ' if online else '')
+        command = (f'call "{find_vcvars()}" >nul && {assembly}cl /nologo /O2 /LD /MD /Brepro /DLX_DEBUG_BUILD '
+                   f'/D_CRT_SECURE_NO_WARNINGS lexeditor_ds1_loader.c lexeditor_ds1_debug.c {extra}'
                    f'/link /Brepro /OUT:dinput8.dll "{lib / "dearxan.lib"}" ws2_32.lib ntdll.lib userenv.lib '
                    f'dbghelp.lib kernel32.lib advapi32.lib bcrypt.lib synchronization.lib')
         # A batch file: cmd's quoting does not survive being passed as one argument.
@@ -113,23 +143,31 @@ def main() -> int:
     parser.add_argument("--zig")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--debug", action="store_true", help="build the debug loader (Arxan off, no network)")
+    parser.add_argument("--online", action="store_true", help="build the online loader (report filtering and isolated saves)")
     parser.add_argument("--dearxan", type=Path, help="an unpacked dearxan release (include/, lib/)")
     args = parser.parse_args()
-    if args.debug:
+    if args.debug and args.online:
+        raise SystemExit("Choose --debug or --online")
+    if args.debug or args.online:
         if not args.dearxan:
-            raise SystemExit("--debug needs --dearxan FOLDER")
+            raise SystemExit("--debug/--online needs --dearxan FOLDER")
+        package = ONLINE_PACKAGE if args.online else DEBUG_PACKAGE
         if args.check:
             with tempfile.TemporaryDirectory() as folder:
-                build_debug(args.dearxan, Path(folder) / "dinput8.dll")
-                same = (Path(folder) / "dinput8.dll").read_bytes() == (DEBUG_PACKAGE / "dinput8.dll").read_bytes()
+                build_debug(args.dearxan, Path(folder) / "dinput8.dll", online=args.online)
+                same = (Path(folder) / "dinput8.dll").read_bytes() == (package / "dinput8.dll").read_bytes()
             print("reproduced" if same else "DIFFERENT from the committed debug dinput8.dll")
             return 0 if same else 1
-        build_debug(args.dearxan, DEBUG_PACKAGE / "dinput8.dll")
-        dll = (DEBUG_PACKAGE / "dinput8.dll").read_bytes()
+        build_debug(args.dearxan, package / "dinput8.dll", online=args.online)
+        dll = (package / "dinput8.dll").read_bytes()
         manifest = {"file": "dinput8.dll", "sha256": hashlib.sha256(dll).hexdigest(), "size": len(dll),
-                    "sourceSha256": source_hash(DEBUG_SOURCES), "compiler": "msvc (Build Tools 2022)",
+                    "sourceSha256": source_hash(ONLINE_SOURCES if args.online else DEBUG_SOURCES), "compiler": "msvc (Build Tools 2022)",
                     "dearxan": DEARXAN}
-        (DEBUG_PACKAGE / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        if args.online:
+            manifest["overhaulRevision"] = OVERHAUL_REVISION
+            manifest["license"] = "AGPL-3.0-only"
+            manifest["gameSha256"] = supported_game_sha256()
+        (package / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
         print(json.dumps(manifest, indent=2))
         return 0
     zig = find_zig(args.zig)
@@ -145,7 +183,7 @@ def main() -> int:
     dll = (PACKAGE / "dinput8.dll").read_bytes()
     manifest = {"file": "dinput8.dll", "sha256": hashlib.sha256(dll).hexdigest(), "size": len(dll),
                 "sourceSha256": source_hash(), "compiler": f"zig {version}"}
-    (PACKAGE / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (PACKAGE / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps(manifest, indent=2))
     return 0
 

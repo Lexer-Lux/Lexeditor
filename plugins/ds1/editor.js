@@ -4691,7 +4691,7 @@ function renderTweaks(){
     :"No tweaks are switched on. Switch one on in the Mods tab to change its settings here."}):null;
   const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original game files":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
-    help:"Save combines every enabled tweak into lexeditor-ds1-patch.bin, which Lexeditor's loader (dinput8.dll in the game folder) applies in memory each time the game starts. The loader switches the game's anti-tamper protection off and keeps the game offline, so a modded game never meets other players. DarkSoulsRemastered.exe itself is never changed. When a tweak adds menu rows, the menu layout file is rebuilt too, keeping one copy of its original. Restore original removes the loader and puts the layout back. Tweaks install when you press Play.",
+    help:"Play installs your enabled tweaks and applies their changes when the game starts. The loader adds multiplayer protection, but cannot guarantee against account restrictions. Modded play uses separate characters that Steam Cloud can sync. Removing the loader returns to your vanilla characters and keeps your modded progress for reinstalling. One original and one recent backup help recover damaged modded saves. Restore original removes the loader and restores changed game files.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
       (status.staleMods||[]).length?LexeditorUI.detailNote(state.readOnly
         ?"The enabled tweaks changed since the last build. Close the game, then press Play to rebuild them."

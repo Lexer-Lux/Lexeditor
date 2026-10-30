@@ -214,7 +214,7 @@ def test_a_pinned_loader_is_moved_aside_when_switching_mods(game, monkeypatch):
     assert (root / (tweak_mods.RUNTIME_DLL + tweak_mods.LOCKED_SUFFIX)).is_file()
     monkeypatch.setattr(Path, "unlink", real_unlink)
     tweak_mods.apply(root, library)
-    assert dll.read_bytes() == tweak_mods.loader_bytes(debug=True)
+    assert dll.read_bytes() == tweak_mods.loader_bytes(online=True)
     assert not (root / (tweak_mods.RUNTIME_DLL + tweak_mods.LOCKED_SUFFIX)).exists()
 
 

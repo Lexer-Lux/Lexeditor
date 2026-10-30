@@ -577,6 +577,7 @@ static void apply_from_file(void)
         write_log("lexeditor-ds1-patch.bin is empty or too large; nothing was changed");
         return;
     }
+#ifndef LX_ONLINE_BUILD
     /* Offline before the first change, and even if the patch then fails:
      * Lexeditor told the reader the game would be offline. */
     if (!lx_block_network()) {
@@ -585,6 +586,7 @@ static void apply_from_file(void)
         return;
     }
     write_log("Online play is off: mods change the game's code");
+#endif
     unsigned char *data = (unsigned char *)HeapAlloc(GetProcessHeap(), 0, (size_t)size.QuadPart);
     DWORD read = 0;
     int ok = data && ReadFile(file, data, (DWORD)size.QuadPart, &read, NULL) && read == (DWORD)size.QuadPart;
