@@ -49,6 +49,41 @@ def test_valid_looking_cache_cannot_claim_ownership_of_a_foreign_dll(game):
     assert dll.read_bytes() == b'another loader'
 
 
+@pytest.mark.parametrize('damaged_record',[False,True])
+def test_previously_published_loader_can_upgrade_without_trusting_installed_record(game,monkeypatch,damaged_record):
+    root,library,_ = game
+    previous = b'a fixture representing a published predecessor'
+    original_manifest = tweak_mods.loader_manifest
+    def published(package):
+        manifest = original_manifest(package)
+        if package == tweak_mods.LOADER_PACKAGE/'online':
+            manifest['previousSha256'] = [hashlib.sha256(previous).hexdigest()]
+        return manifest
+    monkeypatch.setattr(tweak_mods,'loader_manifest',published)
+    (root/tweak_mods.RUNTIME_DLL).write_bytes(previous)
+    if damaged_record:
+        (root/tweak_mods.RUNTIME_RECORD).write_bytes(b'{')
+    assert not tweak_mods._runtime(root)['foreignDll']
+    tweak_mods._write_runtime(root,b'',[],None,library=library)
+    assert (root/tweak_mods.RUNTIME_DLL).read_bytes() == tweak_mods.loader_bytes(online=True)
+    assert tweak_mods._runtime(root)['active']
+
+
+def test_manifest_rebuild_retains_bounded_publisher_history(tmp_path):
+    from test_ds1_runtime_loader import build_module
+    path = tmp_path/'runtime-manifest.json'
+    previous = [hashlib.sha256(str(index).encode()).hexdigest() for index in range(128)]
+    old = hashlib.sha256(b'old').hexdigest()
+    new = hashlib.sha256(b'new').hexdigest()
+    path.write_text(json.dumps({'sha256':old,'previousSha256':previous}))
+    build_module().write_manifest(tmp_path,{'sha256':new})
+    manifest = tweak_mods.loader_manifest(tmp_path)
+    assert manifest['sha256'] == new
+    assert manifest['previousSha256'] == [*previous[1:],old]
+    build_module().write_manifest(tmp_path,{'sha256':new})
+    assert tweak_mods.loader_manifest(tmp_path) == manifest
+
+
 def test_matching_hash_does_not_turn_a_broken_patch_into_a_valid_rollback(game):
     root,library,_ = game
     tweak_mods._write_runtime(root,b'',[],None,library=library)

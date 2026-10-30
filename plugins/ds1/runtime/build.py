@@ -66,6 +66,15 @@ def source_hash(names=SOURCES) -> str:
     return digest.hexdigest()
 
 
+def write_manifest(package: Path, manifest: dict) -> None:
+    """Keep bounded publisher identities so upgrades recognize earlier DLLs."""
+    path = package/'runtime-manifest.json'
+    previous = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
+    identities = list(dict.fromkeys([*previous.get('previousSha256',[]),previous.get('sha256')]))
+    manifest['previousSha256'] = [digest for digest in identities if digest and digest != manifest['sha256']][-128:]
+    path.write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8',newline='\n')
+
+
 def find_zig(explicit: str | None) -> str:
     for candidate in (explicit, os.environ.get("LEXEDITOR_ZIG"), shutil.which("zig")):
         if candidate and Path(candidate).is_file():
@@ -167,7 +176,7 @@ def main() -> int:
             manifest["overhaulRevision"] = OVERHAUL_REVISION
             manifest["license"] = "AGPL-3.0-only"
             manifest["gameSha256"] = supported_game_sha256()
-        (package / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
+        write_manifest(package,manifest)
         print(json.dumps(manifest, indent=2))
         return 0
     zig = find_zig(args.zig)
@@ -183,7 +192,7 @@ def main() -> int:
     dll = (PACKAGE / "dinput8.dll").read_bytes()
     manifest = {"file": "dinput8.dll", "sha256": hashlib.sha256(dll).hexdigest(), "size": len(dll),
                 "sourceSha256": source_hash(), "compiler": f"zig {version}"}
-    (PACKAGE / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
+    write_manifest(PACKAGE,manifest)
     print(json.dumps(manifest, indent=2))
     return 0
 

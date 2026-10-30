@@ -37,14 +37,20 @@ int main(int argc, char **argv)
     memcpy(test_image+0x1000, original, 6);
     memcpy(test_image+0x1100, original, 6);
     memcpy(test_image+0x1200, original, 6);
+    memcpy(test_image+0x1300, original, 6);
     test_image[0x1201]=3;
     DWORD old;
     VirtualProtect(test_image+0x1000, 0x1000, PAGE_EXECUTE_READ, &old);
-    if(argc==3){lx_data_ready=lx_prepare_data();printf("prepared=%d\n",lx_data_ready);}
+    if(argc==3){
+        lx_data_ready=!strcmp(argv[2],"--prepared-shared")?1:lx_prepare_data();
+        printf("prepared=%d\n",lx_data_ready);
+    }
+    apply_from_file();
     lx_load_mod_folders();
     int (*first)(void) = (int (*)(void))(test_image+0x1000);
     int (*second)(void) = (int (*)(void))(test_image+0x1100);
     printf("results=%d,%d\n", first(), second());
+    printf("shared=%d\n",((int (*)(void))(test_image+0x1300))());
     DWORD64 base;
     unsigned char *first_code=test_image+0x1005+(int32_t)read32(test_image+0x1001);
     unsigned char *second_code=test_image+0x1105+(int32_t)read32(test_image+0x1101);

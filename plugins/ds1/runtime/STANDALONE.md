@@ -5,6 +5,12 @@ each prebuilt mod folder in that directory or its `mods` subfolder. Steam still
 starts the game. The editor is optional, and no mod builder runs on the player's
 machine.
 
+The online and debug loaders apply the shared patch only after preparation
+succeeds for this launch. A failed or unavailable helper leaves old shared
+patches inactive while independent native-only folder modules can still load.
+The basic proxy has no pre-entry preparation callback and loads native-only
+folder modules without using a previous shared patch.
+
 If another mod already installed `dinput8.dll`, rename that other loader to
 `dinput8.chain.dll` before extracting this package. The loader loads that DLL
 before game entry and forwards its input calls, or uses system input when the

@@ -33,6 +33,13 @@ def build_module():
     return module
 
 
+def isolated_library(folder):
+    """Native fixtures must never discover the player's Documents library."""
+    library = folder.parent/'empty-library'
+    library.mkdir(exist_ok=True)
+    (folder/'lexeditor-ds1.ini').write_text('[Mods]\nLibrary='+str(library)+'\n',encoding='utf-16')
+
+
 def test_the_shipped_loader_is_built_from_its_source():
     manifest = json.loads((RUNTIME / "package" / "runtime-manifest.json").read_text(encoding="utf-8"))
     assert manifest["sourceSha256"] == build_module().source_hash(), \
@@ -59,6 +66,7 @@ def test_the_debug_loader_leaves_the_game_no_network(tmp_path):
         pytest.skip("Zig is needed to build the test program")
     folder = tmp_path / "game folder"
     folder.mkdir()
+    isolated_library(folder)
     exe = folder / "game.exe"
     subprocess.run([zig, "cc", "-target", "x86_64-windows-gnu", "-O1", "-o", str(exe),
                     str(Path(__file__).with_name("runtime_debug_harness.c")), "-lws2_32"], check=True)
@@ -70,11 +78,13 @@ def test_the_debug_loader_leaves_the_game_no_network(tmp_path):
     assert "a debugger can attach" in log, log
 
 
-@pytest.mark.parametrize("patch, online", [(b"LXD1PAT\0not for this program", False), (b"", True)])
-def test_the_loader_takes_a_patched_game_offline(tmp_path, patch, online):
-    """A game whose code a mod changes must not reach FromSoftware's servers:
-    any patch at all blocks the network, even one that then fails to apply.
-    An empty patch (a menu-layout-only tweak) leaves the game online."""
+@pytest.mark.parametrize("patch", [b"LXD1PAT\0not for this program", b""])
+def test_basic_loader_skips_unprepared_shared_patches(tmp_path, patch):
+    """The basic proxy has no pre-entry merger and cannot trust shared cache.
+
+    No patch was applied, so this path does not change network access.
+    Native-only folder modules enforce their own isolation when they load.
+    """
     import shutil
     try:
         zig = build_module().find_zig(None)
@@ -82,16 +92,16 @@ def test_the_loader_takes_a_patched_game_offline(tmp_path, patch, online):
         pytest.skip("Zig is needed to build the test program")
     folder = tmp_path / "game folder"
     folder.mkdir()
+    isolated_library(folder)
     exe = folder / "game.exe"
     subprocess.run([zig, "cc", "-target", "x86_64-windows-gnu", "-O1", "-o", str(exe),
                     str(Path(__file__).with_name("runtime_debug_harness.c")), "-lws2_32"], check=True)
     shutil.copy2(RUNTIME / "package" / "dinput8.dll", folder / "dinput8.dll")
     (folder / "lexeditor-ds1-patch.bin").write_bytes(patch)
     out = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60, cwd=tmp_path)
-    after = "1,1,1" if online else "0,0,0"
-    assert out.stdout.strip() == f"before=1,1,1 after={after} loaded=1", out
+    assert out.stdout.strip() == "before=1,1,1 after=1,1,1 loaded=1", out
     log = (folder / "lexeditor-ds1-patch.log").read_text(encoding="utf-8")
-    assert ("Online play is off" in log) != online, log
+    assert 'Shared patch skipped' in log and 'Online play is off' not in log,log
 
 
 def patch_file(original=bytes.fromhex("B801000000"), image_size=IMAGE_SIZE, delay=None):
@@ -171,11 +181,12 @@ def test_the_shipped_dll_loads_forwards_directinput_and_leaves_a_game_without_pa
     zig = build_module().find_zig(None)
     folder = tmp_path / "game folder"
     folder.mkdir()
+    isolated_library(folder)
     exe = folder / "game.exe"
     subprocess.run([zig, "cc", "-target", "x86_64-windows-gnu", "-O1", "-o", str(exe),
                     str(Path(__file__).with_name("runtime_dll_harness.c")), "-lole32"], check=True)
     shutil.copy2(RUNTIME / "package" / "dinput8.dll", folder / "dinput8.dll")
     out = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30, cwd=tmp_path)
     assert out.stdout.strip() == "loaded=1 created=0", out
-    assert "No lexeditor-ds1-patch.bin" in (folder / "lexeditor-ds1-patch.log").read_text(encoding="utf-8")
+    assert 'Shared patch skipped' in (folder/'lexeditor-ds1-patch.log').read_text(encoding='utf-8')
 

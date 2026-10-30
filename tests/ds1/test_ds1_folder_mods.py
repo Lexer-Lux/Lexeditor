@@ -311,6 +311,27 @@ def test_native_folder_loader_isolates_broken_disabled_and_conflicting_mods(tmp_
     assert 'broken: Damaged' in result.stdout
     assert 'conflicting: Conflicts' in result.stdout
     assert 'disabled:' not in result.stdout
+    # A stale shared patch must be skipped when preparation is absent or
+    # actually fails. Independent native modules still load in both cases.
+    shared = (b'LXD1PAT\0'+struct.pack('<4I',1,0x3000,0x1234abcd,1)
+              +struct.pack('<3I',1,0x1300,5)+bytes.fromhex('b801000000b837000000'))
+    (tmp_path/'lexeditor-ds1-patch.bin').write_bytes(shared)
+    stale = subprocess.run([str(harness),str(tmp_path)],capture_output=True,text=True,timeout=20)
+    assert stale.returncode == 0 and 'shared=1' in stale.stdout and 'results=42,77' in stale.stdout,stale
+    assert 'Shared patch skipped' in stale.stdout
+    ini = tmp_path/'lexeditor-ds1.ini'
+    previous_ini = ini.read_bytes()
+    failing = tmp_path/'failed-engine'
+    (failing/'plugins/ds1').mkdir(parents=True)
+    (failing/'plugins/ds1/standalone_entry.py').write_text('raise SystemExit(7)')
+    ini.write_text('[Mods]\nLibrary='+str(library)+'\n[Runtime]\nPython='+sys.executable+'\nEngine='+str(failing)+'\n',encoding='utf-16')
+    failed = subprocess.run([str(harness),str(tmp_path),'--prepare-data'],capture_output=True,text=True,timeout=20)
+    assert failed.returncode == 0 and 'prepared=0' in failed.stdout and 'shared=1' in failed.stdout,failed
+    assert 'results=42,77' in failed.stdout,failed
+    assert (tmp_path/'lexeditor-ds1-patch.bin').read_bytes() == shared
+    ini.write_bytes(previous_ini)
+    ready = subprocess.run([str(harness),str(tmp_path),'--prepared-shared'],capture_output=True,text=True,timeout=20)
+    assert ready.returncode == 0 and 'shared=55' in ready.stdout and 'results=42,77' in ready.stdout,ready
     # Empty development folders are not data dependencies of a compiled
     # native-only module. It can load without the optional data helper.
     (tmp_path/'first/sfx').mkdir()

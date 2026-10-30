@@ -1062,6 +1062,19 @@ MAX_RUNTIME = 16 * 1024 * 1024
 OWNED_FILES = (MANIFEST_FILE, BACKUP_FILE, RUNTIME_RECORD, RUNTIME_PATCH, RUNTIME_CONFIG)
 
 
+def loader_manifest(package: Path) -> dict:
+    with (package/'runtime-manifest.json').open('rb') as stream:
+        raw = stream.read(65537)
+    if len(raw) > 65536:
+        raise TweakError("Lexeditor's published loader metadata exceeds its size limit")
+    value = json.loads(raw)
+    if (type(value) is not dict or not _digest(value.get('sha256'))
+            or type(value.get('previousSha256',[])) is not list or len(value.get('previousSha256',[])) > 128
+            or not all(_digest(digest) for digest in value.get('previousSha256',[]))):
+        raise TweakError("Lexeditor's published loader metadata is damaged")
+    return value
+
+
 def loader_bytes(debug: bool = False, *, online: bool = False) -> bytes:
     """The shipped loader, checked against the hash it was published with.
 
@@ -1071,8 +1084,11 @@ def loader_bytes(debug: bool = False, *, online: bool = False) -> bytes:
     if debug and online:
         raise TweakError("Choose the debug or online loader")
     package = LOADER_PACKAGE / "online" if online else LOADER_PACKAGE / "debug" if debug else LOADER_PACKAGE
-    manifest = json.loads((package / "runtime-manifest.json").read_text(encoding="utf-8"))
-    data = (package / RUNTIME_DLL).read_bytes()
+    manifest = loader_manifest(package)
+    with (package/RUNTIME_DLL).open('rb') as stream:
+        data = stream.read(MAX_RUNTIME+1)
+    if len(data) > MAX_RUNTIME:
+        raise TweakError("Lexeditor's shipped loader exceeds its size limit")
     if _sha(data) != manifest.get("sha256"):
         raise TweakError("Lexeditor's DS1 loader does not match its published hash; reinstall Lexeditor")
     return data
@@ -1145,6 +1161,8 @@ def _runtime(game_root: Path) -> dict:
     dll = _sha(_read(dll_path, RUNTIME_FILE)) if dll_path.exists() else None
     # A cache's self-declared hash cannot establish ownership of a foreign DLL.
     ours = {_sha(loader_bytes()), _sha(loader_bytes(debug=True)), _sha(loader_bytes(online=True))}
+    for package in (LOADER_PACKAGE,LOADER_PACKAGE/'debug',LOADER_PACKAGE/'online'):
+        ours.update(loader_manifest(package).get('previousSha256',[]))
     return {"record": record, "patch": patch, "dll": dll, 'problem': problem,
             "foreignDll": dll is not None and dll not in ours,
             "active": bool(record and patch is not None and dll in ours and _sha(patch) == record["patchSha256"])}

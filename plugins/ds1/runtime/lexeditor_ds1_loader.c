@@ -609,8 +609,18 @@ int lx_block_network(void)
     return ok;
 }
 
+#endif
+
+#if !defined(LX_NO_DLLMAIN) || defined(LX_MOD_TEST)
 static void apply_from_file(void)
 {
+    /* This file is a derived description of the current enabled set. Never
+     * reuse a prior run's support after preparation failed or was unavailable.
+     * Independent native-only runtime.lxd modules still have their own path. */
+    if (!lx_data_ready) {
+        write_log("Shared patch skipped: mod preparation is unavailable or failed. Native-only folder mods can still load.");
+        return;
+    }
     wchar_t path[MAX_PATH * 2];
     folder_file(path, MAX_PATH * 2, L"lexeditor-ds1-patch.bin");
     HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -647,7 +657,9 @@ static void apply_from_file(void)
         HeapFree(GetProcessHeap(), 0, data);
     write_log(message);
 }
+#endif
 
+#ifndef LX_NO_DLLMAIN
 #include "lexeditor_ds1_chain.c"
 
 #ifdef LX_DEBUG_BUILD
