@@ -35,3 +35,17 @@ def test_middle_preview_survives_selection_and_pin_changes(page):
     assert boxes[0]['x'] < boxes[1]['x'] < boxes[2]['x']
     if os.environ.get('LEX_MIDDLE_PREVIEW_CAPTURE'):
         page.screenshot(path=os.environ['LEX_MIDDLE_PREVIEW_CAPTURE'])
+
+
+def test_narrow_tab_strip_wraps_without_clipping_names(page):
+    framework(page)
+    page.evaluate('''() => {
+      const U=LexeditorUI;
+      const host=U.el('div',{style:'width:300px'},U.tabStrip({
+        tabs:['Maps','Placements','Lights','Messages','Collision'].map(label=>({id:label,label}))}));
+      document.querySelector('main').append(host);
+    }''')
+    assert page.locator('.lex-tabstrip-button').evaluate_all('''buttons=>buttons.every(button=>{
+      const box=button.getBoundingClientRect(),label=button.querySelector('.lex-tabstrip-label');
+      return label.scrollWidth<=label.clientWidth+1&&box.right<=315;
+    })''')

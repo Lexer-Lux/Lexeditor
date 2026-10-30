@@ -11,7 +11,7 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attack
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapCollisionHigh:false,mapCollisionLow:false,mapNavigation:false,mapRegions:false,mapPlacementFilter:"all",
   dirTab:"all",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null,
-  dirFit:null,mapListPage:0,mapListFit:null,mapListSort:null,mapFit:null};
+  dirFit:null,mapListPage:0,mapListFit:null,mapListSort:null,mapFit:null,collision:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0,animMount=0;
 const lastSubByTab={};
 const attackPreviews=new Map();
@@ -90,15 +90,24 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
     entry.at=LexeditorUI.nextHistoryTick();
     this.undoStack.push(entry);if(this.undoStack.length>200)this.undoStack.shift();
     this.redoStack=[];shell.refresh();
+    // Structural mesh edits can dwarf scalar history. Keep retained snapshots
+    // within 16 MiB rather than retaining 200 complete collision meshes.
+    let bytes=this.undoStack.reduce((sum,item)=>sum+(item.snapshotBytes||0),0);
+    while(bytes>16*1024*1024&&this.undoStack.length){bytes-=this.undoStack.shift().snapshotBytes||0;}
   },
-  async undo(){await edits;const entry=this.undoStack.pop();if(!entry)return false;this.redoStack.push(entry);await this.apply(entry,"before");return true;},
-  async redo(){await edits;const entry=this.redoStack.pop();if(!entry)return false;this.undoStack.push(entry);await this.apply(entry,"after");return true;},
+  async undo(){await edits;if(this.applying)return false;const entry=this.undoStack.at(-1);if(!entry)return false;if(!await this.apply(entry,"before"))return false;this.undoStack.pop();this.redoStack.push(entry);shell.refresh();return true;},
+  async redo(){await edits;if(this.applying)return false;const entry=this.redoStack.at(-1);if(!entry)return false;if(!await this.apply(entry,"after"))return false;this.redoStack.pop();this.undoStack.push(entry);shell.refresh();return true;},
   async apply(entry,side){
     this.applying=true;
     try{
       await edits;
       let refresh=false;
       for(const edit of entry.edits||[entry]){
+        if(edit.collision){
+          const result=await api('/api/map/collision/state',{table:edit.table,mesh:edit[side]});
+          state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
+          continue;
+        }
         if(edit.rename){
           const renamed=await api("/api/rename",{table:edit.table,id:edit.id,name:edit[side],sub:state.sub});
           state.dirty=renamed.dirtyCount;state.changes=renamed.changes||state.changes;
@@ -124,7 +133,8 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
       // would close the drawer mid-inspection. Anything else renders.
       else if((entry.edits||[entry]).every(edit=>edit.table==="AtkParam_Npc")&&await refreshChrDrawer()){}
       else render();
-    }catch(error){notify(error);}
+      return true;
+    }catch(error){notify(error);return false;}
     finally{this.applying=false;shell.refresh();}
   },
   clear(){this.undoStack=[];this.redoStack=[];shell.refresh();}};
@@ -308,7 +318,7 @@ async function refreshMonsterPanels(){
   state.monsterAttacks=attacks;state.thinkRow=think;state.monsterBehaviors=behaviors;
 }
 async function loadDetail(){
-  let row=state.rows.find(row=>key(row)===state.selected);
+  let row=state.collision?.rows.find(row=>key(row)===state.selected)||state.rows.find(row=>key(row)===state.selected);
   let sub=state.sub;
   if(!row&&state.tab==="maps"){
     row=state.dirRows.find(row=>key(row)===state.selected);
@@ -463,6 +473,7 @@ async function openCatalog(table,id){
   }catch(error){notify(error);}
 }
 function openRecord(link){
+  if(link.kind==='collisionVertex')return chooseCollision({kind:'vertices',selected:`${link.table}:${link.id}`});
   if(link.kind==="catalog"&&link.tab)return navigate(link.tab,link.sub,`${link.table}:${link.id}`);
   if(link.kind==="effect")return openEffect(link);
   if(link.kind==="attack")return navigate("attacks",ATTACK_SUBS[link.table]||"attacks",`${link.table}:${link.id}`);
@@ -570,6 +581,7 @@ async function save(){
   await edits;
   try{
     const result=await api("/api/save",{});attackPreviews.clear();await refreshState();
+    if(state.tab==='maps'&&state.mapTab==='collision')await refreshCollision();
     if(state.tab==="tweaks"){await loadTweaks();render();}else shell.refresh();
     if(!reportTweakRebuild(result))LexeditorUI.showToast("Changes saved to the mod project.");
   }
@@ -605,7 +617,8 @@ function renameRecord(row,name){
   });
 }
 function patchRowValues(table,id,values,display,name,modified){
-  const target=state.rows.find(row=>row.table===table&&row.id===id)||state.dirRows.find(row=>row.table===table&&row.id===id);
+  recordRows.delete(`${table}:${id}`);
+  const target=state.collision?.rows.find(row=>row.table===table&&row.id===id)||state.rows.find(row=>row.table===table&&row.id===id)||state.dirRows.find(row=>row.table===table&&row.id===id);
   if(!target||!values)return;
   target.values=values;target.display=display||{};
   if(name!==undefined&&name!==null)target.name=name;
@@ -662,7 +675,8 @@ function commit(row,field,value,control,beforeOverride){
       const updates=[{id:row.id,result}];
       // The other selected records of this table get the same value.
       for(const other of (state.selection||[]).filter(k=>k!==key(row)&&k.startsWith(row.table+":"))){
-        const id=Number(other.slice(row.table.length+1));
+        const rawId=other.slice(row.table.length+1);
+        const id=row.table.startsWith('CollisionMesh|')?rawId:Number(rawId);
         const prior=(await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${id}&sub=${encodeURIComponent(state.sub)}`)).row.fields.find(item=>item.key===field.key)?.value;
         const changed=await api("/api/edit",{table:row.table,id,field:field.key,value,sub:state.sub});
         latest=changed;
@@ -751,7 +765,8 @@ function commit(row,field,value,control,beforeOverride){
           await loadDirectory().catch(notify);
           refreshMapSide();refreshDirectory();refreshMapsDetail();
         }
-        if(updates.some(update=>update.result.refreshRows))await loadItems().then(render);
+        if(row.table.startsWith('CollisionMesh|'))await refreshCollision();
+        else if(updates.some(update=>update.result.refreshRows))await loadItems().then(render);
         else if(state.tab==="animations"){await reloadAnimRows().catch(notify);refreshAnimList();refreshAnimDetail();}
         else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
         // An icon or model edit repaints its face (the picture or name beside the number).
@@ -769,6 +784,8 @@ function commit(row,field,value,control,beforeOverride){
   }).catch(notify);
 }
 function describePinnedCell(propertyKey){
+  const vector={Position:'pos',Rotation:'rot',Scale:'scale'}[propertyKey];
+  if(vector)return {label:propertyKey,render:row=>['X','Y','Z'].map(axis=>row.values?.[vector+axis]).filter(value=>value!==undefined).map(value=>LexeditorUI.formatNumber(value)).join(', ')};
   if(propertyKey==="icon")return{editable:false,label:"",sortable:false,
     width:"var(--lex-fitted-row-height,36px)",
     render:row=>state.tab==="textures"?textureIconCell(row):recordIconCell(row)};
@@ -879,6 +896,13 @@ function referenceFace(row,field){
 }
 function referencePicker(row,field,face,knownLink){
   const link=knownLink||(row.recordLinks||[]).find(entry=>entry.field===field.key);
+  if(link?.kind==='collisionVertex'){
+    const source={kind:state.collision.kind,selected:state.selected,selection:[...(state.selection||[])]};
+    return LexeditorUI.thingFinderButton({label:`Change ${field.label}`,disabled:state.readOnly,
+      type:`ds1-${link.table}`,prompt:`Choose the vertex for ${row.name}.`,
+      target:()=>chooseCollision({kind:'vertices'}),origin:()=>chooseCollision(source),
+      accept:picked=>{state.selection=source.selection;commit(row,field,Number(String(picked).replace(/^v:/,'')),face);}});
+  }
   const clearEntry=Object.entries(field.enum||{}).find(([,label])=>label==="None");
   const source={};
   const value=()=>{const live=state.row&&key(state.row)===key(row)?state.row:row;
@@ -2454,6 +2478,7 @@ function renderScriptDetail(){
       detailSection({title:"CONDITIONS",body:[logView(conditions)]})]});
 }
 function detail(){
+  if(state.mapTab==='collision'&&state.tab==='maps')return collisionDetail();
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing
   // lives in its help bubble, never under it.
@@ -3470,8 +3495,12 @@ function renderItems(){
   return LexeditorUI.stack(strip,view);
 }
 function viewportHooks(){
-  return {readOnly:state.readOnly,collision:{high:state.mapCollisionHigh===true,low:state.mapCollisionLow===true},navigation:state.mapNavigation,regions:state.mapRegions,
+  return {readOnly:state.readOnly||state.mapTab==='collision',transforms:state.mapTab!=='collision',collision:{high:state.mapCollisionHigh===true,low:state.mapCollisionLow===true},navigation:state.mapNavigation,regions:state.mapRegions,
     onSelect:(key,info)=>{state.mapSelected=key;state.mapInfo=info||null;refreshViewportBar();
+    if(state.mapTab==='collision'){
+      if(info?.kind==='Collision'&&info.model!==state.collision?.model)void chooseCollision({model:info.model,mesh:0});
+      return;
+    }
     if(!key||!state.mapView)return;
     const placementKey=`${state.mapView.map}:${key}`;
     if(placementKey!==state.selected)selectPlacement(placementKey,true);},
@@ -3543,6 +3572,9 @@ function syncPlacementRow(map,partKey,names,afters){
   }
 }
 async function refreshMapsAfterUndo(entry){
+  if((entry.edits||[entry]).some(edit=>String(edit.table).startsWith('CollisionMesh|'))){
+    await refreshCollision();return;
+  }
   const edits=entry.edits||[entry];
   const moved=new Map();
   let namesChanged=false;
@@ -3740,6 +3772,7 @@ async function loadMaps(){
   if(!state.mapList.some(row=>row.id===state.mapId))state.mapId=state.mapList[0]?.id||null;
   state.mapView=state.mapId?await api(`/api/map/view?map=${encodeURIComponent(state.mapId)}`):null;
   state.mapSelected=null;state.mapInfo=null;
+  if(state.mapTab==='collision'){await loadCollision();return;}
   clampMapSelection();
   await loadDetail();
 }
@@ -3908,8 +3941,133 @@ async function selectDirectoryParam(row){
   refreshMapSide();refreshDirectory();refreshMapsDetail();
 }
 function mapsStrip(){
-  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"lights",label:"Lights"},{id:"messages",label:"Messages"}],
-    active:state.mapTab,label:"Map views",change:id=>{state.mapTab=id;refreshMapSide();}});
+  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"lights",label:"Lights"},{id:"messages",label:"Messages"},{id:"collision",label:"Collision"}],
+    active:state.mapTab,label:"Map views",change:async id=>{
+      await edits;const wasCollision=state.mapTab==='collision';state.mapTab=id;
+      if(id==='collision'){await chooseCollision({});return;}
+      if(wasCollision){state.collision=null;clampMapSelection();await loadDetail();render();}
+      else refreshMapSide();
+    }});
+}
+async function loadCollision(options={}){
+  const previous=state.collision;
+  const models=Object.entries(state.mapView?.models||{}).filter(([,value])=>value.type===5).map(([name])=>name);
+  const selectedModel=state.mapView?.parts.find(part=>part.key===state.mapSelected&&part.kind==='Collision')?.model;
+  const next={model:previous?.model||selectedModel||models[0],layer:'high',mesh:0,kind:'vertices',
+    query:'',page:0,pageSize:20,...previous,...options};
+  if(!models.includes(next.model))next.model=models[0];
+  state.collision=next;state.selection=[];
+  state.mapCollisionHigh=next.layer==='high';state.mapCollisionLow=next.layer==='low';
+  next.rows=[];next.error='';
+  if(!next.model){next.error='This map has no collision models.';state.row=null;return;}
+  try{
+    const result=await api(`/api/map/collision?map=${encodeURIComponent(state.mapId)}&model=${encodeURIComponent(next.model)}&layer=${next.layer}&mesh=${next.mesh}&kind=${next.kind}`);
+    if(state.collision!==next)return;
+    Object.assign(next,result);
+    state.selected=next.rows.some(row=>key(row)===(options.selected||state.selected))?(options.selected||state.selected):next.rows[0]?key(next.rows[0]):null;
+    await loadDetail();
+  }catch(error){if(state.collision===next){next.error=error.message;state.row=null;}}
+}
+async function chooseCollision(options){
+  await edits;await loadCollision(options);
+  state.mapCollisionHigh=state.collision.layer==='high';state.mapCollisionLow=state.collision.layer==='low';
+  viewportCtl?.setCollisionLayers?.(state.mapCollisionHigh,state.mapCollisionLow);
+  render();markCollisionPoint(true);
+}
+function markCollisionPoint(focus=false){
+  const collision=state.collision;
+  const part=state.mapView?.parts.find(part=>part.model===collision?.model&&part.key===state.mapSelected)
+    ||state.mapView?.parts.find(part=>part.model===collision?.model);
+  viewportCtl?.point?.(part?.key,state.row?.previewPosition,focus);
+}
+async function refreshCollision(){
+  if(state.tab!=='maps'||state.mapTab!=='collision')return;
+  const table=state.collision?.table;
+  for(const cached of recordRows.keys())if(cached.startsWith(`${table}:`))recordRows.delete(cached);
+  await loadCollision();render();
+  if(state.collision?.model)await viewportCtl?.reloadCollision?.(state.collision.model);
+  markCollisionPoint();
+}
+function collisionDetail(){
+  const collision=state.collision;
+  const row=state.row;
+  const noun=collision?.kind==='faces'?'face':'vertex';
+  const actions=['add','duplicate','remove'].map(action=>el('button',{type:'button',class:'lex-header-icon',
+    'aria-label':`${action[0].toUpperCase()+action.slice(1)} collision ${noun}`,
+    title:`${action[0].toUpperCase()+action.slice(1)} collision ${noun}`,
+    disabled:state.readOnly||state.rowBusy||!!collision?.error||(!row&&action!=='add'),
+    onclick:()=>changeCollisionStructure(action)},
+    action==='add'?LexeditorUI.addIcon():action==='duplicate'?LexeditorUI.copyIcon():LexeditorUI.removeIcon()));
+  if(!row||!String(row.table).startsWith('CollisionMesh|'))return detailPanel({title:`Collision ${noun}`,actions,
+    body:[LexeditorUI.detailNote(collision?.error||`Select a ${noun}.`)]});
+  return detailPanel({title:row.name,actions,body:[...fieldSections(row)].map(([title,body])=>detailSection({title,body}))});
+}
+async function changeCollisionStructure(action){
+  if(state.readOnly||state.rowBusy)return;
+  await edits;
+  const collision=state.collision,table=collision.table,kind=collision.kind;
+  const index=Number(state.row?.id.split(':')[1]||0);
+  state.rowBusy=true;shell.refresh();
+  try{
+    const before=(await api(`/api/map/collision/state?table=${encodeURIComponent(table)}`)).mesh;
+    const after=structuredClone(before);
+    let selected=index;
+    if(action==='remove'){
+      if(after[kind].length===1)throw new Error(`Keep at least one ${kind==='vertices'?'vertex':'face'} in a collision mesh. Remove the collision placement to remove it from the map.`);
+      if(kind==='vertices'){
+        const connected=after.faces.filter(face=>face.slice(0,3).includes(index)).length;
+        if(connected===after.faces.length)throw new Error('Removing this vertex would leave no faces. Remove the collision placement instead.');
+        if(connected&&!await confirmAction({title:'Remove connected faces?',message:`Removing Vertex ${index} also removes ${connected} connected faces.`,confirmLabel:'Remove',cancelLabel:'Cancel'}))return;
+        after.vertices.splice(index,1);after.flags.splice(index,1);
+        after.faces=after.faces.filter(face=>!face.slice(0,3).includes(index)).map(face=>face.map((value,i)=>i<3&&value>index?value-1:value));
+      }else after.faces.splice(index,1);
+      selected=Math.min(index,after[kind].length-1);
+    }else{
+      selected=after[kind].length;
+      if(kind==='vertices'){
+        after.vertices.push(action==='duplicate'?[...after.vertices[index]]:[0,0,0,after.vertices[0][3]]);
+        after.flags.push([...after.flags[action==='duplicate'?index:0]]);
+      }else{
+        if(action==='add'&&after.vertices.length<3)throw new Error('Add at least three vertices before adding a face.');
+        after.faces.push(action==='duplicate'?[...after.faces[index]]:[0,1,2,after.faces[0][3]]);
+      }
+    }
+    const snapshotBytes=JSON.stringify(before).length+JSON.stringify(after).length;
+    if(snapshotBytes>16*1024*1024)throw new Error('This structural edit exceeds the 16 MiB undo limit.');
+    const result=await api('/api/map/collision/state',{table,mesh:after});
+    state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
+    fieldHistory.record({collision:true,table,before,after,snapshotBytes});
+    state.selected=`${table}:${kind==='vertices'?'v':'f'}:${selected}`;
+    await refreshCollision();
+  }catch(error){notify(error);}
+  finally{state.rowBusy=false;render();}
+}
+function renderCollision(current){
+  const collision=state.collision||{rows:[],error:'Choose Collision again to load this map.',kind:'vertices'};
+  const selector=(label,value,choices,change)=>detailField({label,control:el('select',{'aria-label':label,value,
+    onchange:event=>change(event.target.value)},...choices.map(([id,name])=>el('option',{value:id,selected:String(id)===String(value)},name)))});
+  const header=LexeditorUI.stack({fill:false,compact:true},mapsStrip(),
+    selector('Collision model',collision.model,Object.entries(state.mapView?.models||{}).filter(([,item])=>item.type===5).map(([name])=>[name,name]),model=>chooseCollision({model,mesh:0,page:0})),
+    selector('Layer',collision.layer,[['high','High collision'],['low','Low collision']],layer=>chooseCollision({layer,mesh:0,page:0})),
+    selector('Mesh',collision.mesh,(collision.meshes||[]).map(mesh=>[mesh.id,mesh.name]),mesh=>chooseCollision({mesh:Number(mesh),page:0})),
+    LexeditorUI.tabStrip({tabs:[{id:'vertices',label:'Vertices'},{id:'faces',label:'Faces'}],active:collision.kind,label:'Collision records',
+      change:kind=>chooseCollision({kind,page:0})}));
+  const preview=collision.preview?.isConnected?collision.preview:mapsViewportPane(current);
+  collision.preview=preview;
+  const rows=collision.rows.filter(row=>row.name.toLowerCase().includes((collision.query||'').toLowerCase()));
+  // names: collision vertices and faces have array indices, not stored names.
+  const view=pagedListDetail({className:'ds1-collision',rows,key,selected:state.selected,slots:false,noun:collision.kind,
+    tableAdd:false,page:collision.page,pageSize:collision.pageSize,rowsKey:'ds1-collision-'+collision.kind,
+    splitKey:'ds1-collision',minLeft:240,minMiddle:280,minRight:360,masterHeader:header,middlePanel:()=>preview,
+    search:{key:'ds1-collision-search',value:collision.query||'',label:'Search '+collision.kind,change:value=>{collision.query=value;collision.page=0;render();}},
+    sync:next=>{collision.page=next.page;collision.pageSize=next.pageSize;state.selection=next.selection||[];},
+    change:next=>{collision.page=next.page;collision.pageSize=next.pageSize;if(next.reason==='pins')view.refreshMaster();else render();},
+    master:({rows,selected,select})=>columnList({rows,key,selected,
+      columns:[{key:'name',label:'Name',grow:1}],
+      decorateRow:(node,row)=>{LexeditorUI.decorateSearchCandidate(node,{type:`ds1-${row.table}`,value:row.id,label:row.name});return node;},
+      select:async(row,event)=>{await edits;state.selected=key(row);await loadDetail();select(row,event);markCollisionPoint(true);shell.refresh();}}),
+    describePinnedCell,commitPinnedCell,detail:()=>collisionDetail(),emptyDetail:()=>collisionDetail()});
+  state.pagedView=view;return view;
 }
 function mapsPane(){
   if(state.mapTab==="placements")return directoryPane();
@@ -4561,9 +4719,7 @@ function refreshAnimDetail(){
   if(!pane){render();return;}
   pane.replaceWith(animDetailBox());
 }
-function renderMaps(){
-  if(!state.mapList.length)return LexeditorUI.notice({tone:"warning",message:"No map files found."});
-  const current=state.mapList.find(row=>row.id===state.mapId)||state.mapList[0];
+function mapsViewportPane(current){
   const duplicate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"duplicate",
     "aria-label":"Duplicate this placement",
     onclick:()=>viewportDuplicate(current.id)},LexeditorUI.copyIcon());
@@ -4594,6 +4750,7 @@ function renderMaps(){
       viewportCtl?.setMapOverlays?.(state.mapNavigation,state.mapRegions);
       if(state.mapSelected&&viewportCtl)viewportCtl.select(state.mapSelected);
       if(state.mapFocus&&viewportCtl){viewportCtl.focus(state.mapFocus);state.mapFocus=null;}
+      if(state.mapTab==='collision')markCollisionPoint(true);
       refreshViewportBar();
     }).catch(error=>{if(token===viewportMount)failMount(host,"Could not load the map.")(error);});
   });
@@ -4601,8 +4758,15 @@ function renderMaps(){
   // on a wrapper: mounting clears the host itself for its canvas.
   const wrap=el("div",{style:"position:relative;min-width:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:520px;"},host);
   LexeditorUI.hoverActions(wrap,{label:"Map actions",
-    actions:[{node:duplicate},{node:remove},{node:add},{node:rotate},{node:highToggle},{node:lowToggle},{node:navigationToggle},{node:regionsToggle}]});
+    actions:[...(state.mapTab==='collision'?[]:[{node:duplicate},{node:remove},{node:add},{node:rotate}]),{node:highToggle},{node:lowToggle},{node:navigationToggle},{node:regionsToggle}]});
   const viewPane=el("div",{style:"min-width:0;display:flex;flex-direction:column;"},wrap);
+  return viewPane;
+}
+function renderMaps(){
+  if(!state.mapList.length)return LexeditorUI.notice({tone:"warning",message:"No map files found."});
+  const current=state.mapList.find(row=>row.id===state.mapId)||state.mapList[0];
+  if(state.mapTab==='collision')return renderCollision(current);
+  const viewPane=mapsViewportPane(current);
   const lists=el("div",{"data-maps-side":"",class:"ds1-maps-left","aria-label":"Map lists",
     style:"min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},mapsStrip(),mapsPane());
   const selection=el("div",{"data-maps-detail-panel":"",class:"ds1-maps-detail","aria-label":"Selection details",

@@ -391,6 +391,11 @@ window.Ds1Viewport = (() => {
     const highlight = new THREE.BoxHelper(new THREE.Object3D(), 0xffd34d);
     highlight.visible = false;
     scene.add(highlight);
+    const pointMarker = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8),
+      new THREE.MeshBasicMaterial({color:0xffd34d,depthTest:false}));
+    pointMarker.visible = false;
+    pointMarker.renderOrder = 100;
+    scene.add(pointMarker);
     const gizmo = new TransformControls(camera, canvas);
     scene.add(gizmo.getHelper());
     // Test seam: project a world point to page pixels, so drag tests
@@ -404,7 +409,7 @@ window.Ds1Viewport = (() => {
     const select = key => {
       selected = key && groups.has(key) ? key : null;
       const group = selected ? groups.get(selected) : null;
-      if (group && group.userData.part.movable) gizmo.attach(group);
+      if (group && group.userData.part.movable && hooks.transforms !== false) gizmo.attach(group);
       else gizmo.detach();
       if (group && group.children.length) {
         highlight.setFromObject(group);
@@ -502,6 +507,29 @@ window.Ds1Viewport = (() => {
     });
     const controller = {
       select,
+      point(key, position, focus = false) {
+        const group = groups.get(key);
+        pointMarker.visible = !!group && Array.isArray(position) && position.length === 3;
+        if (pointMarker.visible) {
+          group.updateWorldMatrix(true, false);
+          pointMarker.position.copy(group.localToWorld(new THREE.Vector3(...position)));
+          if (focus) {
+            const offset = camera.position.clone().sub(controls.target);
+            if (!offset.lengthSq()) offset.set(1, 0.7, 1);
+            controls.target.copy(pointMarker.position);
+            camera.position.copy(pointMarker.position).add(offset.normalize().multiplyScalar(8));
+            userMoved = true;
+          }
+        }
+        requestRender();
+      },
+      async reloadCollision(model) {
+        const response = await fetch(`/api/map/geometry?map=${encodeURIComponent(mapId)}&model=${encodeURIComponent(model)}`);
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || response.statusText);
+        if (!data.meshes?.length) throw new Error(data.notes?.join('; ') || 'No collision geometry returned');
+        return ingest([[model, data]], true);
+      },
       focus(focusKey) {
         const group = focusKey && groups.get(focusKey);
         if (!group) return false;
@@ -605,6 +633,8 @@ window.Ds1Viewport = (() => {
       for (const mat of collisionMats.values()) mat.dispose();
       for (const item of disposable) item.dispose();
       highlight.dispose();
+      pointMarker.geometry.dispose();
+      pointMarker.material.dispose();
       lightGeo.dispose();
       lightMat.dispose();
     };
@@ -642,7 +672,7 @@ window.Ds1Viewport = (() => {
       }
       progress.replaceChildren(LexeditorUI.loadingStatus(`Loading models ${done}/${total}`));
     };
-    const ingest = async batch => {
+    const ingest = async (batch, replace = false) => {
       if (mine !== session || !host.isConnected) return false;
       mountCanvas();
       const fresh = new Map();
@@ -664,9 +694,12 @@ window.Ds1Viewport = (() => {
         }
       await Promise.all([...freshLit.values()].map(([tex, png]) => lightTextureFor(tex, png)));
       if (mine !== session || !host.isConnected) return false;
-      for (const [name, data] of batch) {
-        geometries.set(name, data.meshes.map(mesh => {
+      const prepared = new Map();
+      const allocated = [];
+      try { for (const [name, data] of batch) {
+        prepared.set(name, data.meshes.map(mesh => {
           const geo = new THREE.BufferGeometry();
+          allocated.push(geo);
           geo.setAttribute("position", new THREE.BufferAttribute(f32(mesh.positions), 3));
           if (mesh.normals) geo.setAttribute("normal", new THREE.BufferAttribute(f32(mesh.normals), 3));
           if (mesh.uv) geo.setAttribute("uv", new THREE.BufferAttribute(f32(mesh.uv), 2));
@@ -681,6 +714,16 @@ window.Ds1Viewport = (() => {
           entry.mat = materialFor(mesh, data.textures, entry.fx, isWater(mesh), isCutout(mesh));
           return entry;
         }));
+      }} catch (error) { for (const geo of allocated) geo.dispose(); throw error; }
+      for (const [name, geos] of prepared) {
+        if (replace) {
+          for (const group of groups.values()) if (group.userData.part?.model === name) {
+            for (const child of [...group.children]) if (child.userData.collisionLayer) group.remove(child);
+            group.userData.collisionFilled = false;
+          }
+          for (const entry of geometries.get(name) || []) entry.geo.dispose();
+        }
+        geometries.set(name, geos);
       }
       const names = new Set(batch.map(([name]) => name));
       for (const part of view.parts) {

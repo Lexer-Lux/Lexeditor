@@ -200,10 +200,11 @@ class CollisionStore:
         fields,links = [],[]
         bits = {'indices8':8,'indices16':16,'indices32':32}[state['document'].meshes[index]['index_field']]
         for key,value in listed['values'].items():
-            field = {'key':key,'value':value,'editable':True,'section':'Properties','type':'number','step':1}
+            field = {'key':key,'value':value,'editable':True,'section':'Properties','type':'number',
+                     'step':1,'dtype':'u32','description':''}
             if key.startswith('pos'):
-                field.update(label=f'Position {key[-1]}',min=-3.4028234663852886e38,max=3.4028234663852886e38,
-                             step=.01,help=POSITION_HELP)
+                field.update(label=f'Position {key[-1]}',minimum=-3.4028234663852886e38,maximum=3.4028234663852886e38,
+                             step=.01,dtype='f32',description=POSITION_HELP)
             elif key.startswith('vertex'):
                 label = self._vertex_name(mesh,value)
                 choices = {str(value):label}
@@ -214,7 +215,7 @@ class CollisionStore:
                               'name':label,'resolved':True})
             else:
                 label = 'Face metadata' if kind == 'faces' else f'Vertex metadata {int(key[8:])+1}'
-                field.update(label=label,min=0,max=(1 << bits)-1 if kind == 'faces' else 255,help=METADATA_HELP)
+                field.update(label=label,minimum=0,maximum=(1 << bits)-1 if kind == 'faces' else 255,description=METADATA_HELP)
             if key in old_values:
                 field['vanilla'] = old_values[key]
             fields.append(field)
