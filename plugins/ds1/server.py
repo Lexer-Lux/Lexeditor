@@ -567,9 +567,11 @@ class Handler(PluginRequestHandler):
                                     row['values']['chr'] = models[0] if models else None
                             elif tab == 'treasure':
                                 stems = MAPSTORE.stem_display_names()
+                                links = MAPSTORE.activation_maps()
                                 for row in result['rows']:
+                                    row['values']['maps'] = links.get(row['id'], [])
                                     row['values'].update(
-                                        MAPSTORE.describe_treasure(row['name'], stems))
+                                        MAPSTORE.describe_treasure(row['name'], stems, links.get(row['id'], [])))
                     else:
                         table = query.get('table', [''])[0]
                         if table.endswith('.msb'):

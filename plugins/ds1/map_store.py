@@ -227,13 +227,16 @@ class MapStore:
             return {'owner': owner, 'item': item, 'mapNames': ordered}
         return {'owner': owner, 'item': item, 'mapNames': [place] if place else []}
 
-    def describe_treasure(self, name, stems=None):
+    def describe_treasure(self, name, stems=None, link_ids=()):
         """A treasure row's directory columns: item and map names. The
         reference names carry their map as a stem prefix ('m10_01_
         church gate lever'); names without one keep the whole name."""
         if stems is None:
             stems = self.stem_display_names()
         item, display = describe_treasure_name(name, stems)
+        if link_ids:
+            return {'owner': '', 'item': item,
+                    'mapNames': list(dict.fromkeys(self.display_name(map_id) for map_id in link_ids))}
         return {'owner': '', 'item': item, 'mapNames': [display] if display else []}
 
     def _load(self, map_name):
@@ -366,6 +369,24 @@ class MapStore:
                 for lot in npc_lots.get(placement.get("npc"), ()):
                     links.setdefault(lot, set()).add(map_name)
         return {lot: sorted(maps) for lot, maps in links.items()}
+
+    def activation_maps(self):
+        """Interaction rows used by each map's explicit or inherited activations."""
+        from .msb_events import activation_parameter
+        links = {}
+        for map_name in self.maps():
+            try:
+                document = self.get(map_name)
+            except (MsbError, OSError):
+                continue
+            for item in document.events:
+                try:
+                    parameter = activation_parameter(document, item)
+                except MsbError:
+                    continue
+                if parameter is not None:
+                    links.setdefault(parameter, set()).add(map_name)
+        return {parameter: sorted(maps) for parameter, maps in links.items()}
 
     def map_counts(self):
         """Per-map NPC, enemy and drop counts for the Maps list.

@@ -3810,11 +3810,11 @@ function directoryMatches(){
   const query=state.dirQuery.toLowerCase();
   let filtered=state.dirRows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")+" "+dirRowMap(row)).toLowerCase().includes(query));
   // Local keeps only rows from the open map. Placements name their map;
-  // lots resolve through their dropping NPCs. Treasure rows link to no
-  // placements, so the toggle stays off for them.
+  // lots resolve through their dropping NPCs, and interaction rows through
+  // object activations, including the object's inherited model parameter.
   if(state.dirLocal){
     if(state.dirTab==="npcs"||state.dirTab==="enemies")filtered=filtered.filter(row=>row.table===state.mapId);
-    else if(state.dirTab==="drops")filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
+    else if(DIRECTORY_PARAM_TABS.has(state.dirTab))filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
   }
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,tabSort())||(a.id>b.id?1:a.id<b.id?-1:0));
 }
@@ -3836,9 +3836,9 @@ function directoryStrip(){
   }});
 }
 function directoryLocalRow(){
-  const supported=state.dirTab==="npcs"||state.dirTab==="enemies"||state.dirTab==="drops";
+  const supported=state.dirTab==="npcs"||state.dirTab==="enemies"||DIRECTORY_PARAM_TABS.has(state.dirTab);
   const node=LexeditorUI.pagerToggle({label:"Local?",
-    title:supported?"Show only rows from the open map":"These rows name no map yet, so Local cannot filter them",
+    title:supported?"Show only rows from the open map":"All placements already belong to the open map",
     checked:state.dirLocal,disabled:!supported,
     change:value=>{state.dirLocal=value;state.dirPage=0;refreshDirectory();}});
   node.setAttribute("data-dir-local","");

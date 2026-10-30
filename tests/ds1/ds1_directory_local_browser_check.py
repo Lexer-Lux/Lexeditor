@@ -2,7 +2,7 @@
 
 Two maps share one enemy NPC; only map A drops lot 100. Local keeps the
 open map's enemies and lots, follows map switches, composes with search,
-and stays disabled where rows name no map (shops, treasure).
+and supports interaction definitions through their object-activation events.
 """
 import sys
 import tempfile
@@ -122,8 +122,10 @@ def main():
                     for tab in ("Treasure",):
                         page.locator("[data-maps-dir] .lex-subtab-button", has_text=tab).click()
                         page.wait_for_function(f'state.dirTab==="{tab.lower()}"', timeout=30000)
-                        page.wait_for_function('document.querySelector("[data-dir-local] input").disabled',
+                        page.wait_for_function('!document.querySelector("[data-dir-local] input").disabled',
                                                timeout=30000)
+                        # These synthetic maps contain no activation events.
+                        page.wait_for_function('directoryMatches().length===0',timeout=30000)
                     # Two rows per page forces the page controls out on three
                     # rows; the stacked pager still fits the 360px panel.
                     page.evaluate("state.pageSize=2")

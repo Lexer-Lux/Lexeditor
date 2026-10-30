@@ -1,5 +1,6 @@
 """Typed MSB1 event fields. Padding and unknown event bytes stay intact."""
 import math
+import re
 import struct
 
 # name, byte offset in subtype data, storage type, optional reference list
@@ -55,8 +56,28 @@ def fields(item):
 
 
 def label(name):
-    import re
     return re.sub(r'([a-z])([A-Z])', r'\1 \2', name).capitalize().replace(' id', ' ID')
+
+
+def activation_parameter(doc, item):
+    """The interaction row used by an object-activation event, if resolvable."""
+    if item['type'] != 7:
+        return None
+    item = event(doc, ('event7', item['seq']))
+    from .msb import OBJECT_TYPES
+    part = struct.unpack_from('<i', doc.plain, item['bhead']+4)[0]
+    if not 0 <= part < len(doc.parts) or doc.parts[part]['type'] not in OBJECT_TYPES:
+        return None
+    value = struct.unpack_from('<h', doc.plain, item['bhead']+8)[0]
+    if value != -1:
+        return value if value >= 0 else None
+    # -1 inherits the object's model number. Confirmed against
+    # soulstruct-gui/darksouls1ptde/maps.py:get_field_links and retail maps.
+    model = doc.parts[part]['model']
+    if not 0 <= model < len(doc.models):
+        return None
+    match = re.match(r'^o(\d{4})(?:_|$)', doc.models[model]['name'])
+    return int(match[1]) if match else None
 
 
 def read(doc, key):
