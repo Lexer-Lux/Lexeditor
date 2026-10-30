@@ -710,7 +710,7 @@ def test_saved_project_survives_unexpected_deployment_error(tmp_path, monkeypatc
     assert result == {'tweaksNeedRebuild': True, 'tweaksError': 'bytes cannot serialize'}
 
 
-def test_optional_build_status_failure_still_returns_the_requested_records(monkeypatch, caplog):
+def test_record_requests_do_not_rescan_optional_build_status(monkeypatch):
     from types import SimpleNamespace
     from plugins.ds1 import server
     rows = [{'id':1,'table':'Magic','name':'Example','values':{}}]
@@ -720,14 +720,24 @@ def test_optional_build_status_failure_still_returns_the_requested_records(monke
     for name in ('RULES','MAPSTORE','TAESTORE','SKILLS'):
         monkeypatch.setattr(server,name,other)
     monkeypatch.setattr(server,'_warm_icon_table',lambda:None)
+    scans = []
     def unavailable(*_):
+        scans.append(True)
         raise AttributeError('Older interpreter lacks a filesystem method')
     monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
     replies = []
     server.Handler.do_GET(SimpleNamespace(path='/api/table?tab=spells',
         send_json=lambda value,status=200:replies.append((status,json.loads(json.dumps(value))))))
     assert replies[0][0] == 200 and replies[0][1]['rows'] == rows
-    assert replies[0][1]['tweaksNeedRebuild'] is True
+    assert 'tweaksNeedRebuild' not in replies[0][1] and not scans
+
+
+def test_unknown_build_status_stays_pending_without_failing_the_status_request(monkeypatch, caplog):
+    from plugins.ds1 import server
+    def unavailable(*_):
+        raise AttributeError('Older interpreter lacks a filesystem method')
+    monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
+    assert server._tweaks_flag() is True
     assert 'Older interpreter' in caplog.text
 
 

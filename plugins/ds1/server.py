@@ -650,7 +650,8 @@ class Handler(PluginRequestHandler):
                     result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count + SKILLS.dirty_count
                     result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes() + SKILLS.pending_changes()
                     result['nativeRules'] = RULES.snapshot()
-                    result['tweaksNeedRebuild'] = _tweaks_flag()
+                    # The watcher owns background freshness updates. Reading a
+                    # record must not scan every script mod in the library.
                     self.send_json(result)
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
@@ -998,7 +999,6 @@ class Handler(PluginRequestHandler):
                     result.setdefault('values', {})['ashOfWar'] = skill
                     result.setdefault('display', {})['ashOfWar'] = next((s['name'] for s in SKILLS.value['skills'] if s['id'] == skill), 'None')
                 if not path.startswith('/api/tweaks/'):
-                    result['tweaksNeedRebuild'] = _tweaks_flag()
                     result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count + SKILLS.dirty_count
                     result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes() + SKILLS.pending_changes()
                     result['nativeRules'] = RULES.snapshot()
