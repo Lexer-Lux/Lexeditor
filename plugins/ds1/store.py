@@ -63,7 +63,8 @@ class ItemStore:
             self.portable_specs = record_edits.decode(records)
             if any((self.project/relative).exists() for relative in self.portable_specs):
                 raise ValueError('A mod cannot contain both archives and record edits for the same target')
-            mod = mod_loader.Mod(self.project.name,self.project,{},self.portable_specs)
+            item_specs = {key:value for key,value in self.portable_specs.items() if key in mod_loader.FILES}
+            mod = mod_loader.Mod(self.project.name,self.project,{},item_specs)
             originals = mod_loader.vanilla_files(self.game_root,frozenset(mod.edits))
             self.portable = mod_loader.materialize_mod(mod,originals).files
         vanilla = self._vanilla_path()

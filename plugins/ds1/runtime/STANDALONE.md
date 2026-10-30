@@ -46,6 +46,10 @@ installed fields and records instead of treating a complete archive as this
 mod's intent. A mismatching field or missing record identifies that mod and
 prevents its partial deployment. Imported releases use those same records in
 the editor, including added/edited markers; saving keeps the portable format.
+Event archives also carry only changed EMEVD event records. Their unchanged
+string/link pools are anchored, independent constructor additions use the
+existing event merger, and foreign records and appended pools are preserved.
+Changes requiring relocation of opaque string arguments are refused at export.
 The format is bounded, versioned data and cannot execute a builder.
 
 Prepare the common loader package separately:
@@ -92,5 +96,5 @@ never overwritten. An unowned backup that disagrees with the installed file
 also needs reconciliation before either copy can be replaced.
 
 This implements the current drop-in/install/adopt workflow. Older issue #954's
-C-only port and rebasing the remaining map/character/event archive contributions over unrelated whole-file mods
+C-only port and rebasing the remaining map/character/script archive contributions over unrelated whole-file mods
 are separate requirements; this implementation does not claim those completed.

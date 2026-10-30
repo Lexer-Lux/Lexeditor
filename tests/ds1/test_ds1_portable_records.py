@@ -147,6 +147,15 @@ def test_stale_portable_mod_cannot_overwrite_an_external_edit(tmp_path):
     assert (mod/record_edits.FILENAME).read_bytes() == external
 
 
+def test_damaged_installed_parameters_are_not_blamed_on_portable_mods(tmp_path):
+    game,mod = setup_library(tmp_path)
+    (game/RELATIVE).write_bytes(b'damaged game file')
+    from plugins.ds1.formats import FormatError
+    with pytest.raises(FormatError):
+        mod_loader.compose_installed(game,[mod_loader.read_mod(mod,'Example')])
+    assert json.loads((mod/'mod.json').read_text())['enabled']
+
+
 def test_export_ships_sparse_records_and_reexport_preserves_them(vanilla,tmp_path):
     game,source = setup_library(tmp_path)
     (source/record_edits.FILENAME).unlink()

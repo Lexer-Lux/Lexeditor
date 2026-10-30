@@ -593,6 +593,8 @@ def test_standalone_data_merger_combines_records_and_disables_only_broken_mod(tm
 @pytest.mark.skipif(os.name != 'nt', reason='Windows private runtime')
 def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path):
     from plugins.ds1 import runtime_package,record_edits
+    from dataclasses import replace
+    from test_ds1_editor_failure_boundaries import event_fixture
     from plugins.ds1.store import RELATIVE
     from ds1_fixture import make_archive
     supplied = os.environ.get('LEXEDITOR_TEST_LOADER_PACKAGE')
@@ -602,6 +604,14 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     (game/RELATIVE).parent.mkdir(parents=True)
     (game/RELATIVE).write_bytes(make_archive())
     library.mkdir()
+    emevd,event_base,call = event_fixture()
+    event_path = Path('event/common.emevd')
+    def add_event(identity):
+        constructor = replace(event_base.events[0],instructions=event_base.events[0].instructions+(call(identity,identity),))
+        return replace(event_base,events=(constructor,event_base.events[1],
+                       emevd.Event(identity,(emevd.Instruction(2003,1,b'new'),))))
+    (game/event_path).parent.mkdir(parents=True)
+    (game/event_path).write_bytes(emevd.write(add_event(2000)))
     from plugins.ds1.formats import ItemDocument
     for mod_id,row_id,price in [('first',100,12),('second',101,24),('broken',102,36)]:
         folder = library/mod_id
@@ -614,7 +624,8 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
             (folder/RELATIVE).write_bytes(b'Broken data')
         else:
             portable = record_edits.create(RELATIVE,make_archive(),document.export())
-            (folder/record_edits.FILENAME).write_bytes(record_edits.encode({RELATIVE:portable}))
+            event = record_edits.create(event_path,emevd.write(event_base),emevd.write(add_event(row_id+901)))
+            (folder/record_edits.FILENAME).write_bytes(record_edits.encode({RELATIVE:portable,event_path:event}))
         (folder/'script').mkdir()
         (folder/'script/tweak.py').write_text('raise RuntimeError("Players never run builders")')
     foreign = ItemDocument(make_archive())
@@ -644,6 +655,7 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     assert merged.value('EquipParamGoods',100,'sellValue') == 12
     assert merged.value('EquipParamGoods',101,'sellValue') == 24
     assert merged.value('EquipParamGoods',100,'iconId') == 77
+    assert {event.id for event in emevd.read((game/event_path).read_bytes()).events} == {0,100,1001,1002,2000}
 
 
 def test_standalone_menu_failure_disables_only_its_owner(tmp_path, monkeypatch):

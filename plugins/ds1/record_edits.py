@@ -1,11 +1,14 @@
 """Portable record contributions, rebased through the existing archive adapters.
 
-The release stores only changed PARAM rows and FMG entries, with their old
-values as anchors. Materialization preserves unrelated installed fields and
+The release stores only changed PARAM rows, FMG entries and EMEVD events, with
+their old values as anchors. Materialization preserves unrelated installed fields and
 feeds ordinary archives into the same composer used by the editor.
 """
 import json
 import struct
+import base64
+import hashlib
+from functools import lru_cache
 from pathlib import Path
 
 from core.mod_library import relative_path
@@ -14,6 +17,25 @@ from . import formats, texts
 FILENAME = Path('records.lxd')
 LIMIT = 64 * 1024 * 1024
 MAX_ROWS = 100000
+
+
+def supports(relative):
+    from .mod_loader import FILES
+    from . import emevd
+    return relative in FILES or emevd.is_event_file(relative)
+
+
+@lru_cache(maxsize=128)
+def _targets(path,size,modified,changed):
+    # Cache only the small target index, never the parsed record payloads.
+    return tuple(decode(read(Path(path))))
+
+
+def targets(path):
+    from .tweak_mods import checked
+    path = checked(path)
+    stamp = path.stat()
+    return _targets(str(path),stamp.st_size,stamp.st_mtime_ns,stamp.st_ctime_ns)
 
 
 def read(path):
@@ -51,11 +73,12 @@ def decode(raw):
             or type(value['version']) is not int or value['version'] != 1
             or type(value['files']) is not dict or len(value['files']) > 128):
         raise ValueError('Unsupported record contributions')
-    from .mod_loader import FILES
     result = {}
     for name,spec in value['files'].items():
+        if len(name) > 512:
+            raise ValueError('The record contribution path is too long')
         path = relative_path(name)
-        if path not in FILES or path in result or type(spec) is not dict:
+        if not supports(path) or path in result or type(spec) is not dict:
             raise ValueError('Invalid record contribution target')
         result[path] = spec
     return result
@@ -79,8 +102,26 @@ def _header(data):
     return (data[6:10]+data[12:48]).hex()
 
 
+def validate_original(relative,original):
+    """Diagnose a failed rebase without blaming a mod for damaged game data."""
+    from . import emevd,mod_loader
+    if emevd.is_event_file(relative):
+        _event_document(original)
+    elif relative == mod_loader.RELATIVE:
+        _plain,entries = _entries(original)
+        for entry in entries:
+            if entry.name.lower().endswith('.param'):
+                mod_loader.ParamView(entry.data)
+    elif relative in mod_loader.FILES:
+        document = texts.MenuDocument if relative == texts.MENU_RELATIVE else texts.TextDocument
+        document(original)
+
+
 def create(relative,before,after):
     from . import mod_loader
+    from . import emevd
+    if emevd.is_event_file(relative):
+        return _create_events(before,after)
     if relative == mod_loader.RELATIVE:
         _base,originals = _entries(before)
         _changed,modified = _entries(after)
@@ -158,6 +199,9 @@ def materialize(relative,original,spec):
     from . import mod_loader
     if original is None:
         raise ValueError(f'{relative}: the installed baseline is missing')
+    from . import emevd
+    if emevd.is_event_file(relative):
+        return _materialize_events(original,spec)
     kind = 'params' if relative == mod_loader.RELATIVE else 'texts'
     if (type(spec) is not dict or set(spec) != {'kind','tables'} or spec['kind'] != kind
             or type(spec['tables']) is not list or len(spec['tables']) > 4096):
@@ -258,3 +302,95 @@ def materialize(relative,original,spec):
     if all(entry.data == old for entry,old in zip(entries,original_payloads)):
         return original
     return formats.deflate(original,texts.build_bnd3(plain,entries))
+
+
+def _event_document(data):
+    from . import emevd
+    return emevd.read(formats.inflate(data) if data.startswith(b'DCX\0') else data)
+
+
+def describe(files):
+    """Identity-level changes already carried by portable event records."""
+    changes = []
+    for relative,spec in files.items():
+        if spec.get('kind') != 'events':
+            continue
+        for change in _changes(spec.get('rows')):
+            changes.append({'table':f'Events ({relative.name})','id':change['id'],
+                'label':f"Event {change['id']}",'fields':['Event record'],
+                'added':change['before'] is None,'removed':change['after'] is None})
+    return changes
+
+
+def _event_bytes(event):
+    from . import emevd
+    return (base64.b64encode(emevd.write(emevd.Document((event,)))).decode('ascii')
+            if event is not None else None)
+
+
+def _event(value,identity):
+    from . import emevd
+    if value is None:
+        return None
+    if type(value) is not str or len(value) > LIMIT:
+        raise ValueError('Invalid portable event bytes')
+    document = emevd.read(base64.b64decode(value,validate=True))
+    if (len(document.events) != 1 or document.events[0].id != identity
+            or document.strings or document.linked):
+        raise ValueError('A portable event must contain only its declared event record')
+    return document.events[0]
+
+
+def _create_events(before,after):
+    a,b = _event_document(before),_event_document(after)
+    if (a.linked,a.strings) != (b.linked,b.strings):
+        raise ValueError('Event string/link changes cannot be relocated from opaque instruction arguments')
+    first,last = {event.id:event for event in a.events},{event.id:event for event in b.events}
+    rows = [{'id':key,'before':_event_bytes(first.get(key)),'after':_event_bytes(last.get(key))}
+            for key in sorted(first.keys()|last.keys()) if first.get(key) != last.get(key)]
+    return {'kind':'events','linked':list(a.linked),'stringsSize':len(a.strings),
+            'stringsHash':hashlib.sha256(a.strings).hexdigest(),'rows':rows}
+
+
+def _materialize_events(original,spec):
+    from dataclasses import replace
+    from . import emevd
+    if (type(spec) is not dict or set(spec) != {'kind','linked','stringsSize','stringsHash','rows'}
+            or spec['kind'] != 'events' or type(spec['linked']) is not list
+            or len(spec['linked']) > MAX_ROWS or any(type(item) is not int for item in spec['linked'])
+            or type(spec['stringsSize']) is not int or not 0 <= spec['stringsSize'] <= emevd.MAX_BYTES
+            or type(spec['stringsHash']) is not str or len(spec['stringsHash']) != 64):
+        raise ValueError('Invalid portable event format')
+    document = _event_document(original)
+    if (tuple(spec['linked']) != document.linked[:len(spec['linked'])]
+            or len(document.strings) < spec['stringsSize']
+            or hashlib.sha256(document.strings[:spec['stringsSize']]).hexdigest() != spec['stringsHash']):
+        raise ValueError('The event string/link pool anchor does not match')
+    events = {event.id:event for event in document.events}
+    for change in _changes(spec['rows']):
+        key = change['id']
+        before,after = (_event(change[side],key) for side in ('before','after'))
+        current = events.get(key)
+        if before is None or after is None:
+            if current not in (before,after):
+                raise ValueError(f'Event {key}: the added/removed record anchor does not match')
+            if after is None:
+                events.pop(key,None)
+            else:
+                events[key] = after
+        else:
+            if current is None:
+                raise ValueError(f'Event {key}: the record anchor is missing')
+            merged,collisions = emevd.merge(emevd.Document((before,)),[
+                ('Installed data',emevd.Document((current,))),('Mod edit',emevd.Document((after,)))])
+            if collisions:
+                raise ValueError(f'Event {key}: the edited record anchor conflicts with installed data')
+            events[key] = merged.events[0]
+    ordered = [events[event.id] for event in document.events if event.id in events]
+    existing = {event.id for event in document.events}
+    ordered.extend(events[key] for key in sorted(events.keys()-existing))
+    result = replace(document,events=tuple(ordered))
+    if result == document:
+        return original
+    plain = emevd.write(result)
+    return formats.deflate(original,plain) if original.startswith(b'DCX\0') else plain

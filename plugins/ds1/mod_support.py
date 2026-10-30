@@ -308,7 +308,10 @@ class Ds1ModAdapter:
         from . import record_edits
         if record_edits.FILENAME.as_posix() in paths:
             paths.remove(record_edits.FILENAME.as_posix())
-            paths.update(path.as_posix() for path in mod_loader.FILES)
+            for _name,folder in ordered:
+                records = folder/record_edits.FILENAME
+                if records.is_file():
+                    paths.update(path.as_posix() for path in record_edits.targets(records))
         if (game_root/'menu/menu.tpf.dcx').is_file():
             paths.add('menu/menu.tpf.dcx')
         for relative in sorted(paths):

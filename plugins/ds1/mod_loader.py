@@ -286,6 +286,9 @@ def materialize_mod(mod: Mod, originals: dict) -> Mod:
                 raise ValueError('Duplicate archive and record contributions')
             files[relative] = record_edits.materialize(relative,originals.get(relative),spec)
     except Exception as error:
+        for relative in mod.edits:
+            if originals.get(relative) is not None:
+                record_edits.validate_original(relative,originals[relative])
         raise ModBuildError([mod.folder],f'{mod.name}: {error}') from error
     return Mod(mod.name,mod.folder,files)
 
@@ -1348,7 +1351,9 @@ def describe_changes(folder: Path, game_root: Path | None):
     from . import record_edits
     portable = {}
     if (folder/record_edits.FILENAME).is_file():
-        mod = read_mod(folder,folder.name)
+        declared = record_edits.decode(record_edits.read(folder/record_edits.FILENAME))
+        changes += record_edits.describe(declared)
+        mod = Mod(folder.name,folder,{}, {path:spec for path,spec in declared.items() if path in FILES})
         originals = vanilla_files(game_root,frozenset(mod.edits))
         portable = materialize_mod(mod,originals).files
     mod_params = folder / RELATIVE
