@@ -207,7 +207,8 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path):
     encode = lambda values, dtype: base64.b64encode(struct.pack(f'<{len(values)}{dtype}', *values)).decode()
     mesh = {'positions': encode([-4., 0., -4., 4., 0., -4., 4., 0., 4., -4., 0., 4.], 'f'),
             'indices': encode([0, 1, 2, 0, 2, 3], 'I'), 'normals': '', 'mat_def': '', 'cull': False}
-    errors, requests = [], []
+    errors, requests, held = [], [], []
+    delayed = [False]
     session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
                           'LEXEDITOR_NO_MOD': '0', 'LEXEDITOR_MOD_READ_ONLY': '0'})
     session.start()
@@ -233,15 +234,26 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path):
                     for name in names:
                         layers = ['collisionHigh', 'collisionLow'] if name.startswith('h') else ['navigation'] if name.startswith('n') else [None]
                         items[name] = {'meshes': [dict(mesh, **({'layer': layer} if layer else {})) for layer in layers], 'notes': []}
+                    if names == ['m0000'] and not delayed[0]:
+                        delayed[0] = True
+                        held.append((route, items))
+                        return
                     route.fulfill(json={'items': items})
 
                 page.route('**/api/map/view?*', view)
                 page.route('**/api/map/geometries?*', geometries)
                 page.goto(session.url)
                 page.wait_for_selector('body[data-ds1-ready="true"]', timeout=60000)
-                page.locator('[data-tab="maps"]').click()
-                page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
+                with page.expect_request(lambda request: '/api/map/geometries?' in request.url and 'models=m0000' in request.url):
+                    page.locator('[data-tab="maps"]').click()
                 assert not any('models=h0000' in url or 'models=n0000' in url for url in requests)
+                page.locator('[data-viewport-host]').hover()
+                page.get_by_role('checkbox', name='Navigation', exact=True).check()
+                page.get_by_role('checkbox', name='Regions', exact=True).check()
+                assert held, 'The initial geometry request must be held while layer controls change'
+                for route, items in held:
+                    route.fulfill(json={'items': items})
+                page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
                 page.locator('[data-view-mode="wireframe"]').click()
                 page.locator('[data-viewport-host]').hover()
                 page.get_by_role('checkbox', name='High collision', exact=True).check()

@@ -345,6 +345,7 @@ window.Ds1Viewport = (() => {
       const empty = new THREE.Group();
       place(empty, part);
       if (part.kind === "Region") drawRegion(empty, part);
+      else empty.visible = false;
       root.add(empty);
       groups.set(part.key, empty);
     }
@@ -543,12 +544,18 @@ window.Ds1Viewport = (() => {
         requestRender();
       },
       setCollisionLayers(high, low) {
+        if ((high === true && !showHigh) || (low === true && !showLow)) {
+          for (const name of collisionUnique) if (!geometries.get(name)?.length) overlayAttempted.delete(name);
+        }
         showHigh = high === true;
         showLow = low === true;
         if (showHigh || showLow) loadCollision();
         else applyCollisionVisibility();
       },
       setMapOverlays(navigation, regions) {
+        if (navigation === true && !showNavigation) {
+          for (const name of navigationUnique) if (!geometries.get(name)?.length) overlayAttempted.delete(name);
+        }
         showNavigation = navigation === true;
         showRegions = regions === true;
         if (showNavigation) loadCollision();
@@ -697,7 +704,7 @@ window.Ds1Viewport = (() => {
             mesh.visible = entry.collisionLayer === "navigation" ? showNavigation : entry.collisionLayer === "collisionHigh" ? showHigh : showLow;
             group.add(mesh);
           }
-          group.userData.collisionFilled = true;
+          group.userData.collisionFilled = group.children.length > 0;
           group.updateWorldMatrix(true, true);
           continue;
         }

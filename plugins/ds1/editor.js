@@ -708,7 +708,7 @@ function commit(row,field,value,control,beforeOverride){
             }
           }
         }
-        if(row.table.endsWith(".msb")&&state.tab==="maps"&&state.mapView&&String(row.id).startsWith("region:")&&["shapeType","width","height","depth","radius"].includes(field.key)){
+        if(row.table.endsWith(".msb")&&state.tab==="maps"&&state.mapView?.map===row.table&&String(row.id).startsWith("region:")&&["shapeType","width","height","depth","radius"].includes(field.key)){
           const part=state.mapView.parts.find(entry=>entry.key===row.id);
           const fresh=updates[updates.length-1].result.row;
           const values=Object.fromEntries((fresh?.fields||[]).map(item=>[item.key,item.value]));
@@ -719,10 +719,11 @@ function commit(row,field,value,control,beforeOverride){
           }
           if(field.key==="shapeType")refreshMapsDetail();
         }
-        if(row.table.endsWith(".msb")&&field.key==="hitFilter"&&state.mapView){
+        if(row.table.endsWith(".msb")&&field.key==="hitFilter"&&state.mapView?.map===row.table){
+          const hitFilter=updates[updates.length-1].result.row.fields.find(item=>item.key==="hitFilter")?.value;
           const part=state.mapView.parts.find(entry=>entry.key===row.id);
-          if(part)part.hitFilter=value;
-          viewportCtl?.updateCollision?.(row.id,value);
+          if(part)part.hitFilter=hitFilter;
+          viewportCtl?.updateCollision?.(row.id,hitFilter);
           refreshMapSide();
         }
         if(row.table.endsWith(".msb")&&String(row.id).startsWith("light:")&&state.tab==="maps"&&state.mapView&&row.table===state.mapView.map){
@@ -3654,6 +3655,7 @@ async function reloadViewport(map,selectKey){
     viewportCtl=ctl;
     viewportCtl?.setGizmoMode?.(state.mapGizmo);
     viewportCtl?.setCollisionLayers?.(state.mapCollisionHigh===true,state.mapCollisionLow===true);
+    viewportCtl?.setMapOverlays?.(state.mapNavigation,state.mapRegions);
     if(selectKey&&viewportCtl)viewportCtl.select(selectKey);
   }
   refreshViewportBar();
@@ -4562,6 +4564,7 @@ function renderMaps(){
       viewportCtl=ctl;
       viewportCtl?.setGizmoMode?.(state.mapGizmo);
       viewportCtl?.setCollisionLayers?.(state.mapCollisionHigh===true,state.mapCollisionLow===true);
+      viewportCtl?.setMapOverlays?.(state.mapNavigation,state.mapRegions);
       if(state.mapSelected&&viewportCtl)viewportCtl.select(state.mapSelected);
       if(state.mapFocus&&viewportCtl){viewportCtl.focus(state.mapFocus);state.mapFocus=null;}
       refreshViewportBar();
