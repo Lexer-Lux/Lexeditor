@@ -76,7 +76,7 @@ def _stamp(path, limit):
         after = path.stat()
         if read != before.st_size or (after.st_size,after.st_mtime_ns,after.st_ctime_ns) != (before.st_size,before.st_mtime_ns,before.st_ctime_ns):
             return False
-        return [read,before.st_mtime_ns,before.st_ctime_ns,digest.hexdigest()]
+        return [read,digest.hexdigest()]
     except FileNotFoundError:
         return None if before is None else False
     except (OSError,ValueError):
