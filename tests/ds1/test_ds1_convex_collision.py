@@ -307,6 +307,23 @@ def test_convex_browser_edits_vertices_and_explains_derived_faces(convex_source,
                     assert len(saves)==before+1
                     stored=page.evaluate('(async()=> (await api(`/api/map/collision/state?table=${encodeURIComponent(state.collision.table)}`)).mesh.vertices.length)()')
                     assert stored==count
+                page.unroute('**/api/map/collision/state')
+                page.evaluate('navigate("maps")')
+                page.wait_for_function('state.row?.id==="v:0"')
+                pending_fields=[]
+                def hold_first_field(route):
+                    if not pending_fields:pending_fields.append(route)
+                    else:route.continue_()
+                page.route('**/api/edit',hold_first_field)
+                with page.expect_request(lambda request:request.method=='POST' and request.url.endswith('/api/edit')):
+                    page.evaluate('commit(state.row,state.row.fields.find(field=>field.key==="posX"),-3,null)')
+                page.evaluate('window.undoPendingField=fieldHistory.undo();undefined')
+                page.wait_for_function('state.pending===2')
+                pending_fields[0].continue_()
+                assert page.evaluate('window.undoPendingField')
+                assert page.evaluate('state.row.values.posX')==-2
+                assert page.evaluate('state.collision.rows.length')==4
+                assert page.evaluate('state.dirty')==0
                 assert not page.locator('.lex-important-backdrop').count()
                 assert not errors,errors
             finally:

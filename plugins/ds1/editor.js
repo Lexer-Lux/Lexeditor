@@ -83,8 +83,9 @@ async function api(path,body){
 }
 const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.message||String(error)});
 const failMount=(status,text)=>error=>{status.textContent=text;notify(error);};
-const fieldHistory={undoStack:[],redoStack:[],applying:false,
-  get canUndo(){return !this.applying&&this.undoStack.length>0;},get canRedo(){return !this.applying&&this.redoStack.length>0;},
+const fieldHistory={undoStack:[],redoStack:[],transaction:null,
+  get applying(){return this.transaction?.phase==='applying';},
+  get canUndo(){return !this.transaction&&this.undoStack.length>0;},get canRedo(){return !this.transaction&&this.redoStack.length>0;},
   record(entry){
     if(this.applying||(!entry.edits&&entry.before===entry.after))return;
     entry.at=LexeditorUI.nextHistoryTick();
@@ -98,16 +99,19 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
   undo(){return this.move('before');},
   redo(){return this.move('after');},
   move(side){
-    if(this.applying)return Promise.resolve(false);
-    this.applying=true;
+    if(this.transaction)return Promise.resolve(false);
+    const transaction=this.transaction={phase:'queued'};
     state.pending++;shell.refresh();
     const operation=edits.then(async()=>{
+      // Earlier field requests must still record their history while this
+      // action waits. Suppress feedback only while replaying the history.
+      transaction.phase='applying';
       const source=side==='before'?this.undoStack:this.redoStack;
       const target=side==='before'?this.redoStack:this.undoStack;
       const entry=source.at(-1);
       if(!entry||!await this.apply(entry,side))return false;
       source.pop();target.push(entry);return true;
-    }).finally(()=>{this.applying=false;state.pending--;shell.refresh();});
+    }).finally(()=>{this.transaction=null;state.pending--;shell.refresh();});
     edits=operation.then(()=>{});
     return operation;
   },
