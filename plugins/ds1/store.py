@@ -2,7 +2,7 @@
 import hashlib
 from pathlib import Path
 
-from core.plugin_files import atomic_write
+from core.plugin_files import atomic_write_group
 from .formats import ItemDocument, SUBTABS, ENEMY_SUBTABS, AI_SUBTABS, ATTACK_SUBTABS, EFFECT_TABLE, EFFECT_SUBTABS, STATS_SUBTABS, WORLD_SUBTABS, NPCS_SUBTABS, MISC_SUBTABS, MAX_ARCHIVE
 from . import texts
 
@@ -201,6 +201,8 @@ class ItemStore:
 
     def save(self):
         document = self.validate_save()
+        if not document.dirty_count:
+            return {'saved':True,'path':str(self.records_path if self.portable else self.output),'dirtyCount':0}
         payload = document.export()
         ItemDocument(payload)
         # Text is written only once the mod has changed some; until then the
@@ -209,21 +211,29 @@ class ItemStore:
         if names is not None: texts.TextDocument(names)
         menu = document.menu_texts.export() if document.menu_texts and (document.menu_texts.dirty or document.menu_texts.dirty_texts or self.menu_output.is_file() or texts.MENU_RELATIVE in self.portable) else None
         if menu is not None: texts.MenuDocument(menu)
-        if self.portable_specs is not None:
-            from . import deployment,record_edits
-            specs = dict(self.portable_specs)
-            for relative,raw in ((RELATIVE,payload),(texts.RELATIVE,names),(texts.MENU_RELATIVE,menu)):
-                if raw is not None:
-                    original = deployment.vanilla_source(self.game_root,relative).read_bytes()
-                    specs[relative] = record_edits.create(relative,original,raw)
-            atomic_write(self.records_path,record_edits.encode(specs))
-            self.load()
-            return {'saved':True,'path':str(self.records_path),'dirtyCount':0}
-        atomic_write(self.output, payload)
-        if names is not None: atomic_write(self.text_output, names)
-        if menu is not None: atomic_write(self.menu_output, menu)
+        outputs,expected = {},{}
+        specs = dict(self.portable_specs) if self.portable_specs is not None else None
+        # Existing targets keep their representation. New targets in a
+        # portable project stay portable; a raw archive is never duplicated
+        # into records merely because unrelated map/collision records exist.
+        for relative,raw,path,stamp in ((RELATIVE,payload,self.output,self.output_hash),
+                                       (texts.RELATIVE,names,self.text_output,self.text_output_hash),
+                                       (texts.MENU_RELATIVE,menu,self.menu_output,self.menu_output_hash)):
+            if raw is None:
+                continue
+            if specs is not None and (relative in specs or stamp is None):
+                from . import deployment,record_edits
+                original = deployment.vanilla_source(self.game_root,relative).read_bytes()
+                specs[relative] = record_edits.create(relative,original,raw)
+            else:
+                outputs[path],expected[path] = raw,stamp
+        if specs is not None and specs != self.portable_specs:
+            from . import record_edits
+            outputs[self.records_path] = record_edits.encode(specs)
+            expected[self.records_path] = self.records_hash
+        atomic_write_group(outputs,expected)
         self.load()
-        return {'saved': True, 'path': str(self.output), 'dirtyCount': 0}
+        return {'saved': True, 'path': str(self.records_path if self.portable else self.output), 'dirtyCount': 0}
 
     def discard(self):
         self.load()

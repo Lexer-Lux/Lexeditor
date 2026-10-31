@@ -272,6 +272,37 @@ def test_convex_browser_edits_vertices_and_explains_derived_faces(convex_source,
                 assert page.evaluate('state.tab')=='items'
                 assert page.evaluate('state.selected')==selected
                 assert page.evaluate('state.row.table')=='EquipParamGoods'
+                page.unroute('**/api/map/collision?**')
+                page.evaluate('navigate("maps")')
+                page.evaluate('chooseCollision({kind:"vertices"})')
+                page.wait_for_function('state.row?.id.startsWith("v:")')
+                held_states=[]
+                def hold_state(route):
+                    if route.request.method=='POST':held_states.append(route)
+                    else:route.continue_()
+                page.route('**/api/map/collision/state',hold_state)
+                saves=[]
+                page.on('request',lambda request:saves.append(request) if request.url.endswith('/api/save') else None)
+                # Save and navigation must wait for the same pending mutation,
+                # including structural undo, rather than racing a hidden POST.
+                for action,count in (("changeCollisionStructure('add')",5),("fieldHistory.undo()",4)):
+                    if page.evaluate('state.tab')!='maps':page.evaluate('navigate("maps")')
+                    page.wait_for_function('state.row?.id.startsWith("v:")')
+                    expected=len(held_states)+1
+                    with page.expect_request(lambda request:request.method=='POST' and request.url.endswith('/api/map/collision/state')):
+                        page.evaluate(f'window.meshMutation={action}; undefined')
+                    page.wait_for_function('state.pending===1')
+                    assert len(held_states)==expected
+                    before=len(saves)
+                    page.evaluate('window.meshSave=save();window.meshNavigation=navigate("items","consumables");undefined')
+                    page.wait_for_timeout(80)
+                    assert len(saves)==before
+                    held_states[-1].continue_()
+                    page.evaluate('Promise.all([meshMutation,meshSave,meshNavigation])')
+                    page.wait_for_function('state.tab==="items"&&state.row?.table==="EquipParamGoods"&&state.pending===0&&state.dirty===0')
+                    assert len(saves)==before+1
+                    stored=page.evaluate('(async()=> (await api(`/api/map/collision/state?table=${encodeURIComponent(state.collision.table)}`)).mesh.vertices.length)()')
+                    assert stored==count
                 assert not page.locator('.lex-important-backdrop').count()
                 assert not errors,errors
             finally:

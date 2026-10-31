@@ -99,8 +99,9 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
   async redo(){await edits;if(this.applying)return false;const entry=this.redoStack.at(-1);if(!entry)return false;if(!await this.apply(entry,"after"))return false;this.redoStack.pop();this.undoStack.push(entry);shell.refresh();return true;},
   async apply(entry,side){
     this.applying=true;
+    state.pending++;shell.refresh();
+    const operation=edits.then(async()=>{
     try{
-      await edits;
       let refresh=false;
       for(const edit of entry.edits||[entry]){
         if(edit.collision){
@@ -135,7 +136,10 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
       else render();
       return true;
     }catch(error){notify(error);return false;}
-    finally{this.applying=false;shell.refresh();}
+    finally{this.applying=false;state.pending--;shell.refresh();}
+    });
+    edits=operation.then(()=>{});
+    return operation;
   },
   clear(){this.undoStack=[];this.redoStack=[];shell.refresh();}};
 // Ctrl+Z lives in the shell's shortcut dispatcher, which undoes fieldHistory:
@@ -4020,13 +4024,15 @@ function collisionDetail(){
     body:[LexeditorUI.detailNote(collision?.error||`Select a ${noun}.`)]});
   return detailPanel({title:row.name,actions,body:[...fieldSections(row)].map(([title,body])=>detailSection({title,body}))});
 }
-async function changeCollisionStructure(action){
+function changeCollisionStructure(action){
   if(state.readOnly||state.rowBusy)return;
-  await edits;
   const collision=state.collision,table=collision.table,kind=collision.kind;
   if(kind==='faces'&&collision.derivedFaces)return;
   const index=Number(state.row?.id.split(':')[1]||0);
-  state.rowBusy=true;shell.refresh();
+  const token=navigation;
+  const current=()=>navigation===token&&state.tab==='maps'&&state.mapTab==='collision'&&state.collision===collision;
+  state.rowBusy=true;state.pending++;shell.refresh();
+  edits=edits.then(async()=>{
   try{
     const before=(await api(`/api/map/collision/state?table=${encodeURIComponent(table)}`)).mesh;
     const after=structuredClone(before);
@@ -4064,10 +4070,14 @@ async function changeCollisionStructure(action){
     const result=await api('/api/map/collision/state',{table,mesh:after});
     state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
     fieldHistory.record({collision:true,table,before,after,snapshotBytes});
-    state.selected=`${table}:${kind==='vertices'?'v':'f'}:${selected}`;
-    await refreshCollision();
+    if(current()){
+      state.selected=`${table}:${kind==='vertices'?'v':'f'}:${selected}`;
+      await refreshCollision();
+    }
   }catch(error){notify(error);}
-  finally{state.rowBusy=false;render();}
+  finally{state.rowBusy=false;state.pending--;render();}
+  });
+  return edits;
 }
 function renderCollision(current){
   const collision=state.collision||{rows:[],error:'Choose Collision again to load this map.',kind:'vertices'};
