@@ -298,13 +298,13 @@ LOADER_DESCRIPTION = ("Installs Lexeditor's loader, which applies executable pat
 
 
 def loader_credits() -> str:
-    """Keep the mod's runtime notices sourced from the canonical plugin credits."""
-    text = Path(__file__).with_name("credits.md").read_text(encoding="utf-8")
-    headings = ("Executable tweak loader", "Debug mode (runtime/lexeditor_ds1_debug.c)",
-                "Online loader protection")
-    sections = {part.split("\n", 1)[0]: "## " + part.strip()
-                for part in text.split("\n## ")[1:]}
-    return "\n\n".join(sections[heading] for heading in headings)
+    """Short attribution here; complete notices stay in the plugin's legal credits."""
+    return ("MetalCrow and Ainsley Harriott — anti-ban code from Dark Souls 1 PvP Fixes and Overhaul (AGPLv3).\n"
+            "https://github.com/metal-crow/Dark-Souls-1-Overhaul\n\n"
+            "tremwil — dearxan, used to disable Arxan (MIT / Apache-2.0).\n"
+            "https://github.com/tremwil/dearxan\n\n"
+            "Full license notices: Lexeditor → Information → Credits → Dark Souls Remastered.\n"
+            "https://github.com/Lexer-Lux/Lexeditor/blob/master/plugins/ds1/credits.md")
 
 
 def _loader_folder(root: Path) -> Path | None:
