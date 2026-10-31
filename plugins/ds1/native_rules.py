@@ -56,6 +56,25 @@ def _read_optional(path, limit):
     return raw
 
 
+def decode_settings(raw):
+    try:
+        content = json.loads(raw)
+    except (ValueError,RecursionError) as error:
+        raise ValueError('Unsupported native-rule settings file') from error
+    if (type(content) is not dict or set(content) != {'schema','rules'}
+            or type(content['schema']) is not int or content['schema'] != 1):
+        raise ValueError('Unsupported native-rule settings file')
+    return settings(content['rules'])
+
+
+def patch_spec(original, value):
+    parts = [load_bands_patch.patch_spec(original,load_bands.native_projection(value)),
+             levelup_gains.patch_spec(original,value['levelupGains'])]
+    return {'version':max(part['version'] for part in parts),
+            'islands':[island for part in parts for island in part['islands']],
+            'hooks':[hook for part in parts for hook in part['hooks']]}
+
+
 class NativeRules:
     def __init__(self, game_root, project=None, read_only=True):
         self.game_root = tweak_mods.checked(Path(game_root))
@@ -81,11 +100,7 @@ class NativeRules:
         self.legacy = None
         raw = _read_optional(self._path(), SETTINGS_LIMIT)
         if raw is not None:
-            content = json.loads(raw)
-            if (type(content) is not dict or set(content) != {"schema", "rules"}
-                    or type(content["schema"]) is not int or content["schema"] != 1):
-                raise ValueError("Unsupported native-rule settings file")
-            return settings(content["rules"]), digest(raw)
+            return decode_settings(raw), digest(raw)
         # Read the predecessor's draft settings without ever overwriting them.
         legacy_raw = _read_optional(self.project / LEGACY_FILE, SETTINGS_LIMIT)
         self.legacy = None
@@ -122,10 +137,11 @@ class NativeRules:
 
     def save(self):
         self.validate_save()
-        if self.dirty_count:
+        if self.dirty_count or self.legacy is not None and self.saved_hash is None:
             raw = (json.dumps({"schema": 1, "rules": self.value}, indent=2, allow_nan=False) + "\n").encode()
             atomic_write(self._path(), raw)
             self.saved, self.saved_hash = deepcopy(self.value), digest(raw)
+            self.legacy = None
         return self.snapshot()
 
     def discard(self):
@@ -159,21 +175,24 @@ class NativeRules:
                 "native": dict(self.live), "migration": migration}
 
     def row_modified(self, row_id):
-        """Whether this session changed the native rule row."""
+        """Whether an existing rule differs from the game's original values."""
         if row_id >= 1001:
-            saved = {band["id"]: band for band in self.saved["bands"]}
+            original = {band["id"]: band for band in DEFAULTS["bands"]}
             current = next((band for band in self.value["bands"] if band["id"] == row_id - 1000), None)
-            return current is None or saved.get(row_id - 1000) != current
+            return row_id - 1000 in original and original[row_id - 1000] != current
         if row_id in levelup_gains.ROW_IDS.values():
             output = next(name for name, identity in levelup_gains.ROW_IDS.items()
                           if identity == row_id)
-            return self.value["levelupGains"][output] != self.saved["levelupGains"][output]
+            return self.value["levelupGains"][output] != DEFAULTS["levelupGains"][output]
         if row_id == 200:
-            return (self.value["specialLight"] != self.saved["specialLight"]
-                    or self.value["forcedRecovery"] != self.saved["forcedRecovery"])
+            return (self.value["specialLight"] != DEFAULTS["specialLight"]
+                    or self.value["forcedRecovery"] != DEFAULTS["forcedRecovery"])
         if row_id == 0:
-            return self.value["baseRecovery"] != self.saved["baseRecovery"]
+            return self.value["baseRecovery"] != DEFAULTS["baseRecovery"]
         raise ValueError("Unknown native rule identity")
+
+    def row_created(self, row_id):
+        return row_id >= 1001 and not any(band['id'] == row_id-1000 for band in DEFAULTS['bands'])
 
     def list_rows(self, tab):
         if tab == "levelup":
@@ -191,6 +210,7 @@ class NativeRules:
                     label += f" to {upper:g}%"
                 result.append({"id": 1000 + band["id"], "table": "NativeRules",
                                "name": band["name"], "range": label,
+                               "created": self.row_created(1000 + band["id"]),
                                "modified": self.row_modified(1000 + band["id"])})
                 lower = upper
             return result
@@ -203,19 +223,29 @@ class NativeRules:
         raise ValueError("Unknown native-rules tab")
 
     def read_row(self, row_id):
+        row = self._row(row_id,self.value)
+        row['created'] = self.row_created(row_id)
+        row['modified'] = self.row_modified(row_id)
+        original = {} if row['created'] else {field['key']:field['value']
+                                               for field in self._row(row_id,DEFAULTS)['fields']}
+        for field in row['fields']:
+            field['vanilla'] = original.get(field['key'])
+        return row
+
+    def _row(self, row_id, value):
         if type(row_id) is not int:
             raise ValueError("Invalid native rule identity")
         if row_id >= 1001:
-            return encumbrance.row(row_id - 1000, self.value, read_only=self.read_only)
+            return encumbrance.row(row_id - 1000, value, read_only=self.read_only)
         if row_id in levelup_gains.ROW_IDS.values():
             output = next(key for key, identity in levelup_gains.ROW_IDS.items()
                           if identity == row_id)
-            return levelup_gains.row(output, self.value, read_only=self.read_only)
+            return levelup_gains.row(output, value, read_only=self.read_only)
         if row_id == 200:
-            return encumbrance.overrides(self.value, read_only=self.read_only)
+            return encumbrance.overrides(value, read_only=self.read_only)
         if row_id == 0:
             field = encumbrance.number("baseRecovery", "Base regeneration (stamina/second)",
-                self.value["baseRecovery"], 0, 200,
+                value["baseRecovery"], 0, 200,
                 "Sets recovery before active effect bonuses and load penalties. The original rate is 45. Save and Apply to use this value.")
             field["disabled"] = self.read_only
             return {"id": 0, "table": "NativeRules", "name": "Stamina", "fields": [field]}
@@ -271,11 +301,7 @@ class NativeRules:
 
     def _contribution(self, original):
         self.validate_save()
-        parts = [load_bands_patch.patch_spec(original, load_bands.native_projection(self.saved)),
-                 levelup_gains.patch_spec(original, self.saved["levelupGains"])]
-        spec = {"version": max(part["version"] for part in parts),
-                "islands": [island for part in parts for island in part["islands"]],
-                "hooks": [hook for part in parts for hook in part["hooks"]]}
+        spec = patch_spec(original,self.saved)
         if not spec["hooks"] and not spec["islands"]:
             return None
         encoded = json.dumps(self.saved, sort_keys=True, separators=(",", ":")).encode()
@@ -311,14 +337,45 @@ class NativeRules:
         self.validate_save()
         if self.dirty_count or store.get().dirty_count:
             raise ValueError("Save or discard all changes before applying")
-        if self._needs_native():
-            tweak_mods.ensure_game_closed()
+        tweak_mods.ensure_game_closed()
+        library = tweak_mods.checked(tweak_mods.mods_root()).resolve()
+        if self.project.resolve().parent == library and (self.project/'mod.json').is_file():
+            from core import mod_requires, mods_service
+            from core.mod_builds import activate_with_recovery
+            from .mod_support import Ds1ModAdapter
+            identity = mod_requires.mod_id(self.project)
+            mod_requires.check_changes(library,{identity:True})
+            metadata = self.project/'mod.json'
+            before = metadata.read_bytes()
+            mods_service.set_enabled(self.project,True)
+            switched = metadata.read_bytes()
+            adapter = Ds1ModAdapter()
+            adapter.attach_context(project_root=self.project,library_root=library,game_root=self.game_root)
+            try:
+                result = activate_with_recovery(adapter,[Path(row['path']) for row in mods_service.library_rows(library)
+                                                         if row['enabled']],self.game_root)
+            except Exception:
+                if metadata.read_bytes() == switched:
+                    atomic_write(metadata,before)
+                raise
+            return {**self.deployment_status(),'disabledMods':result['disabledMods']}
         with tweak_mods.locked(self.game_root):
             return self._apply_locked(store)
 
     def _apply_locked(self, store):
         source = self._preflight_params(store)
-        plan = tweak_mods.prepare(self.game_root, project=self._contribution) if self._needs_native() else None
+        from . import mod_loader
+        needs_plan = self._needs_native()
+        if not needs_plan:
+            from core import mods_service
+            ordered = [(row['name'], Path(row['path'])) for row in mods_service.library_rows(tweak_mods.mods_root())
+                       if row['enabled']]
+            if self.project is not None and not any(folder.resolve() == self.project.resolve() for _,folder in ordered):
+                ordered.append((self.project.name,self.project))
+            needs_plan = mod_loader.has_menu_contributions(ordered) or any(
+                tweak_mods.checked(path).is_file() for managed in (tweak_mods.LAYOUT, *tweak_mods.ESD)
+                for path in (managed.manifest(self.game_root), deployment._marker_path(self.game_root,Path(managed.relative))))
+        plan = tweak_mods.prepare(self.game_root, project=self._contribution) if needs_plan else None
 
         def checked_source(current):
             self.validate_save()
@@ -329,8 +386,8 @@ class NativeRules:
 
         # Every enabled mod is combined with this one over the game's own
         # files, before anything installed is touched.
-        from . import mod_loader
-        composition, _mods = mod_loader.build(self.game_root, tweak_mods.mods_root(), self.project)
+        composition, _mods = mod_loader.build(self.game_root, tweak_mods.mods_root(), self.project,
+                                             menu_files=plan['files'] if plan is not None else None)
         # Preflight again after building scripts, before touching installed data.
         checked_source(_read_optional(self.project / RELATIVE, MAX_ARCHIVE))
         if plan is not None:
@@ -355,30 +412,41 @@ class NativeRules:
     def restore(self):
         # Original restoration never changes project values or tweak switches.
         shared = any(tweak_mods.checked(self.game_root / name).exists() for name in tweak_mods.OWNED_FILES)
+        shared = shared or any(tweak_mods.checked(path).exists() for managed in (tweak_mods.LAYOUT, *tweak_mods.ESD)
+                               for path in (managed.manifest(self.game_root),
+                                            deployment._marker_path(self.game_root, Path(managed.relative))))
         if shared:
-            tweak_mods.restore(self.game_root)
-        elif legacy_native.checked(self.game_root / legacy_native.BACKUP).exists():
-            legacy_native.install(self.game_root, legacy_native.DEFAULT_RULES)
-        deployment.disable(self.game_root)
+            tweak_mods.ensure_game_closed()
+            with tweak_mods.locked(self.game_root):
+                # Transfer old dual-writer menu journals before the data
+                # transaction owns its lock. Both paths keep tweak -> data order.
+                tweak_mods.claim_menu_files(self.game_root)
+                deployment.disable(self.game_root,after_restore=lambda:tweak_mods._restore_locked(self.game_root))
+        else:
+            deployment.disable(self.game_root)
         return self.deployment_status()
 
     def deployment_status(self):
         result = deployment.status(self.game_root, self.project)
+        if self.project is not None and (self.project/SETTINGS_FILE).is_file():
+            result['sourceReady'] = True
         result["native"] = tweak_mods.status(self.game_root)
-        result["legacyRestoreAvailable"] = False
-        if not result["native"]["backupOk"]:
-            old_backup = tweak_mods.checked(self.game_root / legacy_native.BACKUP)
-            if old_backup.exists():
-                try:
-                    legacy_native.inspect(self.game_root)
-                    result["legacyRestoreAvailable"] = True
-                except (ValueError, RuntimeError, OSError):
-                    pass
         result["nativeRules"] = self.snapshot()
         current = result["native"].get("project")
         encoded = json.dumps(self.saved, sort_keys=True, separators=(",", ":")).encode()
         active = bool(current and self.project and current["path"] == str(self.project.resolve()))
+        stale = bool(active and current['settingsHash'] != digest(encoded))
+        built = result['native'].get('built') or {}
+        if not active and self.project is not None and built:
+            from core import mod_requires
+            try:
+                identity = mod_requires.mod_id(self.project)
+                if identity in built and (self.project/SETTINGS_FILE).is_file():
+                    active = True
+                    stale = built[identity] != tweak_mods.build_fingerprint(self.project)
+            except (ValueError,OSError):
+                stale = True
         result["nativeProjectActive"] = active
-        result["nativeStale"] = bool(active and current["settingsHash"] != digest(encoded))
+        result["nativeStale"] = stale
         result["stale"] = bool(result["stale"] or result["nativeStale"])
         return result

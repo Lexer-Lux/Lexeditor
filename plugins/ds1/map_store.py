@@ -5,12 +5,13 @@ import hashlib
 import re
 from pathlib import Path
 
-from core.plugin_files import atomic_write
+from core.plugin_files import atomic_write_group
 
-from . import deployment
+from . import deployment, record_edits
 from .formats import FormatError
 from .msb import ENEMY_TYPES, MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError, PLAYER_TYPE
 from .store import MARKER, digest
+from .shops import is_merchant
 
 
 # A map file carries the areas numbered for it: mAA_BB_*.msb owns the
@@ -26,6 +27,10 @@ EVENT_PARAM_LINKS = {
     'activationItem': ('goods', 'EquipParamGoods'),
     'activationParam': ('catalog', 'ObjActParam'),
 }
+
+
+def _is_npc(npc, types):
+    return types.get(npc) == 2 or is_merchant(npc)
 
 
 def parse_key(key):
@@ -133,6 +138,8 @@ class MapStore:
         self.vanilla_docs = {}
         self.hashes = {}
         self._npc_models = None
+        from .collision_store import CollisionStore
+        self.collisions = CollisionStore(self.game_root,self.project,self.writable)
 
     def writable(self):
         if self.read_only:
@@ -227,13 +234,16 @@ class MapStore:
             return {'owner': owner, 'item': item, 'mapNames': ordered}
         return {'owner': owner, 'item': item, 'mapNames': [place] if place else []}
 
-    def describe_treasure(self, name, stems=None):
+    def describe_treasure(self, name, stems=None, link_ids=()):
         """A treasure row's directory columns: item and map names. The
         reference names carry their map as a stem prefix ('m10_01_
         church gate lever'); names without one keep the whole name."""
         if stems is None:
             stems = self.stem_display_names()
         item, display = describe_treasure_name(name, stems)
+        if link_ids:
+            return {'owner': '', 'item': item,
+                    'mapNames': list(dict.fromkeys(self.display_name(map_id) for map_id in link_ids))}
         return {'owner': '', 'item': item, 'mapNames': [display] if display else []}
 
     def _load(self, map_name):
@@ -245,9 +255,18 @@ class MapStore:
         if source.stat().st_size > MAX_MAP:
             raise ValueError("The map file is too large.")
         raw = source.read_bytes()
+        source_hash = hashlib.sha256(raw).hexdigest()
+        records = getattr(self.item_store,'portable_specs',None)
+        if records is None:
+            records = record_edits.project_specs(self.project)
+        portable = records.get(MAP_DIR/map_name)
+        if portable is not None:
+            if output is not None and output.exists():
+                raise ValueError('A mod cannot contain both a map archive and record edits for the same target')
+            raw = record_edits.materialize(MAP_DIR/map_name,raw,portable)
         self.docs[map_name] = MsbDocument(raw, map_name)
         self.hashes[map_name] = {"source": source, "output": output, "vanilla": vanilla,
-                                 "source_hash": hashlib.sha256(raw).hexdigest(),
+                                 "source_hash": source_hash, 'record_spec':portable,
                                  "vanilla_hash": digest(vanilla),
                                  "output_hash": digest(output) if output else None}
 
@@ -257,6 +276,12 @@ class MapStore:
         if map_name not in self.docs:
             self._load(map_name)
         return self.docs[map_name]
+
+    def model_geometry(self, map_name, model, known=None):
+        from . import viewport
+        if model['type'] == 5:
+            return self.collisions.geometry(map_name,model['name'])
+        return viewport.model_geometry(self.game_root,self.project,map_name,model,known)
 
     def _vanilla_doc(self, map_name):
         if map_name not in self.vanilla_docs:
@@ -367,11 +392,29 @@ class MapStore:
                     links.setdefault(lot, set()).add(map_name)
         return {lot: sorted(maps) for lot, maps in links.items()}
 
+    def activation_maps(self):
+        """Interaction rows used by each map's explicit or inherited activations."""
+        from .msb_events import activation_parameter
+        links = {}
+        for map_name in self.maps():
+            try:
+                document = self.get(map_name)
+            except (MsbError, OSError):
+                continue
+            for item in document.events:
+                try:
+                    parameter = activation_parameter(document, item)
+                except MsbError:
+                    continue
+                if parameter is not None:
+                    links.setdefault(parameter, set()).add(map_name)
+        return {parameter: sorted(maps) for parameter, maps in links.items()}
+
     def map_counts(self):
         """Per-map NPC, enemy and drop counts for the Maps list.
 
-        A placed Enemy of npcType 2 is an NPC; every other placed Enemy
-        is an enemy, mirroring the directory's own predicates. Drops
+        Friendly characters and known merchants are NPCs, matching the
+        directory and the character editor. Other placed enemies are foes. Drops
         count the lots whose dropping NPCs stand in the map. Unreadable
         maps report zeros rather than hiding the readable ones.
         """
@@ -390,7 +433,7 @@ class MapStore:
             for placement in placements:
                 if placement.get('kind') not in ('Enemy', 'Dummy enemy'):
                     continue
-                if types.get(placement.get('npc')) == 2:
+                if _is_npc(placement.get('npc'), types):
                     npcs += 1
                 else:
                     enemies += 1
@@ -463,6 +506,7 @@ class MapStore:
                   "rotX": placement["rot"][0], "rotY": placement["rot"][1], "rotZ": placement["rot"][2],
                   "scaleX": placement["scale"][0], "scaleY": placement["scale"][1], "scaleZ": placement["scale"][2],
                   "npcId": npc, "npcType": types.get(npc) if npc is not None else None,
+                  'isNpc':_is_npc(npc,types),
                   "who": who,
                   "mapNames": [self.display_name(map_name)]}
         display = {"npcId": enemy if enemy else (f"Unknown ({npc})" if npc is not None else "")}
@@ -711,7 +755,7 @@ class MapStore:
 
     @property
     def dirty_count(self):
-        return sum(document.dirty_count for document in self.docs.values())
+        return sum(document.dirty_count for document in self.docs.values()) + self.collisions.dirty_count
 
     def pending_changes(self):
         _ids, names, _types = self._npc()
@@ -749,13 +793,16 @@ class MapStore:
             for gone in document.removed:
                 changes.append({"label": f"{map_name} {gone['name']}, {gone['kind']} (removed)",
                                 "before": f"{gone['type']}:{gone['id']}", "after": "removed"})
-        return changes
+        return changes + self.collisions.pending_changes()
 
     def validate_save(self):
         from .tweak_mods import checked
         self.writable()
+        records = record_edits.project_specs(self.project)
         for map_name, document in self.docs.items():
             entry = self.hashes[map_name]
+            if records.get(MAP_DIR/map_name) != entry['record_spec']:
+                raise ValueError('The mod map records changed outside Lexeditor. Reopen it before saving.')
             vanilla = deployment.vanilla_source(self.game_root, MAP_DIR / map_name)
             for path in (entry["source"], vanilla, entry["output"]):
                 if path is not None:
@@ -764,11 +811,16 @@ class MapStore:
                 raise ValueError("The map changed outside Lexeditor. Reopen it before saving.")
             if digest(entry["output"]) != entry["output_hash"]:
                 raise ValueError("The mod map changed outside Lexeditor. Reopen it before saving.")
+        self.collisions.validate_save()
         return True
 
     def save(self):
         self.validate_save()
         from .tweak_mods import checked
+        records_path = checked(self.project/record_edits.FILENAME)
+        records_raw = record_edits.read(records_path) if records_path.is_file() else None
+        records = record_edits.decode(records_raw) if records_raw is not None else {}
+        outputs,expected,records_changed = self.collisions.prepare_save(records)
         for map_name, document in self.docs.items():
             if not document.dirty_count:
                 continue
@@ -778,17 +830,29 @@ class MapStore:
                 raise ValueError("The output path leaves the mod project or enters the installed game.")
             payload = document.export()
             MsbDocument(payload, map_name)
-            output.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write(output, payload)
+            relative = MAP_DIR/map_name
+            if self.hashes[map_name]['record_spec'] is not None:
+                original = deployment.vanilla_source(self.game_root,relative).read_bytes()
+                records[relative] = record_edits.create(relative,original,payload)
+                records_changed = True
+                continue
+            outputs[output] = payload
+            expected[output] = self.hashes[map_name]['output_hash']
+        if records_changed:
+            outputs[records_path] = record_edits.encode(records)
+            expected[records_path] = hashlib.sha256(records_raw).hexdigest() if records_raw is not None else None
+        atomic_write_group(outputs,expected)
         self.docs = {}
         self.vanilla_docs = {}
         self.hashes = {}
         self._npc_models = None
-        return {"saved": True, "dirtyCount": 0}
+        self.collisions.discard()
+        return {"saved": True, "dirtyCount": 0, 'recordsChanged':records_changed}
 
     def discard(self):
         self.docs = {}
         self.vanilla_docs = {}
         self.hashes = {}
         self._npc_models = None
+        self.collisions.discard()
         return {"discarded": True}

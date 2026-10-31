@@ -104,9 +104,9 @@ def api(game, library, monkeypatch, tmp_path):
                             get=lambda: SimpleNamespace(dirty_count=0, pending_changes=lambda: []))
     rules = SimpleNamespace(validate_save=lambda: None, save=lambda: None, discard=lambda: {},
                             dirty_count=0, pending_changes=lambda: [], snapshot=lambda: {})
-    maps = SimpleNamespace(validate_save=lambda: None, save=lambda: None, discard=lambda: {},
+    maps = SimpleNamespace(validate_save=lambda: None, save=lambda: {'recordsChanged':False}, discard=lambda: {},
                            dirty_count=0, pending_changes=lambda: [])
-    taes = SimpleNamespace(validate_save=lambda: None, save=lambda: None, discard=lambda: {},
+    taes = SimpleNamespace(validate_save=lambda: None, save=lambda: {'recordsChanged':False}, discard=lambda: {},
                            dirty_count=0, pending_changes=lambda: [])
     monkeypatch.setattr(ds1_server, "STORE", store)
     monkeypatch.setattr(ds1_server, "RULES", rules)
@@ -722,6 +722,23 @@ def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkey
     monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-two')
     tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
     assert len(calls) == 4
+
+
+def test_menu_cache_tracks_compiled_esd_argument_bytes(tmp_path, monkeypatch):
+    calls=[]
+    def compose(original,specs,*args):
+        argument=specs[0]['changes'][0]['commands'][0]['arg_bytes'][0]
+        calls.append(argument)
+        return original+argument
+    monkeypatch.setattr(tweak_mods.menu_scripts,'compose',compose)
+    managed=next(iter(tweak_mods.ESD))
+    specs=[{'owner':'example','changes':[{'commands':[{'arg_bytes':[b'\x00\xff']}]}]}]
+    assert tweak_mods._compose_menu(b'vanilla',specs,managed,tmp_path)==b'vanilla\x00\xff'
+    assert tweak_mods._compose_menu(b'vanilla',specs,managed,tmp_path)==b'vanilla\x00\xff'
+    assert calls==[b'\x00\xff']
+    specs[0]['changes'][0]['commands'][0]['arg_bytes']=[b'\x00\xfe']
+    assert tweak_mods._compose_menu(b'vanilla',specs,managed,tmp_path)==b'vanilla\x00\xfe'
+    assert calls==[b'\x00\xff',b'\x00\xfe']
 
 
 def test_same_size_same_timestamp_script_edit_is_not_hidden_by_bytecode(game, library):

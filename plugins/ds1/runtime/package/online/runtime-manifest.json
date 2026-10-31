@@ -1,11 +1,20 @@
 {
   "file": "dinput8.dll",
-  "sha256": "0dea27b1e5f6bf5104b154fb1e7d015010be1823657dab376176da05dd61da2a",
-  "size": 1485312,
-  "sourceSha256": "f56f87b0560eaa775c1680bcc8ff156b148bb08029ac6f04dc8b268af758b49a",
+  "sha256": "8ea1e10249d8099f5229bc20ad47b0c1358cc6490901907ab6341d5bd03f4dd3",
+  "size": 1506304,
+  "sourceSha256": "d2a5d9050b5f61a13cab18ffbcd4fe179a477a804e22c69bc71f5580798eb84b",
   "compiler": "msvc (Build Tools 2022)",
   "dearxan": "0.5.6",
   "overhaulRevision": "2a3d8cbe2acee663bef03c7be4f968dbb68f951f",
   "license": "AGPL-3.0-only",
-  "gameSha256": "a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b"
+  "gameSha256": "a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b",
+  "previousSha256": [
+    "e0cc56507c5c6cfcda6a43de5fead7e29e7b736b5a9d47084a21f8bd0a87ed48",
+    "e55711abd23a8435b3aed980250f3514d499e63e141aa1656728dc7025eb3fba",
+    "0dea27b1e5f6bf5104b154fb1e7d015010be1823657dab376176da05dd61da2a",
+    "a46082b75b721a5990f5e1a2695e5ec091866d6f4cc29f3b6d2db335dc3ac961",
+    "40cc2c4f2ef12d022f9ed4c6d1d5c8f692a7c51dc079269b954c030d96d04932",
+    "1b49f4edbc0bdbe1d8ed37c49ecab20f71d49fbebd74f928173d1e74e62040aa",
+    "7f38cd719c7e2dd21864bee66ebbdcf0e943722ba2667f33bca5ec54bff7b007"
+  ]
 }

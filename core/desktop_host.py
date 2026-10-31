@@ -1767,6 +1767,35 @@ class HostApi:
         from core.runtime_bootstrap import user_data_dir
         return mods_service.Onboarding(user_data_dir() / "onboarding.json")
 
+    def unmanaged_mods(self, plugin_id: str) -> dict:
+        adapter = self._mod_adapter(plugin_id)
+        game = self._installations.snapshot(plugin_id).get('root') or ''
+        discover = getattr(adapter, 'standalone_mods', None)
+        rows = discover(Path(game)) if game and discover else []
+        library = self._game_mods(plugin_id)
+        rows = [row for row in rows if Path(row['path']).resolve().parent != library.resolve()]
+        return {'mods': rows, 'root': str(library)}
+
+    def adopt_mod(self, plugin_id: str, path: str) -> dict:
+        from core.standalone_mods import adopt
+        adapter = self._mod_adapter(plugin_id)
+        game = self._installations.snapshot(plugin_id).get('root') or ''
+        if not game or not hasattr(adapter, 'standalone_mods'):
+            raise ValueError('Locate the game before moving a standalone mod')
+        # A move changes the next loaded mod set; use the adapter's own game
+        # guard rather than touching a folder in a running game's library.
+        guard = getattr(adapter, 'ensure_game_closed', None)
+        if guard:
+            guard()
+        configure = getattr(adapter, 'configure_library', None)
+        if configure:
+            configure(Path(game), self._game_mods(plugin_id))
+        folder = adopt(Path(path), self._game_mods(plugin_id), adapter.standalone_mods(Path(game)))
+        projects = getattr(self, '_projects', None)
+        if projects is not None:
+            projects.remap_prefix(Path(path), folder)
+        return {'path': str(folder)}
+
     def mods_overview(self, plugin_id: str) -> dict:
         """Every mod in this game's library, then Lexer's Mod modules not yet here."""
         from core import mods_service
@@ -1775,9 +1804,29 @@ class HostApi:
         result = mods_service.overview(root, plugin.lexmod)
         status = self.mod_library_status(plugin_id)
         result = {**result, "root": str(root), "canManage": bool(status.get("canManage")),
-                  "message": status.get("message", "")}
+                  "message": status.get("message", ""),
+                  "canExport": callable(getattr(self._mod_adapter(plugin_id), "export_release", None))}
         self._attach_mod_marks(plugin_id, result)
         return result
+
+    def export_mod(self, plugin_id: str, path: str) -> dict:
+        """Save a player package using this game's exporter, without activation."""
+        import webview
+        from core import mods_service
+        folder = mods_service.checked_mod(self._game_mods(plugin_id),path)
+        export = getattr(self._mod_adapter(plugin_id),'export_release',None)
+        if not callable(export):
+            raise ValueError('Standalone export is not available for this game')
+        game = self._installations.snapshot(plugin_id).get('root')
+        if not game:
+            raise ValueError('Locate the game before exporting its mod')
+        selection = self._bound_window().create_file_dialog(webview.SAVE_DIALOG,
+            save_filename=f'{folder.name}.zip',file_types=('Mod ZIP (*.zip)',),allow_multiple=False)
+        if not selection:
+            return {'cancelled':True}
+        destination = Path(selection[0] if isinstance(selection,(list,tuple)) else selection)
+        with self._mod_library_lock:
+            return export(folder,Path(game),destination)
 
     def _attach_mod_marks(self, plugin_id: str, result: dict) -> None:
         """Mark each mod with its loader's flags: conflicts plus alerts.
@@ -1841,7 +1890,12 @@ class HostApi:
         game = self._installations.snapshot(plugin_id).get('root') or None
         try:
             reported = describe(folder, Path(game) if game else None)
-            if not isinstance(reported, dict) or not isinstance(reported.get('changes', []), list):
+            if not isinstance(reported, dict):
+                raise ValueError('The record report is invalid')
+            loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}
+            for entry in result['files']:
+                entry['loaded'] = entry['relative'].casefold() in loaded
+            if not isinstance(reported.get('changes', []), list):
                 raise ValueError('The record report is invalid')
             # A derived description is never allowed to fail serialization of
             # the host response, including the Files tab beside these records.
@@ -1850,7 +1904,6 @@ class HostApi:
             if any(not isinstance(row, dict) for row in changes):
                 raise ValueError('The record report has invalid rows')
             total = int(reported.get('total', len(changes)))
-            loaded = {str(entry).casefold() for entry in reported.get('loaded', [])}
         except Exception as error:
             result['note'] = str(error)
             return result
@@ -1859,8 +1912,6 @@ class HostApi:
         result['totalChanges'] = total
         if reported.get('note'):
             result['note'] = reported['note']
-        for entry in result['files']:
-            entry['loaded'] = entry['relative'].casefold() in loaded
         return result
 
     def save_mod_details(self, plugin_id: str, path: str, details: dict) -> dict:

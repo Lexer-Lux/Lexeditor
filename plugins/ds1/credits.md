@@ -939,3 +939,8 @@ TAG0 type reader. Navigation triangle layout was checked against
 SoulsFormats `Formats/NVM.cs` (JKAnderson, MIT):
 https://github.com/JKAnderson/SoulsFormats/blob/master/SoulsFormats/Formats/NVM.cs
 No upstream implementation code or game geometry is redistributed.
+
+Object-activation default references (-1 follows the object's model number)
+were checked against Soulstruct-GUI's DS1 `MapsEditor.get_field_links` and
+the installed maps. No upstream implementation was copied:
+https://github.com/Grimrukh/soulstruct-gui/blob/main/src/soulstruct/gui/darksouls1ptde/maps.py

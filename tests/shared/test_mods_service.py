@@ -290,6 +290,16 @@ class ModContentsTests(unittest.TestCase):
         self.assertEqual(result["note"], "the archive cannot be read")
         self.assertEqual(len(result["files"]), 2)
 
+    def test_invalid_record_data_keeps_independently_reported_file_usage(self):
+        adapter = SimpleNamespace(describe_changes=lambda folder, game: {
+            'changes':[{'id':b'invalid JSON bytes'}], 'loaded':['data/patch.parambnd']})
+        result = self.contents(adapter,game=self.library)
+        self.assertEqual(result['changes'],[])
+        self.assertTrue(result['note'])
+        files = {entry['relative']:entry for entry in result['files']}
+        self.assertTrue(files['data/patch.parambnd']['loaded'])
+        self.assertFalse(files['mod.json']['loaded'])
+
     def test_truncation_passes_through(self):
         adapter = SimpleNamespace(describe_changes=lambda folder, game: {
             "changes": [], "truncated": True, "loaded": [], "note": ""})

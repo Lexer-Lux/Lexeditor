@@ -1,11 +1,10 @@
 """Hand DS1 mods from the shared library to the DS1 mod loader.
 
 Switching a mod on or off in the Mods tab applies the new set at once, the
-same way the editor's Apply does: tweak mods are composed onto the original
-executable (tweak_mods.py), and data mods are combined over the game's own
-parameter, item-name, map and character files (mod_loader.py), all under
-one lock and with the executable put back if the data files cannot be
-written.
+same way the editor's Apply does: native mods prepare a loader patch stream,
+and data mods combine over the game's preserved baseline. Preparation and
+deployment share one lock; a failed data deployment rolls back the menu and
+loader plan. The game executable is read-only.
 """
 from __future__ import annotations
 
@@ -51,13 +50,55 @@ class Ds1ModAdapter:
     package_types = ("folder", "zip")
     context: dict[str, str] = {}
 
-    REPORT_VERSION = 1
+    REPORT_VERSION = 2
     REPORT_LIMIT = 2 * 1024 * 1024
+
+    ensure_game_closed = staticmethod(tweak_mods.ensure_game_closed)
+    configure_library = staticmethod(tweak_mods.configure_library)
+
+    def export_release(self, folder: Path, game_root: Path, destination: Path) -> dict:
+        """One player ZIP: the saved mod and common standalone loader."""
+        import os
+        import shutil
+        import tempfile
+        from . import runtime_mods, runtime_package
+        from core.mod_library import file_tree
+        destination = Path(destination)
+        if destination.exists():
+            raise ValueError('Choose a new ZIP filename; an existing file will not be replaced')
+        if destination.suffix.lower() != '.zip':
+            raise ValueError('Export the mod to a ZIP file')
+        # Package entirely outside the library/game, then publish exclusively.
+        # Export never executes author scripts or changes installed mods.
+        vanilla = deployment.vanilla_source(Path(game_root),Path(tweak_mods.EXECUTABLE.relative)).read_bytes()
+        files = file_tree(folder)  # Shared mod size/path bounds.
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        required = 2 * (runtime_package.plan()['sourceBytes'] + sum((folder/path).stat().st_size for path in files))
+        if shutil.disk_usage(destination.parent).free < required:
+            raise OSError('There is not enough free space to export this mod and its loader')
+        with tempfile.TemporaryDirectory(prefix='.lexeditor-export-',dir=destination.parent) as temporary:
+            staged = Path(temporary)
+            exported = runtime_mods.write_release(folder,staged/'mods',vanilla,game_root=game_root)
+            package = runtime_package.package(staged/'package')
+            (staged/'mods').rename(package/'mods')
+            archive = Path(shutil.make_archive(str(staged/'release'),'zip',package))
+            # Another export cannot silently replace a destination created
+            # while packaging. Windows rename fails if that name now exists.
+            with destination.open('xb') as output, archive.open('rb') as source:
+                try:
+                    shutil.copyfileobj(source,output)
+                    output.flush()
+                    os.fsync(output.fileno())
+                except Exception:
+                    output.close()
+                    destination.unlink(missing_ok=True)
+                    raise
+        return {'path':str(destination),'name':exported.name}
 
     @staticmethod
     def _report_path() -> Path:
-        from core.runtime_bootstrap import user_data_dir
-        return user_data_dir() / "cache/ds1/mod-conflicts.json"
+        from . import composition_cache
+        return composition_cache.user_root()/'mod-conflicts.json'
 
     def attach_context(self, *, project_root=None, library_root=None, game_root=None) -> None:
         values = {"projectRoot": project_root, "libraryRoot": library_root, "gameRoot": game_root}
@@ -69,6 +110,13 @@ class Ds1ModAdapter:
     def inspect(self, root: Path, files: list[Path]) -> dict:
         """Accept a DS1 data mod (its archives) or a tweak mod (its script)."""
         tweak = script_mods.is_script_mod(Path(root))
+        from . import native_rules, native_support
+        tweak = tweak or (Path(root)/native_rules.SETTINGS_FILE).is_file() or (Path(root)/native_support.FOLDER).is_dir()
+        if (Path(root) / 'runtime.lxd').is_file():
+            from .runtime_mods import read
+            tweak_mods.checked(Path(root) / 'runtime.lxd')
+            read(Path(root))
+            tweak = True
         packages, ignored = [], []
         for path in files:
             folded = path.as_posix().casefold()
@@ -84,6 +132,36 @@ class Ds1ModAdapter:
         return {"valid": not problems, "problems": problems, "packages": sorted(packages),
                 "assets": {}, "notDeployed": sorted(ignored)}
 
+    def standalone_mods(self, game_root: Path) -> list[dict]:
+        """Recognized packages only; never infer ownership of loose game files."""
+        from core.mod_library import metadata
+        from .runtime_mods import inspect, MAX_SIZE
+        game_root = tweak_mods.checked(Path(game_root)).resolve()
+        protected = set(assets.ASSET_ROOTS) | {'param', 'paramdef', 'mods'}
+        found = []
+        for root in (game_root, game_root/'mods'):
+            if not root.is_dir():
+                continue
+            tweak_mods.checked(root)
+            for folder in sorted(root.iterdir()):
+                if folder.name.startswith('.') or (root == game_root and folder.name.casefold() in protected):
+                    continue
+                try:
+                    tweak_mods.checked(folder)
+                    if not folder.is_dir() or folder.resolve().parent != root.resolve():
+                        continue
+                    payload = tweak_mods.checked(folder/'runtime.lxd')
+                    if not payload.is_file() or payload.stat().st_size > MAX_SIZE:
+                        continue
+                    inspect(payload.read_bytes())
+                    info = metadata(folder)
+                except (OSError, ValueError):
+                    continue
+                found.append({'path': str(folder), 'name': info.get('name') or folder.name})
+                if len(found) >= 128:
+                    return found
+        return found
+
     def prepare_editable(self, root: Path) -> None:
         """A new DS1 mod is a project folder: give it the project marker."""
         marker = Path(root) / MARKER
@@ -97,7 +175,7 @@ class Ds1ModAdapter:
         for row in mods_service.library_rows(self._library()):
             if Path(row["path"]).resolve() in wanted:
                 mod = mod_loader.read_mod(Path(row["path"]), row["name"])
-                if mod is not None:
+                if mod is not None and (mod.files or mod.edits):
                     mods.append(mod)
         return mods
 
@@ -116,13 +194,20 @@ class Ds1ModAdapter:
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library, cache_root=self._cache_root())
             prepared = perf_counter()
+            from . import texture_packs
+            main_texture = Path('menu/menu.tpf.dcx')
+            layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
+            menu_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
+                          if layout is not None and (game_root/main_texture).is_file() else None)
             ordered = self._ordered_mods(mods)
             try:
                 content = self._content_signature(ordered)
             except Exception:
                 content = None
             report = self._read_report(game_root, ordered)
-            reused = bool(report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered])
+            reused = bool(report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered]
+                          and report.get('menuTextureOrder') == menu_order
+                          and not mod_loader.has_menu_contributions(ordered))
             if reused:
                 # Native settings can change while every data input and
                 # installed data file stays the same. Keep that deployment.
@@ -131,14 +216,20 @@ class Ds1ModAdapter:
                 names = [name for name, _folder in ordered]
             else:
                 data = self._mods(mods)
-                composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root())
+                composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root(),
+                                                           menu_files=plan['files'])
                 conflicts, names = composition.conflicts, [mod.name for mod in data]
+                layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
+                menu_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
+                              if layout is not None and (game_root/main_texture).is_file() else None)
+                mod_loader.align_menu_textures(game_root,composition,layout)
             composed = perf_counter()
             tweak_mods.commit(game_root, plan)
             try:
                 if not reused and composition.files:
                     # The last data mod in load order owns the deployment record.
-                    deployment.apply(game_root, data[-1].folder, composed=composition.files)
+                    owner = data[-1].folder if data else Path(mods[-1]) if mods else None
+                    deployment.apply(game_root, owner, composed=composition.files)
                 elif not reused and any(deployment.status(game_root, None).get(key) for key in ("enabled", "everApplied")):
                     deployment.disable(game_root)
             except Exception:
@@ -150,7 +241,8 @@ class Ds1ModAdapter:
         timings = {'prepareSeconds': prepared - started, 'compositionSeconds': composed - prepared,
                    'deploymentSeconds': finished - composed, 'activationSeconds': finished - started,
                    'reusedInstalledData': reused, 'scripts': plan.get('scripts', []), 'menus': plan.get('menus', [])}
-        self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content, timings=timings)
+        self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content, timings=timings,
+                          menu_order=menu_order)
         return {"activated": [Path(path).name for path in mods],
                 "dataMods": names, "conflicts": len(conflicts), 'timings': timings}
 
@@ -216,10 +308,26 @@ class Ds1ModAdapter:
     def _report_key(cls, game_root: Path, ordered) -> str:
         content = cls._content_signature(ordered)
         originals = []
-        for relative in sorted({key for _folder, _name, stamped in content for key, *_stat in stamped}):
+        # The main pack can be derived from a layout plus split TPFs without
+        # any mod carrying it. It is still part of the installed pair.
+        paths = {key for _folder, _name, stamped in content for key, *_stat in stamped}
+        from . import record_edits
+        if record_edits.FILENAME.as_posix() in paths:
+            paths.remove(record_edits.FILENAME.as_posix())
+            for _name,folder in ordered:
+                records = folder/record_edits.FILENAME
+                if records.is_file():
+                    paths.update(path.as_posix() for path in record_edits.targets(records))
+        if (game_root/'menu/menu.tpf.dcx').is_file():
+            paths.add('menu/menu.tpf.dcx')
+        for relative in sorted(paths):
             path = Path(relative)
-            for source in (game_root / path, deployment._backup_path(game_root, path),
-                           deployment._marker_path(game_root, path)):
+            sources = [game_root / path, deployment._backup_path(game_root, path),
+                       deployment._marker_path(game_root, path)]
+            managed = tweak_mods.managed_menu(path)
+            if managed is not None:
+                sources.append(managed.manifest(game_root))
+            for source in sources:
                 try:
                     stat = source.stat()
                     originals.append((str(source), stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns))
@@ -256,7 +364,7 @@ class Ds1ModAdapter:
         return self._lines_for_order([(Path(file), part, names) for file, part, names in report["conflicts"]], ordered)
 
     def _save_report(self, game_root, ordered, conflicts, *, installed=False,
-                     expected_key=None, expected_content=None, timings=None):
+                     expected_key=None, expected_content=None, timings=None, menu_order=None):
         from core.plugin_files import atomic_write
         try:
             key = self._report_key(game_root, ordered)
@@ -268,6 +376,7 @@ class Ds1ModAdapter:
                       "conflicts": [[str(row.file), row.part, list(row.mods)] for row in conflicts]}
             if installed:
                 report["installedOrder"] = [str(folder.resolve()) for _name, folder in ordered]
+                report['menuTextureOrder'] = menu_order
             if timings is not None:
                 report['timings'] = timings
             encoded = json.dumps(report).encode("utf-8")
@@ -322,7 +431,9 @@ class Ds1ModAdapter:
         for row in rows:
             folder = Path(row["path"])
             try:
-                tweak = script_mods.is_script_mod(folder)
+                from . import native_rules, native_support
+                tweak = (script_mods.is_script_mod(folder) or (folder/'runtime.lxd').is_file()
+                         or (folder/native_rules.SETTINGS_FILE).is_file() or (folder/native_support.FOLDER).is_dir())
             except (OSError, ValueError):
                 continue  # Unreadable metadata is the Mods tab's error row, not a mark.
             # Only a tweak mod's built patches are ever composed; a stray
@@ -393,7 +504,12 @@ class Ds1ModAdapter:
         if game_root is None:
             return {'changes': [], 'loaded': loaded, 'truncated': False,
                     'note': 'Locate the game to compare records against vanilla.'}
-        result = mod_loader.describe_changes(Path(folder), Path(game_root))
+        try:
+            result = mod_loader.describe_changes(Path(folder), Path(game_root))
+        except Exception as error:
+            # Record comparison is optional. Its failure cannot erase the
+            # independently known build/load inputs beside it in Files.
+            return {'changes':[], 'loaded':loaded, 'truncated':False, 'note':str(error)}
         result['loaded'] = loaded
         return result
 

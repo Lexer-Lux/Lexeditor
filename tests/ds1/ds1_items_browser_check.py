@@ -60,7 +60,9 @@ def main():
                     page.goto(session.url)
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     # Subtabs follow the shared alphabetical rule, not declaration order.
-                    expected = [key for key, _label, _table in sorted(SUBTABS, key=lambda entry: entry[1].lower())]
+                    expected = [key for key, _label, _table in sorted(
+                        SUBTABS + (('ashes-of-war','Ashes of War','WeaponSkill'),),
+                        key=lambda entry: entry[1].lower())]
                     # The strip only: record details carry panel tabs with the
                     # same marker now (an "upgrades" Upgrades tab included).
                     strip = '.lex-subtab-bar:not(.lex-tabbed-panel .lex-subtab-bar) [data-subtab]'

@@ -1,22 +1,19 @@
 """Exact-build stamina and encumbrance projections for Remastered.
 
-The legacy fixed-class format remains readable and exactly restorable. Project
+The legacy fixed-class format remains readable. Project
 defaults use its no-op path. Variable bands add a bounded table and two leaf
 selectors while preserving the existing nonleaf frames and unwind metadata.
 Only original Lexeditor instructions are encoded here, not game-code dumps.
 """
 from __future__ import annotations
 
-import ctypes
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 import stat
 import struct
 
-from core.plugin_files import atomic_write
 from . import deployment, load_bands, load_bands_patch
 
 EXECUTABLE = "DarkSoulsRemastered.exe"
@@ -158,43 +155,6 @@ def read_file(path: Path, limit: int, *, optional: bool = False) -> bytes | None
     return content
 
 
-def ensure_game_closed() -> None:
-    """Reuse the shared Win32 bindings but fail closed on enumeration errors."""
-    if os.name != "nt":
-        raise ValueError("Apply and Restore for stamina tweaks require Windows")
-    from core import process_probe as probe
-    from ctypes import wintypes
-    kernel = probe._KERNEL32
-    handle = kernel.CreateToolhelp32Snapshot(probe.TH32CS_SNAPPROCESS, 0)
-    if handle in (None, 0, wintypes.HANDLE(-1).value):
-        raise RuntimeError("Could not verify that Dark Souls Remastered is closed")
-    try:
-        entry = probe.PROCESSENTRY32W()
-        entry.dwSize = ctypes.sizeof(entry)
-        ctypes.set_last_error(0)
-        more = kernel.Process32FirstW(handle, ctypes.byref(entry))
-        while more:
-            if entry.szExeFile.casefold() == EXECUTABLE.casefold():
-                process = kernel.OpenProcess(probe.PROCESS_QUERY_LIMITED_INFORMATION,
-                                             False, entry.th32ProcessID)
-                if not process:
-                    raise RuntimeError("Cannot inspect the game process; close it before applying")
-                try:
-                    code = wintypes.DWORD()
-                    if not kernel.GetExitCodeProcess(process, ctypes.byref(code)):
-                        raise RuntimeError("Could not verify the game process state")
-                    if code.value == probe.STILL_ACTIVE:
-                        raise RuntimeError("Close Dark Souls Remastered before applying or restoring")
-                finally:
-                    kernel.CloseHandle(process)
-            ctypes.set_last_error(0)
-            more = kernel.Process32NextW(handle, ctypes.byref(entry))
-        if ctypes.get_last_error() != 18:  # ERROR_NO_MORE_FILES
-            raise RuntimeError("Game process enumeration did not finish successfully")
-    finally:
-        kernel.CloseHandle(handle)
-
-
 def _owner(game_root: Path) -> dict | None:
     content = read_file(game_root / OWNER, 4096, optional=True)
     if content is None:
@@ -213,10 +173,6 @@ def _owner(game_root: Path) -> dict | None:
     return owner
 
 
-def _write_owner(game_root: Path, owner: dict) -> None:
-    atomic_write(checked(game_root / OWNER), (json.dumps(owner, indent=2) + "\n").encode())
-
-
 def inspect(game_root: Path) -> tuple[bytes, dict, bool]:
     game_root = checked(game_root)
     source = read_file(game_root / EXECUTABLE, MAX_NATIVE_SIZE)
@@ -233,38 +189,3 @@ def inspect(game_root: Path) -> tuple[bytes, dict, bool]:
         raise ValueError("The native executable changed outside Lexeditor")
     rules = identify(source, backup)
     return source, rules, backup is not None
-
-
-def install(game_root: Path, rules: dict, *, expected: bytes | None = None) -> None:
-    """Explicit closed-game replacement with a bounded backup and durable intent."""
-    rules = validate_rules(rules)
-    ensure_game_closed()
-    game_root = checked(game_root)
-    live, backup = checked(game_root / EXECUTABLE), checked(game_root / BACKUP)
-    before, _current, backup_ok = inspect(game_root)
-    if expected is not None and before != expected:
-        raise ValueError("The executable changed while Apply was being prepared")
-    original = read_file(backup, ORIGINAL_SIZE) if backup_ok else before
-    after = transform(original, rules)
-    if after == before:
-        return
-    if not backup_ok:
-        with backup.open("xb") as stream:
-            stream.write(original)
-            stream.flush()
-            os.fsync(stream.fileno())
-        if read_file(backup, ORIGINAL_SIZE) != original:
-            raise RuntimeError("The original executable backup did not verify")
-    ensure_game_closed()
-    checked(live)
-    if inspect(game_root)[0] != before:
-        raise ValueError("The executable changed before replacement")
-    owner = {"schema": 1, "originalHash": ORIGINAL_SHA256,
-             "activeHash": hashlib.sha256(before).hexdigest(),
-             "pendingHash": hashlib.sha256(after).hexdigest()}
-    _write_owner(game_root, owner)
-    atomic_write(live, after)
-    if read_file(live, MAX_NATIVE_SIZE) != after:
-        raise RuntimeError("Executable verification failed; the original backup was retained")
-    owner.update(activeHash=owner["pendingHash"], pendingHash=None)
-    _write_owner(game_root, owner)

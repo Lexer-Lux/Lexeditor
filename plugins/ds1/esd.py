@@ -444,9 +444,8 @@ def _rel(bw, base):
     return bw.pos - base
 
 
-def _write_esd(esd):
-    """Serialize the model, recomputing every offset and count."""
-    long_format = esd.long_format
+def validate_writable(esd):
+    """Validate the writer's supported ESD model without serializing it."""
     dsc = esd.dark_souls_count
     if dsc not in (1, 2, 3):
         raise EsdError("Unsupported ESD dark souls count.")
@@ -457,6 +456,13 @@ def _write_esd(esd):
                 for command in commands:
                     if command.bank not in (1, 5, 6, 7):
                         raise EsdError("Unsupported ESD command bank.")
+
+
+def _write_esd(esd):
+    """Serialize the model, recomputing every offset and count."""
+    validate_writable(esd)
+    long_format = esd.long_format
+    dsc = esd.dark_souls_count
     bw = _Builder(long_format)
     bw.out += b"fsSL" if long_format else b"fSSL"
     bw.u32(1)

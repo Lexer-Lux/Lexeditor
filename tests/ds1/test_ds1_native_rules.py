@@ -1,8 +1,6 @@
-"""Compatibility checks for restoring previously installed draft native patches."""
+"""Read-only compatibility checks for old draft native-patch records."""
 import hashlib
 import json
-from pathlib import Path
-import struct
 
 import pytest
 
@@ -13,7 +11,6 @@ from plugins.ds1 import stamina_patch as native
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
     original = fake_executable(monkeypatch)
-    monkeypatch.setattr(native, "ensure_game_closed", lambda: None)
     game = tmp_path / "legacy-game"
     game.mkdir()
     (game / native.EXECUTABLE).write_bytes(original)
@@ -53,39 +50,35 @@ def test_bad_rules_rejected(key, value):
 
 
 @pytest.mark.parametrize("phase", ["before-image", "after-image"])
-def test_interrupted_native_replacement_can_be_retried(setup, monkeypatch, phase):
+def test_interrupted_legacy_records_can_be_inspected_without_replacement(setup, phase):
     game, mod, store, rules, original = setup
     desired = {**native.DEFAULT_RULES, "baseRecovery": 60}
-    atomic = native.atomic_write
-    calls = []
-    def interrupt(path, content):
-        path = Path(path)
-        calls.append(path.name)
-        if phase == "before-image" and path.name == native.EXECUTABLE:
-            raise OSError("interrupted before image")
-        if phase == "after-image" and path.name == native.OWNER and calls.count(native.OWNER) == 2:
-            raise OSError("interrupted before completion marker")
-        return atomic(path, content)
-    monkeypatch.setattr(native, "atomic_write", interrupt)
-    with pytest.raises(OSError):
-        native.install(game, desired)
+    after = native.transform(original,desired)
+    image = original if phase == 'before-image' else after
+    (game/native.EXECUTABLE).write_bytes(image)
+    (game/native.BACKUP).write_bytes(original)
+    owner = {'schema':1,'originalHash':native.ORIGINAL_SHA256,'activeHash':native.ORIGINAL_SHA256,
+             'pendingHash':hashlib.sha256(after).hexdigest()}
+    (game/native.OWNER).write_text(json.dumps(owner))
+    before = {path.name:path.read_bytes() for path in game.iterdir()}
     _, current, backup_ok = native.inspect(game)
     assert backup_ok and current["baseRecovery"] == (45 if phase == "before-image" else 60)
-    monkeypatch.setattr(native, "atomic_write", atomic)
-    native.install(game, desired)
-    native.install(game, native.DEFAULT_RULES)
-    assert (game / native.EXECUTABLE).read_bytes() == original
+    assert {path.name:path.read_bytes() for path in game.iterdir()} == before
+    assert not hasattr(native,'install')
 
 
 def test_owner_rejects_schema_and_foreign_projected_image(setup):
     game, mod, store, rules, original = setup
-    native.install(game, {**native.DEFAULT_RULES, "baseRecovery": 60})
+    built = native.transform(original,{**native.DEFAULT_RULES,'baseRecovery':60})
+    (game/native.EXECUTABLE).write_bytes(built)
+    (game/native.BACKUP).write_bytes(original)
     owner_path = game / native.OWNER
-    owner = json.loads(owner_path.read_text())
+    owner = {'schema':1,'originalHash':native.ORIGINAL_SHA256,'activeHash':hashlib.sha256(built).hexdigest(),
+             'pendingHash':None}
     owner_path.write_text(json.dumps({**owner, "schema": True}))
     with pytest.raises(ValueError, match="ownership"):
         native.inspect(game)
     owner_path.write_text(json.dumps(owner))
     (game / native.EXECUTABLE).write_bytes(native.transform(original, {**native.DEFAULT_RULES, "baseRecovery": 80}))
     with pytest.raises(ValueError, match="outside"):
-        native.install(game, native.DEFAULT_RULES)
+        native.inspect(game)

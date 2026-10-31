@@ -7,7 +7,7 @@ from pathlib import Path
 from core.plugin_files import atomic_write
 
 from . import assets
-from . import deployment
+from . import deployment, record_edits
 from .formats import FormatError, deflate, inflate, members, pack
 from .msb import MsbDocument
 from .store import MARKER, digest
@@ -111,6 +111,15 @@ class TaeStore:
             raise ValueError("The character file is too large.")
         try:
             raw = source.read_bytes()
+            source_hash = hashlib.sha256(raw).hexdigest()
+            records = getattr(self.item_store,'portable_specs',None)
+            if records is None:
+                records = record_edits.project_specs(self.project)
+            portable = records.get(CHR_DIR/binder)
+            if portable is not None:
+                if output is not None and output.exists():
+                    raise TaeError('A mod cannot contain both a character archive and record edits for the same target')
+                raw = record_edits.materialize(CHR_DIR/binder,raw,portable)
             plain = bytearray(inflate(raw))
             owned = members(plain)
         except FormatError as error:
@@ -126,7 +135,7 @@ class TaeStore:
                 raise TaeError(f"Cannot open {binder}: {name}: {error}") from error
         self.docs[binder] = {"raw": raw, "plain": plain, "members": owned, "taes": taes}
         self.hashes[binder] = {"source": source, "output": output, "vanilla": vanilla,
-                               "source_hash": hashlib.sha256(raw).hexdigest(),
+                               "source_hash": source_hash, 'record_spec':portable,
                                "vanilla_hash": digest(vanilla),
                                "output_hash": digest(output) if output else None}
 
@@ -336,8 +345,11 @@ class TaeStore:
     def validate_save(self):
         from .tweak_mods import checked
         self.writable()
+        records = record_edits.project_specs(self.project)
         for binder, doc in self.docs.items():
             entry = self.hashes[binder]
+            if records.get(CHR_DIR/binder) != entry['record_spec']:
+                raise ValueError('The mod animation records changed outside Lexeditor. Reopen it before saving.')
             vanilla = deployment.vanilla_source(self.game_root, CHR_DIR / binder)
             for path in (entry["source"], vanilla, entry["output"]):
                 if path is not None:
@@ -351,6 +363,7 @@ class TaeStore:
     def save(self):
         self.validate_save()
         from .tweak_mods import checked
+        records, records_changed = record_edits.project_specs(self.project), False
         for binder, doc in self.docs.items():
             if not any(tae.dirty_count for tae in doc["taes"].values()):
                 continue
@@ -381,13 +394,22 @@ class TaeStore:
                 if tae.dirty_count:
                     member = check[name]
                     TaeDocument(bytes(rebuilt[member.offset:member.offset + member.size]), name)
+            payload = deflate(doc['raw'],plain)
+            relative = CHR_DIR/binder
+            if self.hashes[binder]['record_spec'] is not None:
+                original = deployment.vanilla_source(self.game_root,relative).read_bytes()
+                records[relative] = record_edits.create(relative,original,payload)
+                records_changed = True
+                continue
             output.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write(output, deflate(doc["raw"], plain))
+            atomic_write(output, payload)
+        if records_changed:
+            atomic_write(checked(self.project/record_edits.FILENAME),record_edits.encode(records))
         self.docs = {}
         self.vanilla_docs = {}
         self.hashes = {}
         self._char_names = None
-        return {"saved": True, "dirtyCount": 0}
+        return {"saved": True, "dirtyCount": 0, 'recordsChanged':records_changed}
 
     def discard(self):
         self.docs = {}

@@ -39,6 +39,12 @@ def _compose(original, changed, talk_options):
     # serialize identical inputs once; changed bytes/order/owners miss the cache.
     base = esd.parse(original)
     variants = [(owner, esd.parse(data)) for owner, data in changed]
+    result, conflicts = merge_records(base,variants,talk_options=talk_options)
+    return result.to_bytes(), tuple((path,tuple(owners)) for path,owners in conflicts)
+
+
+def merge_records(base,variants,*,talk_options=True):
+    """The same structural merger for a complete script or portable state."""
     conflicts = []
 
     def merge(before, versions, path):
@@ -138,4 +144,4 @@ def _compose(original, changed, talk_options):
         return versions[-1][1]
 
     result = merge(base, variants, "ESD")
-    return result.to_bytes(), tuple((path, tuple(owners)) for path, owners in conflicts)
+    return result, conflicts

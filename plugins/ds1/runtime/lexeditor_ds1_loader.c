@@ -25,7 +25,8 @@
  * still during the game's opening logos, before a save can be loaded.
  *
  * DirectInput8Create, the one function the game imports from dinput8.dll,
- * is forwarded to the system's own dinput8.dll.
+ * is forwarded to dinput8.chain.dll when the player preserved another proxy
+ * there, otherwise to the system's own dinput8.dll.
  *
  * A game whose code a mod changed must never reach FromSoftware's servers or
  * other players: their anti-cheat may ban the account. So whenever the patch
@@ -63,6 +64,9 @@ typedef struct {
 
 /* Where the deferred hooks report; set by DllMain's part, NULL in tests. */
 static void (*lx_report)(const char *text);
+/* Every hook writer enters before suspending anyone. Otherwise two mod
+ * workers can suspend one another, including a worker holding the log lock. */
+static SRWLOCK hook_write_lock = SRWLOCK_INIT;
 
 typedef struct {
     unsigned char *image;
@@ -107,17 +111,8 @@ static int writable(unsigned char *address, size_t size)
     return 1;
 }
 
-static void restore_protections(unsigned char *image, const record_t *records, const DWORD *protections, unsigned upto)
-{
-    for (unsigned index = 0; index < upto; ++index) {
-        DWORD ignored;
-        if (records[index].kind == KIND_HOOK && protections[index])
-            VirtualProtect(image + records[index].rva, records[index].length, protections[index], &ignored);
-    }
-}
-
 static int apply_records(unsigned char *image, unsigned image_size, const unsigned char *data, size_t size,
-                         unsigned count, record_t *records, DWORD *protections, char *message, size_t capacity);
+                         unsigned count, record_t *records, char *message, size_t capacity);
 
 static void report(const char *text)
 {
@@ -126,6 +121,20 @@ static void report(const char *text)
 }
 
 /* A copy of the hooks that outlives the patch file's buffer. */
+static void free_hooks(deferred_t *later)
+{
+    if (!later) return;
+    HANDLE heap = GetProcessHeap();
+    for (unsigned index = 0; index < later->count; ++index)
+        HeapFree(heap, 0, later->original[index]);
+    if (later->rva) HeapFree(heap, 0, later->rva);
+    if (later->length) HeapFree(heap, 0, later->length);
+    if (later->original) HeapFree(heap, 0, later->original);
+    if (later->replacement) HeapFree(heap, 0, later->replacement);
+    if (later->protection) HeapFree(heap, 0, later->protection);
+    HeapFree(heap, 0, later);
+}
+
 static deferred_t *defer_hooks(unsigned char *image, DWORD delay, const record_t *records, unsigned count, unsigned hooks)
 {
     HANDLE heap = GetProcessHeap();
@@ -139,15 +148,19 @@ static deferred_t *defer_hooks(unsigned char *image, DWORD delay, const record_t
     later->original = (unsigned char **)HeapAlloc(heap, 0, hooks * sizeof(unsigned char *));
     later->replacement = (unsigned char **)HeapAlloc(heap, 0, hooks * sizeof(unsigned char *));
     later->protection = (DWORD *)HeapAlloc(heap, 0, hooks * sizeof(DWORD));
-    if (!later->rva || !later->length || !later->original || !later->replacement || !later->protection)
+    if (!later->rva || !later->length || !later->original || !later->replacement || !later->protection) {
+        free_hooks(later);
         return NULL;
+    }
     for (unsigned index = 0; index < count; ++index) {
         const record_t *row = &records[index];
         if (row->kind != KIND_HOOK)
             continue;
         unsigned char *copy = (unsigned char *)HeapAlloc(heap, 0, 2 * (size_t)row->length);
-        if (!copy)
+        if (!copy) {
+            free_hooks(later);
             return NULL;
+        }
         memcpy(copy, row->payload, 2 * (size_t)row->length);
         later->rva[later->count] = row->rva;
         later->length[later->count] = row->length;
@@ -180,30 +193,47 @@ static int pause_others(const deferred_t *later, HANDLE *paused, unsigned *count
     entry.dwSize = sizeof entry;
     DWORD self = GetCurrentThreadId(), process = GetCurrentProcessId();
     int safe = 1;
-    for (BOOL more = Thread32First(snapshot, &entry); more && *count < MAX_THREADS; more = Thread32Next(snapshot, &entry)) {
+    unsigned opened = 0;
+    /* Snapshot enumeration and handle acquisition can take locks: finish
+     * both before suspending any process thread. */
+    for (BOOL more = Thread32First(snapshot, &entry); more; more = Thread32Next(snapshot, &entry)) {
         if (entry.th32OwnerProcessID != process || entry.th32ThreadID == self)
             continue;
         HANDLE thread = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT, FALSE, entry.th32ThreadID);
-        if (!thread)
-            continue;
-        if (SuspendThread(thread) == (DWORD)-1) {
-            CloseHandle(thread);
-            continue;
+        if (!thread || opened == MAX_THREADS) {
+            if (thread) CloseHandle(thread);
+            safe = 0;
+            break;
         }
-        paused[(*count)++] = thread;
+        paused[opened++] = thread;
+    }
+    CloseHandle(snapshot);
+    if (!safe) {
+        for (unsigned index = 0; index < opened; ++index) CloseHandle(paused[index]);
+        return 0;
+    }
+    for (unsigned index = 0; index < opened; ++index) {
+        HANDLE thread = paused[index];
+        if (SuspendThread(thread) == (DWORD)-1) {
+            /* Only the suspended prefix may be resumed. Close the rest
+             * after the caller has resumed it. */
+            for (unsigned rest = index; rest < opened; ++rest) CloseHandle(paused[rest]);
+            return 0;
+        }
+        ++*count;
         CONTEXT context;
         context.ContextFlags = CONTEXT_CONTROL;
         if (!GetThreadContext(thread, &context) || inside_hook(later, context.Rip))
             safe = 0;
     }
-    CloseHandle(snapshot);
     return safe;
 }
 
 static void resume_all(HANDLE *paused, unsigned count)
 {
-    for (unsigned index = 0; index < count; ++index) {
+    for (unsigned index = 0; index < count; ++index)
         ResumeThread(paused[index]);
+    for (unsigned index = 0; index < count; ++index) {
         CloseHandle(paused[index]);
     }
 }
@@ -215,8 +245,10 @@ static int rewrite_hook(deferred_t *later, HANDLE *paused, unsigned index)
     unsigned char *site = later->image + later->rva[index];
     for (int attempt = 0; attempt < 200; ++attempt) {
         unsigned count = 0;
+        AcquireSRWLockExclusive(&hook_write_lock);
         if (!pause_others(later, paused, &count)) {
             resume_all(paused, count);
+            ReleaseSRWLockExclusive(&hook_write_lock);
             Sleep(5);
             continue;
         }
@@ -230,6 +262,7 @@ static int rewrite_hook(deferred_t *later, HANDLE *paused, unsigned index)
             written = 1;
         }
         resume_all(paused, count);
+        ReleaseSRWLockExclusive(&hook_write_lock);
         return written;
     }
     return 0;
@@ -259,28 +292,24 @@ static void keep_hooks(deferred_t *later, HANDLE *paused)
     }
 }
 
-static DWORD WINAPI deferred_hooks(LPVOID argument)
+/* No heap, logging or formatting inside the suspension window. The same
+ * transaction handles immediate and delayed installation. */
+static int write_hooks(deferred_t *later, HANDLE *paused, char *text, size_t capacity)
 {
-    deferred_t *later = (deferred_t *)argument;
-    HANDLE *paused = (HANDLE *)HeapAlloc(GetProcessHeap(), 0, MAX_THREADS * sizeof(HANDLE));
-    char text[200];
-    if (!paused) {
-        report("Out of memory writing the deferred hooks; nothing was changed");
-        return 0;
-    }
-    Sleep(later->delay);
     for (int attempt = 0; attempt < 200; ++attempt) {
         unsigned count = 0;
+        AcquireSRWLockExclusive(&hook_write_lock);
         if (!pause_others(later, paused, &count)) {
             resume_all(paused, count);
+            ReleaseSRWLockExclusive(&hook_write_lock);
             Sleep(5);
             continue;
         }
         for (unsigned index = 0; index < later->count; ++index) {
             if (memcmp(later->image + later->rva[index], later->original[index], later->length[index]) != 0) {
                 resume_all(paused, count);
-                snprintf(text, sizeof text, "The game's code at %08X changed before the hooks were written; nothing was changed", later->rva[index]);
-                report(text);
+                ReleaseSRWLockExclusive(&hook_write_lock);
+                snprintf(text, capacity, "The game's code at %08X changed before the hooks were written; nothing was changed", later->rva[index]);
                 return 0;
             }
         }
@@ -291,28 +320,48 @@ static DWORD WINAPI deferred_hooks(LPVOID argument)
                 break;
         }
         if (index != later->count) {
-            for (unsigned undo = 0; undo < index; ++undo) {
+            for (unsigned undo = index; undo-- > 0;) {
                 DWORD ignored;
                 VirtualProtect(later->image + later->rva[undo], later->length[undo], old[undo], &ignored);
             }
             resume_all(paused, count);
-            report("Windows refused to let the deferred hooks be written; nothing was changed");
-            return 0;
+            ReleaseSRWLockExclusive(&hook_write_lock);
+            return fail(text, capacity, "Windows refused to let the hooks be written; nothing was changed");
         }
-        report("Writing the hooks");
         for (index = 0; index < later->count; ++index) {
-            DWORD ignored;
             memcpy(later->image + later->rva[index], later->replacement[index], later->length[index]);
-            VirtualProtect(later->image + later->rva[index], later->length[index], old[index], &ignored);
             FlushInstructionCache(GetCurrentProcess(), later->image + later->rva[index], later->length[index]);
         }
+        /* Multiple sites may share a page. Write all of them before restoring
+         * any protection, then undo in reverse order to retain the true RX. */
+        for (index = later->count; index-- > 0;) {
+            DWORD ignored;
+            VirtualProtect(later->image + later->rva[index], later->length[index], old[index], &ignored);
+        }
         resume_all(paused, count);
-        snprintf(text, sizeof text, "Applied %u hooks", later->count);
-        report(text);
-        keep_hooks(later, paused);
+        ReleaseSRWLockExclusive(&hook_write_lock);
+        snprintf(text, capacity, "Applied %u hooks", later->count);
+        return 1;
+    }
+    return fail(text, capacity, "No moment was found with every thread outside the hooks; nothing was changed");
+}
+
+static DWORD WINAPI deferred_hooks(LPVOID argument)
+{
+    deferred_t *later = (deferred_t *)argument;
+    HANDLE *paused = (HANDLE *)HeapAlloc(GetProcessHeap(), 0, MAX_THREADS * sizeof(HANDLE));
+    char text[200];
+    if (!paused) {
+        report("Out of memory writing the deferred hooks; nothing was changed");
+        free_hooks(later);
         return 0;
     }
-    report("No moment was found with every thread outside the hooks; nothing was changed");
+    Sleep(later->delay);
+    int written = write_hooks(later, paused, text, sizeof text);
+    report(text);
+    if (written) keep_hooks(later, paused);
+    HeapFree(GetProcessHeap(), 0, paused);
+    free_hooks(later);
     return 0;
 }
 
@@ -332,23 +381,20 @@ int lx_apply(unsigned char *image, const unsigned char *data, size_t size, char 
         return fail(message, capacity, "lexeditor-ds1-patch.bin is damaged");
 
     record_t *records = (record_t *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (count ? count : 1) * sizeof *records);
-    DWORD *protections = (DWORD *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (count ? count : 1) * sizeof *protections);
     int result = 0;
-    if (!records || !protections) {
+    if (!records) {
         fail(message, capacity, "Out of memory reading the patches");
         goto done;
     }
-    result = apply_records(image, image_size, data, size, count, records, protections, message, capacity);
+    result = apply_records(image, image_size, data, size, count, records, message, capacity);
 done:
     if (records)
         HeapFree(GetProcessHeap(), 0, records);
-    if (protections)
-        HeapFree(GetProcessHeap(), 0, protections);
     return result;
 }
 
 static int apply_records(unsigned char *image, unsigned image_size, const unsigned char *data, size_t size,
-                         unsigned count, record_t *records, DWORD *protections, char *message, size_t capacity)
+                         unsigned count, record_t *records, char *message, size_t capacity)
 {
     size_t at = 24;
     for (unsigned index = 0; index < count; ++index) {
@@ -394,19 +440,6 @@ static int apply_records(unsigned char *image, unsigned image_size, const unsign
             delay = records[index].length;
         hooks += records[index].kind == KIND_HOOK;
     }
-    /* Every hook made writable before any is written: a refusal half way
-     * would otherwise leave some hooks in and others out. Deferred hooks are
-     * made writable when they are written. */
-    for (unsigned index = 0; index < count && !delay; ++index) {
-        record_t *row = &records[index];
-        if (row->kind != KIND_HOOK)
-            continue;
-        if (!VirtualProtect(image + row->rva, row->length, PAGE_EXECUTE_READWRITE, &protections[index])) {
-            restore_protections(image, records, protections, index);
-            return fail(message, capacity, "Windows refused to let a hook be written; nothing was changed");
-        }
-    }
-
     /* Code past the image, at the address its relocations were made for. */
     for (unsigned index = 0; index < count; ++index) {
         record_t *row = &records[index];
@@ -417,7 +450,6 @@ static int apply_records(unsigned char *image, unsigned image_size, const unsign
         if (got != want) {
             if (got)
                 VirtualFree(got, 0, MEM_RELEASE);
-            restore_protections(image, records, protections, count);
             return fail(message, capacity, "The address the patch code needs is in use; nothing was changed");
         }
         memcpy(want, row->payload, row->length);
@@ -433,7 +465,6 @@ static int apply_records(unsigned char *image, unsigned image_size, const unsign
         RUNTIME_FUNCTION *table = (RUNTIME_FUNCTION *)HeapAlloc(GetProcessHeap(), 0, (size_t)row->length * sizeof *table);
         if (!table) {
             /* The code pages stay allocated but unused: no hook points at them. */
-            restore_protections(image, records, protections, count);
             return fail(message, capacity, "Out of memory registering patch functions; nothing was changed");
         }
         for (unsigned item = 0; item < row->length; ++item) {
@@ -442,29 +473,35 @@ static int apply_records(unsigned char *image, unsigned image_size, const unsign
             table[item].UnwindData = read32(row->payload + item * 12 + 8);
         }
         if (!RtlAddFunctionTable(table, row->length, (DWORD64)(ULONG_PTR)image)) {
-            restore_protections(image, records, protections, count);
             return fail(message, capacity, "Windows refused the patch functions' unwind table; nothing was changed");
         }
     }
-    if (delay && hooks) {
+    if (hooks) {
         deferred_t *later = defer_hooks(image, delay, records, count, hooks);
-        if (!later || !CreateThread(NULL, 0, deferred_hooks, later, 0, NULL))
+        if (!later)
             return fail(message, capacity, "Could not schedule the hooks; the patch code is placed but unused");
-        snprintf(message, capacity, "Placed the patch code; %u hooks follow after %lu ms", hooks, (unsigned long)delay);
-        return 1;
+        if (delay) {
+            HANDLE worker = CreateThread(NULL, 0, deferred_hooks, later, 0, NULL);
+            if (!worker) {
+                free_hooks(later);
+                return fail(message, capacity, "Could not schedule the hooks; the patch code is placed but unused");
+            }
+            CloseHandle(worker);
+            snprintf(message, capacity, "Placed the patch code; %u hooks follow after %lu ms", hooks, (unsigned long)delay);
+            return 1;
+        }
+        HANDLE *paused = (HANDLE *)HeapAlloc(GetProcessHeap(), 0, MAX_THREADS * sizeof(HANDLE));
+        int written = paused ? write_hooks(later, paused, message, capacity)
+            : fail(message, capacity, "Out of memory writing the hooks; nothing was changed");
+        if (paused) HeapFree(GetProcessHeap(), 0, paused);
+        free_hooks(later);
+        if (!written) return 0;
     }
-    /* Nothing below can fail. */
-    for (unsigned index = 0; index < count; ++index) {
-        record_t *row = &records[index];
-        if (row->kind != KIND_HOOK)
-            continue;
-        memcpy(image + row->rva, row->payload + row->length, row->length);
-        FlushInstructionCache(GetCurrentProcess(), image + row->rva, row->length);
-    }
-    restore_protections(image, records, protections, count);
     snprintf(message, capacity, "Applied %u patch records", count);
     return 1;
 }
+
+#include "lexeditor_ds1_mods.c"
 
 #ifndef LX_NO_DLLMAIN
 static void folder_file(wchar_t *path, size_t capacity, const wchar_t *name)
@@ -483,19 +520,30 @@ static DWORD started;
 static void write_log(const char *text)
 {
     static int lines;
+    static SRWLOCK lock = SRWLOCK_INIT;
+    AcquireSRWLockExclusive(&lock);
     wchar_t path[MAX_PATH * 2];
     folder_file(path, MAX_PATH * 2, L"lexeditor-ds1-patch.log");
     HANDLE file = CreateFileW(path, lines ? FILE_APPEND_DATA : GENERIC_WRITE, FILE_SHARE_READ, NULL,
                               lines ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (file == INVALID_HANDLE_VALUE)
+    if (file == INVALID_HANDLE_VALUE) {
+        ReleaseSRWLockExclusive(&lock);
         return;
-    char line[320];
+    }
+    LARGE_INTEGER size;
+    if (GetFileSizeEx(file, &size) && size.QuadPart > 64000) {
+        CloseHandle(file);
+        file = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (file == INVALID_HANDLE_VALUE) {ReleaseSRWLockExclusive(&lock); return;}
+    }
+    char line[768];
     int length = snprintf(line, sizeof line, "%s%6lu ms  %s", lines ? "\r\n" : "",
                           (unsigned long)(GetTickCount() - started), text);
     DWORD written;
-    WriteFile(file, line, (DWORD)(length > 0 ? length : 0), &written, NULL);
+    WriteFile(file, line, (DWORD)(length <= 0 ? 0 : length < sizeof line ? length : sizeof line - 1), &written, NULL);
     CloseHandle(file);
     ++lines;
+    ReleaseSRWLockExclusive(&lock);
 }
 
 /* --- No network ---------------------------------------------------------- */
@@ -561,8 +609,18 @@ int lx_block_network(void)
     return ok;
 }
 
+#endif
+
+#if !defined(LX_NO_DLLMAIN) || defined(LX_MOD_TEST)
 static void apply_from_file(void)
 {
+    /* This file is a derived description of the current enabled set. Never
+     * reuse a prior run's support after preparation failed or was unavailable.
+     * Independent native-only runtime.lxd modules still have their own path. */
+    if (!lx_data_ready) {
+        write_log("Shared patch skipped: mod preparation is unavailable or failed. Native-only folder mods can still load.");
+        return;
+    }
     wchar_t path[MAX_PATH * 2];
     folder_file(path, MAX_PATH * 2, L"lexeditor-ds1-patch.bin");
     HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -593,38 +651,37 @@ static void apply_from_file(void)
     CloseHandle(file);
     if (!ok)
         snprintf(message, sizeof message, "Could not read lexeditor-ds1-patch.bin; nothing was changed");
-    else
-        lx_apply((unsigned char *)GetModuleHandleW(NULL), data, read, message, sizeof message);
+    else if (lx_apply((unsigned char *)GetModuleHandleW(NULL), data, read, message, sizeof message))
+        lx_check_claims(data, read, NULL, message, sizeof message, 1);
     if (data)
         HeapFree(GetProcessHeap(), 0, data);
     write_log(message);
 }
+#endif
 
-typedef HRESULT(WINAPI *create_t)(HINSTANCE, DWORD, REFIID, LPVOID *, LPUNKNOWN);
-
-__declspec(dllexport) HRESULT WINAPI DirectInput8Create(HINSTANCE instance, DWORD version, REFIID iid, LPVOID *out, LPUNKNOWN outer)
-{
-    static create_t create;
-    if (!create) {
-        wchar_t path[MAX_PATH];
-        UINT length = GetSystemDirectoryW(path, MAX_PATH);
-        if (!length || length > MAX_PATH - 14)
-            return E_FAIL;
-        wcscat(path, L"\\dinput8.dll");
-        HMODULE system = LoadLibraryW(path);
-        create = system ? (create_t)GetProcAddress(system, "DirectInput8Create") : NULL;
-        if (!create)
-            return E_FAIL;
-    }
-    return create(instance, version, iid, out, outer);
-}
+#ifndef LX_NO_DLLMAIN
+#include "lexeditor_ds1_chain.c"
 
 #ifdef LX_DEBUG_BUILD
 /* The debug loader (lexeditor_ds1_debug.c) blocks the network, switches
  * Arxan off, and then applies the tweaks. */
 void lx_debug_start(void);
 void lx_debug_log(const char *text) { write_log(text); }
-void lx_debug_apply(void) { apply_from_file(); }
+void lx_debug_apply(void) { lx_data_ready=lx_prepare_data(); lx_chain_start(); apply_from_file(); lx_load_mod_folders(); }
+#endif
+
+#ifndef LX_DEBUG_BUILD
+static DWORD WINAPI start_mods(void *ignored)
+{
+    (void)ignored;
+    /* Data preparation needs the pre-entry-point dearxan callback supplied
+     * by the online/debug package. The basic proxy loads native-only mods. */
+    lx_data_ready=0;
+    lx_chain_start();
+    apply_from_file();
+    lx_load_mod_folders();
+    return 0;
+}
 #endif
 
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
@@ -637,7 +694,8 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
 #ifdef LX_DEBUG_BUILD
         lx_debug_start();
 #else
-        apply_from_file();
+        HANDLE worker=CreateThread(NULL,0,start_mods,NULL,0,NULL);
+        if(worker)CloseHandle(worker);
 #endif
     }
     return TRUE;

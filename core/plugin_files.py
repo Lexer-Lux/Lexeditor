@@ -7,6 +7,8 @@ that code once, with the message passed in.
 from __future__ import annotations
 
 import os
+import hashlib
+import stat
 import tempfile
 import time
 import urllib.request
@@ -15,6 +17,15 @@ from typing import Callable
 
 Progress = Callable[[int, int, str], None]
 USER_AGENT = "Lexeditor/1.0"
+
+
+def is_link(path: Path) -> bool:
+    """Recognize symlinks and Windows reparse points on supported Python versions."""
+    try:
+        info = Path(path).lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISLNK(info.st_mode) or bool(getattr(info, 'st_file_attributes', 0) & 0x400)
 
 
 def atomic_write(path: Path, data: bytes) -> None:
@@ -61,6 +72,75 @@ def atomic_write(path: Path, data: bytes) -> None:
                 time.sleep(0.1)
     finally:
         Path(name).unlink(missing_ok=True)
+
+
+def atomic_write_group(changes: dict[Path, bytes], expected: dict[Path, str | None], *, limit=512*1024*1024) -> None:
+    """Commit related project files, restoring caught failures as one group.
+
+    expected holds each file's hash when opened (None means absent). Both
+    snapshots and new contents share the memory bound. External changes are
+    refused before writing and preserved if found while rolling back.
+    """
+    if set(changes) != set(expected) or any(not isinstance(data, bytes) for data in changes.values()):
+        raise ValueError('A grouped save needs one expected hash per output file')
+    if len({Path(path).resolve() for path in changes}) != len(changes):
+        raise ValueError('A grouped save cannot write the same path twice')
+    total = sum(len(data) for data in changes.values())
+    if total > limit:
+        raise ValueError('The grouped save exceeds its memory limit')
+
+    def snapshot(path):
+        if is_link(path):
+            raise ValueError(f'{path.name}: a grouped save cannot follow a link')
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            return None
+        if size > limit:
+            raise ValueError(f'{path.name} is too large to save safely')
+        with path.open('rb') as stream:
+            data = stream.read(min(size+1, limit+1))
+            if len(data) > limit or stream.read(1):
+                raise ValueError(f'{path.name} grew during the save')
+        return data
+
+    def digest(data):
+        return hashlib.sha256(data).hexdigest() if data is not None else None
+
+    originals = {}
+    for path in changes:
+        before = snapshot(path)
+        if digest(before) != expected[path]:
+            raise ValueError(f'{path.name} changed outside Lexeditor; unsaved edits were kept')
+        total += len(before or b'')
+        if total > limit:
+            raise ValueError('The grouped save exceeds its memory limit')
+        originals[path] = before
+    touched = []
+    try:
+        for path, data in changes.items():
+            if digest(snapshot(path)) != expected[path]:
+                raise ValueError(f'{path.name} changed during the save; external bytes were kept')
+            touched.append(path)
+            atomic_write(path, data)
+    except Exception as error:
+        failures = []
+        for path in reversed(touched):
+            try:
+                current = digest(snapshot(path))
+                if current == expected[path]:
+                    continue
+                if current != digest(changes[path]):
+                    raise ValueError('changed externally; external bytes were kept')
+                if originals[path] is None:
+                    path.unlink()
+                else:
+                    atomic_write(path, originals[path])
+            except Exception as rollback_error:
+                failures.append(f'{path.name}: {rollback_error}')
+        if failures:
+            raise RuntimeError(f'Save failed: {error}; could not restore ' + '; '.join(failures)) from error
+        raise
 
 
 def fetch_file(url: str, target: Path, *, limit: int, progress: Progress | None = None,

@@ -25,11 +25,10 @@ both apply. Two mods setting the same field of one placement conflict.
 A map a mod restructures (added or removed parts, or any byte outside
 the placement fields) is taken whole from the last mod instead.
 
-Character binders are merged by member: two mods changing different
-animation files in one binder both apply. Two mods changing the same
-member conflict. A resized member rebuilds the binder; a binder a mod
-restructures (added or removed members) is taken whole from the last
-mod instead.
+Character binders combine by member, with ESD state-machine and TAE animation
+records combined inside supported members. Independent animation-event edits
+and added animations both survive. Unsupported member changes conflict as
+whole members. Resized or added members rebuild the binder directory.
 """
 from __future__ import annotations
 
@@ -45,11 +44,12 @@ import zlib
 
 from plugins.ds3.formats import DS3FormatError, ParamView
 
-from . import assets, texts, emevd
+from . import assets, texts, emevd, composition_cache, collision_archive
 from .formats import FormatError, MAX_ARCHIVE, TABLES, deflate, inflate, members, pack, schema
 from .msb import MAP_DIR, MAX_FILE as MAX_MAP, MsbDocument, MsbError
 from .store import MARKER, RELATIVE
 from .tae_store import CHR_DIR, MAX_BINDER
+from .mod_usage import loaded_files
 
 FILES = (RELATIVE, texts.RELATIVE, texts.MENU_RELATIVE)
 MAX_MAP_FILES = 64
@@ -75,6 +75,7 @@ class Mod:
     name: str
     folder: Path
     files: dict[Path, bytes]
+    edits: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -115,6 +116,12 @@ def content_files(folder: Path, name: str, *, only=None) -> list[tuple[Path, Pat
     from .tweak_mods import checked
     folder = checked(Path(folder))
     found = []
+    from . import record_edits
+    records = checked(folder/record_edits.FILENAME)
+    if records.is_file():
+        if records.stat().st_size > record_edits.LIMIT:
+            raise ValueError(f'{name}: record contributions are too large')
+        found.append((record_edits.FILENAME,records))
     for relative in FILES:
         if only is not None and relative not in only:
             continue
@@ -159,20 +166,48 @@ def content_files(folder: Path, name: str, *, only=None) -> list[tuple[Path, Pat
     return found
 
 
+def _file_limit(relative):
+    return (MAX_ARCHIVE if relative in FILES else MAX_MAP
+            if relative.suffix == '.msb' and relative.parent == MAP_DIR else MAX_BINDER
+            if assets.is_character_file(relative) else assets.MAX_ASSET_BYTES)
+
+
+def _read_data(path, relative):
+    from .tweak_mods import checked
+    path = checked(path)
+    size = path.stat().st_size
+    if size > _file_limit(relative):
+        raise ValueError(f'{relative.name} is too large')
+    with path.open('rb') as stream:
+        data = stream.read(size+1)
+    if len(data) != size:
+        raise ValueError(f'{relative.name} changed size while it was being read')
+    return data
+
+
 def read_mod(folder: Path, name: str, *, only=None) -> Mod | None:
     """A DS1 data mod's saved files, or None for a folder that is not one."""
     from .tweak_mods import checked
     folder = checked(Path(folder))
-    if not (folder / MARKER).is_file():
+    if not (folder / MARKER).is_file() and not (folder/'mod.json').is_file():
         return None
     files = {}
+    edits = {}
     try:
+        from . import record_edits
         for key, path in content_files(folder, name, only=only):
-            files[key] = path.read_bytes()
+            if key == record_edits.FILENAME:
+                edits = record_edits.decode(record_edits.read(path))
+                if only is not None:
+                    edits = {key:spec for key,spec in edits.items() if key in only}
+            else:
+                files[key] = _read_data(path,key)
+        if files.keys() & edits.keys():
+            raise ValueError('A mod cannot declare both an archive and record edits for the same target')
     except Exception as error:
         from core.mod_builds import ModBuildError
         raise ModBuildError([folder], f'{name}: {error}') from error
-    return Mod(name, folder, files)
+    return Mod(name, folder, files, edits)
 
 
 def active_mods(library_root: Path, project_root: Path | None = None, *, only=None) -> list[Mod]:
@@ -189,12 +224,12 @@ def active_mods(library_root: Path, project_root: Path | None = None, *, only=No
         if not row["enabled"] and folder != (Path(project_root).resolve() if project_root else None):
             continue
         mod = read_mod(folder, row["name"], only=only)
-        if mod is not None:
+        if mod is not None and (mod.files or mod.edits):
             mods.append(mod)
             seen.add(folder)
     if project_root is not None and Path(project_root).resolve() not in seen:
         mod = read_mod(Path(project_root), Path(project_root).name, only=only)
-        if mod is not None:
+        if mod is not None and (mod.files or mod.edits):
             mods.append(mod)
     return mods
 
@@ -206,56 +241,186 @@ def vanilla_files(game_root: Path, paths: frozenset[Path]) -> dict[Path, bytes]:
     from . import deployment
     from .tweak_mods import checked
     result = {}
-    from . import assets as _assets
-    for relative in sorted(paths):
+    for relative in sorted({target for path in paths for target in collision_archive.pair(path)}):
+        from . import tweak_mods
+        managed = tweak_mods.managed_menu(relative)
+        if managed is not None:
+            result[relative] = tweak_mods.menu_baseline(game_root, managed)[1]
+            continue
         path = checked(deployment.vanilla_source(Path(game_root), relative))
         if path.is_file():
-            limit = (MAX_ARCHIVE if relative in FILES else MAX_MAP
-                     if relative.suffix == ".msb" and relative.parent == MAP_DIR else MAX_BINDER
-                     if relative.suffix == ".dcx" and relative.parent == CHR_DIR else _assets.MAX_ASSET_BYTES)
-            if path.stat().st_size > limit:
-                raise ValueError(f"The game's {relative.name} is too large")
-            result[relative] = path.read_bytes()
+            result[relative] = _read_data(path,relative)
     return result
 
 
-def build(game_root: Path, library_root: Path, project_root: Path | None = None) -> tuple[Composition, list[Mod]]:
+def build(game_root: Path, library_root: Path, project_root: Path | None = None, *, menu_files=None) -> tuple[Composition, list[Mod]]:
     mods = active_mods(library_root, project_root)
-    return compose_installed(game_root, mods), mods
+    return compose_installed(game_root, mods, menu_files=menu_files), mods
 
 
-def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False, cache_root=None) -> Composition:
+def normalize_collisions(game_root: Path, mods: list[Mod]) -> list[Mod]:
+    """Loose authoring members enter the same portable archive composer."""
+    from . import collision_edits
+    from .collision_write import CollisionDocument
+    from core.mod_builds import ModBuildError
+    destinations = {target[0] for mod in mods for relative in mod.files
+                    if (target := collision_archive.loose_for(relative)) is not None}
+    if not destinations:
+        return mods
+    originals = vanilla_files(game_root,frozenset(destinations))
+    archives = {header:collision_archive.CollisionArchive(*(originals[path] for path in collision_archive.pair(header)))
+                for header in destinations if all(path in originals for path in collision_archive.pair(header))}
+    result = []
+    for mod in mods:
+        files,edits = dict(mod.files),dict(mod.edits)
+        try:
+            for relative,raw in mod.files.items():
+                target = collision_archive.loose_for(relative)
+                if target is None:
+                    continue
+                header,prefix = target
+                if any(path in files for path in collision_archive.pair(header)):
+                    raise ValueError('A collision member cannot also declare its complete raw archive')
+                if header not in archives:
+                    raise ValueError(f'{relative}: no installed collision archive for this member')
+                archive = archives[header]
+                matches = [name for name in archive.members if name == prefix or name.startswith(prefix+'a')]
+                if len(matches) != 1:
+                    raise ValueError(f'{relative}: no unique installed collision member')
+                name = matches[0]
+                prior = edits.get(header,{'kind':'collision','members':[]})
+                if prior.get('kind') != 'collision' or any(row['name'] == name for row in prior['members']):
+                    raise ValueError(f'{relative}: duplicate collision record contribution')
+                spec = collision_edits.create_state(CollisionDocument(archive.member(name)),CollisionDocument(raw))
+                members = list(prior['members'])
+                if spec is not None:
+                    entry = archive.members[name]
+                    members.append({'name':name,'id':entry['id'],'path':entry['name'],'edits':spec})
+                if members:
+                    edits[header] = {'kind':'collision','members':members}
+                files.pop(relative)
+        except Exception as error:
+            raise ModBuildError([mod.folder],f'{mod.name}: {error}') from error
+        result.append(Mod(mod.name,mod.folder,files,edits))
+    return result
+
+
+def compose_installed(game_root: Path, mods: list[Mod], *, conflicts_only: bool = False, cache_root=None,
+                      menu_files=None) -> Composition:
     """Load every mod's original assets before composing the enabled set."""
-    paths = frozenset(name for mod in mods for name in mod.files)
+    if menu_files is not None and conflicts_only:
+        raise ValueError('Conflict-only composition cannot mutate a deployment plan')
+    mods = normalize_collisions(game_root,mods)
+    paths = frozenset(target for mod in mods for name in (mod.files.keys()|mod.edits.keys())
+                      for target in collision_archive.pair(name))
     originals = vanilla_files(game_root, paths)
     files, conflicts = {}, []
+    processed = set()
     for relative in sorted(paths):
-        selected = [Mod(mod.name, mod.folder, {relative: mod.files[relative]})
-                    for mod in mods if relative in mod.files]
+        group = collision_archive.pair(relative)
+        if relative in processed:
+            continue
+        processed.update(group)
+        relative = group[0]
+        baseline = {target: originals.get(target) for target in group}
+        selected = [Mod(mod.name,mod.folder,
+                        {target:mod.files[target] for target in group if target in mod.files},
+                        {target:mod.edits[target] for target in group if target in mod.edits})
+                    for mod in mods if any(target in mod.files or target in mod.edits for target in group)]
+        from . import tweak_mods
+        managed = tweak_mods.managed_menu(relative) if menu_files is not None else None
+        planned = next((item for item in menu_files if item['managed'] == managed), None) if managed else None
+        declaration_names = list(planned['mods']) if planned is not None else []
+        declaration_label = ', '.join(declaration_names) or 'Menu edits'
+        if planned is not None and planned['after'] != originals[relative]:
+            selected.insert(0, Mod(declaration_label, Path(game_root),
+                                   {relative: planned['after']}))
         try:
-            result = _compose_file(relative, originals.get(relative), selected, conflicts_only, cache_root)
+            result = _compose_files(baseline, selected, conflicts_only, cache_root)
         except Exception as error:
             from core.mod_builds import ModBuildError
             if isinstance(error, ModBuildError):
                 raise
-            original = originals.get(relative)
+            present = {target: payload for target, payload in baseline.items() if payload is not None}
             # Diagnose only on failure. A broken original or composer remains
             # an operation error; it must not switch off an innocent mod.
-            if original is not None:
-                compose({relative: original}, [Mod('Vanilla', Path(game_root), {relative: original})],
+            if present:
+                compose(present, [Mod('Vanilla', Path(game_root), present)],
                         conflicts_only=True)
             failed = []
             for mod in selected:
                 try:
-                    compose({relative: original} if original is not None else {}, [mod], conflicts_only=True)
+                    compose(present, [mod], conflicts_only=True)
                 except Exception:
                     failed.append(mod.folder)
             if failed:
                 raise ModBuildError(failed, f'{relative}: {error}') from error
             raise
-        files.update(result.files)
+        if managed is not None:
+            for conflict in result.conflicts:
+                conflict.mods = list(dict.fromkeys(name for owner in conflict.mods
+                    for name in (declaration_names if owner == declaration_label else [owner])))
+            if planned is None:
+                current, _original, manifest = tweak_mods.menu_baseline(game_root, managed)
+                planned = {'managed': managed, 'before': current, 'project': None,
+                           'previous': tweak_mods._current_manifest(current, manifest, managed)}
+                menu_files.append(planned)
+            planned['after'] = result.files.get(relative, originals[relative])
+            # A combined data/declaration recipe must never masquerade as the
+            # declaration-only recipe used by _compose_menu's installed reuse.
+            planned['inputs'] = None
+            planned['mods'] = list(dict.fromkeys([*declaration_names, *[mod.name for mod in mods
+                if relative in mod.files or relative in mod.edits]])) if planned['after'] != originals[relative] else []
+        else:
+            files.update(result.files)
         conflicts.extend(result.conflicts)
     return Composition(files, conflicts)
+
+
+def has_menu_contributions(ordered):
+    from . import record_edits, tweak_mods
+    for name, folder in ordered:
+        try:
+            for relative, disk in content_files(folder, name):
+                targets = record_edits.targets(disk) if relative == record_edits.FILENAME else (relative,)
+                if any(tweak_mods.managed_menu(target) is not None for target in targets):
+                    return True
+        except (OSError, ValueError) as error:
+            from core.mod_builds import ModBuildError
+            raise ModBuildError([folder], f'{name}: {error}') from error
+    return False
+
+
+def materialize_mod(mod: Mod, originals: dict) -> Mod:
+    """Resolve portable edits against the actual baseline before composing."""
+    from . import record_edits, collision_edits
+    from core.mod_builds import ModBuildError
+    files = dict(mod.files)
+    retained = {}
+    try:
+        for relative,spec in mod.edits.items():
+            group = collision_archive.pair(relative)
+            if any(target in files for target in group):
+                raise ValueError('Duplicate archive and record contributions')
+            if collision_edits.supported(relative):
+                if any(target not in originals for target in group):
+                    raise ValueError('The installed split collision baseline is missing')
+                archive = collision_archive.CollisionArchive(*(originals[target] for target in group))
+                for name,member in collision_edits.member_specs(archive,spec).items():
+                    collision_edits.open_member(archive.member(name),member)
+                retained[relative] = spec
+            else:
+                files[relative] = record_edits.materialize(relative,originals.get(relative),spec)
+    except Exception as error:
+        for relative in mod.edits:
+            if collision_edits.supported(relative):
+                group = collision_archive.pair(relative)
+                if all(target in originals for target in group):
+                    collision_edits.validate_original(*(originals[target] for target in group), mod.edits[relative])
+            elif originals.get(relative) is not None:
+                record_edits.validate_original(relative,originals[relative])
+        raise ModBuildError([mod.folder],f'{mod.name}: {error}') from error
+    return Mod(mod.name,mod.folder,files,retained)
 
 
 @lru_cache(maxsize=1)
@@ -267,29 +432,57 @@ def _composition_revision():
     # Request handling, script transport, cache I/O and native tweak planning
     # cannot change an archive composed from these already-built input bytes.
     unrelated = {'server.py', 'script_worker.py', 'plugin.py', 'mod_support.py',
-                 'tweak_mods.py', 'composition_cache.py'}
+                 'tweak_mods.py', 'composition_cache.py', 'project_refresh.py', 'mod_usage.py',
+                 'map_store.py', 'collision_store.py'}
     sources = [*(path for path in Path(__file__).parent.glob('*.py') if path.name not in unrelated),
                Path(__file__).parents[1] / 'ds3/formats.py',
                *(path for path in METADATA.rglob('*') if path.suffix in ('.xml', '.json'))]
     for path in sorted(sources):
-        digest.update(str(path).encode('utf-8'))
+        digest.update(path.relative_to(Path(__file__).parents[2]).as_posix().encode('utf-8'))
         digest.update(path.read_bytes())
     return digest.digest()
 
 
-def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
+def _compose_files(originals, mods, conflicts_only, cache_root=None):
     """Reuse unchanged archive outputs without retaining their input buffers.
 
     Bytes, names and load order determine the result. Hash actual contents so
     external edits are detected even when a file's timestamp is unchanged.
     """
     global _compose_cache_bytes
+    relatives = tuple(sorted(originals))
     digest = sha256()
-    for blob in [bytes([original is not None]), original or b''] + [
-            blob for mod in mods for blob in (mod.name.encode('utf-8'), mod.files[relative])]:
-        digest.update(len(blob).to_bytes(8, 'little'))
+    def chunk(blob):
+        digest.update(len(blob).to_bytes(8,'little'))
         digest.update(blob)
-    key = (relative, conflicts_only, digest.digest())
+    for relative in relatives:
+        original = originals[relative]
+        chunk(relative.as_posix().encode('utf-8'))
+        chunk(bytes([original is not None]))
+        chunk(original or b'')
+    for mod in mods:
+        chunk(mod.name.encode('utf-8'))
+        for relative in relatives:
+            chunk(relative.as_posix().encode('utf-8'))
+            if relative in mod.edits:
+                if relative in mod.files:
+                    from core.mod_builds import ModBuildError
+                    raise ModBuildError([mod.folder],f'{mod.name}: duplicate archive and record contributions')
+                try:
+                    encoded = json.dumps(mod.edits[relative],sort_keys=True,
+                                         separators=(',',':'),allow_nan=False).encode('utf-8')
+                except (ValueError,TypeError,RecursionError) as error:
+                    from core.mod_builds import ModBuildError
+                    raise ModBuildError([mod.folder],f'{mod.name}: invalid portable records ({error})') from error
+                chunk(b'portable-records')
+                chunk(encoded)
+                del encoded
+            elif relative in mod.files:
+                chunk(b'archive')
+                chunk(mod.files[relative])
+            else:
+                chunk(b'absent')
+    key = (relatives, conflicts_only, digest.digest())
     with _compose_cache_lock:
         cached = _compose_cache.get(key)
         if cached is not None:
@@ -297,38 +490,59 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
     remember = cached is None
     disk_key = None
     if cached is None and cache_root is not None and not conflicts_only:
-        from . import composition_cache
         try:
-            disk_key = sha256(_composition_revision() + relative.as_posix().encode('utf-8') + digest.digest()).digest()
+            disk_key = sha256(_composition_revision() + digest.digest()).digest()
             payload = composition_cache.load(cache_root, disk_key)
             if payload is not None:
                 header, data = payload.split(b'\n', 1)
                 metadata = json.loads(header)
-                if (not isinstance(metadata, dict) or type(metadata.get('hasData')) is not bool
+                if (not isinstance(metadata, dict) or not isinstance(metadata.get('files'), list)
                         or not isinstance(metadata.get('conflicts'), list)):
                     raise ValueError('Invalid composition cache header')
+                restored, at = {}, 0
+                for row in metadata['files']:
+                    if (not isinstance(row, list) or len(row) != 2 or type(row[0]) is not str
+                            or type(row[1]) is not int or row[1] < 0 or row[1] > len(data)-at
+                            or Path(row[0]) not in relatives or Path(row[0]) in restored):
+                        raise ValueError('Invalid composition cache files')
+                    restored[Path(row[0])] = data[at:at+row[1]]
+                    at += row[1]
+                if at != len(data):
+                    raise ValueError('Invalid composition cache payload length')
                 for row in metadata['conflicts']:
-                    if (not isinstance(row, list) or len(row) != 3 or row[0] != str(relative)
+                    if (not isinstance(row, list) or len(row) != 3 or type(row[0]) is not str
+                            or Path(row[0]) not in relatives
                             or not isinstance(row[1], str) or not isinstance(row[2], list)
                             or any(not isinstance(name, str) for name in row[2])):
                         raise ValueError('Invalid composition cache conflict')
                 rows = tuple((Path(path), part, tuple(names)) for path, part, names in metadata['conflicts'])
-                cached = (data if metadata['hasData'] else None, rows, len(payload))
+                cached = (restored, rows, len(payload))
         except Exception:
             pass
     if cached is None:
-        result = compose({relative: original} if original is not None else {}, mods,
+        present = {relative: original for relative, original in originals.items() if original is not None}
+        prepared = [materialize_mod(mod,present) if mod.edits else mod for mod in mods]
+        from . import tweak_mods
+        for relative in relatives:
+            managed = tweak_mods.managed_menu(relative)
+            if managed is not None:
+                from core.mod_builds import ModBuildError
+                for mod in prepared:
+                    payload = mod.files[relative]
+                    if len(payload) > managed.limit or not tweak_mods._menu_baseline(payload, managed):
+                        raise ModBuildError([mod.folder], f'{mod.name}: invalid {managed.label}')
+        result = compose(present, prepared,
                          conflicts_only=conflicts_only)
-        data = result.files.get(relative)
+        data = result.files
         rows = tuple((c.file, c.part, tuple(c.mods)) for c in result.conflicts)
-        size = len(data or b'') + sum(len(part.encode('utf-8')) +
+        size = sum(len(payload) for payload in data.values()) + sum(len(part.encode('utf-8')) +
                sum(len(name.encode('utf-8')) for name in names) for _, part, names in rows)
         cached = (data, rows, size)
         if disk_key is not None:
             try:
-                metadata = {'hasData': data is not None,
+                metadata = {'files': [(str(path), len(payload)) for path, payload in data.items()],
                             'conflicts': [(str(path), part, names) for path, part, names in rows]}
-                payload = json.dumps(metadata).encode('utf-8') + b'\n' + (data or b'')
+                payload = json.dumps(metadata).encode('utf-8') + b'\n' + b''.join(data.values())
                 composition_cache.store(cache_root, disk_key, payload)
             except Exception:
                 pass
@@ -339,12 +553,30 @@ def _compose_file(relative, original, mods, conflicts_only, cache_root=None):
                 _compose_cache_bytes -= previous[2]
             _compose_cache[key] = cached
             _compose_cache_bytes += cached[2]
-            while _compose_cache_bytes > _COMPOSE_CACHE_LIMIT or len(_compose_cache) > 64:
+            while _compose_cache_bytes > _COMPOSE_CACHE_LIMIT or len(_compose_cache) > composition_cache.ENTRIES:
                 _, evicted = _compose_cache.popitem(last=False)
                 _compose_cache_bytes -= evicted[2]
     data, rows, _ = cached
-    return Composition({relative: data} if data is not None else {},
+    return Composition(dict(data),
                        [Conflict(path, part, list(names)) for path, part, names in rows])
+
+
+def align_menu_textures(game_root: Path, composition: Composition, layout: bytes | None) -> None:
+    """Couple derived main-pack indices to the layout in either build host."""
+    from . import deployment,texture_packs
+    main = Path('menu/menu.tpf.dcx')
+    if layout is None or not (game_root/main).is_file():
+        return
+    def payload(relative):
+        return composition.files.get(relative) or deployment.vanilla_source(game_root,relative).read_bytes()
+    supplements = [payload(Path(f'menu/menu_{index}.tpf.dcx')) for index in range(6)
+                   if Path(f'menu/menu_{index}.tpf.dcx') in composition.files
+                   or (game_root/f'menu/menu_{index}.tpf.dcx').is_file()]
+    combined = texture_packs.align_menu(layout,payload(main),supplements)
+    if combined != deployment.vanilla_source(game_root,main).read_bytes():
+        composition.files[main] = combined
+    else:
+        composition.files.pop(main,None)
 
 
 def _is_asset(relative: Path) -> bool:
@@ -352,6 +584,8 @@ def _is_asset(relative: Path) -> bool:
     if relative in FILES:
         return False
     if relative.suffix == ".msb" and relative.parent == MAP_DIR:
+        return False
+    if collision_archive.header_for(relative) is not None:
         return False
     from . import assets
     return not assets.is_character_file(relative)
@@ -364,6 +598,31 @@ def compose(vanilla: dict[Path, bytes], mods: list[Mod], *, conflicts_only: bool
     lowest first. Only files that end up different from vanilla are returned.
     """
     files, conflicts = {}, []
+    headers = {collision_archive.header_for(relative)
+               for relative in list(vanilla) + [path for mod in mods for path in mod.files.keys()|mod.edits.keys()]}
+    for header in sorted(path for path in headers if path is not None):
+        pair = collision_archive.pair(header)
+        if any(relative not in vanilla for relative in pair):
+            raise ValueError(f'{header}: the installed split collision pair is missing')
+        variants = []
+        for mod in mods:
+            if header in mod.edits:
+                if any(relative in mod.files for relative in pair):
+                    raise ValueError(f'{mod.name}: duplicate raw archive and collision records')
+                variants.append((mod.name,None,None,mod.edits[header]))
+                continue
+            if not any(relative in mod.files for relative in pair):
+                continue
+            if not all(relative in mod.files for relative in pair):
+                raise ValueError(f'{mod.name}: split collision contributions need both header and data')
+            variants.append((mod.name, *(mod.files[relative] for relative in pair)))
+        output_header, output_body, collisions = collision_archive.compose(
+            *(vanilla[relative] for relative in pair), variants, conflicts_only=conflicts_only)
+        conflicts.extend(Conflict(header, part, owners) for part, owners in collisions)
+        if not conflicts_only:
+            for relative, payload in zip(pair, (output_header, output_body)):
+                if payload != vanilla[relative]:
+                    files[relative] = payload
     if RELATIVE in vanilla:
         result = _compose_params(vanilla[RELATIVE], [(mod.name, mod.files[RELATIVE])
                                                      for mod in mods if RELATIVE in mod.files], conflicts_only=conflicts_only)
@@ -567,24 +826,31 @@ def _table_rows(payload: bytes, size: int) -> list[tuple[int, bytes | None, byte
 
 
 def _standard_tail(payload: bytes, size: int, rows: list) -> bytes | None:
-    """The bytes after the names when the table has the game's own layout."""
+    """Preserve the tail of a contiguous PARAM, including tool-added names.
+
+    Shipped tables rebuild exactly. Other writers can leave padding or orphan
+    names; retain that entire trailing region when normalizing their directory.
+    """
     count = len(rows)
     data_start = _HEADER + _STRIDE * count
     data_end = data_start + size * count
+    strings = struct.unpack_from('<I',payload,0)[0]
     if (not count or struct.unpack_from("<H", payload, 4)[0] != data_start
-            or struct.unpack_from("<I", payload, 0)[0] != (data_end + 15) // 16 * 16):
+            or not data_end <= strings <= len(payload)):
         return None
     terminator = 2 if payload[0x2E] & 1 else 1
     cursor = data_end
+    standard = strings == (data_end+15)//16*16
     for index in range(count):
         _id, offset, name_offset = struct.unpack_from("<iII", payload, _HEADER + _STRIDE * index)
         if offset != data_start + index * size:
             return None
         if name_offset:
-            if name_offset != cursor:
+            if name_offset < data_end:
                 return None
+            standard = standard and name_offset == cursor
             cursor += len(rows[index][1]) + terminator
-    return payload[cursor:]
+    return payload[cursor:] if standard else payload[data_end:]
 
 
 def _write_table(header: bytes, size: int, rows: list, tail: bytes) -> bytes:
@@ -901,16 +1167,6 @@ def _compose_maps(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path)
 
 # --- Characters ------------------------------------------------------------
 
-def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
-    touched = [name for name, _data in changed]
-    if len(touched) < 2:
-        return changed[-1][1], []
-    conflict = Conflict(relative, f"{relative.name} (whole {kind})")
-    for name in touched:
-        conflict.add(name)
-    return changed[-1][1], [conflict]
-
-
 def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) -> tuple[bytes, list[Conflict]]:
     """Compose loose character states by field, just like embedded scripts."""
     from . import esd_merge
@@ -930,6 +1186,26 @@ def _compose_esd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Path) 
             conflict.add(name)
         conflicts.append(conflict)
     return (vanilla if combined == original else deflate(vanilla, combined)), conflicts
+
+
+def _whole_anibnd(changed: list[tuple[str, bytes]], relative: Path, kind: str = "character file") -> tuple[bytes, list[Conflict]]:
+    touched = [name for name, _data in changed]
+    if len(touched) < 2:
+        return changed[-1][1], []
+    conflict = Conflict(relative, f"{relative.name} (whole {kind})")
+    for name in touched:
+        conflict.add(name)
+    return changed[-1][1], [conflict]
+
+
+def _member_composer(member):
+    if member.lower().endswith('.esd'):
+        from .esd_merge import compose
+        return compose
+    if member.lower().endswith('.tae'):
+        from .tae_merge import compose
+        return compose
+    return None
 
 
 def _compose_emevd(vanilla, mods, relative, *, conflicts_only=False):
@@ -1015,21 +1291,21 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
     winners: dict[str, bytes] = {}
     owners: dict[str, str] = {}
     conflicts: dict[str, Conflict] = {}
-    combined_esd = {}
+    combined_records = {}
     for member, base in base_members.items():
-        if not member.lower().endswith('.esd'):
+        composer = _member_composer(member)
+        if composer is None:
             continue
         original = bytes(base_plain[base.offset:base.offset + base.size])
         variants = [(name, bytes(plain[owned[member].offset:owned[member].offset + owned[member].size]))
                     for name, plain, owned in plains]
         if len({data for _, data in variants if data != original}) < 2:
             continue
-        from . import esd_merge
         try:
-            combined, collisions = esd_merge.compose(original, variants)
+            combined, collisions = composer(original, variants)
         except FormatError:
-            continue  # Unknown ESD layouts keep the existing member conflict.
-        combined_esd[member] = combined
+            continue  # Unsupported record layouts retain the member conflict.
+        combined_records[member] = combined
         for part, names in collisions:
             key = f'{member}/{part}'
             conflict = conflicts.setdefault(key, Conflict(relative, key))
@@ -1037,7 +1313,7 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
                 conflict.add(name)
     for name, plain, owned in plains:
         for member, entry in owned.items():
-            if member in combined_esd:
+            if member in combined_records:
                 continue
             base = base_members[member]
             theirs = bytes(plain[entry.offset:entry.offset + entry.size])
@@ -1049,7 +1325,7 @@ def _compose_anibnd(vanilla: bytes, mods: list[tuple[str, bytes]], relative: Pat
                 entry_conflict.add(name)
             winners[member] = theirs
             owners[member] = name
-    winners.update(combined_esd)
+    winners.update(combined_records)
     if conflicts_only:
         return vanilla, list(conflicts.values())
     items = {member: bytes(base_plain[entry.offset:entry.offset + entry.size])
@@ -1097,10 +1373,11 @@ def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind
                 result.pop(member, None)
             else:
                 result[member] = theirs
-    # Directory additions do not prevent the existing ESD composer from
-    # combining independent state-machine edits to a retained member.
+    # Directory additions still allow independent state-machine or animation
+    # edits to a retained member to combine through its record composer.
     for member, original in base.items():
-        if not member.lower().endswith('.esd') or any(member not in variant for _, variant in variants):
+        composer = _member_composer(member)
+        if composer is None or any(member not in variant for _, variant in variants):
             continue
         edits = [(name, variant[member]) for name, variant in variants]
         if len({entry.data for _name, entry in edits if entry.data != original.data}) < 2:
@@ -1108,9 +1385,8 @@ def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind
         if any((entry.member_id, entry.name, entry.flags) !=
                (original.member_id, original.name, original.flags) for _, entry in edits):
             continue
-        from . import esd_merge
         try:
-            combined, collisions = esd_merge.compose(original.data, [(name, entry.data) for name, entry in edits])
+            combined, collisions = composer(original.data, [(name, entry.data) for name, entry in edits])
         except FormatError:
             continue
         result[member] = replace(original, data=combined)
@@ -1120,9 +1396,9 @@ def _compose_bnd3_directory(vanilla, base_plain, plains, changed, relative, kind
             collision = conflicts.setdefault(part_key, Conflict(relative, part_key))
             for name in names:
                 collision.add(name)
-    entries = [result[key(e)] for e in base_entries if key(e) in result]
-    entries += sorted((e for name, e in result.items() if name not in base),
-                      key=lambda e: (e.member_id, e.name))
+    # Animation binders keep their high-ID skeleton/compendium entries last.
+    # Appending new clips after those entries crashes the native loader.
+    entries = sorted(result.values(), key=lambda e: (e.member_id, e.name))
     if len({e.member_id for e in entries}) != len(entries):
         return _whole_anibnd(changed, relative, kind)
     if conflicts_only:
@@ -1288,8 +1564,16 @@ def describe_changes(folder: Path, game_root: Path | None):
         notes.append('Locate the game to compare records against vanilla.')
         return {'changes': changes, 'truncated': False, 'note': ' '.join(notes)}
     game_root = Path(game_root)
+    from . import record_edits
+    portable = {}
+    if (folder/record_edits.FILENAME).is_file():
+        declared = record_edits.decode(record_edits.read(folder/record_edits.FILENAME))
+        changes += record_edits.describe(declared)
+        mod = Mod(folder.name,folder,{}, {path:spec for path,spec in declared.items() if path in FILES})
+        originals = vanilla_files(game_root,frozenset(mod.edits))
+        portable = materialize_mod(mod,originals).files
     mod_params = folder / RELATIVE
-    params = (mod_params.read_bytes() if mod_params.is_file() else None, None)
+    params = (portable.get(RELATIVE,mod_params.read_bytes() if mod_params.is_file() else None), None)
     if params[0] is not None:
         params = (params[0], _vanilla_bytes(game_root, RELATIVE, notes,
                                           "parameter archive"))
@@ -1314,14 +1598,15 @@ def describe_changes(folder: Path, game_root: Path | None):
     for relative, document in ((texts.RELATIVE, texts.TextDocument),
                                (texts.MENU_RELATIVE, texts.MenuDocument)):
         mod_file = folder / relative
-        if not mod_file.is_file():
+        if not mod_file.is_file() and relative not in portable:
             continue
         what = "menu text" if document is texts.MenuDocument else "item text"
         base_bytes = _vanilla_bytes(game_root, relative, notes, what)
         if base_bytes is None:
             continue
         try:
-            mine, base = document(mod_file.read_bytes()), document(base_bytes)
+            mine = document(portable[relative] if relative in portable else mod_file.read_bytes())
+            base = document(base_bytes)
         except FormatError as error:
             notes.append(f'{relative.name} cannot be read ({error})')
             continue
@@ -1332,20 +1617,3 @@ def describe_changes(folder: Path, game_root: Path | None):
     truncated = total > CHANGE_LIMIT
     return {'changes': changes[:CHANGE_LIMIT], 'truncated': truncated,
             'total': total, 'note': ' '.join(notes)}
-
-
-def loaded_files(folder: Path):
-    """Mod-folder-relative files the loader reads, casefolded for matching."""
-    from .tweak_mods import checked
-    folder = checked(Path(folder))
-    try:
-        pairs = content_files(folder, folder.name)
-    except (ValueError, OSError):
-        return []
-    found = set()
-    for _key, disk in pairs:
-        try:
-            found.add(disk.relative_to(folder).as_posix().casefold())
-        except ValueError:
-            continue
-    return sorted(found)

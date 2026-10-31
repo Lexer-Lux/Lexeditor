@@ -183,16 +183,11 @@ def metadata(root: Path) -> dict:
     mod has not actually been named yet (core/mod_metadata.py).
     """
     from core import mod_metadata
-    path = root / MOD_FILE
-    value = {}
-    if path.exists():
-        value = json.loads(path.read_text(encoding="utf-8-sig"))
-        if not isinstance(value, dict):
-            raise ValueError("mod.json must contain an object")
-        for key in ("name", "version"):
-            if key in value and not isinstance(value[key], str):
-                raise ValueError(f"Mod {key} must be text")
-    standard = mod_metadata.read(root)
+    value = mod_metadata._stored(root)
+    for key in ("name", "version"):
+        if key in value and not isinstance(value[key], str):
+            raise ValueError(f"Mod {key} must be text")
+    standard = mod_metadata._standard(root,value)
     return {**value, **{key: standard[key] for key in mod_metadata.FIELDS},
             "name": standard["displayName"], "version": standard["version"],
             "missing": standard["missing"]}

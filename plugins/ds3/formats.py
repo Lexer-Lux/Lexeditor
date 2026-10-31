@@ -25,9 +25,6 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 from core.numeric_values import integer_value
 
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.padding import PKCS7
-
 
 DS3_REGULATION_KEY = b"ds3#jn/8_7(rsY9pg55GFN7VFL#+3n/)"
 DCX_MAGIC = b"DCX\x00"
@@ -144,6 +141,7 @@ def decrypt_regulation(data: bytes) -> tuple[bytes, bool]:
     if len(data) < 32 or (len(data) - 16) % 16:
         raise DS3FormatError("DS3 regulation is neither BND4 nor IV + AES-CBC ciphertext")
     iv, ciphertext = data[:16], data[16:]
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     decryptor = Cipher(algorithms.AES(DS3_REGULATION_KEY), modes.CBC(iv)).decryptor()
     padded = decryptor.update(ciphertext) + decryptor.finalize()
     plain = dcx_payload(padded) if padded.startswith(DCX_MAGIC) else _strip_writer_padding(padded)
@@ -154,6 +152,8 @@ def decrypt_regulation(data: bytes) -> tuple[bytes, bool]:
 
 def encrypt_regulation(plain: bytes, iv: bytes | None = None) -> bytes:
     """Return the installed game's shape: IV || AES-CBC of a DCX-wrapped BND4."""
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.primitives.padding import PKCS7
     if not plain.startswith(b"BND4"):
         raise DS3FormatError("Only audited BND4 payloads can be encrypted as DS3 regulation data")
     iv = os.urandom(16) if iv is None else iv

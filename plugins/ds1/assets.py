@@ -33,6 +33,7 @@ ASSET_ROOTS = ("chr", "event", "facegen", "font", "map", "menu", "movww", "msg",
 # The installed game's biggest asset is a 380 MB movie.
 MAX_ASSET_BYTES = 512 * 1024 * 1024
 MAX_ASSET_FILES = 2000
+MAX_ASSET_NODES = 32000
 MAX_ASSET_TOTAL = 4 * 1024 * 1024 * 1024
 MAX_PREVIEW_DIM = 512
 MAX_PREVIEW_BYTES = 256 * 1024 * 1024
@@ -53,6 +54,7 @@ COLLISION_EXTENSIONS = frozenset({'.hkx', '.hkxbhd', '.hkxbdt'})
 TEXTURE_EXTENSIONS = frozenset({'.tpf', '.tpfbhd', '.tpfbdt', '.chrtpfbdt', '.dds', '.png', '.ccm'})
 SPLIT_ARCHIVE_EXTENSIONS = frozenset({'.tpfbdt'})
 SOUND_EXTENSIONS = frozenset({'.fev', '.fsb', '.itl', '.mix', '.mch', '.rpc'})
+BUILD_INPUT_SUFFIXES = frozenset({'.py', '.pyc', '.pyo'})
 # FMOD bank name tags that mark music: area themes (m), streamed themes
 # (sm) and the mix setup. Every other bank is sound effects.
 MUSIC_TAGS = ('_sm', '_m', 'main', 'mixer', 'multi')
@@ -121,16 +123,56 @@ def is_owned(relative):
 
 def check_relative(value):
     """A game-relative override path, contained and within the asset roots."""
-    relative = Path(str(value).replace("\\", "/"))
-    if relative.is_absolute() or ".." in relative.parts or not relative.parts:
-        raise AssetError("An override names a file inside the installed game")
+    from core.mod_library import relative_path
+    try:
+        relative = relative_path(str(value))
+    except ValueError as error:
+        raise AssetError(str(error)) from error
     if relative.parts[0] not in ASSET_ROOTS:
         raise AssetError(f"The {relative.parts[0]} folder holds no replaceable game files")
+    if relative.suffix.casefold() == '.exe':
+        raise AssetError('Executable files are not mod data; Lexeditor never writes game executables')
+    if relative.suffix.casefold() in BUILD_INPUT_SUFFIXES:
+        raise AssetError('Python files are build inputs, not Dark Souls game assets')
     if is_owned(relative):
         raise AssetError("That file has its own editor; change it there instead")
-    if relative.name.startswith(".lexeditor-") or relative.name.endswith(".lexeditor-original"):
+    if '.lexeditor-' in relative.name.casefold():
         raise AssetError("That name is reserved for Lexeditor's own bookkeeping")
     return relative
+
+
+def _project_files(root, strict):
+    """Stream a bounded tree; refuse links before entering directories."""
+    count = 0
+    for top in ASSET_ROOTS:
+        stack = [root/top]
+        while stack:
+            directory = stack.pop()
+            try:
+                directory = _checked(directory)
+                if not directory.is_dir():
+                    continue
+                with os.scandir(directory) as entries:
+                    for entry in entries:
+                        count += 1
+                        if count > MAX_ASSET_NODES:
+                            if strict:
+                                raise AssetError(f'The asset tree contains more than {MAX_ASSET_NODES} files or folders')
+                            return
+                        if entry.name.casefold() == '__pycache__' or '.lexeditor-' in entry.name.casefold():
+                            continue
+                        try:
+                            path = _checked(Path(entry.path))
+                            if path.is_dir():
+                                stack.append(path)
+                            elif path.suffix.casefold() not in BUILD_INPUT_SUFFIXES:
+                                yield path
+                        except (OSError, ValueError) as error:
+                            if strict:
+                                raise AssetError(f'{entry.name}: {error}') from error
+            except (OSError, ValueError) as error:
+                if strict:
+                    raise AssetError(f'{directory.name}: {error}') from error
 
 
 def scan_project(project, strict=True, game_root=None):
@@ -148,46 +190,36 @@ def scan_project(project, strict=True, game_root=None):
     root = _checked(project)
     tweak_mod = script_mods.is_script_mod(root)
     found, total = [], 0
-    for top in ASSET_ROOTS:
-        folder = root / top
-        if not folder.is_dir():
+    for path in _project_files(root,strict):
+        if path.name == MARKER or path.name == 'mod.json':
             continue
-        for path in sorted(folder.rglob("*")):
-            if path.is_dir() or path.name == MARKER or path.name == "mod.json" \
-                    or path.name.startswith(".lexeditor-"):
-                continue
-            relative = path.relative_to(root)
-            if is_owned(relative):
-                continue
-            # script/ is a game folder and also where a tweak mod keeps its
-            # build script, assembly and templates (core/script_mods). In a
-            # tweak mod that folder is the mod's own code, never an override:
-            # deploying it put tweak.py and its sources into the game.
-            if tweak_mod and script_mods.owns(relative.as_posix()):
-                continue
-            if len(found) >= MAX_ASSET_FILES:
-                if strict:
-                    raise AssetError(f"A mod carries at most {MAX_ASSET_FILES} asset overrides")
-                return found
-            size = path.stat().st_size
-            if size > MAX_ASSET_BYTES:
-                if strict:
-                    raise AssetError(f"{relative.as_posix()} is too large to carry as an override")
-                continue
-            total += size
-            if total > MAX_ASSET_TOTAL:
-                if strict:
-                    raise AssetError("The mod's asset overrides are too large in total")
-                return found
-            if game_root is None:
-                status = None
-            else:
-                status = 'modified' if (Path(game_root) / relative).is_file() else 'new'
-            found.append({"relative": relative.as_posix(), "size": size,
-                          "kind": kind_of(relative.as_posix()),
-                          "archive": is_split_archive(relative.as_posix()),
-                          "status": status})
-    return found
+        relative = path.relative_to(root)
+        if is_owned(relative) or tweak_mod and script_mods.owns(relative.as_posix()):
+            continue
+        try:
+            relative = check_relative(relative)
+        except AssetError:
+            if strict:
+                raise
+            continue
+        if len(found) >= MAX_ASSET_FILES:
+            if strict:
+                raise AssetError(f'A mod carries at most {MAX_ASSET_FILES} asset overrides')
+            break
+        size = path.stat().st_size
+        if size > MAX_ASSET_BYTES:
+            if strict:
+                raise AssetError(f'{relative.as_posix()} is too large to carry as an override')
+            continue
+        total += size
+        if total > MAX_ASSET_TOTAL:
+            if strict:
+                raise AssetError('The mod\'s asset overrides are too large in total')
+            break
+        status = None if game_root is None else 'modified' if (Path(game_root)/relative).is_file() else 'new'
+        found.append({'relative':relative.as_posix(),'size':size,'kind':kind_of(relative.as_posix()),
+                      'archive':is_split_archive(relative.as_posix()),'status':status})
+    return sorted(found,key=lambda row:row['relative'].casefold())
 
 
 def scan_game(game_root, project=None):
@@ -346,7 +378,7 @@ def store_bytes(project, relative, data):
         raise AssetError("That file is too large to carry as an override")
     target = _checked(Path(project) / relative)
     target.parent.mkdir(parents=True, exist_ok=True)
-    from .store import atomic_write
+    from core.plugin_files import atomic_write
     atomic_write(target, bytes(data))
     return {"relative": relative.as_posix(), "size": len(data)}
 

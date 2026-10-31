@@ -154,8 +154,11 @@ def main():
                         state.deployment.everApplied=false;
                         state.deployment.changedExternally=false;
                         state.deployment.native.backupOk=true;
+                        state.deployment.native.canRestore=false;
                         render();
                     }""")
+                    assert page.get_by_role("button", name="Restore original", exact=True).is_disabled()
+                    page.evaluate('state.deployment.native.canRestore=true;render()')
                     assert page.get_by_role("button", name="Restore original", exact=True).is_enabled()
                     session.stop()
                     session = DS1Session({**env, "LEXEDITOR_NO_MOD": "1", "LEXEDITOR_MOD_READ_ONLY": "1"})

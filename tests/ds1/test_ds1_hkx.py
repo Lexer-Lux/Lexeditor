@@ -193,3 +193,12 @@ def test_item_blob_past_data_refused():
         HkxDocument(_retarget_blob_count(blob, count=2 ** 30))
     with pytest.raises(HkxError, match='out of range'):
         HkxDocument(_retarget_blob_count(blob, count=-5))
+
+
+def test_large_primitive_item_is_bounded_by_its_real_data():
+    # Retail collision arrays exceed the old 1 MiB item limit. The same
+    # checked ITEM reader serves animation blobs and collision coordinates.
+    blob = build_tag0(extra_data=1500000)
+    assert peek_animation(blob)['frames'] == 4
+    with pytest.raises(HkxError,match='past its data'):
+        peek_animation(_retarget_blob_count(blob,delta=5000))

@@ -108,7 +108,7 @@ def test_archive_cache_tracks_contents_order_originals_and_mode(monkeypatch, tmp
         return mod_loader.Mod(name, tmp_path / name, {relative: data})
     mods = [mod('A', b'a'), mod('B', b'b')]
     def run(original=b'base', selected=None, inspect=False):
-        return mod_loader._compose_file(relative, original, mods if selected is None else selected, inspect)
+        return mod_loader._compose_files({relative: original}, mods if selected is None else selected, inspect)
     first = run()
     first.conflicts[0].mods.clear()
     first.files.clear()
@@ -255,7 +255,7 @@ def test_mod_activation_deploys_the_current_script_build(monkeypatch, tmp_path):
     monkeypatch.setattr(tweak_mods, 'locked', lambda game: nullcontext())
     def prepare(game, library, **kwargs):
         generated.write_bytes(b'current settings')
-        return {}
+        return {'files': []}
     monkeypatch.setattr(tweak_mods, 'prepare', prepare)
     monkeypatch.setattr(tweak_mods, 'commit', lambda game, plan: None)
     monkeypatch.setattr(adapter, '_mods', lambda paths: [

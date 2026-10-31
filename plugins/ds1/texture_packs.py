@@ -101,6 +101,38 @@ def write(header, textures):
     return bytes(result)
 
 
+def menu_texture_names(layout_data):
+    """Names addressed by the prepared layout's TEXI slots, in slot order."""
+    from . import formats, menu_layout
+    layout = menu_layout.Drb(formats.inflate(layout_data))
+    directory, count = layout.sections['TEXI']
+    return [layout.string(struct.unpack_from('<i', directory, i * 16)[0]) for i in range(count)]
+
+
+def align_menu(layout_data, main, supplements=()):
+    """The combined menu's texture indices address an identically ordered pack."""
+    from . import formats
+    names = menu_texture_names(layout_data)
+    plain = formats.inflate(main) if main.startswith(b'DCX\0') else main
+    header, rows = read(plain)
+    available = {row.name: row for row in rows}
+    for payload in supplements:
+        data = formats.inflate(payload) if payload.startswith(b'DCX\0') else payload
+        _, extra = read(data)
+        for row in extra:
+            available.setdefault(row.name, row)
+    missing = [name for name in names if name not in available]
+    if missing:
+        raise FormatError('Menu textures missing: ' + ', '.join(missing))
+    ordered = [available[name] for name in names]
+    selected = set(names)
+    ordered.extend(row for row in rows if row.name not in selected)
+    if ordered == rows:
+        return main
+    result = write(header, ordered)
+    return formats.deflate(main, result) if main.startswith(b'DCX\0') else result
+
+
 def merge(original, variants, *, conflicts_only=False):
     """Independent additions, edits and deletions; last owner wins collisions."""
     header, base_rows = read(original)

@@ -76,10 +76,15 @@ class LoaderTests(unittest.TestCase):
         tweak_mods.save({mod_id: {"enabled": on} for mod_id, on in switches.items()}, self.library)
 
     def expected(self, *ids):
-        return exe_patches.runtime_patch(VANILLA, [exe_patches.validate(SPECS[i], i.title()) for i in ids])
+        from plugins.ds1 import runtime_mods
+        return {name: runtime_mods.build(VANILLA, [exe_patches.validate(SPECS[name], name.title())]) for name in ids} or b''
 
     def runtime(self):
-        return (self.game / tweak_mods.RUNTIME_PATCH).read_bytes()
+        # Ordinary mods now live in independently loadable library folders.
+        # The loader-owned patch must not duplicate any of their hooks.
+        self.assertEqual((self.game / tweak_mods.RUNTIME_PATCH).read_bytes(), b'')
+        return {name: (self.library/name.title()/'runtime.lxd').read_bytes() for name in SPECS
+                if json.loads((self.library/name.title()/'mod.json').read_text())['enabled']} or b''
 
     def old_install(self, *ids):
         """What an earlier Lexeditor left: tweaks built into the executable."""
@@ -195,7 +200,7 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual(self.runtime(), self.expected("alpha"))
         self.assertEqual((self.game / tweak_mods.RUNTIME_DLL).read_bytes(), tweak_mods.loader_bytes(online=True))
         self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.LOCK_FILE, tweak_mods.RUNTIME_DLL,
-                                               tweak_mods.RUNTIME_PATCH, tweak_mods.RUNTIME_RECORD]))
+                                               tweak_mods.RUNTIME_PATCH, tweak_mods.RUNTIME_RECORD, tweak_mods.RUNTIME_CONFIG]))
         lock = self.game / tweak_mods.LOCK_FILE
         lock_identity = (lock.stat().st_dev, lock.stat().st_ino)
         self.assertEqual(lock.read_bytes(), b"0")
@@ -223,16 +228,20 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual(self.live.read_bytes(), VANILLA)
         self.assertEqual(self.files(), sorted([exe_patches.EXECUTABLE, tweak_mods.LOCK_FILE]))
 
-    def test_an_executable_an_earlier_lexeditor_patched_is_put_back_once(self):
+    def test_an_executable_an_earlier_lexeditor_patched_is_left_for_steam(self):
         self.old_install("alpha")
         self.enable(alpha=True)
-        before = tweak_mods.status(self.game, self.library)
-        self.assertTrue(before["builtIntoExecutable"])
+        before = self.live.read_bytes()
+        with self.assertRaisesRegex(tweak_mods.TweakError, 'Verify.*Steam'):
+            tweak_mods.apply(self.game, self.library)
+        tweak_mods.restore(self.game, self.library)
+        self.assertEqual(self.live.read_bytes(), before)
+        self.live.write_bytes(VANILLA)  # Simulated verification outside Lexeditor.
         result = tweak_mods.apply(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), VANILLA)
         self.assertEqual(self.runtime(), self.expected("alpha"))
-        self.assertEqual((result["applied"], result["builtIntoExecutable"]), (["Alpha"], False))
-        self.assertNotIn(tweak_mods.MANIFEST_FILE, self.files())
+        self.assertEqual(result["applied"], ["Alpha"])
+        self.assertIn(tweak_mods.MANIFEST_FILE, self.files())
 
     def test_another_mods_dinput8_is_never_replaced(self):
         (self.game / tweak_mods.RUNTIME_DLL).write_bytes(b"someone else's loader")
@@ -248,21 +257,20 @@ class LoaderTests(unittest.TestCase):
         tweak_mods.apply(self.game, self.library)
         foreign = self.live.read_bytes()[:-1] + b"\x7f"
         self.live.write_bytes(foreign)
-        for action in (tweak_mods.apply, tweak_mods.restore):
-            with self.assertRaisesRegex(tweak_mods.TweakError, "outside Lexeditor"):
-                action(self.game, self.library)
+        with self.assertRaisesRegex(tweak_mods.TweakError, "Verify.*Steam"):
+            tweak_mods.apply(self.game, self.library)
+        tweak_mods.restore(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), foreign)
-        self.assertIn("outside Lexeditor", tweak_mods.status(self.game, self.library)["problem"])
+        self.assertIn('Verify', tweak_mods.status(self.game, self.library)['problem'])
+        self.assertNotIn(tweak_mods.RUNTIME_DLL, self.files())
 
-    def test_a_changed_or_missing_original_is_refused(self):
+    def test_a_changed_or_missing_old_executable_backup_is_never_used(self):
         self.enable(alpha=True)
         patched = self.old_install("alpha")
         (self.game / tweak_mods.BACKUP_FILE).write_bytes(VANILLA[:-1] + b"\x01")
-        with self.assertRaisesRegex(tweak_mods.TweakError, "original"):
-            tweak_mods.restore(self.game, self.library)
+        tweak_mods.restore(self.game, self.library)
         (self.game / tweak_mods.BACKUP_FILE).unlink()
-        with self.assertRaisesRegex(tweak_mods.TweakError, "original"):
-            tweak_mods.restore(self.game, self.library)
+        tweak_mods.restore(self.game, self.library)
         self.assertEqual(self.live.read_bytes(), patched)
 
     def test_a_failed_write_keeps_the_original(self):
@@ -275,15 +283,10 @@ class LoaderTests(unittest.TestCase):
 
     def test_a_change_while_preparing_is_refused(self):
         self.enable(alpha=True)
-        real = exe_patches.runtime_patch
-
-        def build_then_tamper(*args):
-            result = real(*args)
-            self.live.write_bytes(VANILLA[:-1] + b"\x02")
-            return result
-        with mock.patch.object(exe_patches, "runtime_patch", build_then_tamper):
-            with self.assertRaisesRegex(tweak_mods.TweakError, "changed while"):
-                tweak_mods.apply(self.game, self.library)
+        plan = tweak_mods.prepare(self.game,self.library)
+        self.live.write_bytes(VANILLA[:-1] + b"\x02")
+        with self.assertRaisesRegex(tweak_mods.TweakError, "changed while"):
+            tweak_mods.commit(self.game,plan)
         self.assertEqual(self.live.read_bytes(), VANILLA[:-1] + b"\x02")
 
     def test_a_running_game_stops_everything_before_any_write(self):
@@ -571,9 +574,8 @@ class BuildContextTests(unittest.TestCase):
             game = Path(folder)
             source = game / "param.dcx"
             source.write_bytes(b"vanilla")
-            from plugins.ds1.mod_loader import RELATIVE as relative
-            mod = mock.Mock(files={relative: b"mod"})
-            mod.name = "A mod"
+            from plugins.ds1.mod_loader import RELATIVE as relative, Mod
+            mod = Mod('A mod',game/'mod',{relative:b'mod'})
             with mock.patch("plugins.ds1.deployment.vanilla_source", return_value=source), \
                  mock.patch("plugins.ds1.mod_loader.active_mods", return_value=[mod]) as active, \
                  mock.patch("plugins.ds1.mod_loader._compose_params",

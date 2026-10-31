@@ -11,7 +11,7 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attack
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
   mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapCollisionHigh:false,mapCollisionLow:false,mapNavigation:false,mapRegions:false,mapPlacementFilter:"all",
   dirTab:"all",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null,
-  dirFit:null,mapListPage:0,mapListFit:null,mapListSort:null,mapFit:null};
+  dirFit:null,mapListPage:0,mapListFit:null,mapListSort:null,mapFit:null,collision:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0,animMount=0;
 const lastSubByTab={};
 const attackPreviews=new Map();
@@ -83,22 +83,47 @@ async function api(path,body){
 }
 const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.message||String(error)});
 const failMount=(status,text)=>error=>{status.textContent=text;notify(error);};
-const fieldHistory={undoStack:[],redoStack:[],applying:false,
-  get canUndo(){return this.undoStack.length>0;},get canRedo(){return this.redoStack.length>0;},
+const fieldHistory={undoStack:[],redoStack:[],transaction:null,
+  get applying(){return this.transaction?.phase==='applying';},
+  get canUndo(){return !this.transaction&&this.undoStack.length>0;},get canRedo(){return !this.transaction&&this.redoStack.length>0;},
   record(entry){
     if(this.applying||(!entry.edits&&entry.before===entry.after))return;
     entry.at=LexeditorUI.nextHistoryTick();
     this.undoStack.push(entry);if(this.undoStack.length>200)this.undoStack.shift();
     this.redoStack=[];shell.refresh();
+    // Structural mesh edits can dwarf scalar history. Keep retained snapshots
+    // within 16 MiB rather than retaining 200 complete collision meshes.
+    let bytes=this.undoStack.reduce((sum,item)=>sum+(item.snapshotBytes||0),0);
+    while(bytes>16*1024*1024&&this.undoStack.length){bytes-=this.undoStack.shift().snapshotBytes||0;}
   },
-  async undo(){await edits;const entry=this.undoStack.pop();if(!entry)return false;this.redoStack.push(entry);await this.apply(entry,"before");return true;},
-  async redo(){await edits;const entry=this.redoStack.pop();if(!entry)return false;this.undoStack.push(entry);await this.apply(entry,"after");return true;},
+  undo(){return this.move('before');},
+  redo(){return this.move('after');},
+  move(side){
+    if(this.transaction)return Promise.resolve(false);
+    const transaction=this.transaction={phase:'queued'};
+    state.pending++;shell.refresh();
+    const operation=edits.then(async()=>{
+      // Earlier field requests must still record their history while this
+      // action waits. Suppress feedback only while replaying the history.
+      transaction.phase='applying';
+      const source=side==='before'?this.undoStack:this.redoStack;
+      const target=side==='before'?this.redoStack:this.undoStack;
+      const entry=source.at(-1);
+      if(!entry||!await this.apply(entry,side))return false;
+      source.pop();target.push(entry);return true;
+    }).finally(()=>{this.transaction=null;state.pending--;shell.refresh();});
+    edits=operation.then(()=>{});
+    return operation;
+  },
   async apply(entry,side){
-    this.applying=true;
     try{
-      await edits;
       let refresh=false;
       for(const edit of entry.edits||[entry]){
+        if(edit.collision){
+          const result=await api('/api/map/collision/state',{table:edit.table,mesh:edit[side]});
+          state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
+          continue;
+        }
         if(edit.rename){
           const renamed=await api("/api/rename",{table:edit.table,id:edit.id,name:edit[side],sub:state.sub});
           state.dirty=renamed.dirtyCount;state.changes=renamed.changes||state.changes;
@@ -124,8 +149,8 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
       // would close the drawer mid-inspection. Anything else renders.
       else if((entry.edits||[entry]).every(edit=>edit.table==="AtkParam_Npc")&&await refreshChrDrawer()){}
       else render();
-    }catch(error){notify(error);}
-    finally{this.applying=false;shell.refresh();}
+      return true;
+    }catch(error){notify(error);return false;}
   },
   clear(){this.undoStack=[];this.redoStack=[];shell.refresh();}};
 // Ctrl+Z lives in the shell's shortcut dispatcher, which undoes fieldHistory:
@@ -308,7 +333,7 @@ async function refreshMonsterPanels(){
   state.monsterAttacks=attacks;state.thinkRow=think;state.monsterBehaviors=behaviors;
 }
 async function loadDetail(){
-  let row=state.rows.find(row=>key(row)===state.selected);
+  let row=state.collision?.rows.find(row=>key(row)===state.selected)||state.rows.find(row=>key(row)===state.selected);
   let sub=state.sub;
   if(!row&&state.tab==="maps"){
     row=state.dirRows.find(row=>key(row)===state.selected);
@@ -463,6 +488,13 @@ async function openCatalog(table,id){
   }catch(error){notify(error);}
 }
 function openRecord(link){
+  if(link.kind==='collisionVertex'){
+    const [,map,model,layer,mesh]=link.table.split('|');
+    const options={model,layer,mesh:Number(mesh),kind:'vertices',selected:`${link.table}:${link.id}`};
+    if(state.tab==='maps'&&state.mapTab==='collision'&&state.mapId===map)return chooseCollision(options);
+    state.mapId=map;state.mapTab='collision';state.collision={...options,rows:[]};
+    return navigate('maps','placements',options.selected);
+  }
   if(link.kind==="catalog"&&link.tab)return navigate(link.tab,link.sub,`${link.table}:${link.id}`);
   if(link.kind==="effect")return openEffect(link);
   if(link.kind==="attack")return navigate("attacks",ATTACK_SUBS[link.table]||"attacks",`${link.table}:${link.id}`);
@@ -546,14 +578,15 @@ async function deploymentAction(action){
   if(state.deployBusy)return;
   if(state.dirty+state.pending){LexeditorUI.showAlert({title:"Save project changes first",message:"Applying installs the archive already saved to the mod project."});return;}
   const confirmations={
-    apply:{title:"Apply this mod to the installed game?",message:"Lexeditor installs the saved parameter archive, map files and character files and composes this project's native rules with enabled library tweaks. Each original is preserved once. Close the game first and test native changes offline.",confirmLabel:"Apply"},
-    disable:{title:"Restore the original installed files?",message:"Lexeditor restores its owned parameter, map, character and executable changes. Project values and library tweak switches remain unchanged.",confirmLabel:"Restore original"}
+    apply:{title:"Apply this mod to the installed game?",message:"Lexeditor combines this mod's saved changes with enabled library mods. It preserves the original data and applies native changes in memory. Close the game first.",confirmLabel:"Apply"},
+    disable:{title:"Restore the original installed files?",message:"Lexeditor restores owned data files and removes its loader. Saved mod settings and the game executable stay unchanged.",confirmLabel:"Restore original"}
   };
   if(action==="apply"&&state.nativeRules?.migration)confirmations.apply.message+=" "+state.nativeRules.migration;
   const ok=await confirmAction({...confirmations[action],cancelLabel:"Cancel"});
   if(!ok)return;
   state.deployBusy=true;render();
-  try{await api("/api/deployment/"+action,{});await loadDeployment();}
+  try{const result=await api("/api/deployment/"+action,{});await loadDeployment();
+    if(result.disabledMods?.length)LexeditorUI.showToast(result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});}
   catch(error){notify(error);}
   finally{state.deployBusy=false;render();}
 }
@@ -569,6 +602,7 @@ async function save(){
   await edits;
   try{
     const result=await api("/api/save",{});attackPreviews.clear();await refreshState();
+    if(state.tab==='maps'&&state.mapTab==='collision')await refreshCollision();
     if(state.tab==="tweaks"){await loadTweaks();render();}else shell.refresh();
     if(!reportTweakRebuild(result))LexeditorUI.showToast("Changes saved to the mod project.");
   }
@@ -584,6 +618,7 @@ async function discard(){
   // server reply re-sets it, so this runs after the last one; the
   // drift itself stays on disk for the next save to rebuild.
   state.tweaksNeedRebuild=false;
+  ignoredModRevision=modRevision;
 }
 // An item's in-game name lives in the game's text, which the mod carries
 // beside its parameters; the server renames it there.
@@ -603,7 +638,8 @@ function renameRecord(row,name){
   });
 }
 function patchRowValues(table,id,values,display,name,modified){
-  const target=state.rows.find(row=>row.table===table&&row.id===id)||state.dirRows.find(row=>row.table===table&&row.id===id);
+  recordRows.delete(`${table}:${id}`);
+  const target=state.collision?.rows.find(row=>row.table===table&&row.id===id)||state.rows.find(row=>row.table===table&&row.id===id)||state.dirRows.find(row=>row.table===table&&row.id===id);
   if(!target||!values)return;
   target.values=values;target.display=display||{};
   if(name!==undefined&&name!==null)target.name=name;
@@ -660,7 +696,8 @@ function commit(row,field,value,control,beforeOverride){
       const updates=[{id:row.id,result}];
       // The other selected records of this table get the same value.
       for(const other of (state.selection||[]).filter(k=>k!==key(row)&&k.startsWith(row.table+":"))){
-        const id=Number(other.slice(row.table.length+1));
+        const rawId=other.slice(row.table.length+1);
+        const id=row.table.startsWith('CollisionMesh|')?rawId:Number(rawId);
         const prior=(await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${id}&sub=${encodeURIComponent(state.sub)}`)).row.fields.find(item=>item.key===field.key)?.value;
         const changed=await api("/api/edit",{table:row.table,id,field:field.key,value,sub:state.sub});
         latest=changed;
@@ -749,7 +786,8 @@ function commit(row,field,value,control,beforeOverride){
           await loadDirectory().catch(notify);
           refreshMapSide();refreshDirectory();refreshMapsDetail();
         }
-        if(updates.some(update=>update.result.refreshRows))await loadItems().then(render);
+        if(row.table.startsWith('CollisionMesh|'))await refreshCollision();
+        else if(updates.some(update=>update.result.refreshRows))await loadItems().then(render);
         else if(state.tab==="animations"){await reloadAnimRows().catch(notify);refreshAnimList();refreshAnimDetail();}
         else if(field.key.startsWith("residentSpEffectId")||["refId","refCategory","replaceSpEffectId","cycleOccurrenceSpEffectId","atkOccurrenceSpEffectId"].includes(field.key))render();
         // An icon or model edit repaints its face (the picture or name beside the number).
@@ -767,6 +805,10 @@ function commit(row,field,value,control,beforeOverride){
   }).catch(notify);
 }
 function describePinnedCell(propertyKey){
+  const vector={Position:'pos',Rotation:'rot',Scale:'scale'}[propertyKey];
+  if(vector)return {label:propertyKey,render:row=>{
+    const values=['X','Y','Z'].map(axis=>row.values?.[vector+axis]).filter(value=>value!==undefined);
+    return values.map(value=>LexeditorUI.formatNumber(value,{maximumSignificantDigits:7})).join(', ');}};
   if(propertyKey==="icon")return{editable:false,label:"",sortable:false,
     width:"var(--lex-fitted-row-height,36px)",
     render:row=>state.tab==="textures"?textureIconCell(row):recordIconCell(row)};
@@ -877,6 +919,13 @@ function referenceFace(row,field){
 }
 function referencePicker(row,field,face,knownLink){
   const link=knownLink||(row.recordLinks||[]).find(entry=>entry.field===field.key);
+  if(link?.kind==='collisionVertex'){
+    const source={kind:state.collision.kind,selected:state.selected,selection:[...(state.selection||[])]};
+    return LexeditorUI.thingFinderButton({label:`Change ${field.label}`,disabled:state.readOnly,
+      type:`ds1-${link.table}`,prompt:`Choose the vertex for ${row.name}.`,
+      target:()=>chooseCollision({kind:'vertices'}),origin:()=>chooseCollision(source),
+      accept:picked=>{state.selection=source.selection;commit(row,field,Number(String(picked).replace(/^v:/,'')),face);}});
+  }
   const clearEntry=Object.entries(field.enum||{}).find(([,label])=>label==="None");
   const source={};
   const value=()=>{const live=state.row&&key(state.row)===key(row)?state.row:row;
@@ -1074,7 +1123,10 @@ async function openIconGallery(row,field,face){
   }
   const dialog=el("section",{class:"lex-dialog ds1-icon-gallery",role:"dialog","aria-modal":"true","aria-label":`Choose icon for ${field.label}`},
     el("h2",{},`Choose icon for ${field.label}`),grid,
-    el("div",{class:"lex-dialog-actions"},el("button",{type:"button",class:"lex-dialog-action",onclick:close},"Cancel")));
+    el("div",{class:"lex-dialog-actions"},
+      ...(field.emptyValue!==undefined?[el("button",{type:"button",class:"lex-dialog-action",onclick:()=>{
+        commit(row,field,field.emptyValue,face);face.value=String(field.emptyValue);close();}},"Clear icon")]:[]),
+      el("button",{type:"button",class:"lex-dialog-action",onclick:close},"Cancel")));
   backdrop.append(dialog);
   backdrop.addEventListener("click",event=>{if(event.target===backdrop)close();});
   document.body.append(backdrop);
@@ -2191,6 +2243,21 @@ function mapsNoun(){
   if(table==="ObjActParam")return "Treasure";
   return "Placement";
 }
+function addSkillButton(){
+  return el("button",{type:"button",class:"lex-header-icon","aria-label":"Add Ash of War",title:"Add Ash of War",disabled:state.rowBusy,onclick:()=>addSkill()},LexeditorUI.addIcon());
+}
+function emptySkillDetail(){
+  return detailPanel({title:"Ashes of War",actions:[addSkillButton()],body:[LexeditorUI.detailNote(
+    state.rows.length?"No matching Ashes of War. Change the search, or add a skill.":"No Ashes of War yet. Add a skill, then assign it from a weapon’s details.")]});
+}
+async function addSkill(){
+  if(state.readOnly){await viewportRequestMod();return;}
+  if(state.rowBusy)return;
+  state.rowBusy=true;render();
+  try{const result=await api("/api/rows/add",{table:"WeaponSkill",id:null});state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;state.query="";await loadItems();state.selected=key(result.row);const index=sortedRows().findIndex(row=>key(row)===state.selected);if(index>=0)state.page=Math.floor(index/state.pageSize);await loadDetail();}
+  catch(error){notify(error);}
+  finally{state.rowBusy=false;render();}
+}
 function rowActionButtons(kind){
   const locked=state.readOnly||state.rowBusy;
   const playerStart=kind==="placement"&&state.row.kind==="Player";
@@ -2207,7 +2274,7 @@ function rowActionButtons(kind){
     :[];
   const duplicateTitle=state.readOnly?`Open a mod project to add ${nouns[0]}s`:`Copy this ${nouns[0]} under the next free ID`;
   const removeTitle=playerStart?"The player start cannot be removed":state.readOnly?`Open a mod project to remove ${nouns[0]}s`:`Remove this ${nouns[0]} from its ${nouns[1]}`;
-  return [...goTo,el("button",{type:"button",class:"lex-header-icon","data-row-action":"duplicate","data-row-kind":kind,disabled:locked,
+  return [...(state.row?.table==="WeaponSkill"?[addSkillButton()]:[]),...goTo,el("button",{type:"button",class:"lex-header-icon","data-row-action":"duplicate","data-row-kind":kind,disabled:locked,
       title:duplicateTitle,"aria-label":duplicateTitle,
       onclick:()=>duplicateRow(kind)},LexeditorUI.copyIcon()),
     el("button",{type:"button",class:"lex-header-icon","data-row-action":"remove","data-row-kind":kind,disabled:locked||playerStart,
@@ -2434,6 +2501,7 @@ function renderScriptDetail(){
       detailSection({title:"CONDITIONS",body:[logView(conditions)]})]});
 }
 function detail(){
+  if(state.mapTab==='collision'&&state.tab==='maps')return collisionDetail();
   const impact=state.row?.impact;
   // A record's heading is its name, on every tab. An attack's sharing
   // lives in its help bubble, never under it.
@@ -2445,6 +2513,7 @@ function detail(){
   if(ASSET_TABS.has(state.tab))return renderAssetDetail();
   if(state.tab==="scripts"&&state.row?.table==="ScriptState")return renderScriptDetail();
   if(!state.row){
+    if(state.tab==="items"&&state.sub==="ashes-of-war")return emptySkillDetail();
     if(state.tab==="animations"&&state.animScope.level==="events")
       return detailPanel({title:"Event",actions:taeActions().slice(0,1),
         body:[LexeditorUI.detailNote(state.rows.length?"Select an event, or add one.":"This animation has no events yet. Add the first one.")]});
@@ -2512,7 +2581,7 @@ const ds1LabelKinds=new Set(["physical","magic","fire","lightning","critical",
   "poison","toxic","bleed","curse","poise",
   "vit","att","end","res","soulLv","souls","slot","humanity","humanityStat","hp","stamina","mp",
   "divine","occult","stability"]);const ds1IconTables=new Set(["EquipParamWeapon","EquipParamProtector","EquipParamAccessory",
-  "EquipParamGoods","Magic","SpEffectParam"]);
+  "EquipParamGoods","Magic","SpEffectParam","WeaponSkill"]);
 function ds1LabelArt(panel){
   if(!(panel instanceof Element))return;
   for(const field of panel.querySelectorAll("[data-lex-icon]")){
@@ -3437,7 +3506,7 @@ function renderItems(){
     // names: a menu label keeps its slot name, so an edited label keeps its record.
     renamable:row=>state.tab==="text"?false:state.tab==="stats"?!["CalcCorrectGraph","EquipMtrlSetParam","CharaInitParam","NativeRules"].includes(row.table):state.tab==="items"&&!(state.sub==="spells"&&row.table!=="Magic"),
     describePinnedCell,commitPinnedCell,
-    detail,emptyDetail:()=>detailPanel({title:"No matching "+noun,...(ASSET_TABS.has(state.tab)?{actions:[assetUploadButton()]}:{}),body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
+    detail,emptyDetail:()=>state.tab==="items"&&state.sub==="ashes-of-war"?emptySkillDetail():detailPanel({title:"No matching "+noun,...(ASSET_TABS.has(state.tab)?{actions:[assetUploadButton()]}:{}),body:[LexeditorUI.detailNote("Change the search to find a record.")]})});
   state.pagedView=view;
   // Pinned headers take the same game art as their fields; the master
   // list renders here, outside any detail panel.
@@ -3449,8 +3518,12 @@ function renderItems(){
   return LexeditorUI.stack(strip,view);
 }
 function viewportHooks(){
-  return {readOnly:state.readOnly,collision:{high:state.mapCollisionHigh===true,low:state.mapCollisionLow===true},navigation:state.mapNavigation,regions:state.mapRegions,
+  return {readOnly:state.readOnly||state.mapTab==='collision',transforms:state.mapTab!=='collision',collision:{high:state.mapCollisionHigh===true,low:state.mapCollisionLow===true},navigation:state.mapNavigation,regions:state.mapRegions,
     onSelect:(key,info)=>{state.mapSelected=key;state.mapInfo=info||null;refreshViewportBar();
+    if(state.mapTab==='collision'){
+      if(info?.kind==='Collision'&&info.model!==state.collision?.model)void chooseCollision({model:info.model,mesh:0});
+      return;
+    }
     if(!key||!state.mapView)return;
     const placementKey=`${state.mapView.map}:${key}`;
     if(placementKey!==state.selected)selectPlacement(placementKey,true);},
@@ -3522,6 +3595,9 @@ function syncPlacementRow(map,partKey,names,afters){
   }
 }
 async function refreshMapsAfterUndo(entry){
+  if((entry.edits||[entry]).some(edit=>String(edit.table).startsWith('CollisionMesh|'))){
+    await refreshCollision();return;
+  }
   const edits=entry.edits||[entry];
   const moved=new Map();
   let namesChanged=false;
@@ -3719,6 +3795,7 @@ async function loadMaps(){
   if(!state.mapList.some(row=>row.id===state.mapId))state.mapId=state.mapList[0]?.id||null;
   state.mapView=state.mapId?await api(`/api/map/view?map=${encodeURIComponent(state.mapId)}`):null;
   state.mapSelected=null;state.mapInfo=null;
+  if(state.mapTab==='collision'){await loadCollision();return;}
   clampMapSelection();
   await loadDetail();
 }
@@ -3775,8 +3852,8 @@ function refreshMapSide(){
 }
 const DIRECTORY_PARAM_TABS=new Set(["drops","treasure"]);
 const DIRECTORY_TABS=["all","drops","treasure","npcs","enemies"];
-const isDirectoryFoe=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.npcType!==2;
-const isDirectoryFriend=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.npcType===2;
+const isDirectoryFoe=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&!row.values.isNpc;
+const isDirectoryFriend=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.isNpc;
 let dirTabRestored=false;
 async function loadDirectory(){
   if(!dirTabRestored){dirTabRestored=true;try{const saved=localStorage.getItem("lex-ds1-directory-tab");if(saved)state.dirTab=saved;}catch(_error){}}
@@ -3809,11 +3886,11 @@ function directoryMatches(){
   const query=state.dirQuery.toLowerCase();
   let filtered=state.dirRows.filter(row=>(row.id+" "+row.name+" "+(row.range||"")+" "+dirRowMap(row)).toLowerCase().includes(query));
   // Local keeps only rows from the open map. Placements name their map;
-  // lots resolve through their dropping NPCs. Treasure rows link to no
-  // placements, so the toggle stays off for them.
+  // lots resolve through their dropping NPCs, and interaction rows through
+  // object activations, including the object's inherited model parameter.
   if(state.dirLocal){
     if(state.dirTab==="npcs"||state.dirTab==="enemies")filtered=filtered.filter(row=>row.table===state.mapId);
-    else if(state.dirTab==="drops")filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
+    else if(DIRECTORY_PARAM_TABS.has(state.dirTab))filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
   }
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,tabSort())||(a.id>b.id?1:a.id<b.id?-1:0));
 }
@@ -3835,9 +3912,9 @@ function directoryStrip(){
   }});
 }
 function directoryLocalRow(){
-  const supported=state.dirTab==="npcs"||state.dirTab==="enemies"||state.dirTab==="drops";
+  const supported=state.dirTab==="npcs"||state.dirTab==="enemies"||DIRECTORY_PARAM_TABS.has(state.dirTab);
   const node=LexeditorUI.pagerToggle({label:"Local?",
-    title:supported?"Show only rows from the open map":"These rows name no map yet, so Local cannot filter them",
+    title:supported?"Show only rows from the open map":"All placements already belong to the open map",
     checked:state.dirLocal,disabled:!supported,
     change:value=>{state.dirLocal=value;state.dirPage=0;refreshDirectory();}});
   node.setAttribute("data-dir-local","");
@@ -3887,8 +3964,158 @@ async function selectDirectoryParam(row){
   refreshMapSide();refreshDirectory();refreshMapsDetail();
 }
 function mapsStrip(){
-  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"lights",label:"Lights"},{id:"messages",label:"Messages"}],
-    active:state.mapTab,label:"Map views",change:id=>{state.mapTab=id;refreshMapSide();}});
+  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"lights",label:"Lights"},{id:"messages",label:"Messages"},{id:"collision",label:"Collision"}],
+    active:state.mapTab,label:"Map views",change:async id=>{
+      await edits;const wasCollision=state.mapTab==='collision';state.mapTab=id;
+      if(id==='collision'){await chooseCollision({});return;}
+      if(wasCollision){state.collision=null;clampMapSelection();await loadDetail();render();}
+      else refreshMapSide();
+    }});
+}
+async function loadCollision(options={}){
+  const previous=state.collision;
+  const token=navigation,map=state.mapId;
+  const models=Object.entries(state.mapView?.models||{}).filter(([,value])=>value.type===5).map(([name])=>name);
+  const selectedModel=state.mapView?.parts.find(part=>part.key===state.mapSelected&&part.kind==='Collision')?.model;
+  const next={model:previous?.model||selectedModel||models[0],layer:'high',mesh:0,kind:'vertices',
+    query:'',page:0,pageSize:20,...previous,...options};
+  if(!models.includes(next.model))next.model=models[0];
+  state.collision=next;state.selection=[];
+  state.mapCollisionHigh=next.layer==='high';state.mapCollisionLow=next.layer==='low';
+  next.rows=[];next.error='';next.loading=true;state.row=null;
+  const current=()=>state.collision===next&&state.tab==='maps'&&state.mapTab==='collision'&&state.mapId===map&&navigation===token;
+  if(!next.model){next.error='This map has no collision models.';next.loading=false;return true;}
+  try{
+    const result=await api(`/api/map/collision?map=${encodeURIComponent(map)}&model=${encodeURIComponent(next.model)}&layer=${next.layer}&mesh=${next.mesh}&kind=${next.kind}`);
+    if(!current())return false;
+    Object.assign(next,result);
+    state.selected=next.rows.some(row=>key(row)===(options.selected||state.selected))?(options.selected||state.selected):next.rows[0]?key(next.rows[0]):null;
+    await loadDetail();
+    return current();
+  }catch(error){if(current()){next.error=error.message;state.row=null;return true;}return false;}
+  finally{next.loading=false;}
+}
+async function chooseCollision(options){
+  await edits;
+  if(state.tab!=='maps'||state.mapTab!=='collision')return;
+  const loaded=loadCollision(options);render();
+  if(!await loaded)return;
+  state.mapCollisionHigh=state.collision.layer==='high';state.mapCollisionLow=state.collision.layer==='low';
+  viewportCtl?.setCollisionLayers?.(state.mapCollisionHigh,state.mapCollisionLow);
+  render();markCollisionPoint(true);
+}
+function markCollisionPoint(focus=false){
+  const collision=state.collision;
+  const part=state.mapView?.parts.find(part=>part.model===collision?.model&&part.key===state.mapSelected)
+    ||state.mapView?.parts.find(part=>part.model===collision?.model);
+  viewportCtl?.point?.(part?.key,state.row?.previewPosition,focus);
+}
+async function refreshCollision(){
+  if(state.tab!=='maps'||state.mapTab!=='collision')return;
+  const table=state.collision?.table;
+  for(const cached of recordRows.keys())if(cached.startsWith(`${table}:`))recordRows.delete(cached);
+  if(!await loadCollision())return;
+  render();
+  if(state.collision?.model)await viewportCtl?.reloadCollision?.(state.collision.model);
+  markCollisionPoint();
+}
+function collisionDetail(){
+  const collision=state.collision;
+  const row=state.row;
+  const noun=collision?.kind==='faces'?'face':'vertex';
+  if(collision?.loading)return detailPanel({title:`Collision ${noun}`,body:[LexeditorUI.loadingPanel({label:'Loading collision records'})]});
+  const derived=collision?.kind==='faces'&&collision.derivedFaces;
+  const actions=['add','duplicate','remove'].map(action=>el('button',{type:'button',class:'lex-header-icon',
+    'aria-label':`${action[0].toUpperCase()+action.slice(1)} collision ${noun}`,
+    title:derived?collision.faceEditReason:`${action[0].toUpperCase()+action.slice(1)} collision ${noun}`,
+    disabled:state.readOnly||state.rowBusy||derived||!!collision?.error||(!row&&action!=='add'),
+    onclick:()=>changeCollisionStructure(action)},
+    action==='add'?LexeditorUI.addIcon():action==='duplicate'?LexeditorUI.copyIcon():LexeditorUI.removeIcon()));
+  if(!row||!String(row.table).startsWith('CollisionMesh|'))return detailPanel({title:`Collision ${noun}`,actions,
+    body:[LexeditorUI.detailNote(collision?.error||`Select a ${noun}.`)]});
+  return detailPanel({title:row.name,actions,body:[...fieldSections(row)].map(([title,body])=>detailSection({title,body}))});
+}
+function changeCollisionStructure(action){
+  if(state.readOnly||state.rowBusy)return;
+  const collision=state.collision,table=collision.table,kind=collision.kind;
+  if(kind==='faces'&&collision.derivedFaces)return;
+  const index=Number(state.row?.id.split(':')[1]||0);
+  const token=navigation;
+  const current=()=>navigation===token&&state.tab==='maps'&&state.mapTab==='collision'&&state.collision===collision;
+  state.rowBusy=true;state.pending++;shell.refresh();
+  edits=edits.then(async()=>{
+  try{
+    const before=(await api(`/api/map/collision/state?table=${encodeURIComponent(table)}`)).mesh;
+    const after=structuredClone(before);
+    const faceArrays=['faces','materialIndices','materialIndices16'].filter(name=>Array.isArray(after[name]));
+    let selected=index;
+    if(action==='remove'){
+      if(after[kind].length===1)throw new Error(`Keep at least one ${kind==='vertices'?'vertex':'face'} in a collision mesh. Remove the collision placement to remove it from the map.`);
+      if(kind==='vertices'){
+        const connected=collision.derivedFaces?0:after.faces.filter(face=>face.slice(0,3).includes(index)).length;
+        if(collision.derivedFaces&&after.vertices.length<=3)throw new Error('Keep at least three distinct vertices in a convex collision.');
+        if(!collision.derivedFaces&&connected===after.faces.length)throw new Error('Removing this vertex would leave no faces. Remove the collision placement instead.');
+        if(connected&&!await confirmAction({title:'Remove connected faces?',message:`Removing Vertex ${index} also removes ${connected} connected faces.`,confirmLabel:'Remove',cancelLabel:'Cancel'}))return;
+        after.vertices.splice(index,1);after.flags.splice(index,1);
+        if(!collision.derivedFaces){
+          const keep=after.faces.map(face=>!face.slice(0,3).includes(index));
+          for(const name of faceArrays)after[name]=after[name].filter((row,i)=>keep[i]);
+          after.faces=after.faces.map(face=>face.map((value,i)=>i<3&&value>index?value-1:value));
+        }
+      }else for(const name of faceArrays)after[name].splice(index,1);
+      selected=Math.min(index,after[kind].length-1);
+    }else{
+      selected=after[kind].length;
+      if(kind==='vertices'){
+        const center=[0,1,2].map(axis=>after.vertices.reduce((sum,v)=>sum+v[axis],0)/after.vertices.length);
+        after.vertices.push(action==='duplicate'?[...after.vertices[index]]:[...center,after.vertices[0][3]]);
+        after.flags.push([...after.flags[action==='duplicate'?index:0]]);
+      }else{
+        if(action==='add'&&after.vertices.length<3)throw new Error('Add at least three vertices before adding a face.');
+        after.faces.push(action==='duplicate'?[...after.faces[index]]:[0,1,2,after.faces[0][3]]);
+        for(const name of faceArrays)if(name!=='faces')after[name].push([...after[name][action==='duplicate'?index:0]]);
+      }
+    }
+    const snapshotBytes=JSON.stringify(before).length+JSON.stringify(after).length;
+    if(snapshotBytes>16*1024*1024)throw new Error('This structural edit exceeds the 16 MiB undo limit.');
+    const result=await api('/api/map/collision/state',{table,mesh:after});
+    state.dirty=result.dirtyCount;state.changes=result.changes||state.changes;
+    fieldHistory.record({collision:true,table,before,after,snapshotBytes});
+    if(current()){
+      state.selected=`${table}:${kind==='vertices'?'v':'f'}:${selected}`;
+      await refreshCollision();
+    }
+  }catch(error){notify(error);}
+  finally{state.rowBusy=false;state.pending--;render();}
+  });
+  return edits;
+}
+function renderCollision(current){
+  const collision=state.collision||{rows:[],error:'Choose Collision again to load this map.',kind:'vertices'};
+  const selector=(label,value,choices,change)=>detailField({label,control:el('select',{'aria-label':label,value,
+    onchange:event=>change(event.target.value)},...choices.map(([id,name])=>el('option',{value:id,selected:String(id)===String(value)},name)))});
+  const header=LexeditorUI.stack({fill:false,compact:true},mapsStrip(),
+    selector('Collision model',collision.model,Object.entries(state.mapView?.models||{}).filter(([,item])=>item.type===5).map(([name])=>[name,name]),model=>chooseCollision({model,mesh:0,page:0})),
+    selector('Layer',collision.layer,[['high','High collision'],['low','Low collision']],layer=>chooseCollision({layer,mesh:0,page:0})),
+    selector('Mesh',collision.mesh,(collision.meshes||[]).map(mesh=>[mesh.id,mesh.name]),mesh=>chooseCollision({mesh:Number(mesh),page:0})),
+    LexeditorUI.tabStrip({tabs:[{id:'vertices',label:'Vertices'},{id:'faces',label:'Faces'}],active:collision.kind,label:'Collision records',
+      change:kind=>chooseCollision({kind,page:0})}));
+  const preview=collision.preview?.isConnected?collision.preview:mapsViewportPane(current);
+  collision.preview=preview;
+  const rows=collision.rows.filter(row=>row.name.toLowerCase().includes((collision.query||'').toLowerCase()));
+  // names: collision vertices and faces have array indices, not stored names.
+  const view=pagedListDetail({className:'ds1-collision',rows,key,selected:state.selected,slots:false,noun:collision.kind,
+    tableAdd:false,page:collision.page,pageSize:collision.pageSize,rowsKey:'ds1-collision-'+collision.kind,
+    splitKey:'ds1-collision',minLeft:240,minMiddle:280,minRight:360,masterHeader:header,middlePanel:()=>preview,
+    search:{key:'ds1-collision-search',value:collision.query||'',label:'Search '+collision.kind,change:value=>{collision.query=value;collision.page=0;render();}},
+    sync:next=>{collision.page=next.page;collision.pageSize=next.pageSize;state.selection=next.selection||[];},
+    change:next=>{collision.page=next.page;collision.pageSize=next.pageSize;if(next.reason==='pins')view.refreshMaster();else render();},
+    master:({rows,selected,select})=>collision.loading?LexeditorUI.loadingPanel({label:'Loading collision records'}):columnList({rows,key,selected,
+      columns:[{key:'name',label:'Name',grow:1}],
+      decorateRow:(node,row)=>{LexeditorUI.decorateSearchCandidate(node,{type:`ds1-${row.table}`,value:row.id,label:row.name});return node;},
+      select:async(row,event)=>{await edits;state.selected=key(row);await loadDetail();select(row,event);markCollisionPoint(true);shell.refresh();}}),
+    describePinnedCell,commitPinnedCell,detail:()=>collisionDetail(),emptyDetail:()=>collisionDetail()});
+  state.pagedView=view;return view;
 }
 function mapsPane(){
   if(state.mapTab==="placements")return directoryPane();
@@ -4540,9 +4767,7 @@ function refreshAnimDetail(){
   if(!pane){render();return;}
   pane.replaceWith(animDetailBox());
 }
-function renderMaps(){
-  if(!state.mapList.length)return LexeditorUI.notice({tone:"warning",message:"No map files found."});
-  const current=state.mapList.find(row=>row.id===state.mapId)||state.mapList[0];
+function mapsViewportPane(current){
   const duplicate=el("button",{type:"button",class:"lex-viewport-picker","data-viewport-action":"duplicate",
     "aria-label":"Duplicate this placement",
     onclick:()=>viewportDuplicate(current.id)},LexeditorUI.copyIcon());
@@ -4573,6 +4798,7 @@ function renderMaps(){
       viewportCtl?.setMapOverlays?.(state.mapNavigation,state.mapRegions);
       if(state.mapSelected&&viewportCtl)viewportCtl.select(state.mapSelected);
       if(state.mapFocus&&viewportCtl){viewportCtl.focus(state.mapFocus);state.mapFocus=null;}
+      if(state.mapTab==='collision')markCollisionPoint(true);
       refreshViewportBar();
     }).catch(error=>{if(token===viewportMount)failMount(host,"Could not load the map.")(error);});
   });
@@ -4580,8 +4806,15 @@ function renderMaps(){
   // on a wrapper: mounting clears the host itself for its canvas.
   const wrap=el("div",{style:"position:relative;min-width:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:520px;"},host);
   LexeditorUI.hoverActions(wrap,{label:"Map actions",
-    actions:[{node:duplicate},{node:remove},{node:add},{node:rotate},{node:highToggle},{node:lowToggle},{node:navigationToggle},{node:regionsToggle}]});
+    actions:[...(state.mapTab==='collision'?[]:[{node:duplicate},{node:remove},{node:add},{node:rotate}]),{node:highToggle},{node:lowToggle},{node:navigationToggle},{node:regionsToggle}]});
   const viewPane=el("div",{style:"min-width:0;display:flex;flex-direction:column;"},wrap);
+  return viewPane;
+}
+function renderMaps(){
+  if(!state.mapList.length)return LexeditorUI.notice({tone:"warning",message:"No map files found."});
+  const current=state.mapList.find(row=>row.id===state.mapId)||state.mapList[0];
+  if(state.mapTab==='collision')return renderCollision(current);
+  const viewPane=mapsViewportPane(current);
   const lists=el("div",{"data-maps-side":"",class:"ds1-maps-left","aria-label":"Map lists",
     style:"min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;"},mapsStrip(),mapsPane());
   const selection=el("div",{"data-maps-detail-panel":"",class:"ds1-maps-detail","aria-label":"Selection details",
@@ -4624,6 +4857,7 @@ function renderAnimPanels(){
   return el("div",{class:"ds1-anim"},lists,viewPane,selection);
 }
 function appliedLabel(deploy){
+  if(!deploy.enabled&&deploy.nativeProjectActive)return "Yes, this mod's native rules";
   if(!deploy.everApplied)return "No";
   if(deploy.changedExternally)return "Unknown — installed file changed outside Lexeditor";
   if(deploy.pendingRecovery)return "Unknown — an interrupted operation needs Apply or Restore to finish";
@@ -4640,33 +4874,33 @@ function needsAttentionNote(deploy){
 }
 function renderInfo(){
   const deploy=state.deployment||{};
-  const upToDate=deploy.enabled&&deploy.thisProjectActive?(deploy.stale?"No, reapply after the latest save":"Yes"):"-";
+  const selectedActive=deploy.enabled&&deploy.thisProjectActive||deploy.nativeProjectActive;
+  const upToDate=selectedActive?(deploy.stale?"No, rebuild after the latest save":"Yes"):"-";
   return detailPanel({className:"lex-information-panel",title:"Information",body:[
     detailSection({title:"ITEMS",body:[detailField({label:"EDITION",control:readonlyField("Dark Souls Remastered / Steam")}),
       detailField({label:"SUPPORT",control:readonlyField("Items, effects, native rules, monster stats, enemy attacks, placements, animation events and assets"),help:infoHelp("Edit documented item properties, reviewed monster stats, enemy attack damage, map placements and animation event timing, or replace whole asset files. Names are reference labels. Unknown fields and padding stay unchanged. Saves go to the selected mod project.")})]}),
     detailSection({title:"INSTALLED GAME",body:[
       detailField({label:"APPLIED",control:readonlyField(appliedLabel(deploy))}),
-      detailField({label:"ORIGINAL PRESERVED",control:readonlyField(deploy.everApplied?(deploy.backupOk?"Yes":"No, needs attention"):"Not yet applied"),
+      detailField({label:"ORIGINAL PRESERVED",control:readonlyField(deploy.everApplied?(deploy.backupOk?"Yes":"No, needs attention"):(deploy.nativeProjectActive?"Not needed for native rules":"Not yet applied")),
         help:infoHelp("The first Apply keeps one copy of the installed file exactly as it was. Disable always restores that copy.")}),
       detailField({label:"UP TO DATE",control:readonlyField(upToDate),
-        help:infoHelp("Apply installs the archive already saved in the mod project. Reapply after every later save that should reach the installed game.")}),
+        help:infoHelp("Save builds changes for enabled library mods. Apply installs saved changes from this project.")}),
       needsAttentionNote(deploy),
       actionRow(
         el("button",{type:"button",disabled:state.deployBusy||!deploy.isProject||!deploy.sourceReady||deploy.changedExternally,onclick:()=>deploymentAction("apply")},deploy.everApplied?"Reapply":"Apply"),
-        el("button",{type:"button",disabled:state.deployBusy||(!deploy.everApplied&&!deploy.native?.backupOk&&!deploy.legacyRestoreAvailable)||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
+        el("button",{type:"button",disabled:state.deployBusy||(!deploy.everApplied&&!deploy.native?.canRestore)||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
       )].filter(Boolean)}),
     detailSection({title:"NATIVE RULES",body:[
-      detailField({label:"APPLIED PROJECT",control:readonlyField(deploy.native?.project?.path||"None"),
-        help:infoHelp("Native rules are applied in memory by the same loader as library tweaks, from one patch. Applying library tweaks keeps the last applied project rules. Restore original removes both without changing saved settings.")}),
-      deploy.legacyRestoreAvailable?LexeditorUI.detailNote("Restore the earlier draft's native patch before applying the combined rules. Its verified original is available."):
-        deploy.native?.problem?LexeditorUI.detailNote(deploy.native.problem):null,
+      detailField({label:"APPLIED PROJECT",control:readonlyField(deploy.native?.project?.path||(deploy.nativeProjectActive?"Selected library mod":"None")),
+        help:infoHelp("Library native rules follow each mod's switch. Projects outside the library keep their last applied rules until reapplied or restored.")}),
+      deploy.native?.problem?LexeditorUI.detailNote(deploy.native.problem):null,
       deploy.native?.pendingRecovery?LexeditorUI.detailNote("An interrupted native operation is recoverable. Retry Apply or Restore original."):null,
       state.nativeRules?.migration?LexeditorUI.detailNote(state.nativeRules.migration):null
     ].filter(Boolean)}),
-    modLoaderSection({loader:deploy.note||"Dark Souls Remastered reads this file as a loose file; no mod loader is installed.",
-      output:"Apply replaces the installed parameter archive, map, animation and asset files with the mod project's saved copies, after preserving each original once.",
-      order:"One complete parameter archive and the project's map files. Separate projects are not merged; applying a different project replaces what is currently installed.",
-      safety:"Apply composes enabled library tweaks and project native rules before replacing the executable, parameter archive and map files. Outside changes are refused.",
+    modLoaderSection({loader:deploy.note||"Enabled mods combine over the game's files. Native mods use Lexeditor Loader.",
+      output:"Apply combines saved changes from enabled mods with the game's preserved originals.",
+      order:"The Mods tab lists overlaps and changes that cannot combine.",
+      safety:"Apply prepares enabled mods before it writes installed files. The loader applies native changes in memory.",
       removal:"Restore original restores all owned files. The project and library tweak settings stay unchanged."})]});
 }
 // Tweaks are library mods: a switch saves at once, and changed tweaks
@@ -4679,9 +4913,9 @@ async function tweakRequest(path,body,failure){
   finally{state.tweakBusy=false;render();}
 }
 async function restoreTweaks(){
-  const ok=await confirmAction({title:"Restore the original executable?",message:"Close the game first. The tweaks' switches stay as they are.",confirmLabel:"Restore original",cancelLabel:"Cancel"});
+  const ok=await confirmAction({title:"Remove the installed tweaks?",message:"Restores owned menu files and removes Lexeditor's loader. Close the game first. Saved mod settings stay unchanged.",confirmLabel:"Restore original",cancelLabel:"Cancel"});
   if(!ok)return;
-  await tweakRequest("/api/tweaks/restore",{},"Could not restore the executable");
+  await tweakRequest("/api/tweaks/restore",{},"Could not restore the game files");
 }
 function renderTweaks(){
   const status=state.tweaks;
@@ -4706,9 +4940,8 @@ function renderTweaks(){
       status.loaderMessage?detailField({label:"LAST GAME START",control:readonlyField(status.loaderMessage),
         help:infoHelp("What the loader reported the last time the game started. If the game was updated or another tool changed it, the loader changes nothing and says so here.")}):null,
       empty?missingMods:null,
-      status.builtIntoExecutable?LexeditorUI.detailNote("An earlier Lexeditor built tweaks into DarkSoulsRemastered.exe. Restore original puts the original executable back; tweaks then load from dinput8.dll."):null,
       status.problem?LexeditorUI.detailNote(status.problem):null,
-      actionRow(el("button",{type:"button",disabled:busy||!status.windows||status.state!=="tweaked",onclick:restoreTweaks},"Restore original"))].filter(Boolean)});
+      actionRow(el("button",{type:"button",disabled:busy||!status.windows||!status.canRestore,onclick:restoreTweaks},"Restore original"))].filter(Boolean)});
   return LexeditorUI.tweaksPage({plugin:"ds1",render,
     pages:[{id:"mods",label:"Mods",body:()=>[installed,...panels],bind,whole:empty?installed:null}]});
 }
@@ -4728,5 +4961,72 @@ async function boot(){
   try{await refreshState();await loadItems();render();}catch(error){state.error=error.message;render();}
   finally{document.body.dataset.ds1Ready=state.error?"error":"true";await LexeditorUI.finishPluginLoading();}
 }
+// Directory notifications do the detection; this request reads a revision.
+// Clean project data follows external edits. Unsaved edits and focused inputs
+// defer replacement; history only resets when a new disk baseline was loaded.
+let modRevision=0, modProjectRevision=0, ignoredModRevision=null, modRefreshPending=false, modProjectRefreshPending=false, modPollTimer=null, modPollBusy=false, modPollStopped=false;
+let modProjectFiles=[];
+async function refreshProjectData(){
+  let locked=false;
+  try{
+    const probe=await api('/api/project-refresh',{files:modProjectFiles,checkOnly:true});
+    if(probe.deferred)return;
+    if(!probe.changed){modProjectRefreshPending=false;modProjectFiles=[];return;}
+    if(document.body.inert||state.pending||state.dirty||state.rowBusy||state.bandForm||state.taeForm||state.assetUpload
+       ||document.querySelector('input:focus,select:focus,textarea:focus'))return;
+    locked=true;state.pending++;LexeditorUI.setEditorBusy('project-refresh','Refreshing mod files');
+    const result=await api('/api/project-refresh',{files:modProjectFiles});
+    modProjectRefreshPending=!!result.deferred;
+    if(!result.deferred)modProjectFiles=[];
+    if(!result.refreshed)return;
+    attackPreviews.clear();recordRows.clear();textLabelPreviews.clear();fieldHistory.clear();
+    await refreshState();
+    if(!shell.isModsOpen())await navigate(state.tab,state.sub);
+  }catch(error){
+    modProjectRefreshPending=false;
+    modProjectFiles=[];
+    LexeditorUI.showToast(`Could not refresh the view after mod files changed: ${error.message}`,{tone:'warning'});
+  }finally{
+    if(locked){state.pending--;LexeditorUI.setEditorBusy('project-refresh',null);shell.refresh();}
+  }
+}
+async function pollModChanges(){
+  if(modPollBusy||modPollStopped)return;
+  modPollBusy=true;
+  try{
+    const response=await fetch(`/api/mod-changes?since=${modRevision}&projectSince=${modProjectRevision}`);
+    if(!response.ok)return;
+    const result=await response.json();
+    const changed=result.revision!==modRevision;
+    modRevision=result.revision;
+    modProjectRevision=result.projectRevision||0;
+    modRefreshPending ||= changed;
+    if(result.projectChanged){
+      modProjectRefreshPending=true;
+      modProjectFiles=modProjectFiles===null||!Array.isArray(result.projectFiles)?null:[...new Set([...modProjectFiles,...result.projectFiles])];
+      if(modProjectFiles&&(modProjectFiles.length>128||new TextEncoder().encode(JSON.stringify(modProjectFiles)).length>48000))modProjectFiles=null;
+    }
+    if(!document.body.inert&&!state.pending&&!document.querySelector('[aria-modal="true"]')){
+      state.tweaksNeedRebuild=!!result.tweaksNeedRebuild&&ignoredModRevision!==modRevision;
+      shell.refresh();
+      if(modProjectRefreshPending&&!state.dirty&&!state.bandForm&&!state.taeForm&&!state.assetUpload
+         &&!fieldHistory.applying&&!document.querySelector('input:focus,select:focus,textarea:focus')){
+        await refreshProjectData();
+      }
+    if(modRefreshPending){
+      modRefreshPending=false;
+      await shell.refreshMods();
+      if(state.tab==="tweaks"&&!shell.isModsOpen()&&!document.querySelector('#main input:focus,#main select:focus,#main textarea:focus')){
+        await loadTweaks();render();
+      }
+    }
+    }
+  }catch(_error){/* A session changing projects can briefly be unavailable. */}
+  finally{
+    modPollBusy=false;
+    if(!modPollStopped)modPollTimer=setTimeout(pollModChanges,document.hidden?3000:1000);
+  }
+}
+window.addEventListener('pagehide',()=>{modPollStopped=true;clearTimeout(modPollTimer);},{once:true});
 window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&(state.dirty||state.pending||state.tweaksNeedRebuild))event.preventDefault();});
-boot();
+boot().then(pollModChanges);

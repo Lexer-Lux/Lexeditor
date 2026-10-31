@@ -57,16 +57,23 @@ def backgrounds(page):
     }""")
 
 
-def test_shell_layers_step_down_visibly(page):
+def test_shell_layers_step_down_visibly(page,tmp_path):
     page.evaluate(HOST, {'firstRun': False, 'lexmod': False, 'vanilla': False,
                          'conflicts': False, 'alerts': False, 'bundle': False,
                          'save': False, 'projects': False})
     page.wait_for_timeout(400)
     page.locator('[data-tab="mods"]').click()
     page.get_by_role('textbox', name='Name').wait_for()
+    # Measure the palette after the tab's CSS transition, not its first
+    # interpolated frame, which can still match the inactive tab on CI.
+    page.evaluate('''async()=>{
+      await Promise.all(document.querySelector('[data-tab="mods"]').getAnimations()
+        .map(animation=>animation.finished.catch(()=>{})));
+    }''')
     colors = {name: rgb(value) for name, value in backgrounds(page).items()}
     assert gap(colors['app'], colors['panel']) >= STEP, colors
     assert gap(colors['panel'], colors['tab']) >= STEP, colors
     assert gap(colors['panel'], colors['panelTab']) >= STEP, colors
     assert gap(colors['app'], colors['tab']) >= STEP, colors
     assert gap(colors['tab'], colors['tabActive']) >= STEP, colors
+    page.screenshot(path=str(tmp_path/'theme-contrast.png'))

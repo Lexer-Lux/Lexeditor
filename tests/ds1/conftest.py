@@ -6,9 +6,11 @@ library, and a mod switched on there would change the test's result.
 """
 import pytest
 
-from plugins.ds1 import tweak_mods
+from plugins.ds1 import tweak_mods,composition_cache
 
 
 @pytest.fixture(autouse=True)
 def _own_mod_library(tmp_path_factory, monkeypatch):
     monkeypatch.setenv(tweak_mods.MODS_ENV, str(tmp_path_factory.mktemp("ds1-library")))
+    cache = tmp_path_factory.mktemp('ds1-cache')
+    monkeypatch.setattr(composition_cache,'user_root',lambda:cache)

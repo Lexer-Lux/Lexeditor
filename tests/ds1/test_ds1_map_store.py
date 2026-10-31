@@ -46,6 +46,48 @@ def test_list_rows_carry_npc_type_for_the_directory_split(tmp_path):
     assert friends.list_rows()[0]["values"]["npcType"] == 2
 
 
+def test_directory_and_map_counts_include_merchants_without_friendly_npc_type(tmp_path):
+    game,mod,store=setup(tmp_path,npc=6040)
+    (game/RELATIVE).write_bytes(make_archive(table_ids={'NpcParam':[6040,120000]},
+        field_values={'NpcParam':{6040:{'npcType':0}}}))
+    row=store.list_rows()[0]
+    assert row['values']['npcType']==0 and row['values']['isNpc']
+    assert store.map_counts()[MAP]['npcs']==1
+    assert store.map_counts()[MAP]['enemies']==0
+
+
+def test_local_npc_directory_renders_a_merchant_with_nonfriendly_type(tmp_path):
+    from playwright.sync_api import sync_playwright
+    from plugins.ds1.plugin import DS1Session
+    game,_mod,_store=setup(tmp_path,npc=6040)
+    (game/RELATIVE).write_bytes(make_archive(table_ids={'NpcParam':[6040,120000]},
+        field_values={'NpcParam':{6040:{'npcType':0}}}))
+    session=DS1Session({'LEXEDITOR_DS1_ROOT':str(game),'LEXEDITOR_NO_MOD':'1',
+                       'LEXEDITOR_MOD_READ_ONLY':'1','LEXEDITOR_DS1_MODS_ROOT':str(tmp_path/'library'),
+                       'LOCALAPPDATA':str(tmp_path/'appdata')})
+    session.start()
+    try:
+        with sync_playwright() as play:
+            browser=play.chromium.launch(headless=True)
+            try:
+                page=browser.new_page(viewport={'width':1440,'height':900})
+                page.goto(session.url)
+                page.wait_for_selector('body[data-ds1-ready="true"]')
+                page.locator('[data-tab="maps"]').click()
+                page.wait_for_function('state.tab==="maps" && state.rows.length>0 && !state.error')
+                page.locator('[data-tabstrip-id="placements"]').click()
+                page.locator('[data-maps-dir] .lex-subtab-button',has_text='NPCs').click()
+                page.wait_for_function('state.dirTab==="npcs" && directoryMatches().length===1')
+                page.locator('[data-dir-local] input').check()
+                assert page.evaluate('directoryMatches()[0].values.npcId')==6040
+                assert page.locator('[data-maps-dir] .lex-list-row').count()==1
+                page.screenshot(path=str(tmp_path/'merchant-local.png'))
+            finally:
+                browser.close()
+    finally:
+        session.stop()
+
+
 def test_locate_drop_finds_first_placement_of_a_dropper(tmp_path):
     _game, _mod, store = setup(tmp_path)
     store.item_store.edit("NpcParam", 120000, "itemLotId_1", 100)

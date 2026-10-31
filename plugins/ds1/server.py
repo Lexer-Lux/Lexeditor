@@ -4,13 +4,15 @@ from concurrent.futures import ThreadPoolExecutor
 import base64
 import binascii
 import json
+import logging
 import os
 from pathlib import Path
 import threading
 from urllib.parse import parse_qs, urlparse
 
+from core import mod_watch
 from core.plugin_http import PluginRequestHandler
-from . import assets, deployment, data_map, fsb, icons, scripts, shops, theme
+from . import assets, deployment, data_map, fsb, icons, scripts, shops, theme, record_edits
 from . import anim
 from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore, parse_key
@@ -19,6 +21,7 @@ from .flver import FlverError
 from .tae import EVENT_TYPES, TaeError
 from .tae_store import TaeStore
 from .native_rules import NativeRules
+from .weapon_skills import WeaponSkills, TABLE as SKILL_TABLE, TAB as SKILL_TAB, RELATIVE as SKILL_FILE
 from .formats import FormatError, stats_fields, TABLES, FMG_TABLES, save_description
 from .effects import TABLE as EFFECT_TABLE
 from .store import ItemStore
@@ -28,7 +31,7 @@ from . import viewport
 
 # Armor shows its male icon; male and female differ only on a few pieces,
 # and the male set is complete.
-_ICON_KEYS = {'EquipParamWeapon': 'iconId', 'EquipParamProtector': 'iconIdM',
+_ICON_KEYS = {'WeaponSkill': 'iconId', 'EquipParamWeapon': 'iconId', 'EquipParamProtector': 'iconIdM',
               'EquipParamAccessory': 'iconId', 'EquipParamGoods': 'iconId',
               'Magic': 'iconId', 'SpEffectParam': 'iconId'}
 ROOT = Path(__file__).resolve().parents[2]
@@ -54,10 +57,50 @@ STORE = ItemStore(os.environ.get('LEXEDITOR_DS1_ROOT', r'C:\Program Files (x86)\
                   or not os.environ.get('LEXEDITOR_DS1_PROJECT'))
 
 RULES = NativeRules(STORE.game_root, STORE.project, STORE.read_only)
+SKILLS = WeaponSkills(STORE.game_root, STORE.project, STORE.read_only)
 MAPSTORE = MapStore(STORE.game_root, STORE.project, STORE.read_only, STORE)
 TAESTORE = TaeStore(STORE.game_root, STORE.project, STORE.read_only, STORE)
 NATIVE_TABS = {"encumbrance", "encumbrance-overrides", "levelup", "misc"}
 UPLOAD_BODY_LIMIT = 2100000
+
+
+def _refresh_project(paths=None, check_only=False):
+    global STORE, RULES, MAPSTORE, TAESTORE, SKILLS
+    from . import project_refresh
+    if type(check_only) is not bool:
+        raise ValueError('Unsupported project refresh mode')
+    if paths is not None:
+        from core.mod_library import relative_path
+        if type(paths) is not list or len(paths) > 128 or any(type(path) is not str or len(path)>4096 for path in paths):
+            raise ValueError('Unsupported project refresh paths')
+        paths = [relative_path(path).as_posix() for path in paths]
+    dirty = (STORE.document.dirty_count if STORE.document is not None else 0)
+    if dirty or RULES.dirty_count or MAPSTORE.dirty_count or TAESTORE.dirty_count or SKILLS.dirty_count:
+        return {'refreshed': False, 'deferred': True}
+    if check_only:
+        return {'changed': project_refresh.changed(STORE,RULES,MAPSTORE,TAESTORE,SKILLS,paths), 'deferred':False}
+    fresh = project_refresh.refresh(STORE, RULES, MAPSTORE, TAESTORE, SKILLS, paths)
+    if fresh is not None:
+        STORE, RULES, MAPSTORE, TAESTORE, SKILLS = fresh
+    return {'refreshed': fresh is not None, 'deferred': False}
+
+
+def _project_paths(snapshot, *, project_root=False):
+    if STORE.project is None:
+        return []
+    paths = []
+    for path in snapshot.get('paths', ['*']):
+        if project_root:
+            if path == '*':
+                return None
+            paths.append(path)
+            continue
+        folder, separator, relative = path.partition('/')
+        if folder == '*' or folder.casefold() == STORE.project.name.casefold():
+            if not separator:
+                return None  # Directory replacement, overflow, or initial resync.
+            paths.append(relative)
+    return paths if len(paths) <= 128 and len(json.dumps(paths)) < 32000 else None
 
 
 def _asset_target(relative, side):
@@ -184,8 +227,15 @@ def _tweaks_flag() -> bool:
     """Whether the installed tweaks differ from the library (Save rebuilds them)."""
     try:
         return bool(tweak_mods.needs_rebuild(STORE.game_root).get("needed"))
-    except (ValueError, OSError, RuntimeError):
-        return False
+    except Exception:
+        # Freshness is optional request metadata, never a gate on record data.
+        # An unreadable status cannot prove that the installed build is current.
+        logging.getLogger(__name__).warning('Could not check mod build freshness', exc_info=True)
+        return True
+
+
+_MOD_CHANGES_LOCK = threading.Lock()
+_MOD_CHANGES_CACHE = {"revision": None, "flag": False}
 
 
 def _rebuild_tweaks_on_save() -> dict:
@@ -267,9 +317,51 @@ class Handler(PluginRequestHandler):
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
+        if path == '/api/mod-changes':
+            # Lock-free status: the watcher and the flag cache carry their own
+            # locks, and nothing here touches STORE, MAPSTORE or unsaved rows.
+            # The staleness check runs only when the watcher revision moves.
+            try:
+                library = tweak_mods.mods_root()
+                snap = mod_watch.snapshot(library, query.get('since', ['0'])[0])
+                # An explicitly opened project can live outside the global
+                # library. Watch that folder itself, never its whole parent.
+                project_snap = None
+                if STORE.project is not None and STORE.project.parent.resolve() != library.resolve():
+                    project_snap = mod_watch.snapshot(STORE.project, query.get('projectSince',['0'])[0])
+                record = Path(STORE.game_root) / tweak_mods.RUNTIME_RECORD
+                try:
+                    stamp = record.stat()
+                    stamp = (stamp.st_mtime_ns, stamp.st_size)
+                except OSError:
+                    stamp = None
+                cache_key = (str(library), snap['revision'], stamp)
+                with _MOD_CHANGES_LOCK:
+                    cached_revision = _MOD_CHANGES_CACHE["revision"]
+                    cached_flag = _MOD_CHANGES_CACHE["flag"]
+                if cached_revision != cache_key:
+                    flag = _tweaks_flag()
+                    with _MOD_CHANGES_LOCK:
+                        _MOD_CHANGES_CACHE["revision"] = cache_key
+                        _MOD_CHANGES_CACHE["flag"] = flag
+                else:
+                    flag = cached_flag
+                self.send_json({"revision": snap["revision"],
+                                "projectRevision":project_snap['revision'] if project_snap is not None else 0,
+                                "changed": snap["changed"],
+                                "projectChanged": bool(project_snap['changed']) if project_snap is not None else STORE.project is not None and any(
+                                    name == '*' or name.casefold() == STORE.project.name.casefold()
+                                    for name in snap['changed']),
+                                "projectFiles": _project_paths(project_snap,project_root=True) if project_snap is not None else _project_paths(snap),
+                                "status": (project_snap['status'] if project_snap is not None else None) or snap['status'],
+                                "tweaksNeedRebuild": flag})
+            except (ValueError, OSError, RuntimeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
         if path in ('/api/state', '/api/table', '/api/row', '/api/attacks', '/api/behaviors', '/api/shop', '/api/data-map', '/api/assets',
                     '/api/world/locate',
                     '/api/map/view', '/api/map/geometry', '/api/map/geometries',
+                    '/api/map/collision', '/api/map/collision/state',
                     '/api/chr/view', '/api/chr/geometry',
                     '/api/parts/view', '/api/parts/geometry',
                     '/api/anim/list', '/api/anim/skeleton', '/api/anim/frames', '/api/theme', '/api/theme/sfx',
@@ -304,6 +396,7 @@ class Handler(PluginRequestHandler):
                                 found['modelPick'] = pick
                     elif path == '/api/state':
                         result = STORE.state()
+                        result['tabs'].append({'id': SKILL_TAB, 'label': 'Ashes of War', 'table': SKILL_TABLE, 'count': len(SKILLS.value['skills'])})
                         result['animTabs'] = [{'id': 'animations', 'label': 'Animations',
                                                'table': 'Tae', 'count': len(TAESTORE.binders())}]
                         for entry in result.get('miscTabs', []):
@@ -314,6 +407,7 @@ class Handler(PluginRequestHandler):
                         result['theme'] = theme_status()
                     elif path == '/api/data-map':
                         result = data_map.payload(STORE, RULES.snapshot(refresh=True), theme_status())
+                        result['rows'].append({'id': 'weapon-skills', 'filename': SKILL_FILE.as_posix(), 'path': str(STORE.project / SKILL_FILE) if STORE.project else '', 'coverage': 'editable', 'status': 'integrated', 'openable': True, 'controls': 'Ashes of War', 'notes': 'Mod-owned skill definitions and exact weapon assignments. Combat actions are supplied separately.', 'target': 'items', 'sub': SKILL_TAB, 'targets': [{'id': 'items', 'label': 'Items'}]})
                     elif path == '/api/theme':
                         self.send_json(theme_status())
                         return
@@ -331,14 +425,18 @@ class Handler(PluginRequestHandler):
                             else {'map': None, 'key': None}
                     elif path == '/api/map/view':
                         result = viewport.map_view(MAPSTORE, query.get('map', [''])[0])
+                    elif path == '/api/map/collision':
+                        result = MAPSTORE.collisions.view(query.get('map',[''])[0],query.get('model',[''])[0],
+                            query.get('layer',['high'])[0],int(query.get('mesh',['0'])[0]),query.get('kind',['vertices'])[0])
+                    elif path == '/api/map/collision/state':
+                        result = {'mesh':MAPSTORE.collisions.snapshot(query.get('table',[''])[0])}
                     elif path == '/api/map/geometry':
                         document = MAPSTORE.get(query.get('map', [''])[0])
                         model = next((entry for entry in document.models
                                       if entry['name'] == query.get('model', [''])[0]), None)
                         if model is None:
                             raise MsbError('Unknown map model')
-                        result = viewport.model_geometry(
-                            MAPSTORE.game_root, MAPSTORE.project, document.map_name, model,
+                        result = MAPSTORE.model_geometry(document.map_name,model,
                             frozenset(filter(None, query.get('known', [''])[0].split(','))) or None)
                     elif path == '/api/map/geometries':
                         # One request per progressive batch instead of one per
@@ -358,9 +456,7 @@ class Handler(PluginRequestHandler):
                                 items[name] = {'error': 'Unknown map model'}
                                 continue
                             try:
-                                payload = viewport.model_geometry(
-                                    MAPSTORE.game_root, MAPSTORE.project, document.map_name,
-                                    model, frozenset(seen) or None)
+                                payload = MAPSTORE.model_geometry(document.map_name,model, frozenset(seen) or None)
                             except (FormatError, OSError, ValueError) as error:
                                 items[name] = {'error': str(error)}
                                 continue
@@ -516,7 +612,12 @@ class Handler(PluginRequestHandler):
                             else:
                                 result = {'rows': TAESTORE.list_chars()}
                         else:
-                            result = {'rows': RULES.list_rows(tab) if tab in NATIVE_TABS else STORE.get().list_rows(tab)}
+                            result = {'rows': SKILLS.list_rows() if tab == SKILL_TAB else RULES.list_rows(tab) if tab in NATIVE_TABS else STORE.get().list_rows(tab)}
+                            for listed in result['rows']:
+                                if listed.get('table') == 'EquipParamWeapon':
+                                    skill = SKILLS.assignment(listed['id'])
+                                    listed.setdefault('values', {})['ashOfWar'] = skill
+                                    listed.setdefault('display', {})['ashOfWar'] = next((s['name'] for s in SKILLS.value['skills'] if s['id'] == skill), 'None')
                             if tab == 'drops':
                                 links = MAPSTORE.lot_maps()
                                 displays = MAPSTORE.place_display_names()
@@ -531,24 +632,31 @@ class Handler(PluginRequestHandler):
                                     row['values']['chr'] = models[0] if models else None
                             elif tab == 'treasure':
                                 stems = MAPSTORE.stem_display_names()
+                                links = MAPSTORE.activation_maps()
                                 for row in result['rows']:
+                                    row['values']['maps'] = links.get(row['id'], [])
                                     row['values'].update(
-                                        MAPSTORE.describe_treasure(row['name'], stems))
+                                        MAPSTORE.describe_treasure(row['name'], stems, links.get(row['id'], [])))
                     else:
                         table = query.get('table', [''])[0]
-                        if table.endswith('.msb'):
+                        if table.startswith('CollisionMesh|'):
+                            result = {'row':MAPSTORE.collisions.read_row(table,query.get('id',[''])[0])}
+                        elif table.endswith('.msb'):
                             result = {'row': MAPSTORE.read(table, query.get('id', [''])[0])}
                         elif table.endswith('.anibnd.dcx'):
                             result = {'row': TAESTORE.read(table, query.get('id', [''])[0])}
                         else:
                             row_id = int(query.get('id', [''])[0])
                             only = stats_fields(query.get('sub', [''])[0], table)
-                            result = {'row': RULES.read_row(row_id) if table == 'NativeRules'
+                            result = {'row': SKILLS.read_row(row_id) if table == SKILL_TABLE else RULES.read_row(row_id) if table == 'NativeRules'
                                       else STORE.get().read_row(table, row_id, only=only, game_root=STORE.game_root)}
-                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count
-                    result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes()
+                            if table == 'EquipParamWeapon':
+                                SKILLS.decorate_weapon(result['row'])
+                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count + SKILLS.dirty_count
+                    result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes() + SKILLS.pending_changes()
                     result['nativeRules'] = RULES.snapshot()
-                    result['tweaksNeedRebuild'] = _tweaks_flag()
+                    # The watcher owns background freshness updates. Reading a
+                    # record must not scan every script mod in the library.
                     self.send_json(result)
             except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
                 self.send_json({'error': str(error)}, 400)
@@ -603,7 +711,7 @@ class Handler(PluginRequestHandler):
                     # requests run side by side instead of queueing behind it.
                     with LOCK:
                         _warm_icon_table()
-                        icon_id = STORE.get().value(table, row_id, key)
+                        icon_id = SKILLS.icon_id(row_id) if table == SKILL_TABLE else STORE.get().value(table, row_id, key)
                     if not isinstance(icon_id, int) or icon_id <= 0:
                         raise LookupError('That record has no item picture')
                     png = icons.icon_png(STORE.game_root, icon_id)
@@ -707,25 +815,47 @@ class Handler(PluginRequestHandler):
         path = urlparse(self.path).path
         try:
             if path not in ('/api/edit', '/api/rename', '/api/save', '/api/discard', '/api/bands/add', '/api/bands/delete', '/api/tae/add', '/api/tae/remove', '/api/rows/add', '/api/rows/remove', '/api/placements/add', '/api/placements/remove', '/api/placements/create', '/api/assets/upload', '/api/assets/remove', '/api/deployment/apply', '/api/deployment/disable',
-                            '/api/tweaks/save', '/api/tweaks/restore', '/api/annotation-help'):
+                            '/api/tweaks/save', '/api/tweaks/restore', '/api/annotation-help', '/api/project-refresh',
+                            '/api/map/collision/state'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
             if origin and origin != f"http://{self.headers.get('Host')}":
                 raise PermissionError('Cross-origin writes are not permitted')
             length = int(self.headers.get('Content-Length', '0'))
-            limit = UPLOAD_BODY_LIMIT if path == '/api/assets/upload' else 65536
+            limit = (UPLOAD_BODY_LIMIT if path == '/api/assets/upload' else
+                     record_edits.LIMIT if path == '/api/map/collision/state' else 65536)
             if not 0 < length <= limit:
                 raise ValueError('Invalid request size')
             payload = json.loads(self.rfile.read(length))
             if not isinstance(payload, dict): raise ValueError('Expected an object')
             with LOCK:
-                if path == '/api/edit':
+                if path == '/api/project-refresh':
+                    self.send_json(_refresh_project(payload.get('files'),payload.get('checkOnly',False)))
+                    return
+                elif path == '/api/map/collision/state':
+                    if set(payload) != {'table','mesh'}:
+                        raise ValueError('Unsupported collision state operation')
+                    MAPSTORE.collisions.replace_mesh(payload['table'],payload['mesh'])
+                    result = {'updated':True}
+                elif path == '/api/edit':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))
                     extra = {}
-                    if payload.get('table') == 'NativeRules':
+                    if payload.get('table') == SKILL_TABLE:
+                        row = SKILLS.edit(payload.get('id'), payload.get('field'), payload.get('value'))
+                        listed = next(s for s in SKILLS.list_rows() if s['id'] == row['id'])
+                        extra = {'values': listed['values'], 'display': listed['display'], 'modified': listed['modified']}
+                    elif payload.get('table') == 'EquipParamWeapon' and payload.get('field') == 'ashOfWar':
+                        SKILLS.assign(payload.get('id'), payload.get('value'), {r.row_id for r in STORE.get().params['EquipParamWeapon'].rows})
+                        row = SKILLS.decorate_weapon(STORE.get().read_row('EquipParamWeapon', payload['id'], game_root=STORE.game_root))
+                        values, display = STORE.get().row_values('EquipParamWeapon', payload['id'])
+                        extra = {'values': values, 'display': display, 'name': row['name']}
+                    elif payload.get('table') == 'NativeRules':
                         row = RULES.edit_row(payload.get('id'), payload.get('field'), payload.get('value'))
                         extra = {'modified': RULES.row_modified(payload.get('id'))}
+                    elif str(payload.get('table','')).startswith('CollisionMesh|'):
+                        row = MAPSTORE.collisions.edit_row(payload['table'],payload.get('id'),payload.get('field'),payload.get('value'))
+                        extra = {'values':row['values'],'display':row['display'],'modified':row['modified']}
                     elif str(payload.get('table', '')).endswith('.msb'):
                         row = MAPSTORE.edit(payload.get('table'), payload.get('id'), payload.get('field'), payload.get('value'))
                         values, display, name = MAPSTORE.row_values(
@@ -761,9 +891,9 @@ class Handler(PluginRequestHandler):
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count, **extra}
                 elif path == '/api/rename':
                     only = stats_fields(payload.get('sub', ''), payload.get('table'))
-                    row = STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'), only=only)
+                    row = SKILLS.edit(payload.get('id'), 'name', payload.get('name')) if payload.get('table') == SKILL_TABLE else STORE.rename(payload.get('table'), payload.get('id'), payload.get('name'), only=only)
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count,
-                              'modified': STORE.get().row_modified(payload.get('table'), payload.get('id'))}
+                              'modified': True if payload.get('table') == SKILL_TABLE else STORE.get().row_modified(payload.get('table'), payload.get('id'))}
                 elif path == '/api/tae/add':
                     for key in ('table', 'tae', 'anim', 'type', 'start', 'end'):
                         if key not in payload:
@@ -808,12 +938,12 @@ class Handler(PluginRequestHandler):
                     for key in ('table', 'id'):
                         if key not in payload:
                             raise ValueError('Duplicating a record needs its table and ID')
-                    result = {'row': STORE.add_row(payload['table'], payload['id'], payload.get('newId'))}
+                    result = {'row': SKILLS.add(payload['id']) if payload['table'] == SKILL_TABLE else STORE.add_row(payload['table'], payload['id'], payload.get('newId'))}
                 elif path == '/api/rows/remove':
                     for key in ('table', 'id'):
                         if key not in payload:
                             raise ValueError('Removing a record needs its table and ID')
-                    result = {'removed': STORE.remove_row(payload['table'], payload['id'])}
+                    result = {'removed': SKILLS.remove(payload['id']) if payload['table'] == SKILL_TABLE else STORE.remove_row(payload['table'], payload['id'])}
                 elif path == '/api/placements/add':
                     for key in ('map', 'id'):
                         if key not in payload:
@@ -840,19 +970,24 @@ class Handler(PluginRequestHandler):
                               at=payload.get('at'), neighbour=payload.get('neighbour'), keep=payload.get('keep'))}
                 elif path == '/api/save':
                     RULES.validate_save()
+                    SKILLS.validate_save()
                     STORE.validate_save()
                     MAPSTORE.validate_save()
                     TAESTORE.validate_save()
                     result = STORE.save()
-                    MAPSTORE.save()
-                    TAESTORE.save()
+                    saved_maps = MAPSTORE.save()
+                    saved_animations = TAESTORE.save()
+                    if saved_maps.get('recordsChanged') or saved_animations.get('recordsChanged'):
+                        STORE.load()
                     RULES.save()
+                    SKILLS.save()
                     result.update(_rebuild_tweaks_on_save())
                 elif path == '/api/discard':
                     result = STORE.discard()
                     MAPSTORE.discard()
                     TAESTORE.discard()
                     RULES.discard()
+                    SKILLS.discard()
                 # Tweaks are library mods, not part of the selected project, so
                 # they save at once; the rebuild rides on Save, or installs straight
                 # away when the session has no writable project.
@@ -873,10 +1008,14 @@ class Handler(PluginRequestHandler):
                     result = RULES.apply(STORE)
                 else:
                     result = RULES.restore()
+                if result.get('row', {}).get('table') == 'EquipParamWeapon':
+                    SKILLS.decorate_weapon(result['row'])
+                    skill = SKILLS.assignment(result['row']['id'])
+                    result.setdefault('values', {})['ashOfWar'] = skill
+                    result.setdefault('display', {})['ashOfWar'] = next((s['name'] for s in SKILLS.value['skills'] if s['id'] == skill), 'None')
                 if not path.startswith('/api/tweaks/'):
-                    result['tweaksNeedRebuild'] = _tweaks_flag()
-                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count
-                    result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes()
+                    result['dirtyCount'] = STORE.get().dirty_count + RULES.dirty_count + MAPSTORE.dirty_count + TAESTORE.dirty_count + SKILLS.dirty_count
+                    result['changes'] = STORE.get().pending_changes() + MAPSTORE.pending_changes() + TAESTORE.pending_changes() + SKILLS.pending_changes()
                     result['nativeRules'] = RULES.snapshot()
                 self.send_json(result)
         except PermissionError as error:

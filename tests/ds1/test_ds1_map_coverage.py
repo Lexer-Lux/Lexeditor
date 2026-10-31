@@ -62,6 +62,14 @@ def test_collision_triangles_and_one_broken_layer(monkeypatch, tmp_path):
     result = map_collision.geometry(tmp_path, None, 'm10_02_00_00.msb', 'h0000')
     assert [mesh['layer'] for mesh in result['meshes']] == ['collisionHigh']
     assert len(result['notes']) == 1 and result['notes'][0].startswith('collisionLow:')
+    # The integrated editor preview must retain loose and older storage
+    # variants even when the authoring writer cannot modify that shape.
+    store = MapStore(tmp_path,None,True)
+    integrated = store.model_geometry('m10_02_00_00.msb',{'type':5,'name':'h0000'})
+    assert [mesh['layer'] for mesh in integrated['meshes']] == ['collisionHigh']
+    assert integrated['meshes'][0]['positions'] == result['meshes'][0]['positions']
+    with pytest.raises(ValueError):
+        store.collisions.view('m10_02_00_00.msb','h0000','high',0,'vertices')
 
 
 def test_navigation_binary_geometry_validates_indices():
@@ -265,7 +273,8 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path, read_only):
     delayed = [False]
     session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_DS1_PROJECT': str(mod),
                           'LEXEDITOR_NO_MOD': '1' if read_only else '0',
-                          'LEXEDITOR_MOD_READ_ONLY': '1' if read_only else '0'})
+                          'LEXEDITOR_MOD_READ_ONLY': '1' if read_only else '0',
+                          'LEXEDITOR_DS1_MODS_ROOT':str(tmp_path/'library')})
     session.start()
     try:
         with sync_playwright() as play:
@@ -331,13 +340,31 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path, read_only):
                 assert page.locator('[data-field-key="startsDisabled"]:visible').get_attribute('type') == 'checkbox'
                 screenshot = os.environ.get('LEXEDITOR_MAP_REVIEW_SCREENSHOT')
                 if screenshot:
-                    page.screenshot(path=screenshot)
+                    target = Path(screenshot)
+                    page.screenshot(path=str(target.with_stem(target.stem+('-readonly' if read_only else '-editable'))))
                 if read_only:
                     assert page.locator('[data-field-key="startsDisabled"]:visible').is_disabled()
                     assert not errors, errors
                     return
                 page.locator('[data-field-key="startsDisabled"]:visible').check()
                 page.wait_for_function('state.pending===0 && state.row.fields.find(f=>f.key==="startsDisabled").value===true')
+                original_map = (game/'map/MapStudio/m10_02_00_00.msb').read_bytes()
+                page.locator('[data-row-action="duplicate"][data-row-kind="placement"]').click()
+                page.wait_for_function('!state.rowBusy && state.row?.id==="5:1"')
+                assert page.locator('[data-field-key="hitFilter"]:visible').input_value() == '15'
+                height = page.locator('[data-field-key="posY"]:visible')
+                height.fill('-30');height.press('Tab')
+                page.wait_for_function('state.pending===0 && state.row.fields.find(f=>f.key==="posY").value===-30')
+                page.evaluate('api("/api/save",{})')
+                saved = MsbDocument((mod/'map/MapStudio/m10_02_00_00.msb').read_bytes())
+                assert saved._by_id[(5,1)]['pos'][1] == -30
+                assert next(field['value'] for field in saved.read_placement((5,1))['fields'] if field['key']=='hitFilter') == 15
+                page.locator('[data-row-action="remove"][data-row-kind="placement"]').click()
+                page.get_by_role('button',name='Remove',exact=True).click()
+                page.wait_for_function('!state.rowBusy && !state.mapView.parts.some(part=>part.key==="5:1")')
+                page.evaluate('api("/api/save",{})')
+                assert (5,1) not in MsbDocument((mod/'map/MapStudio/m10_02_00_00.msb').read_bytes())._by_id
+                assert (game/'map/MapStudio/m10_02_00_00.msb').read_bytes() == original_map
                 page.evaluate('selectPlacement("m10_02_00_00.msb:region:0",false)')
                 page.wait_for_selector('[data-field-key="width"]:visible')
                 control = page.locator('[data-field-key="width"]:visible')

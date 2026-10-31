@@ -65,7 +65,7 @@ def test_the_same_member_conflicts_and_the_later_mod_is_used():
     b = mod("B", (BINDER, edited("a87.tae", (0, 0, "start", 0.75))))
     result = mod_loader.compose(GAME, [a, b])
     assert value(result.files[BINDER], "a87.tae", 0, 0, "start") == 0.75
-    assert [(c.part, c.mods) for c in result.conflicts] == [("a87.tae", ["A", "B"])]
+    assert [(c.part, c.mods) for c in result.conflicts] == [("a87.tae/animation 3300", ["A", "B"])]
     lines = result.by_mod([a, b])
     assert "B changes this too and loads later" in lines["A"][0] and "overrides A" in lines["B"][0]
 

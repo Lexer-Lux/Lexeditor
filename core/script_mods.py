@@ -31,7 +31,7 @@ import threading
 from time import perf_counter
 from typing import Any, Callable
 
-from core.plugin_files import atomic_write
+from core.plugin_files import atomic_write, is_link
 from core.mod_builds import ModBuildError
 
 SCRIPT_VERSION = 1
@@ -48,6 +48,10 @@ OWN_FILES = frozenset({SCHEMA_FILE, VALUES_FILE, MANIFEST_FILE})
 # game files a tweak mod can ship.
 GAME_ARCHIVE_SUFFIXES = frozenset({".dcx"})
 FIELD_TYPES = frozenset({"bool", "int", "number", "enum", "sound", "intList"})
+MAX_METADATA_BYTES = 8 * 1024 * 1024
+MAX_SOURCE_BYTES = 32 * 1024 * 1024
+MAX_SOURCE_TOTAL = 128 * 1024 * 1024
+MAX_SOURCE_NODES = 32000
 _IMPORT_LOCK = threading.Lock()
 
 
@@ -70,10 +74,14 @@ class ScriptModInfrastructureError(ScriptModError):
 
 def _read_json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        with path.open('rb') as stream:
+            data = stream.read(MAX_METADATA_BYTES + 1)
+        if len(data) > MAX_METADATA_BYTES:
+            raise ValueError('exceeds the 8 MiB metadata limit')
+        return json.loads(data.decode('utf-8-sig'))
     except FileNotFoundError:
         return None
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, RecursionError) as error:
         raise ScriptModError(f"{path.name} is not readable JSON: {error}") from error
 
 
@@ -218,9 +226,15 @@ def _load(root: Path):
     with _IMPORT_LOCK:
         # Source-content checks can notice edits with unchanged size/mtime.
         # Python's timestamp-based bytecode cache must not hide those edits.
-        for bytecode in package_dir.rglob('*.pyc'):
-            if '__pycache__' in bytecode.parts and bytecode.resolve().is_relative_to(package_dir.resolve()):
-                bytecode.unlink(missing_ok=True)
+        for relative in consumed_files(root):
+            if relative.parts[0] != SCRIPT_FOLDER or relative.suffix != '.py':
+                continue
+            bytecode = Path(importlib.util.cache_from_source(str(root/relative)))
+            if is_link(bytecode.parent):
+                raise ScriptModError('Build bytecode cache must not be a link')
+            if not bytecode.resolve().is_relative_to(package_dir.resolve()):
+                raise ScriptModError('Build bytecode cache is outside the script folder')
+            bytecode.unlink(missing_ok=True)
         for loaded in [key for key in sys.modules if key == name or key.startswith(name + ".")]:
             del sys.modules[loaded]
         init = package_dir / "__init__.py"
@@ -355,19 +369,69 @@ def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
         raise ScriptModError("Generated-file rollback failed: " + "; ".join(errors))
 
 
+_INPUT_NAMES = ('mod.json', SCHEMA_FILE, VALUES_FILE)
+
+
+def consumed_files(root: Path) -> list[Path]:
+    root = Path(root)
+    found = [Path(name) for name in _INPUT_NAMES if (root / name).is_file()]
+    pending, visited = [root / SCRIPT_FOLDER], 0
+    while pending:
+        directory = pending.pop()
+        try:
+            if is_link(directory):
+                raise ScriptModError('Build source directories must not be links')
+            if not directory.exists():
+                continue
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    visited += 1
+                    if visited > MAX_SOURCE_NODES:
+                        raise ScriptModError('Build source contains too many entries')
+                    if entry.name in ('.git', '__pycache__'):
+                        continue
+                    path = Path(entry.path)
+                    if is_link(path):
+                        raise ScriptModError('Build sources must not be links')
+                    if entry.is_dir(follow_symlinks=False):
+                        pending.append(path)
+                    elif entry.is_file(follow_symlinks=False):
+                        relative = path.relative_to(root)
+                        if owns(relative):
+                            found.append(relative)
+        except OSError as error:
+            raise ScriptModError(f'Build source is not readable: {error}') from error
+    return sorted(found)
+
+
 def source_fingerprint(root: Path) -> str:
     """Content identity of a script's source and settings, excluding its outputs."""
     root = Path(root)
-    paths = [root / name for name in ('mod.json', SCHEMA_FILE, VALUES_FILE)]
-    paths += [path for path in (root / SCRIPT_FOLDER).rglob('*')
-              if path.is_file() and '__pycache__' not in path.parts
-              and owns(path.relative_to(root))]
+    paths = [root / name for name in _INPUT_NAMES]
+    paths += [root / relative for relative in consumed_files(root)
+              if relative.parts and relative.parts[0] == SCRIPT_FOLDER]
     digest = hashlib.sha256()
+    total = 0
     for path in sorted(paths):
         name = path.relative_to(root).as_posix().encode('utf-8')
-        data = path.read_bytes() if path.is_file() else b''
+        limit = MAX_METADATA_BYTES if path.name in _INPUT_NAMES and path.parent == root else MAX_SOURCE_BYTES
+        if path.is_symlink():
+            raise ScriptModError(f'{path.name}: build source must not be a link')
+        if path.is_file():
+            with path.open('rb') as stream:
+                data = stream.read(min(limit, MAX_SOURCE_TOTAL-total) + 1)
+        else:
+            data = b''
+        total += len(data)
+        if len(data) > limit or total > MAX_SOURCE_TOTAL:
+            raise ScriptModError(f'{path.name}: build source exceeds its size limit')
         if path == root / 'mod.json':
-            metadata = json.loads(data)
+            try:
+                metadata = json.loads(data)
+                if not isinstance(metadata,dict):
+                    raise ValueError('must be an object')
+            except (ValueError,RecursionError) as error:
+                raise ScriptModError(f'mod.json is not readable JSON: {error}') from error
             data = json.dumps({key: metadata.get(key) for key in
                                ('id', 'name', 'enabled', 'order', 'script')}, sort_keys=True).encode('utf-8')
         digest.update(len(name).to_bytes(8, 'little') + name)
@@ -475,6 +539,8 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
         conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
         if conflicts:
             raise error(f"{row['name']} conflicts with {', '.join(conflicts)}", folders=[row['path']])
+        if row.get('prebuilt'):
+            continue
         try:
             snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
         except Exception as failure:
@@ -482,6 +548,8 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
     built = []
     try:
         for row in rows:
+            if row.get('prebuilt'):
+                continue
             context.current = row["name"]
             started = perf_counter()
             result = build(Path(row["path"]), context, allowed_roots=allowed_roots)

@@ -170,7 +170,7 @@ def test_malformed_composition_cache_is_a_miss(tmp_path, monkeypatch, payload):
     monkeypatch.setattr(mod_loader, '_compose_cache', {})
     monkeypatch.setattr(composition_cache, 'load', lambda *args: payload)
     monkeypatch.setattr(composition_cache, 'store', lambda *args: None)
-    result = mod_loader._compose_file(relative, None, [mod], False, tmp_path)
+    result = mod_loader._compose_files({relative: None}, [mod], False, tmp_path)
     assert result.files[relative] == b'new'
 
 
@@ -181,7 +181,7 @@ def test_cache_write_failure_does_not_fail_composition(tmp_path, monkeypatch):
     def fail(*args):
         raise TypeError('bad cache')
     monkeypatch.setattr(composition_cache, 'store', fail)
-    result = mod_loader._compose_file(relative, None, [mod_loader.Mod('Healthy', tmp_path, {relative: b'new'})], False, tmp_path)
+    result = mod_loader._compose_files({relative: None}, [mod_loader.Mod('Healthy', tmp_path, {relative: b'new'})], False, tmp_path)
     assert result.files[relative] == b'new'
 
 
@@ -189,9 +189,9 @@ def test_valid_cached_conflict_report_keeps_peer_names(tmp_path, monkeypatch):
     from collections import OrderedDict
     relative = Path('opaque.bin')
     monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
-    payload = json.dumps({'hasData': True, 'conflicts': [[str(relative), 'field', ['A', 'B']]]}).encode() + b'\nnew'
+    payload = json.dumps({'files': [[str(relative), 3]], 'conflicts': [[str(relative), 'field', ['A', 'B']]]}).encode() + b'\nnew'
     monkeypatch.setattr(composition_cache, 'load', lambda *args: payload)
-    result = mod_loader._compose_file(relative, None,
+    result = mod_loader._compose_files({relative: None},
         [mod_loader.Mod('A', tmp_path, {relative: b'input'})], False, tmp_path)
     assert result.files[relative] == b'new'
     assert result.conflicts[0].mods == ['A', 'B']
@@ -242,11 +242,12 @@ def test_combined_parameter_reads_reuse_archive_cache_and_skip_other_assets(tmp_
     assert len(calls) == 2
 
 
-def test_editor_only_source_changes_do_not_invalidate_archive_outputs(monkeypatch):
+@pytest.mark.parametrize('editor_source', ['server.py','map_store.py','collision_store.py'])
+def test_editor_only_source_changes_do_not_invalidate_archive_outputs(monkeypatch,editor_source):
     mod_loader._composition_revision.cache_clear()
     baseline = mod_loader._composition_revision()
     read = Path.read_bytes
-    changed = {'name': 'server.py'}
+    changed = {'name': editor_source}
     def edited(path):
         contents = read(path)
         return contents + b'\n# source edit' if path.parent == Path(mod_loader.__file__).parent and path.name == changed['name'] else contents
@@ -710,6 +711,37 @@ def test_saved_project_survives_unexpected_deployment_error(tmp_path, monkeypatc
     assert result == {'tweaksNeedRebuild': True, 'tweaksError': 'bytes cannot serialize'}
 
 
+def test_record_requests_do_not_rescan_optional_build_status(monkeypatch):
+    from types import SimpleNamespace
+    from plugins.ds1 import server
+    rows = [{'id':1,'table':'Magic','name':'Example','values':{}}]
+    document = SimpleNamespace(list_rows=lambda _:rows,dirty_count=0,pending_changes=lambda:[])
+    monkeypatch.setattr(server,'STORE',SimpleNamespace(get=lambda:document,game_root=None))
+    other = SimpleNamespace(dirty_count=0,pending_changes=lambda:[],snapshot=lambda:{})
+    for name in ('RULES','MAPSTORE','TAESTORE','SKILLS'):
+        monkeypatch.setattr(server,name,other)
+    monkeypatch.setattr(server,'_warm_icon_table',lambda:None)
+    scans = []
+    def unavailable(*_):
+        scans.append(True)
+        raise AttributeError('Older interpreter lacks a filesystem method')
+    monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
+    replies = []
+    server.Handler.do_GET(SimpleNamespace(path='/api/table?tab=spells',
+        send_json=lambda value,status=200:replies.append((status,json.loads(json.dumps(value))))))
+    assert replies[0][0] == 200 and replies[0][1]['rows'] == rows
+    assert 'tweaksNeedRebuild' not in replies[0][1] and not scans
+
+
+def test_unknown_build_status_stays_pending_without_failing_the_status_request(monkeypatch, caplog):
+    from plugins.ds1 import server
+    def unavailable(*_):
+        raise AttributeError('Older interpreter lacks a filesystem method')
+    monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
+    assert server._tweaks_flag() is True
+    assert 'Older interpreter' in caplog.text
+
+
 def test_bad_archive_is_attributed_but_bad_vanilla_is_not(tmp_path, monkeypatch):
     from ds1_fixture import make_archive
     relative = mod_loader.RELATIVE
@@ -762,7 +794,7 @@ def test_full_activation_recovers_broken_script_and_corrupt_caches(game, tmp_pat
 
 def test_failed_rollback_is_reported_and_remaining_files_are_attempted(tmp_path, monkeypatch):
     from types import SimpleNamespace
-    managed = SimpleNamespace(label='fixture', live=lambda game: game / 'file')
+    managed = SimpleNamespace(relative='menu/file', label='fixture', live=lambda game: game / 'file')
     monkeypatch.setattr(tweak_mods, '_read', lambda *args: b'after')
     restored = []
     def write(*args, **kwargs):
@@ -771,9 +803,9 @@ def test_failed_rollback_is_reported_and_remaining_files_are_attempted(tmp_path,
         restored.append('runtime')
         raise OSError('rollback disk failure')
     monkeypatch.setattr(tweak_mods, '_write', write)
-    monkeypatch.setattr(tweak_mods, '_write_runtime', fail)
+    monkeypatch.setattr(tweak_mods, '_rollback_runtime', fail)
     done = [{'managed': managed, 'before': b'before', 'after': b'after', 'previous': {}},
-            {'managed': None, 'previous': {'patch': None, 'mods': [], 'project': None}}]
+            {'runtime':{}}]
     with pytest.raises(tweak_mods.TweakError, match='rollback disk failure'):
         tweak_mods._undo(tmp_path, done)
     assert restored == ['runtime', 'file']

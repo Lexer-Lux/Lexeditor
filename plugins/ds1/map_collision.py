@@ -54,30 +54,57 @@ def meshes(source):
     return result
 
 
-def sources(game_root, project, map_name, model_name):
+def preview_meshes(source):
+    """Apply extended-mesh transforms while retaining older storage previews."""
+    from .collision_write import CollisionDocument
+    data = inflate(source) if source[:4] == b'DCX\0' else bytes(source)
+    entries = hkx._peek_tables(data)
+    names = [item['type'].name for item in entries if item['type'] is not None]
+    convex = names.count('hkpConvexVerticesShape') == 1
+    if not convex and (sum(names.count(name) for name in ('CustomParamStorageExtendedMeshShape','CustomParamStorageMeshShape')) != 1 or names.count('hkpMoppCode') != 1):
+        return meshes(source)
+    document = CollisionDocument(source)
+    return preview_document(document,document.meshes)
+
+
+def preview_document(document, values):
+    result = []
+    for index,mesh in enumerate(values):
+        vertices = document.transformed_vertices(index,mesh['vertices'])
+        result.append({'positions':_encode([v for row in vertices for v in row],'f'),
+            'indices':_encode([v for face in mesh['faces'] for v in face[:3]],'I'),
+            'normals':'','verts':len(vertices),'tris':len(mesh['faces']),'cull':False,'mat_def':'',
+            'name':f'Collision {index+1}'})
+    return result
+
+
+def source(game_root, project, map_name, model_name, layer):
     """High and low share one MSB instance, but have separate files."""
-    if not re.fullmatch(r'h[A-Za-z0-9_]+', model_name):
+    if (not re.fullmatch(r'h[A-Za-z0-9_]+', model_name)
+            or not re.fullmatch(r'm\d\d_\d\d_\d\d_\d\d\.msb',map_name)
+            or layer not in ('collisionHigh','collisionLow')):
         raise FormatError('Invalid map collision model name')
     folder = Path('map') / Path(map_name).stem
-    for prefix, layer in (('h', 'collisionHigh'), ('l', 'collisionLow')):
-        name = prefix + model_name[1:]
-        # A loose member in the mod is the editable override of a binder member.
-        roots = [Path(project)] if project is not None else []
-        roots.append(Path(game_root))
-        loose = next((root / folder / (name + suffix) for root in roots
-                      for suffix in ('.hkx.dcx', '.hkx')
-                      if (root / folder / (name + suffix)).is_file()), None)
-        if loose is not None:
-            yield layer, loose, None, name
-            continue
-        archive = prefix + Path(map_name).stem[1:]
-        header = next((root / folder / (archive + '.hkxbhd') for root in roots
-                       if (root / folder / (archive + '.hkxbhd')).is_file()), None)
-        if header is not None:
-            relative = folder / (archive + '.hkxbdt')
-            body = next((root / relative for root in roots if (root / relative).is_file()), None)
-            if body is not None:
-                yield layer, header, body, name
+    prefix = 'h' if layer == 'collisionHigh' else 'l'
+    name = prefix + model_name[1:]
+    roots = [Path(project)] if project is not None else []
+    roots.append(Path(game_root))
+    for root in roots:
+        candidates = [root/folder/(stem+suffix) for stem in (name,name+'a'+Path(map_name).stem[1:3])
+                      for suffix in ('.hkx.dcx','.hkx') if (root/folder/(stem+suffix)).is_file()]
+        if len(candidates) > 1:
+            raise FormatError(f'{model_name}: multiple loose collision files declare the same member')
+        if candidates:
+            return candidates[0],None,name
+    archive = prefix + Path(map_name).stem[1:]
+    header = next((root/folder/(archive+'.hkxbhd') for root in roots
+                   if (root/folder/(archive+'.hkxbhd')).is_file()),None)
+    if header is not None:
+        relative = folder/(archive+'.hkxbdt')
+        body = next((root/relative for root in roots if (root/relative).is_file()),None)
+        if body is not None:
+            return header,body,name
+    return None
 
 
 @functools.lru_cache(maxsize=32)
@@ -89,8 +116,12 @@ def _directory(path, stamp):
 
 def geometry(game_root, project, map_name, model_name):
     result, notes = [], []
-    for layer, header, body, name in sources(game_root, project, map_name, model_name):
+    for layer in ('collisionHigh','collisionLow'):
         try:
+            located = source(game_root,project,map_name,model_name,layer)
+            if located is None:
+                raise FormatError('No collision file')
+            header,body,name = located
             if body is None:
                 if header.stat().st_size > hkx.MAX_FILE:
                     raise FormatError('Collision file is too large')
@@ -105,11 +136,7 @@ def geometry(game_root, project, map_name, model_name):
                     raise FormatError(f'{header.name} has no unique member for {name}')
                 offset, size = directory[candidates[0]]
                 raw = bhf.read_member(body, offset, size)
-            result.extend(dict(mesh, layer=layer) for mesh in meshes(raw))
+            result.extend(dict(mesh, layer=layer) for mesh in preview_meshes(raw))
         except (FormatError, OSError, ValueError, IndexError, TypeError, struct.error, RecursionError) as error:
             notes.append(f'{layer}: {error}')
-    found = {mesh['layer'] for mesh in result}
-    for layer in ('collisionHigh', 'collisionLow'):
-        if layer not in found and not any(note.startswith(layer + ':') for note in notes):
-            notes.append(f'{layer}: no collision file')
     return {'meshes': result, 'notes': notes}

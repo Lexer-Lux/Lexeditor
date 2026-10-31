@@ -32,10 +32,26 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 
 def select(page, table, row_id):
     row = page.locator(f'.lex-list-row[data-key="{table}:{row_id}"]')
-    row.scroll_into_view_if_needed()
+    try:
+        row.scroll_into_view_if_needed()
+    except Exception as error:
+        snapshot = page.evaluate('''({tab:state.tab,sub:state.sub,page:state.page,pageSize:state.pageSize,
+            selected:state.selected,rows:state.rows?.map(row=>`${row.table}:${row.id}`),error:state.error,
+            inert:document.body.inert,loading:!!document.querySelector('.lex-plugin-loading-screen')})''')
+        raise AssertionError(f'The requested NPC was not displayed: {snapshot}') from error
     row.click()
     page.wait_for_function('(key) => state.row && `${state.row.table}:${state.row.id}` === key',
                            arg=f'{table}:{row_id}')
+
+
+def open_npcs(page,url):
+    page.goto(url)
+    page.wait_for_selector('body[data-ds1-ready="true"]',timeout=60000)
+    # Boot exposes its data-ready flag before finishPluginLoading completes.
+    # An actual reader cannot navigate through that still-inert loading screen.
+    page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
+    page.evaluate("navigate('npcs','npcs')")
+    page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
 
 
 def test_armor_assembled_npc_has_no_clickable_preview():
@@ -66,10 +82,7 @@ def test_armor_assembled_npc_has_no_clickable_preview():
                 try:
                     page = browser.new_page(viewport={'width': 1440, 'height': 900})
                     page.on('pageerror', lambda error: errors.append(str(error)))
-                    page.goto(session.url)
-                    page.wait_for_selector('body[data-ds1-ready="true"]', timeout=60000)
-                    page.evaluate("navigate('npcs','npcs')")
-                    page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
+                    open_npcs(page,session.url)
                     select(page, 'NpcParam', 223000)
                     page.wait_for_selector(
                         '.lex-detail-panel-icon[data-lex-preview-state="unavailable"]')
@@ -132,10 +145,7 @@ def test_drawer_lists_attacks_and_edits_hitboxes():
                 try:
                     page = browser.new_page(viewport={'width': 1440, 'height': 900})
                     page.on('pageerror', lambda error: errors.append(str(error)))
-                    page.goto(session.url)
-                    page.wait_for_selector('body[data-ds1-ready="true"]', timeout=60000)
-                    page.evaluate("navigate('npcs','npcs')")
-                    page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
+                    open_npcs(page,session.url)
                     select(page, 'NpcParam', 251000)
                     page.wait_for_selector('.lex-model-preview-trigger')
                     page.locator('.lex-model-preview-trigger').click()
@@ -176,10 +186,7 @@ def test_armor_assembled_npc_with_attacks_opens_attack_drawer():
                 try:
                     page = browser.new_page(viewport={'width': 1440, 'height': 900})
                     page.on('pageerror', lambda error: errors.append(str(error)))
-                    page.goto(session.url)
-                    page.wait_for_selector('body[data-ds1-ready="true"]', timeout=60000)
-                    page.evaluate("navigate('npcs','npcs')")
-                    page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
+                    open_npcs(page,session.url)
                     select(page, 'NpcParam', 223000)
                     # No model to picture, so the placeholder stays, but the
                     # magnifier opens the attack drawer.
@@ -225,10 +232,7 @@ def test_drawer_motion_picker_drives_shared_transport():
                 try:
                     page = browser.new_page(viewport={'width': 1440, 'height': 900})
                     page.on('pageerror', lambda error: errors.append(str(error)))
-                    page.goto(session.url)
-                    page.wait_for_selector('body[data-ds1-ready="true"]', timeout=60000)
-                    page.evaluate("navigate('npcs','npcs')")
-                    page.wait_for_function("state.tab==='npcs'&&state.rows&&state.rows.length")
+                    open_npcs(page,session.url)
                     select(page, 'NpcParam', 251000)
                     page.wait_for_selector('.lex-model-preview-trigger')
                     page.locator('.lex-model-preview-trigger').click()
