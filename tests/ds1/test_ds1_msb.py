@@ -12,6 +12,26 @@ from plugins.ds1.msb import MsbDocument, MsbError
 NPC_IDS = frozenset({120000, 120100, 121000})
 
 
+def test_added_player_is_in_native_subtype_run_and_part_links_stay_on_targets():
+    parts=(("player",4,0,0,None),("collision",5,0,0,None),
+           ("object",9,0,0,None),("enemy",10,0,0,120000))
+    doc=MsbDocument(build_msb(parts=parts))
+    collision=doc.parts[1]
+    obj,enemy=doc.parts[2:]
+    # Global part indices, unlike entity IDs, move on insertion.
+    struct.pack_into('<i',doc.plain,obj['type_data']+4,1)
+    struct.pack_into('<i',doc.plain,enemy['type_data']+28,1)
+    doc.add_placement((4,0))
+    after=MsbDocument(doc.export())
+    kinds=[p['type'] for p in after.parts]
+    assert kinds==[4,4,5,9,10]
+    first=kinds.index(4);count=kinds.count(4)
+    assert all(p['type']==4 for p in after.parts[first:first+count])
+    for p,offset in ((after.parts[3],4),(after.parts[4],28)):
+        target=struct.unpack_from('<i',after.plain,p['type_data']+offset)[0]
+        assert after.parts[target]['name']==collision['name']
+
+
 def test_placements_listed_with_models_and_links():
     doc = MsbDocument(build_msb())
     placements = doc.placements()

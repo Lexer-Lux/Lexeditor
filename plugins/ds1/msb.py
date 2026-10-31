@@ -1040,8 +1040,8 @@ class MsbDocument:
         self._shift_caches(end, start - end)
         self._shift_dirs(end, start - end)
 
-    def _relocate_parts(self, extra=(), drop=()):
-        self._relocate_param(3, extra=extra, drop=drop)
+    def _relocate_parts(self, extra=(), drop=(), at=None):
+        self._relocate_param(3, extra=extra, drop=drop, at=at)
 
 
     @staticmethod
@@ -1237,7 +1237,7 @@ class MsbDocument:
 
     def add_placement(self, part_key):
         """Duplicate a placement: fresh identity and name, its own entity,
-        appended last. The copy starts where its source stands."""
+        filed after its own kind. The copy starts where its source stands."""
         if part_key[0] == 'region':
             return self.add_region(part_key)
         if str(part_key[0]).startswith('event'):
@@ -1285,7 +1285,12 @@ class MsbDocument:
         struct.pack_into('<i', entry, 0x58, ent_at - base)
         struct.pack_into('<i', entry, 0x5C, tabs_at - base)
         self.plain += entry + name_bytes + sib + entity + blob
-        self._relocate_parts(extra=[base])
+        # The native loader keeps a first index and count for each subtype
+        # (0x51E50F in the supported DSR build), so each kind must stay
+        # contiguous. Appending Players after collisions makes new arrivals
+        # invisible to that lookup, despite parsing correctly in the editor.
+        insert_at = max(i for i, item in enumerate(self.parts) if item['type'] == ptype) + 1
+        self._relocate_parts(extra=[base], at=insert_at)
         new = {'id': new_id, 'type': ptype, 'model': part['model'], 'name': name,
                'pos': part['pos'], 'rot': part['rot'], 'scale': part['scale'],
                'base': base, 'type_data': tabs_at,
@@ -1294,7 +1299,8 @@ class MsbDocument:
                          (sib_at, sib_at + len(sib)), (ent_at, ent_at + ENTITY_SIZE)]}
         if ptype in ENEMY_TYPES:
             new['spans'].append((tabs_at, tabs_at + ENEMY_READ))
-        self.parts.append(new)
+        self.parts.insert(insert_at, new)
+        self._shift_part_references(insert_at, 1)
         self._model_counts()
         self._by_id[(ptype, new_id)] = new
         self._strings.extend(new['spans'][1:3])
@@ -1387,6 +1393,17 @@ class MsbDocument:
             if any(struct.unpack_from('<i', self.plain, part['type_data'])[0] == collision_index
                    for part in self.parts if part['type'] == 11):
                 raise MsbError('Remove the connected collision that uses this collision first')
+        if removed['type'] == 5:
+            for part in self.parts:
+                if part['type'] == 11:
+                    at = part['type_data']
+                    value = struct.unpack_from('<i', self.plain, at)[0]
+                    if value > collision_index:
+                        struct.pack_into('<i', self.plain, at, value - 1)
+        self._shift_part_references(gone, -1)
+
+    def _shift_part_references(self, index, delta):
+        """Keep global part references on the same records after insertion/removal."""
         slots = [event['ahead'] for event in self.events]
         for event in self.events:
             if event['type'] in (4, 7):
@@ -1398,15 +1415,11 @@ class MsbDocument:
                 slots.append(part['type_data'] + 28)
             elif part['type'] in OBJECT_TYPES:
                 slots.append(part['type_data'] + 4)
-            elif part['type'] == 11 and removed['type'] == 5:
-                at = part['type_data']
-                value = struct.unpack_from('<i', self.plain, at)[0]
-                if value > collision_index:
-                    struct.pack_into('<i', self.plain, at, value - 1)
         for at in slots:
             value = struct.unpack_from('<i', self.plain, at)[0]
-            if value >= gone:
-                struct.pack_into('<i', self.plain, at, -1 if value == gone else value-1)
+            if value >= index:
+                struct.pack_into('<i', self.plain, at,
+                                 -1 if delta < 0 and value == index else value + delta)
         for event in self.events:
             event['area'] = struct.unpack_from('<i', self.plain, event['ahead'])[0]
 
