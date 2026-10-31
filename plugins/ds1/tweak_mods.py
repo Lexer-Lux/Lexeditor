@@ -1548,9 +1548,13 @@ def prepared_menu_layout(game_root: Path, files: list[dict]) -> bytes | None:
 
 def _menu_identity(original, specs, managed):
     try:
-        from .mod_loader import _composition_revision
+        from . import formats, esd
         kind = 'layout' if managed == LAYOUT else ESD_ARCHIVE[managed]
-        return _sha(json.dumps([_composition_revision().hex(), kind, managed.relative, _sha(original), specs],
+        # Only these codecs compose a menu. Map, item and editor changes must
+        # not invalidate an otherwise identical menu archive.
+        modules = (menu_layout, formats) if managed == LAYOUT else (menu_scripts, esd, formats)
+        revision = _sha(b'\0'.join(Path(module.__file__).read_bytes() for module in modules))
+        return _sha(json.dumps([revision, kind, managed.relative, _sha(original), specs],
                               sort_keys=True, separators=(',', ':'), default=_menu_cache_value).encode('utf-8'))
     except (OSError, TypeError, ValueError):
         return None  # Optional recipe metadata cannot prevent composition.

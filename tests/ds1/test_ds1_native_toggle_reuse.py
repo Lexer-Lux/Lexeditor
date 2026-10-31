@@ -5,6 +5,40 @@ import sys
 import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+
+def test_menu_recipe_tracks_its_codec_without_global_editor_revision(tmp_path, monkeypatch):
+    from plugins.ds1 import tweak_mods, menu_layout, menu_scripts, formats, esd, mod_loader
+    for module in (menu_layout, menu_scripts, formats, esd):
+        source = tmp_path / (module.__name__.replace('.', '_') + '.py')
+        source.write_bytes(b'first codec')
+        monkeypatch.setattr(module, '__file__', str(source))
+    specs = [{'owner': 'UI', 'nodes': [], 'moves': []}]
+    identity = tweak_mods._menu_identity(b'original', specs, tweak_mods.LAYOUT)
+    assert identity is not None
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'unrelated editor change')
+    assert tweak_mods._menu_identity(b'original', specs, tweak_mods.LAYOUT) == identity
+    Path(menu_layout.__file__).write_bytes(b'changed layout codec')
+    assert tweak_mods._menu_identity(b'original', specs, tweak_mods.LAYOUT) != identity
+    assert tweak_mods._menu_identity(b'changed original', specs, tweak_mods.LAYOUT) != identity
+
+
+def test_inserted_menu_blobs_preserve_existing_nodes_and_roundtrip():
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from test_ds1_menu_layout import drb
+    from plugins.ds1.menu_layout import Drb
+    layout = Drb(drb())
+    def blobs(parsed):
+        return {(dialog, node.name): (parsed._blob('SHAP', 'SHPR', node.shape),
+                                     parsed._blob('CTRL', 'CTPR', node.control))
+                for dialog in parsed.dialogs() for node in parsed.nodes(dialog)}
+    original = blobs(layout)
+    for index in range(80):
+        layout.add_text('data_simple_arms', f'added_{index}', 'text_param_receive', index, 16,
+                        before='text_receive_name' if index % 2 else None)
+    current = blobs(layout)
+    assert all(current[key] == value for key, value in original.items())
+    assert blobs(Drb(layout.to_bytes())) == current
+
 def test_native_toggle_reuses_installed_data_without_composition(tmp_path, monkeypatch):
     from plugins.ds1 import mod_support, mod_loader, tweak_mods
     from plugins.ds1.store import MARKER, RELATIVE

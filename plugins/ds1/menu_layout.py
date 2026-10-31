@@ -36,7 +36,7 @@ beyond its rectangle.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from bisect import bisect_right
+from bisect import bisect_right, insort
 import hashlib
 from pathlib import Path
 import struct
@@ -105,6 +105,7 @@ class Drb:
         self._strings = {}
         self._dialogs = None
         self._blob_starts = {}
+        self._checked_blob_ends = set()
         self._strings_used = None
         at = 16
         for tag in SECTIONS:
@@ -170,6 +171,17 @@ class Drb:
         """The type name and data of one shape or control, bounded by the next blob."""
         kind, start, end = self._span(tag, blob_tag, offset)
         return kind, bytes(self.sections[blob_tag][0][start:end])
+
+    def _added_blob(self, tag: str, start: int) -> None:
+        """Entry insertion reorders references, but existing blob offsets stay put."""
+        cached = self._blob_starts.get(tag)
+        count = self.sections[tag][1]
+        if cached is not None and cached[0] == count - 1:
+            starts = cached[1]
+            at = bisect_right(starts, start)
+            if not at or starts[at - 1] != start:
+                insort(starts, start)
+            self._blob_starts[tag] = (count, starts)
 
     def dialogs(self) -> dict[str, int]:
         """Dialog names mapped to their DLG offsets."""
@@ -460,6 +472,7 @@ class Drb:
             self._trim(tag, self.sections[tag][1] * 8)
             self.sections[tag][0][entry:entry] = struct.pack("<ii", kind, data)
             self.sections[tag][1] += 1
+            self._added_blob(tag, data)
             self._pad(tag)
         shape_entry = control_entry = entry
 
@@ -507,9 +520,14 @@ class Drb:
         data, count = self.sections[tag]
         if not count:
             return 0
-        last = max(struct.unpack_from("<ii", data, index * 8)[1] for index in range(count))
-        offset = next(index * 8 for index in range(count) if struct.unpack_from("<ii", data, index * 8)[1] == last)
-        return last + len(self._blob(tag, blob_tag, offset)[1])
+        if tag not in self._checked_blob_ends:
+            last = max(struct.unpack_from("<ii", data, index * 8)[1] for index in range(count))
+            offset = next(index * 8 for index in range(count) if struct.unpack_from("<ii", data, index * 8)[1] == last)
+            self._blob(tag, blob_tag, offset)  # Validate the original final span once.
+            self._checked_blob_ends.add(tag)
+        # The last blob's span ends at the section boundary, including its
+        # existing padding. Finding that last entry cannot change the answer.
+        return len(self.sections[blob_tag][0])
 
 
 # --- tweak patch descriptions ------------------------------------------------
