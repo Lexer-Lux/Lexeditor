@@ -14,10 +14,11 @@ from contextlib import contextmanager
 from core.mod_builds import ModBuildError
 from core import mod_library, mod_requires, mods_service
 from core.plugin_files import atomic_write
-from . import deployment, exe_patches, menu_dim, menu_layout, menu_scripts, mod_loader, tweak_mods
+from . import assets, deployment, exe_patches, menu_dim, menu_layout, menu_scripts, mod_loader, tweak_mods
 
 REPORT = 'lexeditor-ds1-load.json'
 MAX_REPORT = 1024 * 1024
+MAX_SIGNATURE_BYTES = assets.MAX_ASSET_TOTAL
 
 
 def discover(roots, game=None):
@@ -55,12 +56,31 @@ def discover(roots, game=None):
                   key=lambda row:(row['order'],row['name'].casefold()))
 
 
-def _stamp(path):
+def _stamp(path, limit):
+    before = None
     try:
-        stat = Path(path).stat()
-        return [stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]
-    except OSError:
-        return None
+        path = tweak_mods.checked(Path(path))
+        before = path.stat()
+        if not 0 <= before.st_size <= min(limit,assets.MAX_ASSET_BYTES):
+            return False
+        digest,read = hashlib.sha256(),0
+        with path.open('rb') as stream:
+            while True:
+                block = stream.read(min(1024*1024,before.st_size-read+1))
+                if not block:
+                    break
+                read += len(block)
+                if read > before.st_size:
+                    return False
+                digest.update(block)
+        after = path.stat()
+        if read != before.st_size or (after.st_size,after.st_mtime_ns,after.st_ctime_ns) != (before.st_size,before.st_mtime_ns,before.st_ctime_ns):
+            return False
+        return [read,before.st_mtime_ns,before.st_ctime_ns,digest.hexdigest()]
+    except FileNotFoundError:
+        return None if before is None else False
+    except (OSError,ValueError):
+        return False  # An unavailable signature disables only report reuse.
 
 
 def _requires_data(folder):
@@ -99,7 +119,7 @@ def _modules(rows):
 
 def _identity(rows, game, targets):
     from . import native_rules, collision_archive
-    paths, contributors = [], []
+    paths, contributors, optional = [], [], set()
     for row in rows:
         folder = row['path']
         inputs = [path for _, path in mod_loader.content_files(folder,row['name'])]
@@ -118,21 +138,21 @@ def _identity(rows, game, targets):
     for relative in sorted(dependencies):
         managed = tweak_mods.managed_menu(relative)
         if managed is not None:
-            paths.extend((managed.backup(game), managed.manifest(game), deployment._marker_path(game,relative)))
+            journals = (managed.backup(game), managed.manifest(game), deployment._marker_path(game,relative))
+            paths.extend(journals)
+            optional.update(journals)
     record, warning = tweak_mods.runtime_record(game)
     project = record.get('project') if record else None
-    stamped = []
-    for path in paths:
-        if path.name == native_rules.SETTINGS_FILE:
-            value = native_rules.digest(native_rules._read_optional(path,native_rules.SETTINGS_LIMIT))
-        elif path == game/tweak_mods.RUNTIME_PATCH and path.is_file():
-            with path.open('rb') as stream:
-                data = stream.read(tweak_mods.MAX_RUNTIME+1)
-            if len(data) > tweak_mods.MAX_RUNTIME:
-                raise ValueError('The installed shared patch exceeds its size limit')
-            value = hashlib.sha256(data).hexdigest()
-        else:
-            value = _stamp(path)
+    stamped,remaining = [],MAX_SIGNATURE_BYTES
+    for path in dict.fromkeys(paths):
+        try:
+            value = _stamp(path,remaining)
+        except (OSError,ValueError):
+            return None
+        if value is False or value is None and path not in optional:
+            return None
+        if value is not None:
+            remaining -= value[0]
         stamped.append([str(path),value])
     from . import runtime_mods
     allocations = []
@@ -277,7 +297,7 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
             failures = prior.get('disabled') if valid else None
             valid = valid and type(failures) is list and all(type(row) is dict and all(
                 type(row.get(key)) is str for key in ('id','name','error')) for row in failures)
-            if valid and prior.get('signature') == _identity(rows,game,prior['targets']):
+            if valid and type(prior.get('signature')) is str and prior['signature'] == _identity(rows,game,prior['targets']):
                 enabled = {row['id'] for row in rows}
                 remaining = [row for row in failures if row['id'] not in enabled]
                 if remaining != failures:

@@ -148,13 +148,31 @@ def test_released_collisions_run_without_builders_on_foreign_baseline(collision_
     assert coordinates(final) == [2,5,0]
     assert coordinates(final,'h0001a10') == [10,0,0]
     assert standalone_runtime._run(game,[library],lambda:None)['reused']
+    # A bounded/unavailable optional identity cannot stop healthy loading or
+    # make two missing signatures compare equal on the next launch.
+    monkeypatch.setattr(standalone_runtime,'MAX_SIGNATURE_BYTES',1)
+    for _ in range(2):
+        uncached=standalone_runtime._run(game,[library],lambda:None)
+        assert set(uncached['loaded'])=={'first','second'}
+        assert not uncached.get('reused') and uncached['signature'] is None
+    def unavailable(*args):raise PermissionError('signature read unavailable')
+    monkeypatch.setattr(standalone_runtime,'_stamp',unavailable)
+    assert set(standalone_runtime._run(game,[library],lambda:None)['loaded'])=={'first','second'}
 
 
-def test_standalone_signature_watches_both_halves_when_only_body_was_written(collision_source,tmp_path):
+@pytest.mark.parametrize('relative',[HEADER,BODY])
+def test_standalone_signature_watches_both_halves_when_only_body_was_written(collision_source,tmp_path,monkeypatch,relative):
     original = split_fixture(collision_source)
     write_pair(tmp_path,original)
+    # Reproduce identical metadata deterministically instead of relying on
+    # the filesystem clock advancing between two quick writes on Windows.
+    stat=Path.stat
+    frozen={tmp_path/path:stat(tmp_path/path) for path in (HEADER,BODY)}
+    def unchanged_metadata(path,*args,**kwargs):
+        return frozen[path] if path in frozen else stat(path,*args,**kwargs)
+    monkeypatch.setattr(Path,'stat',unchanged_metadata)
     first = standalone_runtime._identity([],tmp_path,[BODY.as_posix()])
-    changed = bytearray(original[0])
+    changed = bytearray((tmp_path/relative).read_bytes())
     changed[-1] ^= 1
-    (tmp_path/HEADER).write_bytes(changed)
+    (tmp_path/relative).write_bytes(changed)
     assert standalone_runtime._identity([],tmp_path,[BODY.as_posix()]) != first
