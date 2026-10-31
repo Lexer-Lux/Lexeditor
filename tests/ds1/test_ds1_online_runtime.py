@@ -81,12 +81,20 @@ def test_install_and_remove_preserve_saves_and_describe_new_runtime(tmp_path):
 def test_existing_loader_description_is_updated_without_resetting_switch(tmp_path):
     folder = tweak_mods.ensure_loader_mod(tmp_path)
     metadata = json.loads((folder / 'mod.json').read_text())
+    assert 'MetalCrow' in metadata['credits'] and 'Ainsley Harriott' in metadata['credits']
+    assert 'tremwil' in metadata['credits'] and 'GNU AFFERO GENERAL PUBLIC LICENSE' in metadata['credits']
+    del metadata['credits']  # Upgrade an existing loader created before credits were included.
     metadata.update(description='keeps the game offline', enabled=True, author='reader')
     (folder / 'mod.json').write_text(json.dumps(metadata))
     assert tweak_mods.ensure_loader_mod(tmp_path) == folder
     fresh = json.loads((folder / 'mod.json').read_text())
     assert fresh['enabled'] and fresh['author'] == 'reader'
     assert fresh['description'] == tweak_mods.LOADER_DESCRIPTION
+    assert fresh['credits'] == tweak_mods.loader_credits()
+    fresh['credits'] += '\nAdditional attribution from the reader.'
+    (folder / 'mod.json').write_text(json.dumps(fresh))
+    tweak_mods.ensure_loader_mod(tmp_path)
+    assert json.loads((folder / 'mod.json').read_text())['credits'] == fresh['credits']
 
 
 @pytest.fixture(scope='module')

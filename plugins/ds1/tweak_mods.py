@@ -297,6 +297,16 @@ LOADER_DESCRIPTION = ("Installs Lexeditor's loader, which applies executable pat
                       "that Steam Cloud can sync. Removing the loader returns to your vanilla characters.")
 
 
+def loader_credits() -> str:
+    """Keep the mod's runtime notices sourced from the canonical plugin credits."""
+    text = Path(__file__).with_name("credits.md").read_text(encoding="utf-8")
+    headings = ("Executable tweak loader", "Debug mode (runtime/lexeditor_ds1_debug.c)",
+                "Online loader protection")
+    sections = {part.split("\n", 1)[0]: "## " + part.strip()
+                for part in text.split("\n## ")[1:]}
+    return "\n\n".join(sections[heading] for heading in headings)
+
+
 def _loader_folder(root: Path) -> Path | None:
     """The folder claiming the loader id, or None when no mod does."""
     try:
@@ -327,10 +337,16 @@ def ensure_loader_mod(root: Path | None = None) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     found = _loader_folder(folder)
     if found is not None:
-        # Update only our description, preserving the reader's other metadata.
+        # Backfill absent runtime credits, preserving any reader-written credits.
         metadata = mod_metadata._stored(found)
+        changed = False
         if metadata.get("description") != LOADER_DESCRIPTION:
             metadata["description"] = LOADER_DESCRIPTION
+            changed = True
+        if not metadata.get("credits"):
+            metadata["credits"] = loader_credits()
+            changed = True
+        if changed:
             atomic_write(found / "mod.json", (json.dumps(metadata, indent=2) + "\n").encode("utf-8"))
         _drop_debug_flag(folder)
         return found
@@ -342,7 +358,7 @@ def ensure_loader_mod(root: Path | None = None) -> Path:
     target = checked(folder / LOADER_FOLDER)
     target.mkdir(parents=True, exist_ok=True)
     atomic_write(target / "mod.json", (json.dumps(
-        {"id": LOADER_ID, "name": LOADER_NAME, "description": LOADER_DESCRIPTION,
+        {"id": LOADER_ID, "name": LOADER_NAME, "description": LOADER_DESCRIPTION, "credits": loader_credits(),
          "enabled": enabled, "order": 0}, indent=2) + "\n").encode("utf-8"))
     _drop_debug_flag(folder)
     return target
