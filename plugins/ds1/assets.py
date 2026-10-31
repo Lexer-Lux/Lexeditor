@@ -378,7 +378,7 @@ def store_bytes(project, relative, data):
         raise AssetError("That file is too large to carry as an override")
     target = _checked(Path(project) / relative)
     target.parent.mkdir(parents=True, exist_ok=True)
-    from .store import atomic_write
+    from core.plugin_files import atomic_write
     atomic_write(target, bytes(data))
     return {"relative": relative.as_posix(), "size": len(data)}
 

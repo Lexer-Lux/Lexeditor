@@ -293,6 +293,10 @@ def test_convex_browser_edits_vertices_and_explains_derived_faces(convex_source,
                         page.evaluate(f'window.meshMutation={action}; undefined')
                     page.wait_for_function('state.pending===1')
                     assert len(held_states)==expected
+                    if action=='fieldHistory.undo()':
+                        page.evaluate('window.concurrentUndo=null;fieldHistory.undo().then(result=>window.concurrentUndo=result);undefined')
+                        page.wait_for_function('window.concurrentUndo===false')
+                        assert not page.evaluate('fieldHistory.canUndo||fieldHistory.canRedo')
                     before=len(saves)
                     page.evaluate('window.meshSave=save();window.meshNavigation=navigate("items","consumables");undefined')
                     page.wait_for_timeout(80)

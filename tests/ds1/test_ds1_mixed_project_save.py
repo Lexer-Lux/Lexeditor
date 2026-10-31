@@ -46,6 +46,18 @@ def test_unchanged_item_save_does_not_export_or_create_an_archive(tmp_path,monke
     assert record_edits.project_specs(project)==maps
 
 
+def test_first_raw_project_save_keeps_its_apply_artifact_then_skips_rebuilding(tmp_path,monkeypatch):
+    game,project,params,_maps=setup(tmp_path)
+    (project/record_edits.FILENAME).unlink()
+    store=ItemStore(game,project,False)
+    store.save()
+    saved=(project/RELATIVE).read_bytes()
+    assert ItemDocument(saved).value('EquipParamGoods',100,'sellValue')==ItemDocument(params).value('EquipParamGoods',100,'sellValue')
+    monkeypatch.setattr(ItemDocument,'export',lambda *a,**k:pytest.fail('A saved unchanged archive must not rebuild'))
+    store.save()
+    assert (project/RELATIVE).read_bytes()==saved
+
+
 def test_mixed_portable_params_and_raw_text_roll_back_together_and_retry(tmp_path,monkeypatch):
     game,project,params,maps=setup(tmp_path)
     changed=ItemDocument(params);changed.edit('EquipParamGoods',100,'sellValue',12)

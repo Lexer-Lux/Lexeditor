@@ -84,7 +84,7 @@ async function api(path,body){
 const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.message||String(error)});
 const failMount=(status,text)=>error=>{status.textContent=text;notify(error);};
 const fieldHistory={undoStack:[],redoStack:[],applying:false,
-  get canUndo(){return this.undoStack.length>0;},get canRedo(){return this.redoStack.length>0;},
+  get canUndo(){return !this.applying&&this.undoStack.length>0;},get canRedo(){return !this.applying&&this.redoStack.length>0;},
   record(entry){
     if(this.applying||(!entry.edits&&entry.before===entry.after))return;
     entry.at=LexeditorUI.nextHistoryTick();
@@ -95,12 +95,23 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
     let bytes=this.undoStack.reduce((sum,item)=>sum+(item.snapshotBytes||0),0);
     while(bytes>16*1024*1024&&this.undoStack.length){bytes-=this.undoStack.shift().snapshotBytes||0;}
   },
-  async undo(){await edits;if(this.applying)return false;const entry=this.undoStack.at(-1);if(!entry)return false;if(!await this.apply(entry,"before"))return false;this.undoStack.pop();this.redoStack.push(entry);shell.refresh();return true;},
-  async redo(){await edits;if(this.applying)return false;const entry=this.redoStack.at(-1);if(!entry)return false;if(!await this.apply(entry,"after"))return false;this.redoStack.pop();this.undoStack.push(entry);shell.refresh();return true;},
-  async apply(entry,side){
+  undo(){return this.move('before');},
+  redo(){return this.move('after');},
+  move(side){
+    if(this.applying)return Promise.resolve(false);
     this.applying=true;
     state.pending++;shell.refresh();
     const operation=edits.then(async()=>{
+      const source=side==='before'?this.undoStack:this.redoStack;
+      const target=side==='before'?this.redoStack:this.undoStack;
+      const entry=source.at(-1);
+      if(!entry||!await this.apply(entry,side))return false;
+      source.pop();target.push(entry);return true;
+    }).finally(()=>{this.applying=false;state.pending--;shell.refresh();});
+    edits=operation.then(()=>{});
+    return operation;
+  },
+  async apply(entry,side){
     try{
       let refresh=false;
       for(const edit of entry.edits||[entry]){
@@ -136,10 +147,6 @@ const fieldHistory={undoStack:[],redoStack:[],applying:false,
       else render();
       return true;
     }catch(error){notify(error);return false;}
-    finally{this.applying=false;state.pending--;shell.refresh();}
-    });
-    edits=operation.then(()=>{});
-    return operation;
   },
   clear(){this.undoStack=[];this.redoStack=[];shell.refresh();}};
 // Ctrl+Z lives in the shell's shortcut dispatcher, which undoes fieldHistory:

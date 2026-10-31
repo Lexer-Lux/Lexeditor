@@ -201,7 +201,7 @@ class ItemStore:
 
     def save(self):
         document = self.validate_save()
-        if not document.dirty_count:
+        if not document.dirty_count and (self.portable_specs is not None or self.output_hash is not None):
             return {'saved':True,'path':str(self.records_path if self.portable else self.output),'dirtyCount':0}
         payload = document.export()
         ItemDocument(payload)
