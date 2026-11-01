@@ -2246,7 +2246,7 @@ function mapsNoun(){
   if(table.endsWith(".msb")&&String(state.row?.id||"").startsWith("light:"))return "Light";
   if(table.endsWith(".msb")&&String(state.row?.id||"").startsWith("message:"))return "Message";
   if(table==="ShopLineupParam")return "Shop entry";
-  if(table==="ObjActParam")return "Treasure";
+  if(table==="ObjActParam")return "Interaction";
   return "Placement";
 }
 function addSkillButton(){
@@ -3861,13 +3861,12 @@ function refreshMapSide(){
 }
 const DIRECTORY_PARAM_TABS=new Set(["drops","treasure"]);
 const DIRECTORY_CATEGORIES=[
-  {id:'drops',label:'Drops'}, {id:'treasure',label:'Interactions'},
   {id:'npcs',label:'NPCs'}, {id:'enemies',label:'Enemies'},
   {id:'objects',label:'Objects'}, {id:'players',label:'Player starts'},
   {id:'pieces',label:'Map pieces'}, {id:'surfaces',label:'Surfaces'},
   {id:'connections',label:'Connections'}, {id:'navigation',label:'Navigation'},
   {id:'regions',label:'Regions'}, {id:'loot',label:'Treasure'}, {id:'events',label:'Events'}];
-const DIRECTORY_TABS=DIRECTORY_CATEGORIES.map(tab=>tab.id);
+const DIRECTORY_TABS=[...DIRECTORY_PARAM_TABS,...DIRECTORY_CATEGORIES.map(tab=>tab.id)];
 function directoryCategory(row){
   const kind=row.values?.kind;
   if(kind==='Enemy'||kind==='Dummy enemy')return row.values.isNpc?'npcs':'enemies';
@@ -3975,7 +3974,10 @@ async function selectDirectoryParam(row){
   refreshMapSide();refreshDirectory();refreshMapsDetail();
 }
 function mapsStrip(){
-  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},...DIRECTORY_CATEGORIES,{id:"lights",label:"Lights"},{id:"messages",label:"Messages"},{id:"collision",label:"Collision"}],
+  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},
+    ...state.worldTabs.filter(tab=>DIRECTORY_PARAM_TABS.has(tab.id)),...DIRECTORY_CATEGORIES,
+    {id:"lights",label:"Lights"},{id:"messages",label:"Messages"},{id:"collision",label:"Collision"}]
+      .sort((a,b)=>a.label.localeCompare(b.label)),
     active:state.mapTab,label:"Map views",change:async id=>{
       await edits;const wasCollision=state.mapTab==='collision';state.mapTab=id;state.dirPage=0;
       if(id==='collision'){await chooseCollision({});return;}

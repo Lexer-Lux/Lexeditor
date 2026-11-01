@@ -1,4 +1,5 @@
 """Map categories, linked chest rewards, and alternate FLVER face sets."""
+import io
 import struct
 import sys
 from pathlib import Path
@@ -11,6 +12,24 @@ from plugins.ds1.flver import FlverDocument
 from plugins.ds1.map_store import MapStore
 from plugins.ds1.msb import MAP_DIR, MsbError
 from msb_fixture import build_msb
+
+
+def test_lightmap_rgb_survives_zero_alpha_and_resizing(tmp_path):
+    from PIL import Image
+    from tpf_fixture import make_dds_rgba, make_tpf
+    from plugins.ds1.viewport import _resolve_textures
+    # The same DDS bytes have different semantics in the two material slots.
+    # The diffuse keeps transparency; irradiance must keep RGB beneath it.
+    dds=make_dds_rgba(8,8,[(30,90,150,0)]*64)
+    piece=tmp_path/'piece.flver'
+    piece.with_suffix('.tpf').write_bytes(make_tpf([('light',dds),('diffuse',dds)]))
+    textures,notes=_resolve_textures('piece',str(piece),'',['diffuse','light'],cap=2,opaque={'light'})
+    assert not notes
+    with Image.open(io.BytesIO(textures['light'])) as image:
+        assert image.mode=='RGB' and image.size==(2,2)
+        assert image.tobytes()==bytes((30,90,150))*4
+    with Image.open(io.BytesIO(textures['diffuse'])) as image:
+        assert image.mode=='RGBA' and image.getpixel((0,0))[3]==0
 
 
 @pytest.mark.parametrize('flags,expected', [([0,1,2,128], [0]), ([1,2,129], [0]),
@@ -91,6 +110,9 @@ def test_flat_map_categories_and_collision_overlay_render(tmp_path):
                 def view(route):
                     response=route.fetch();data=response.json()
                     data['models']['h0000']={'type':5,'available':True}
+                    data['models']['m0000']={'type':0,'available':True}
+                    data['parts'].append({'key':'0:0','model':'m0000','kind':'Map piece','name':'Floor',
+                                          'pos':[0,0,0],'rot':[0,0,0],'scale':[1,1,1]})
                     data['parts'].append({'key':'5:0','model':'h0000','kind':'Collision','name':'Collision',
                                           'pos':[0,0,0],'rot':[0,0,0],'scale':[1,1,1]})
                     route.fulfill(response=response,json=data)
@@ -100,14 +122,28 @@ def test_flat_map_categories_and_collision_overlay_render(tmp_path):
                     encode=lambda values,dtype:base64.b64encode(struct.pack(f'<{len(values)}{dtype}',*values)).decode()
                     mesh={'positions':encode([-2.,0.,-2.,2.,0.,-2.,2.,0.,2.,-2.,0.,2.],'f'),
                           'indices':encode([0,1,2,0,2,3],'I'),'normals':'','mat_def':'','cull':False}
-                    route.fulfill(json={'items':{name:{'meshes':[dict(mesh,layer='collisionHigh')],
-                                                            'notes':[]} for name in names}})
+                    from PIL import Image
+                    out=io.BytesIO();Image.new('RGB',(2,2),(80,100,110)).save(out,format='PNG')
+                    png=base64.b64encode(out.getvalue()).decode()
+                    items={}
+                    for name in names:
+                        if name=='m0000':
+                            item=dict(mesh,uv=encode([0.,0.,1.,0.,1.,1.,0.,1.],'f'),
+                                uv1=encode([-31.8,0.2,-31.2,0.2,-31.2,0.8,-31.8,0.8],'f'),
+                                map='diffuse',light='light')
+                            items[name]={'meshes':[item],'notes':[],
+                                'textures':{'diffuse':png,'light':png},
+                                'texture_ids':{'diffuse':'diffuse-id','light':'light-id'}}
+                        else:items[name]={'meshes':[dict(mesh,layer='collisionHigh')],'notes':[]}
+                    route.fulfill(json={'items':items})
                 page.route('**/api/map/view?*',view)
                 page.route('**/api/map/geometries?*',geometry)
                 page.goto(session.url)
                 page.wait_for_selector('body[data-ds1-ready="true"]',timeout=60000)
                 page.locator('[data-tab="maps"]').click()
                 page.wait_for_function('state.tab==="maps" && !!state.mapView && !state.error')
+                page.wait_for_function('''()=>{let lit=null;document.querySelector('[data-viewport-host]')?._viewportScene
+                    ?.traverse(o=>{if(o.material?.lightMap)lit=o.material.lightMap;});return lit?.wrapS===1000&&lit.channel===1;}''')
                 assert page.locator('[data-tabstrip-id="placements"]').count()==0
                 assert page.locator('[data-tabstrip-id="all"]').count()==0
                 for category in ('objects','loot','treasure','drops'):
@@ -122,7 +158,7 @@ def test_flat_map_categories_and_collision_overlay_render(tmp_path):
                 page.locator('[data-viewport-host]').hover()
                 page.get_by_role('checkbox',name='High collision',exact=True).check()
                 page.wait_for_function('''()=>{let n=0;document.querySelector('[data-viewport-host]')._viewportScene
-                    .traverse(o=>{if(o.userData.collisionLayer==='collisionHigh')n++;});return n===3;}''')
+                    .traverse(o=>{if(o.userData.collisionLayer==='collisionHigh')n++;});return n===4;}''')
                 overlay=page.evaluate('''()=>{const out=[];document.querySelector('[data-viewport-host]')._viewportScene
                     .traverse(o=>{if(o.userData.collisionLayer)out.push({mesh:!!o.isMesh,depth:o.material.depthTest,
                         offset:o.material.polygonOffset,write:o.material.depthWrite});});return out;}''')
