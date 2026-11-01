@@ -447,7 +447,7 @@ def _cached_member(bdt, offset, size):
     return blob
 
 
-def _dds_png(blob, cap=TEXTURE_PREVIEW_CAP):
+def _dds_png(blob, cap=TEXTURE_PREVIEW_CAP, opaque=False):
     """A DDS blob as PNG bytes, capped for previews. Decodes are
     cached by content hash: one map shows the same texture on many
     models, and decoding it once keeps map opens fast. Sized past a
@@ -456,7 +456,7 @@ def _dds_png(blob, cap=TEXTURE_PREVIEW_CAP):
     info = dds_info(blob)
     if info['width'] * info['height'] > MAX_TEXTURE_PIXELS:
         raise AssetError('That texture is too large to preview')
-    key = (hashlib.blake2b(bytes(blob), digest_size=16).digest(), cap)
+    key = (hashlib.blake2b(bytes(blob), digest_size=16).digest(), cap, opaque)
     hit = _PNG_CACHE.get(key)
     if hit is not None:
         _PNG_CACHE.move_to_end(key)
@@ -465,6 +465,10 @@ def _dds_png(blob, cap=TEXTURE_PREVIEW_CAP):
     try:
         with Image.open(io.BytesIO(bytes(blob))) as image:
             image.load()
+            if opaque:
+                # Lightmap alpha is data, not surface transparency. Discard
+                # it before Pillow's premultiplied resize can erase RGB.
+                image = image.convert('RGB')
             if max(image.size) > cap:
                 image.thumbnail((cap, cap))
             out = io.BytesIO()
@@ -479,7 +483,7 @@ def _dds_png(blob, cap=TEXTURE_PREVIEW_CAP):
 
 
 def _resolve_textures(kind, location, member, needed, game_root=None, project=None,
-                      cap=TEXTURE_PREVIEW_CAP, area=None, with_meta=False):
+                      cap=TEXTURE_PREVIEW_CAP, area=None, with_meta=False, opaque=()):
     """Diffuse PNGs by material name: the model's own textures, then
     its companion and area archives, then a sibling character's
     binder when the name is a character stem. Anything missing or
@@ -510,7 +514,7 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
                 continue
             raw = blob[entry['offset']:entry['offset'] + entry['size']]
             try:
-                png = _dds_png(raw, cap)
+                png = _dds_png(raw, cap, opaque=name in opaque)
             except (AssetError, FlverError, FormatError, ValueError,
                     struct.error, KeyError, OSError) as error:
                 notes.append(f'{name}: {error}')
@@ -792,8 +796,9 @@ def _textured(kind, location, member, stamp, skin, game_root, project, cap, area
         encoded['textures'] = {}
         _disk_write(entry, encoded)
         return encoded
+    lights = {mesh['light'] for mesh in encoded['meshes'] if mesh.get('light')}
     found, notes = _resolve_textures(kind, location, member, needed, game_root, project, cap,
-                                     area)
+                                    area, opaque=lights)
     encoded['textures'] = found
     encoded['notes'].extend(notes)
     _disk_write(entry, encoded)

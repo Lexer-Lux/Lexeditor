@@ -160,10 +160,11 @@ window.Ds1Viewport = (() => {
           // and tagging them sRGB crushed the Depths to near-black
           // (a median wall texel decoded to under 2% brightness).
           image.colorSpace = THREE.NoColorSpace;
-          // Same DirectX bytes as the diffuse, but an atlas-ranged UV
-          // set on channel 1: clamp, never tile.
+          // Some DS1 atlas UVs carry whole-tile offsets (the Depths
+          // wall uses U around -31). Repeat retains their atlas position;
+          // clamping smears one edge texel into colored wall-wide bands.
           image.flipY = false;
-          image.wrapS = image.wrapT = THREE.ClampToEdgeWrapping;
+          image.wrapS = image.wrapT = THREE.RepeatWrapping;
           image.channel = 1;
           lightCache.set(key, image);
           disposable.push(image);
@@ -272,13 +273,14 @@ window.Ds1Viewport = (() => {
     let collisionLoading = null;
     const overlayAttempted = new Set();
     const collisionMats = new Map();
-    const collisionMaterial = (hitFilter, layer) => {
-      const cacheKey = `${hitFilter ?? "x"}:${layer}`;
+    const collisionMaterial = (hitFilter, layer, hidden = false) => {
+      const cacheKey = `${hitFilter ?? "x"}:${layer}:${hidden}`;
       if (!collisionMats.has(cacheKey)) {
         const color = hitFilter === 15 ? 0xe5484d : hitFilter === 14 ? 0xf76b15
           : hitFilter === 13 ? 0x8e4ec6 : layer === "navigation" ? 0x6699ff : 0x12a594;
         collisionMats.set(cacheKey, new THREE.MeshBasicMaterial({color,
-          side: THREE.DoubleSide, transparent: true, opacity: 0.28, depthWrite: false,
+          side: THREE.DoubleSide, transparent: true, opacity: hidden ? 0.07 : 0.28,
+          depthFunc: hidden ? THREE.GreaterDepth : THREE.LessEqualDepth, depthWrite: false,
           polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}));
       }
       return collisionMats.get(cacheKey);
@@ -299,6 +301,11 @@ window.Ds1Viewport = (() => {
           if (!layer) continue;
           hasCollision = true;
           mesh.visible = layer === "navigation" ? showNavigation : layer === "collisionHigh" ? showHigh : showLow;
+          // X-ray only the selected surface. Showing every hidden room
+          // through every other room turns the whole map into a solid tint.
+          if (mesh.userData.hiddenCollisionFill || mesh.userData.hiddenCollisionEdge)
+            mesh.visible &&= placed.userData.part.key === selected ||
+              (pointMarker.visible && placed.userData.part.key === pointMarker.userData.partKey);
           if (mesh.visible) anyVisible = true;
         }
         if (hasCollision) placed.visible = anyVisible;
@@ -416,6 +423,7 @@ window.Ds1Viewport = (() => {
     const readOnly = hooks.readOnly !== false;
     const select = key => {
       selected = key && groups.has(key) ? key : null;
+      pointMarker.visible = false;
       const group = selected ? groups.get(selected) : null;
       if (group && group.userData.part.movable && hooks.transforms !== false) gizmo.attach(group);
       else gizmo.detach();
@@ -424,6 +432,7 @@ window.Ds1Viewport = (() => {
         highlight.visible = true;
       } else highlight.visible = false;
       if (hooks.onSelect) hooks.onSelect(selected, group ? {...group.userData.part} : null);
+      applyCollisionVisibility();
       requestRender();
     };
     let startPos = null, startRot = null, gizmoMode = "translate", spinStart = false;
@@ -517,6 +526,7 @@ window.Ds1Viewport = (() => {
       select,
       point(key, position, focus = false) {
         const group = groups.get(key);
+        pointMarker.userData.partKey = key;
         pointMarker.visible = !!group && Array.isArray(position) && position.length === 3;
         if (pointMarker.visible) {
           group.updateWorldMatrix(true, false);
@@ -529,7 +539,7 @@ window.Ds1Viewport = (() => {
             userMoved = true;
           }
         }
-        requestRender();
+        applyCollisionVisibility();
       },
       async reloadCollision(model) {
         const response = await fetch(`/api/map/geometry?map=${encodeURIComponent(mapId)}&model=${encodeURIComponent(model)}`);
@@ -610,7 +620,7 @@ window.Ds1Viewport = (() => {
         for (const mesh of group.children) {
           if (mesh.userData.collisionLayer) mesh.material = mesh.isLineSegments
             ? collisionEdgeMaterial(hitFilter, mesh.userData.collisionLayer, mesh.userData.hiddenCollisionEdge)
-            : collisionMaterial(hitFilter, mesh.userData.collisionLayer);
+            : collisionMaterial(hitFilter, mesh.userData.collisionLayer, mesh.userData.hiddenCollisionFill);
         }
         viewModes.bindScene(scene);
         requestRender();
@@ -760,6 +770,13 @@ window.Ds1Viewport = (() => {
             mesh.userData.collisionLayer = entry.collisionLayer;
             mesh.renderOrder = 10;
             mesh.visible = entry.collisionLayer === "navigation" ? showNavigation : entry.collisionLayer === "collisionHigh" ? showHigh : showLow;
+            const hiddenFill = new THREE.Mesh(entry.geo, collisionMaterial(part.hitFilter, entry.collisionLayer, true));
+            hiddenFill.userData.collisionLayer = entry.collisionLayer;
+            hiddenFill.userData.hiddenCollisionFill = true;
+            hiddenFill.renderOrder = 9;
+            hiddenFill.visible = mesh.visible;
+            hiddenFill.raycast = () => {};
+            group.add(hiddenFill);
             group.add(mesh);
             entry.edgesGeo ||= new THREE.EdgesGeometry(entry.geo);
             for (const hidden of [true, false]) {
