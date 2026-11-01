@@ -3876,9 +3876,12 @@ function directoryCategory(row){
 }
 async function loadDirectory(){
   if(!DIRECTORY_TABS.includes(state.mapTab)){state.dirRows=[];return;}
-  if(DIRECTORY_PARAM_TABS.has(state.mapTab))
-    state.dirRows=(await api('/api/table?tab='+encodeURIComponent(state.mapTab))).rows;
-  else state.dirRows=state.rows.filter(row=>directoryCategory(row)===state.mapTab);
+  const tab=state.mapTab;
+  const rows=DIRECTORY_PARAM_TABS.has(tab)
+    ?(await api('/api/table?tab='+encodeURIComponent(tab))).rows
+    :state.rows.filter(row=>directoryCategory(row)===tab);
+  if(state.mapTab!==tab)return;
+  state.dirRows=rows;
   const pages=Math.max(1,Math.ceil(directoryMatches().length/state.pageSize));
   if(state.dirPage>pages-1)state.dirPage=pages-1;
 }
@@ -3916,10 +3919,9 @@ function refreshDirectory(){
   pane.replaceChildren(...directoryList());
 }
 function directoryLocalRow(){
-  const supported=true;
   const node=LexeditorUI.pagerToggle({label:"Local?",
-    title:supported?"Show only rows from the open map":"All placements already belong to the open map",
-    checked:state.dirLocal,disabled:!supported,
+    title:"Show only rows from the open map",
+    checked:state.dirLocal,
     change:value=>{state.dirLocal=value;state.dirPage=0;refreshDirectory();}});
   node.setAttribute("data-dir-local","");
   node.querySelector("input").setAttribute("data-lex-view-filter","");
@@ -3976,10 +3978,18 @@ function mapsStrip(){
   return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},...DIRECTORY_CATEGORIES,{id:"lights",label:"Lights"},{id:"messages",label:"Messages"},{id:"collision",label:"Collision"}],
     active:state.mapTab,label:"Map views",change:async id=>{
       await edits;const wasCollision=state.mapTab==='collision';state.mapTab=id;state.dirPage=0;
-      if(DIRECTORY_TABS.includes(id))await loadDirectory();
       if(id==='collision'){await chooseCollision({});return;}
-      if(wasCollision){state.collision=null;clampMapSelection();await loadDetail();render();}
-      else refreshMapSide();
+      if(wasCollision)state.collision=null;
+      if(DIRECTORY_TABS.includes(id)){
+        await loadDirectory();if(state.mapTab!==id)return;
+        const rows=directoryMatches(),row=rows.find(row=>key(row)===state.selected)||rows[0];
+        state.selected=row?key(row):null;
+        state.mapSelected=row&&!DIRECTORY_PARAM_TABS.has(id)?row.id:null;
+        viewportCtl?.select(state.mapSelected);
+      }else clampMapSelection();
+      await loadDetail();
+      if(wasCollision)render();
+      else{refreshMapSide();refreshMapsDetail();}
     }});
 }
 async function loadCollision(options={}){
