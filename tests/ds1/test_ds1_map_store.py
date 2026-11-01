@@ -75,9 +75,9 @@ def test_local_npc_directory_renders_a_merchant_with_nonfriendly_type(tmp_path):
                 page.wait_for_selector('body[data-ds1-ready="true"]')
                 page.locator('[data-tab="maps"]').click()
                 page.wait_for_function('state.tab==="maps" && state.rows.length>0 && !state.error')
-                page.locator('[data-tabstrip-id="placements"]').click()
-                page.locator('[data-maps-dir] .lex-subtab-button',has_text='NPCs').click()
-                page.wait_for_function('state.dirTab==="npcs" && directoryMatches().length===1')
+                page.locator('[data-tabstrip-id="enemies"]').click()
+                page.locator('[data-maps-side] .lex-tabstrip-button',has_text='NPCs').click()
+                page.wait_for_function('state.mapTab==="npcs" && directoryMatches().length===1')
                 page.locator('[data-dir-local] input').check()
                 assert page.evaluate('directoryMatches()[0].values.npcId')==6040
                 assert page.locator('[data-maps-dir] .lex-list-row').count()==1

@@ -68,29 +68,29 @@ def main():
                     assert page.locator('button[data-tab="world"]').count() == 0
                     page.locator('button[data-tab="maps"]').click()
                     page.wait_for_function('state.tab==="maps" && state.rows.length>0 && !state.error')
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"')
-                    page.wait_for_selector('[data-maps-dir] [data-subtab="treasure"]')
-                    assert page.locator('[data-maps-dir] [data-subtab]').evaluate_all(
-                        'nodes=>nodes.map(n=>n.dataset.subtab)') == ['all', 'drops', 'enemies', 'npcs', 'treasure']
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"')
+                    page.wait_for_selector('[data-tabstrip-id="treasure"]')
+                    assert page.locator('[data-tabstrip-id="all"]').count()==0
+                    assert page.locator('[data-tabstrip-id="placements"]').count()==0
                     # The NPC/enemy split follows the live npcType, not names.
-                    page.locator('[data-maps-dir] [data-subtab="npcs"]').click()
-                    page.wait_for_function('state.dirTab==="npcs"')
+                    page.locator('[data-tabstrip-id="npcs"]').click()
+                    page.wait_for_function('state.mapTab==="npcs"')
                     npcs = page.evaluate('state.dirRows.map(r=>r.values.npcId)')
                     assert npcs, npcs
                     assert page.evaluate('state.dirRows.every(r=>r.values.npcType===2)')
                     if not real_root:
                         assert npcs == [FRIEND], npcs
-                    page.locator('[data-maps-dir] [data-subtab="enemies"]').click()
-                    page.wait_for_function('state.dirTab==="enemies"')
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"')
                     assert page.evaluate('state.dirRows.length > 0')
                     assert page.evaluate('state.dirRows.every(r=>r.values.npcType!==2)')
                     if not real_root:
                         assert sorted(page.evaluate('state.dirRows.map(r=>r.values.npcId)')) == [FOE, FOE]
                     assert page.locator('[data-maps-dir] [data-goto]').count() > 0
                     for tab, _, table in WORLD_SUBTABS:
-                        page.locator(f'[data-maps-dir] [data-subtab="{tab}"]').click()
-                        page.wait_for_function('(want)=>state.dirTab===want.tab && state.dirRows.length>0 && state.dirRows[0].table===want.table && !state.error',
+                        page.locator(f'[data-tabstrip-id="{tab}"]').click()
+                        page.wait_for_function('(want)=>state.mapTab===want.tab && state.dirRows.length>0 && state.dirRows[0].table===want.table && !state.error',
                                                arg={'tab': tab, 'table': table})
                         page.wait_for_timeout(200)
                         assert page.evaluate('state.dirRows.length') > 0
@@ -119,8 +119,8 @@ def main():
                         if output:
                             page.screenshot(path=str(output / f'dir-{tab}.png'))
                     # Go-to jumps maps and lands the camera on the placement.
-                    page.locator('[data-maps-dir] [data-subtab="enemies"]').click()
-                    page.wait_for_function('state.dirTab==="enemies" && state.dirRows.length>0')
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies" && state.dirRows.length>0')
                     target = page.evaluate('state.dirRows.find(r=>r.table!==state.mapId)?.table')
                     assert target, 'directory spans one map only'
                     page.wait_for_function('!!viewportCtl', timeout=60000)

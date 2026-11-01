@@ -9,8 +9,8 @@ const state={tab:"items",sub:"consumables",tabs:[],enemyTabs:[],aiTabs:[],attack
   assetTabs:[{id:"files",label:"Files"}],soundTabs:[{id:"sfx",label:"Sound effects"},{id:"music",label:"Music"}],scriptTabs:[{id:"ingame",label:"Ingame menus"},{id:"common",label:"Common menus"},{id:"talk",label:"Dialogue"}],scriptDetail:null,assetDetail:null,assetBusy:false,assetUpload:null,
   assetFiles:[],
   dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],mapView:null,
-  mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapCollisionHigh:false,mapCollisionLow:false,mapNavigation:false,mapRegions:false,mapPlacementFilter:"all",
-  dirTab:"all",dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null,
+  mapId:null,mapList:[],mapTab:"maps",mapSelected:null,mapInfo:null,mapBusy:false,mapOfferOpen:false,mapGizmo:"move",mapCollisionHigh:false,mapCollisionLow:false,mapNavigation:false,mapRegions:false,
+  dirRows:[],dirQuery:"",dirPage:0,dirLocal:false,mapFocus:null,
   dirFit:null,mapListPage:0,mapListFit:null,mapListSort:null,mapFit:null,collision:null};
 let edits=Promise.resolve(),navigation=0,recordsRequest=0,selectVisibleRecord=null,viewportCtl=null,viewportMount=0,animMount=0;
 const lastSubByTab={};
@@ -337,7 +337,7 @@ async function loadDetail(){
   let sub=state.sub;
   if(!row&&state.tab==="maps"){
     row=state.dirRows.find(row=>key(row)===state.selected);
-    if(row)sub=state.dirTab;
+    if(row)sub=state.mapTab;
   }
   if(!row&&state.tab==="maps"&&state.mapView){
     const light=(state.mapView.lights||[]).find(entry=>`${state.mapView.map}:${entry.key}`===state.selected);
@@ -413,7 +413,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab==="npcs"&&!state.npcTabs.some(entry=>entry.id===sub))sub="npcs";
   else if(tab==="drops"&&!state.worldTabs.some(entry=>entry.id===sub))sub="drops";
     else if(tab==="attacks"&&!state.attackTabs.some(entry=>entry.id===sub))sub="attacks";
-  else if(tab==="maps"){if(DIRECTORY_TABS.includes(sub))state.dirTab=sub;sub="placements";}
+  else if(tab==="maps"){state.mapTab=DIRECTORY_TABS.includes(sub)?sub:"maps";sub="placements";}
   else if(tab==="animations"&&!state.animTabs.some(entry=>entry.id===sub))sub="animations";
   else if(tab==="effects"&&!state.effectTabs.some(entry=>entry.id===sub))sub="effects-all";
   // Without the curve table, Stats opens on the first list with rows instead of an error.
@@ -433,7 +433,13 @@ async function navigate(tab,sub=state.sub,selected=null){
     else if(tab==="datamap")state.dataMap=await api("/api/data-map");else if(tab==="info")await loadDeployment();else if(tab==="tweaks")await loadTweaks();
     if(token!==navigation)return;
     // A link lands on the page that holds its record, not on page one.
-    if(tab==="maps"&&selected){state.mapTab=String(selected).includes(".msb:message:")?"messages":"placements";if(String(selected).includes(".msb:"))state.dirTab="all";}
+    if(tab==="maps"&&selected){
+      const placement=state.rows.find(row=>key(row)===selected);
+      state.mapTab=String(selected).includes('.msb:message:')?'messages':
+        String(selected).includes('.msb:light:')?'lights':placement?directoryCategory(placement):
+        String(selected).startsWith('ObjActParam:')?'treasure':state.mapTab;
+      await loadDirectory();
+    }
     if(selected){const index=sortedRows().findIndex(row=>key(row)===selected);if(index>=0)state.page=Math.floor(index/state.pageSize);}
     state.error="";render();
     if(selected)revealSelection();
@@ -3830,6 +3836,9 @@ async function selectPlacement(placementKey,fromCanvas){
   }
   if(placementKey===state.selected&&state.row&&key(state.row)===placementKey)return;
   state.selected=placementKey;state.mapSelected=row.id;
+  if(fromCanvas&&state.mapTab!=='collision'){
+    state.mapTab=directoryCategory(row);await loadDirectory();
+  }
   if(!fromCanvas&&viewportCtl)viewportCtl.select(state.mapSelected);
   await loadDetail().catch(notify);
   refreshMapSide();refreshDirectory();refreshMapsDetail();
@@ -3851,32 +3860,34 @@ function refreshMapSide(){
   side.replaceChildren(mapsStrip(),mapsPane());
 }
 const DIRECTORY_PARAM_TABS=new Set(["drops","treasure"]);
-const DIRECTORY_TABS=["all","drops","treasure","npcs","enemies"];
-const isDirectoryFoe=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&!row.values.isNpc;
-const isDirectoryFriend=row=>(row.values.kind==="Enemy"||row.values.kind==="Dummy enemy")&&row.values.isNpc;
-let dirTabRestored=false;
+const DIRECTORY_CATEGORIES=[
+  {id:'drops',label:'Drops'}, {id:'treasure',label:'Interactions'},
+  {id:'npcs',label:'NPCs'}, {id:'enemies',label:'Enemies'},
+  {id:'objects',label:'Objects'}, {id:'players',label:'Player starts'},
+  {id:'pieces',label:'Map pieces'}, {id:'surfaces',label:'Surfaces'},
+  {id:'connections',label:'Connections'}, {id:'navigation',label:'Navigation'},
+  {id:'regions',label:'Regions'}, {id:'loot',label:'Treasure'}, {id:'events',label:'Events'}];
+const DIRECTORY_TABS=DIRECTORY_CATEGORIES.map(tab=>tab.id);
+function directoryCategory(row){
+  const kind=row.values?.kind;
+  if(kind==='Enemy'||kind==='Dummy enemy')return row.values.isNpc?'npcs':'enemies';
+  return {'Object':'objects','Player':'players','Map piece':'pieces','Collision':'surfaces',
+    'Connect collision':'connections','Navigation':'navigation','Region':'regions','Treasure':'loot'}[kind]||'events';
+}
 async function loadDirectory(){
-  if(!dirTabRestored){dirTabRestored=true;try{const saved=localStorage.getItem("lex-ds1-directory-tab");if(saved)state.dirTab=saved;}catch(_error){}}
-  if(!DIRECTORY_TABS.includes(state.dirTab))state.dirTab="all";
-  if(state.dirTab==="all"){state.dirRows=[];return;}
-  if(state.dirTab==="npcs")state.dirRows=state.rows.filter(isDirectoryFriend);
-  else if(state.dirTab==="enemies")state.dirRows=state.rows.filter(isDirectoryFoe);
-  else state.dirRows=(await api("/api/table?tab="+encodeURIComponent(state.dirTab))).rows;
+  if(!DIRECTORY_TABS.includes(state.mapTab)){state.dirRows=[];return;}
+  if(DIRECTORY_PARAM_TABS.has(state.mapTab))
+    state.dirRows=(await api('/api/table?tab='+encodeURIComponent(state.mapTab))).rows;
+  else state.dirRows=state.rows.filter(row=>directoryCategory(row)===state.mapTab);
   const pages=Math.max(1,Math.ceil(directoryMatches().length/state.pageSize));
   if(state.dirPage>pages-1)state.dirPage=pages-1;
-}
-function directoryTabs(){
-  return [{id:"all",label:"All",help:"Every placement on the open map: enemies, objects and player starts. Pick one to edit it."},
-    ...state.worldTabs.filter(entry=>DIRECTORY_PARAM_TABS.has(entry.id)),
-    {id:"npcs",label:"NPCs",help:"Named characters who do not fight you: merchants, blacksmiths and quest givers. Pick one to see it in the map."},
-    {id:"enemies",label:"Enemies",help:"Everything placed that fights you, bosses included. Pick one to see it in the map."}];
 }
 // The directory shows a reference name split across columns: the item (or
 // the enemy standing there) under Name, its owner under Owner, and the map
 // list's own name under Map. The row's full name stays untouched for
 // sorting and the detail pane.
 function dirRowName(row){
-  if(DIRECTORY_PARAM_TABS.has(state.dirTab))return row.values.item||row.name;
+  if(DIRECTORY_PARAM_TABS.has(state.mapTab))return row.values.item||row.name;
   return row.values.who||row.display?.npcId||row.values.part||row.name;
 }
 function dirRowMap(row){
@@ -3889,30 +3900,23 @@ function directoryMatches(){
   // lots resolve through their dropping NPCs, and interaction rows through
   // object activations, including the object's inherited model parameter.
   if(state.dirLocal){
-    if(state.dirTab==="npcs"||state.dirTab==="enemies")filtered=filtered.filter(row=>row.table===state.mapId);
-    else if(DIRECTORY_PARAM_TABS.has(state.dirTab))filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
+    if(!DIRECTORY_PARAM_TABS.has(state.mapTab))filtered=filtered.filter(row=>row.table===state.mapId);
+    else if(DIRECTORY_PARAM_TABS.has(state.mapTab))filtered=filtered.filter(row=>(row.values.maps||[]).includes(state.mapId));
   }
   return filtered.sort((a,b)=>LexeditorUI.compareRecords(a,b,tabSort())||(a.id>b.id?1:a.id<b.id?-1:0));
 }
 function directoryPane(){
-  return el("div",{"data-maps-dir":"",style:"display:flex;flex-direction:column;min-height:0;flex:1 1 auto;min-width:0;"},directoryStrip(),...directoryList());
+  return el("div",{"data-maps-dir":"",style:"display:flex;flex-direction:column;min-height:0;flex:1 1 auto;min-width:0;"},...directoryList());
 }
 function refreshDirectory(){
   if(state.tab!=="maps")return;
   const pane=document.querySelector("[data-maps-dir]");
   if(!pane)return;
   stopPaneFit(pane);
-  pane.replaceChildren(directoryStrip(),...directoryList());
-}
-function directoryStrip(){
-  return subtabBar({tabs:directoryTabs(),active:state.dirTab,label:"World directory",shortcuts:false,className:"lex-dir-tabs",change:id=>{
-    state.dirTab=id;state.dirPage=0;
-    try{localStorage.setItem("lex-ds1-directory-tab",id);}catch(_error){}
-    void loadDirectory().then(refreshDirectory).catch(notify);
-  }});
+  pane.replaceChildren(...directoryList());
 }
 function directoryLocalRow(){
-  const supported=state.dirTab==="npcs"||state.dirTab==="enemies"||DIRECTORY_PARAM_TABS.has(state.dirTab);
+  const supported=true;
   const node=LexeditorUI.pagerToggle({label:"Local?",
     title:supported?"Show only rows from the open map":"All placements already belong to the open map",
     checked:state.dirLocal,disabled:!supported,
@@ -3922,27 +3926,26 @@ function directoryLocalRow(){
   return node;
 }
 function directoryList(){
-  if(state.dirTab==="all")return [placementsPane()];
   const matches=directoryMatches();
   const size=paneSize("dir");
   const pages=Math.max(1,Math.ceil(matches.length/size));
   if(state.dirPage>pages-1)state.dirPage=pages-1;
   const shown=matches.slice(state.dirPage*size,(state.dirPage+1)*size);
-  const param=DIRECTORY_PARAM_TABS.has(state.dirTab);
+  const param=DIRECTORY_PARAM_TABS.has(state.mapTab);
   const select=(row,event)=>{
     if(event&&(event.shiftKey||event.ctrlKey||event.metaKey))return;
     if(param)void selectDirectoryParam(row);
     else void selectPlacement(key(row),false);
   };
   const columns=[{key:"name",label:"Name",grow:1,render:row=>dirRowName(row)}];
-  if(state.dirTab==="drops")columns.push({key:"owner",label:"Owner",grow:1,
+  if(state.mapTab==="drops")columns.push({key:"owner",label:"Owner",grow:1,
     sortValue:row=>row.values.owner||"",render:row=>row.values.owner||""});
   // Local shows only the open map's rows, so the Map column would repeat
   // the same map on every row; it returns when unticked.
   if(!state.dirLocal)columns.push({key:"map",label:"Map",grow:1,
     sortValue:row=>dirRowMap(row),render:row=>dirRowMap(row)});
   if(!param)columns.push(goToCell(row=>`Show ${dirRowName(row)} in the map viewport`,row=>goToPlacement(row.table,key(row))));
-  else if(state.dirTab==="drops")columns.push(goToCell(row=>`Show where ${dirRowName(row)} drops`,row=>goToDrop(row.id)));
+  else if(state.mapTab==="drops")columns.push(goToCell(row=>`Show where ${dirRowName(row)} drops`,row=>goToDrop(row.id)));
   // Search on its own row up top, like the animations panes; the pager
   // below the list only pages and filters.
   const list=columnList({rows:shown,key,selected:state.selected,select,columns,class:"lex-list-fill"});
@@ -3954,7 +3957,13 @@ function directoryList(){
   sizePaneRows(list,size,false);
   fitPaneList(list,"dir",size,both);
   return [LexeditorUI.bottomSearch({key:"maps-directory",value:state.dirQuery,label:"Search the world",
-      change:value=>{state.dirQuery=value;state.dirPage=0;refreshDirectory();}}),
+      change:value=>{
+        state.dirQuery=value;state.dirPage=0;
+        const matches=directoryMatches();
+        if(!DIRECTORY_PARAM_TABS.has(state.mapTab)&&matches.length&&!matches.some(row=>key(row)===state.selected))
+          void selectPlacement(key(matches[0]),false);
+        else refreshDirectory();
+      }}),
     both];
 }
 async function selectDirectoryParam(row){
@@ -3964,9 +3973,10 @@ async function selectDirectoryParam(row){
   refreshMapSide();refreshDirectory();refreshMapsDetail();
 }
 function mapsStrip(){
-  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},{id:"placements",label:"Placements"},{id:"lights",label:"Lights"},{id:"messages",label:"Messages"},{id:"collision",label:"Collision"}],
+  return LexeditorUI.tabStrip({tabs:[{id:"maps",label:"Maps"},...DIRECTORY_CATEGORIES,{id:"lights",label:"Lights"},{id:"messages",label:"Messages"},{id:"collision",label:"Collision"}],
     active:state.mapTab,label:"Map views",change:async id=>{
-      await edits;const wasCollision=state.mapTab==='collision';state.mapTab=id;
+      await edits;const wasCollision=state.mapTab==='collision';state.mapTab=id;state.dirPage=0;
+      if(DIRECTORY_TABS.includes(id))await loadDirectory();
       if(id==='collision'){await chooseCollision({});return;}
       if(wasCollision){state.collision=null;clampMapSelection();await loadDetail();render();}
       else refreshMapSide();
@@ -4118,7 +4128,7 @@ function renderCollision(current){
   state.pagedView=view;return view;
 }
 function mapsPane(){
-  if(state.mapTab==="placements")return directoryPane();
+  if(DIRECTORY_TABS.includes(state.mapTab))return directoryPane();
   if(state.mapTab==="lights")return lightsPane();
   if(state.mapTab==="messages")return messagesPane();
   return mapsListPane();
@@ -4169,60 +4179,6 @@ function mapsListPane(){
   sizePaneRows(list,size,false);
   fitPaneList(list,"maps",size,both);
   return both;
-}
-function placementFilterMatches(row){
-  const filter=state.mapPlacementFilter||"all";
-  if(filter==="all")return true;
-  const viewPart=state.mapView?.parts.find(entry=>entry.key===row.id);
-  const kind=row.values?.kind||viewPart?.kind||"";
-  const hit=row.values?.hitFilter??viewPart?.hitFilter;
-  if(filter==="collisions")return kind==="Collision"||kind==="Connect collision";
-  if(filter==="death")return hit===13||hit===14||hit===15;
-  if(filter==="pieces")return kind==="Map piece";
-  if(filter==="navigation")return kind==="Navigation";
-  if(filter==="regions")return kind==="Region";
-  if(filter==="events")return String(row.id).startsWith("event");
-  return true;
-}
-function placementsPane(){
-  const here=sortedRows().filter(row=>row.table===state.mapId&&placementFilterMatches(row));
-  const size=paneSize("placements");
-  const pages=Math.max(1,Math.ceil(here.length/size));
-  if(state.page>pages-1)state.page=pages-1;
-  const shown=here.slice(state.page*size,(state.page+1)*size);
-  const select=(row,event)=>{
-    if(event&&(event.shiftKey||event.ctrlKey||event.metaKey))return;
-    selectPlacement(key(row),false);
-  };
-  selectVisibleRecord=select;
-  const columns=[{key:"name",label:"Name",grow:1}];
-  // Names never carry the map: it gets its own column, shared with the
-  // directory, but only when the rows span more than one map. This list
-  // is scoped to the open map, so the column stays hidden here.
-  if(new Set(here.map(row=>row.table)).size>1)columns.push({key:"map",label:"Map",grow:1,
-    sortValue:row=>dirRowMap(row),render:row=>dirRowMap(row)});
-  columns.push(goToCell(row=>`Show ${row.name} in the map viewport`,row=>goToPlacement(row.table,key(row))));
-  const list=columnList({rows:shown,key,selected:state.selected,select,class:"lex-list-fill",columns});
-  const kindFilter=LexeditorUI.pagerSelect({label:"Show",value:state.mapPlacementFilter||"all",
-    options:[{id:"all",label:"All placements"},{id:"collisions",label:"Collisions"},{id:"death",label:"Death zones"},{id:"pieces",label:"Map pieces"},{id:"navigation",label:"Navigation"},{id:"regions",label:"Regions"},{id:"events",label:"Events"}],
-    change:value=>{state.mapPlacementFilter=value;state.page=0;refreshMapSide();}});
-  const pager=LexeditorUI.compactPager({pages,page:state.page,total:here.length,pageSize:size,
-    filters:[kindFilter],change:value=>{state.page=value;refreshMapSide();}});
-  const both=LexeditorUI.pagedPane(list,pager);
-  both.style.flex="1 1 auto";both.style.minHeight="0";
-  sizePaneRows(list,size,false);
-  fitPaneList(list,"placements",size,both);
-  return LexeditorUI.stack(
-    LexeditorUI.bottomSearch({key:"maps-placements",value:state.query,label:"Search placements",
-      change:value=>{state.query=value;state.page=0;
-        // Filtering picks its first match, as the old list did, but
-        // stays on this tab: the reader asked to search, not to leave.
-        // The pick routes through selection so the details follow it.
-        const matches=sortedRows().filter(row=>row.table===state.mapId&&placementFilterMatches(row));
-        if(matches.length&&!matches.some(row=>key(row)===state.selected)){
-          void selectPlacement(key(matches[0]),false);
-        }else refreshMapSide();}}),
-    both);
 }
 // The open map's lights, straight from its view: no fetch, and the
 // list dies with the map, so a map switch cannot strand it.

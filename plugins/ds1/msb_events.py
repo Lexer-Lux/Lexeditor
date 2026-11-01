@@ -56,6 +56,8 @@ def fields(item):
 
 
 def label(name):
+    if re.fullmatch(r'itemLot[1-5]', name):
+        return f'Reward {name[7:]}'
     return re.sub(r'([a-z])([A-Z])', r'\1 \2', name).capitalize().replace(' id', ' ID')
 
 
@@ -92,7 +94,9 @@ def read(doc, key):
             options = {'-1': 'None'} | {str(i): target['name'] for i, target in enumerate(source)}
         limits = {'B': (0, 255), 'b': (-128, 127), 'h': (-32768, 32767), 'i': (-2**31, 2**31-1)}
         low, high = limits.get(dtype, (None, None))
-        result.append({'key': name, 'label': label(name), 'description': '',
+        description = ('The items this treasure gives. Open the reward to edit its items, quantities and chances.'
+                       if name.startswith('itemLot') else '')
+        result.append({'key': name, 'label': label(name), 'description': description,
                        'group': LABELS[item['type']], 'value': value, 'vanilla': original,
                        'type': 'bool' if dtype == '?' else 'enum' if reference else 'number',
                        'dtype': {'?': 'bool', 'f': 'f32', 'B': 'u8', 'b': 's8', 'h': 's16', 'i': 's32'}[dtype],
