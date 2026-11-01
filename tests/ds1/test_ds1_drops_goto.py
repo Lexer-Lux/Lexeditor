@@ -66,10 +66,10 @@ def test_drops_goto_prefers_the_open_map():
                     page.wait_for_function(f'state.mapId==="{MAP_B}" && !!state.mapView',
                                            timeout=60000)
                     page.wait_for_function('!!viewportCtl', timeout=60000)
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"', timeout=60000)
-                    page.locator('[data-maps-dir] .lex-subtab-button', has_text='Drops').click()
-                    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"', timeout=60000)
+                    page.locator('[data-maps-side] .lex-tabstrip-button', has_text='Drops').click()
+                    page.wait_for_function('state.mapTab==="drops"', timeout=30000)
                     page.wait_for_selector('[data-maps-dir] [data-goto="ItemLotParam:100"]',
                                             timeout=30000)
                     page.locator('[data-maps-dir] [data-goto="ItemLotParam:100"]').click()

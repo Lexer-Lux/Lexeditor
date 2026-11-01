@@ -3562,6 +3562,204 @@
   // switches, bare controls - side by side. Named parts wrap to a new row
   // before their controls become too narrow. Bare controls keep equal lanes.
   // toggleRow and multiNumberRow use this row with their parts pre-made.
+  // Scalar fields and composite row parts share the same numeric interaction.
+  const installNumericControl = (node, control, options = {}) => {
+    const input = control instanceof Element
+      ? (control.matches('input') ? control : control.querySelector('input')) : null;
+    if (!input || input.__lexValueSliderPaint) return;
+    const step = input.getAttribute('step');
+    const numericLike = input.type === 'number' ||
+      (['numeric','decimal'].includes(input.inputMode) && step !== null && step !== '');
+    const readOnly = options.readOnly === true || input.disabled || input.readOnly;
+    const min = options.min ?? input.getAttribute('min') ?? input.dataset.min;
+    const max = options.max ?? input.getAttribute('max') ?? input.dataset.max;
+    const dataType = options.dataType || (step === 'any' ? 'FLOAT' : 'INT');
+    // A bounded number draws its own value as a fill behind the box, and on
+    // hover the fill slides out into a slider for rough adjustment.
+    const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
+    const highBound = max === null || max === undefined || max === "" ? null : Number(max);
+    // The slider always spans the whole accepted range. A second, narrower
+    // span computed from the data read as a second range (Lexer), so the
+    // handle moves in exactly what the field accepts.
+    const [sliderLow, sliderHigh] = [lowBound, highBound];
+    const boundedSlider = Number.isFinite(lowBound) && Number.isFinite(highBound);
+    // Native arrows move by 1 when step is "any": without this, float
+    // fields changed through whole numbers from the keyboard too.
+    if (input && !readOnly && ["FLOAT", "F32", "F64", "ANGLE32"].includes(dataType)
+        && (input.step === "any" || !Number.isFinite(Number(input.step)))) {
+      input.addEventListener("keydown", event => {
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+        event.preventDefault();
+        const at = readNumeric(input);
+        const base = Number.isFinite(at) ? at : 0;
+        const floor = input.min === "" ? -Infinity : Number(input.min);
+        const ceiling = input.max === "" ? Infinity : Number(input.max);
+        const next = Math.max(Number.isFinite(floor) ? floor : -Infinity,
+          Math.min(Number.isFinite(ceiling) ? ceiling : Infinity,
+            Number((base + (event.key === "ArrowUp" ? 0.1 : -0.1)).toPrecision(12))));
+        if (next === base) return;
+        writeNumeric(input, next);
+        input.dispatchEvent(new Event("input", {bubbles: true}));
+        input.dispatchEvent(new Event("change", {bubbles: true}));
+      });
+    }
+    // Wide ranges still have a coarse slider; direct entry retains precise
+    // control. A field's declared bounds, not an arbitrary span cutoff,
+    // determine whether it has a range to show.
+    if (input && !readOnly && numericLike && !input.dataset.lexExactInteger &&
+        (!boundedSlider || highBound > lowBound)) {
+      const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
+      const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
+      fill.append(handle);
+      // Without both bounds there is no finite range to sweep across.
+      // Drag relative to the starting value instead, without adding a cap.
+      const dragStep = Number(input.step) > 0 ? Number(input.step) : input.step === "any" ? 0.1 : 1;
+      let dragStart = null;
+      const ratio = () => {
+        const value = readNumeric(input);
+        if (!Number.isFinite(value)) return 0;
+        if (!boundedSlider) {
+          const scale = dragStep * 100;
+          if (Number.isFinite(lowBound)) {
+            const distance = Math.max(0, value - lowBound);
+            return 1 - scale / (scale + distance);
+          }
+          if (Number.isFinite(highBound)) {
+            const distance = Math.max(0, highBound - value);
+            return scale / (scale + distance);
+          }
+          return 0.5 + Math.atan(value / scale) / Math.PI;
+        }
+        return Math.max(0, Math.min(1, (value - sliderLow) / (sliderHigh - sliderLow)));
+      };
+      const paint = () => {
+        fill.style.setProperty("--lex-value-ratio", String(ratio()));
+        // A face, stepper or lock beside the input makes the host taller
+        // or wider than the box, and the fill then paints outside the
+        // box. Measure the box and pin the fill to it - but only when
+        // they differ, so normal fields keep their pure-CSS geometry
+        // (the reference rail's inset included).
+        const host = fill.parentElement;
+        const target = input.getBoundingClientRect();
+        const owner = host?.getBoundingClientRect();
+        if (!host || !target.width || !target.height || !owner.width || !owner.height) return;
+        if (Math.abs(owner.width - target.width) < 2 && Math.abs(owner.height - target.height) < 2 &&
+            Math.abs(owner.left - target.left) < 2 && Math.abs(owner.top - target.top) < 2) {
+          fill.style.left = fill.style.top = fill.style.width = fill.style.height = "";
+          return;
+        }
+        const scale = owner.width / host.offsetWidth || 1;
+        fill.style.left = `${(target.left - owner.left) / scale + 1}px`;
+        fill.style.top = `${(target.top - owner.top) / scale + 1}px`;
+        fill.style.width = `${target.width / scale - 2}px`;
+        fill.style.height = `${target.height / scale - 2}px`;
+      };
+      input.__lexValueSliderPaint = paint;
+      input.addEventListener("input", paint);
+      input.addEventListener("change", paint);
+      if (typeof ResizeObserver === "function") new ResizeObserver(paint).observe(node);
+      requestAnimationFrame(paint);
+      const box = () => (control instanceof Element && control.matches(".lex-unit-field")
+        ? control : input);
+      const setFromPointer = event => {
+        if (input.disabled || input.readOnly || refusesEdit(input)) return;
+        const bounds = box().getBoundingClientRect();
+        const share = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+        // A float field's step is "any": snapping to step 1 would drag
+        // it through whole numbers only. Without a usable step the
+        // pointer position stands, rounded past float dust.
+        const declared = Number(input.step);
+        const snap = Number.isFinite(declared) && declared > 0 ? declared
+          : !boundedSlider && input.step !== "any" ? dragStep : 0;
+        const raw = boundedSlider ? sliderLow + share * (sliderHigh - sliderLow)
+          : dragStart.value + (event.clientX - dragStart.x) * dragStart.rate;
+        const snapped = snap > 0 ? Math.round(raw / snap) * snap : Number(raw.toPrecision(12));
+        const nextValue = Math.max(lowBound ?? -Infinity, Math.min(highBound ?? Infinity, snapped));
+        if (!Number.isFinite(nextValue)) return;
+        if (readNumeric(input) === nextValue) return;
+        writeNumeric(input, nextValue);
+        paint();
+        // A plugin still needs the input event so local previews (for example,
+        // a curve) can update. Mark drag events so it can avoid refreshing the
+        // complete shell for every pointer pixel.
+        input.lexValueSliderDragging = true;
+        input.dispatchEvent(new Event("input", {bubbles: true}));
+      };
+      handle.addEventListener("pointerdown", event => {
+        if (input.disabled || input.readOnly || refusesEdit(input)) return;
+        event.preventDefault();
+        dragStart = {x: event.clientX, value: readNumeric(input) || 0,
+          rate: Math.max(dragStep, Math.abs(readNumeric(input) || 0) / 100)};
+        handle.setPointerCapture(event.pointerId);
+        node.classList.add("lex-value-dragging");
+        input.lexValueSliderDragging = true;
+        let pendingPointer = null;
+        let paintFrame = 0;
+        const queuePointer = moved => {
+          pendingPointer = moved;
+          if (paintFrame) return;
+          paintFrame = requestAnimationFrame(() => {
+            paintFrame = 0;
+            const next = pendingPointer;
+            pendingPointer = null;
+            if (next) setFromPointer(next);
+          });
+        };
+        const flushPointer = () => {
+          if (paintFrame) cancelAnimationFrame(paintFrame);
+          paintFrame = 0;
+          const next = pendingPointer;
+          pendingPointer = null;
+          if (next) setFromPointer(next);
+        };
+        const move = moved => queuePointer(moved);
+        let stopped = false;
+        // A drag that ends off-window never sees its pointerup: the
+        // window losing focus ends it instead, or the slider keeps
+        // following the pointer and swallowing its hover events.
+        const blurStop = () => stop();
+        const stop = () => {
+          if (stopped) return;
+          stopped = true;
+          flushPointer();
+          handle.removeEventListener("pointermove", move);
+          handle.removeEventListener("pointerup", stop);
+          handle.removeEventListener("pointercancel", stop);
+          window.removeEventListener("blur", blurStop);
+          node.classList.remove("lex-value-dragging");
+          input.lexValueSliderDragging = false;
+          input.dispatchEvent(new Event("change", {bubbles: true}));
+        };
+        handle.addEventListener("pointermove", move);
+        handle.addEventListener("pointerup", stop);
+        handle.addEventListener("pointercancel", stop);
+        window.addEventListener("blur", blurStop);
+      });
+      node.classList.add("lex-has-value-fill");
+      // The fill is drawn behind the value box, so it has to be positioned
+      // against THAT box. Prepending it to whatever happened to be the input's
+      // parent worked where the parent was a unit field or a provenance
+      // control - both of which are positioned and box-shaped - and failed
+      // everywhere else: with a bare input the nearest positioned ancestor is
+      // the field control, which is as tall as the whole property row, so the
+      // fill painted the row from top to bottom. A host of its own means the
+      // box the fill measures is always the box the reader sees.
+      const fillHost = control instanceof Element && control.matches(".lex-unit-field")
+        ? control
+        : input.parentElement?.matches?.(".lex-source-control-internal,.lex-unit-field")
+          ? input.parentElement
+          : (() => {
+            const host = element("span", {class: "lex-value-host"});
+            input.replaceWith(host);
+            host.append(input);
+            return host;
+          })();
+      fillHost?.prepend(fill);
+      requestAnimationFrame(paint);
+    }
+
+  };
+
   const detailPart = (part, options = {}) => {
     if (part instanceof Element && part.matches(".lex-toggle")) return part;
     const control = part instanceof Element ? part : part.control;
@@ -3585,6 +3783,7 @@
       if (!field.id) field.id = `lex-part-${Math.random().toString(36).slice(2, 9)}`;
       caption.setAttribute("for", field.id);
     }
+    installNumericControl(item, control);
     const input = options.copy ? item.querySelector('input:not([type="checkbox"]),select,textarea') : null;
     item.prepend(input
       ? copyValueButton(() => input.tagName === "SELECT"
@@ -3889,189 +4088,7 @@
       anchorDetailPin(pin, node.querySelector(".lex-detail-field-control"), input);
     node.lexRejectValue = rejectValue;
 
-    // A bounded number draws its own value as a fill behind the box, and on
-    // hover the fill slides out into a slider for rough adjustment.
-    const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
-    const highBound = max === null || max === undefined || max === "" ? null : Number(max);
-    // The slider always spans the whole accepted range. A second, narrower
-    // span computed from the data read as a second range (Lexer), so the
-    // handle moves in exactly what the field accepts.
-    const [sliderLow, sliderHigh] = [lowBound, highBound];
-    const boundedSlider = Number.isFinite(lowBound) && Number.isFinite(highBound);
-    // Native arrows move by 1 when step is "any": without this, float
-    // fields changed through whole numbers from the keyboard too.
-    if (input && !readOnly && ["FLOAT", "F32", "F64", "ANGLE32"].includes(dataType)
-        && (input.step === "any" || !Number.isFinite(Number(input.step)))) {
-      input.addEventListener("keydown", event => {
-        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-        event.preventDefault();
-        const at = readNumeric(input);
-        const base = Number.isFinite(at) ? at : 0;
-        const floor = input.min === "" ? -Infinity : Number(input.min);
-        const ceiling = input.max === "" ? Infinity : Number(input.max);
-        const next = Math.max(Number.isFinite(floor) ? floor : -Infinity,
-          Math.min(Number.isFinite(ceiling) ? ceiling : Infinity,
-            Number((base + (event.key === "ArrowUp" ? 0.1 : -0.1)).toPrecision(12))));
-        if (next === base) return;
-        writeNumeric(input, next);
-        input.dispatchEvent(new Event("input", {bubbles: true}));
-        input.dispatchEvent(new Event("change", {bubbles: true}));
-      });
-    }
-    // Wide ranges still have a coarse slider; direct entry retains precise
-    // control. A field's declared bounds, not an arbitrary span cutoff,
-    // determine whether it has a range to show.
-    if (input && !readOnly && numericLike && !input.dataset.lexExactInteger &&
-        (!boundedSlider || highBound > lowBound)) {
-      const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
-      const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
-      fill.append(handle);
-      // Without both bounds there is no finite range to sweep across.
-      // Drag relative to the starting value instead, without adding a cap.
-      const dragStep = Number(input.step) > 0 ? Number(input.step) : input.step === "any" ? 0.1 : 1;
-      let dragStart = null;
-      const ratio = () => {
-        const value = readNumeric(input);
-        if (!Number.isFinite(value)) return 0;
-        if (!boundedSlider) {
-          const scale = dragStep * 100;
-          if (Number.isFinite(lowBound)) {
-            const distance = Math.max(0, value - lowBound);
-            return 1 - scale / (scale + distance);
-          }
-          if (Number.isFinite(highBound)) {
-            const distance = Math.max(0, highBound - value);
-            return scale / (scale + distance);
-          }
-          return 0.5 + Math.atan(value / scale) / Math.PI;
-        }
-        return Math.max(0, Math.min(1, (value - sliderLow) / (sliderHigh - sliderLow)));
-      };
-      const paint = () => {
-        fill.style.setProperty("--lex-value-ratio", String(ratio()));
-        // A face, stepper or lock beside the input makes the host taller
-        // or wider than the box, and the fill then paints outside the
-        // box. Measure the box and pin the fill to it - but only when
-        // they differ, so normal fields keep their pure-CSS geometry
-        // (the reference rail's inset included).
-        const host = fill.parentElement;
-        const target = input.getBoundingClientRect();
-        const owner = host?.getBoundingClientRect();
-        if (!host || !target.width || !target.height || !owner.width || !owner.height) return;
-        if (Math.abs(owner.width - target.width) < 2 && Math.abs(owner.height - target.height) < 2 &&
-            Math.abs(owner.left - target.left) < 2 && Math.abs(owner.top - target.top) < 2) {
-          fill.style.left = fill.style.top = fill.style.width = fill.style.height = "";
-          return;
-        }
-        const scale = owner.width / host.offsetWidth || 1;
-        fill.style.left = `${(target.left - owner.left) / scale + 1}px`;
-        fill.style.top = `${(target.top - owner.top) / scale + 1}px`;
-        fill.style.width = `${target.width / scale - 2}px`;
-        fill.style.height = `${target.height / scale - 2}px`;
-      };
-      input.__lexValueSliderPaint = paint;
-      input.addEventListener("input", paint);
-      input.addEventListener("change", paint);
-      if (typeof ResizeObserver === "function") new ResizeObserver(paint).observe(node);
-      requestAnimationFrame(paint);
-      const box = () => (control instanceof Element && control.matches(".lex-unit-field")
-        ? control : input);
-      const setFromPointer = event => {
-        if (input.disabled || input.readOnly || refusesEdit(input)) return;
-        const bounds = box().getBoundingClientRect();
-        const share = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
-        // A float field's step is "any": snapping to step 1 would drag
-        // it through whole numbers only. Without a usable step the
-        // pointer position stands, rounded past float dust.
-        const declared = Number(input.step);
-        const snap = Number.isFinite(declared) && declared > 0 ? declared
-          : !boundedSlider && input.step !== "any" ? dragStep : 0;
-        const raw = boundedSlider ? sliderLow + share * (sliderHigh - sliderLow)
-          : dragStart.value + (event.clientX - dragStart.x) * dragStart.rate;
-        const snapped = snap > 0 ? Math.round(raw / snap) * snap : Number(raw.toPrecision(12));
-        const nextValue = Math.max(lowBound ?? -Infinity, Math.min(highBound ?? Infinity, snapped));
-        if (!Number.isFinite(nextValue)) return;
-        if (readNumeric(input) === nextValue) return;
-        writeNumeric(input, nextValue);
-        paint();
-        // A plugin still needs the input event so local previews (for example,
-        // a curve) can update. Mark drag events so it can avoid refreshing the
-        // complete shell for every pointer pixel.
-        input.lexValueSliderDragging = true;
-        input.dispatchEvent(new Event("input", {bubbles: true}));
-      };
-      handle.addEventListener("pointerdown", event => {
-        if (input.disabled || input.readOnly || refusesEdit(input)) return;
-        event.preventDefault();
-        dragStart = {x: event.clientX, value: readNumeric(input) || 0,
-          rate: Math.max(dragStep, Math.abs(readNumeric(input) || 0) / 100)};
-        handle.setPointerCapture(event.pointerId);
-        node.classList.add("lex-value-dragging");
-        input.lexValueSliderDragging = true;
-        let pendingPointer = null;
-        let paintFrame = 0;
-        const queuePointer = moved => {
-          pendingPointer = moved;
-          if (paintFrame) return;
-          paintFrame = requestAnimationFrame(() => {
-            paintFrame = 0;
-            const next = pendingPointer;
-            pendingPointer = null;
-            if (next) setFromPointer(next);
-          });
-        };
-        const flushPointer = () => {
-          if (paintFrame) cancelAnimationFrame(paintFrame);
-          paintFrame = 0;
-          const next = pendingPointer;
-          pendingPointer = null;
-          if (next) setFromPointer(next);
-        };
-        const move = moved => queuePointer(moved);
-        let stopped = false;
-        // A drag that ends off-window never sees its pointerup: the
-        // window losing focus ends it instead, or the slider keeps
-        // following the pointer and swallowing its hover events.
-        const blurStop = () => stop();
-        const stop = () => {
-          if (stopped) return;
-          stopped = true;
-          flushPointer();
-          handle.removeEventListener("pointermove", move);
-          handle.removeEventListener("pointerup", stop);
-          handle.removeEventListener("pointercancel", stop);
-          window.removeEventListener("blur", blurStop);
-          node.classList.remove("lex-value-dragging");
-          input.lexValueSliderDragging = false;
-          input.dispatchEvent(new Event("change", {bubbles: true}));
-        };
-        handle.addEventListener("pointermove", move);
-        handle.addEventListener("pointerup", stop);
-        handle.addEventListener("pointercancel", stop);
-        window.addEventListener("blur", blurStop);
-      });
-      node.classList.add("lex-has-value-fill");
-      // The fill is drawn behind the value box, so it has to be positioned
-      // against THAT box. Prepending it to whatever happened to be the input's
-      // parent worked where the parent was a unit field or a provenance
-      // control - both of which are positioned and box-shaped - and failed
-      // everywhere else: with a bare input the nearest positioned ancestor is
-      // the field control, which is as tall as the whole property row, so the
-      // fill painted the row from top to bottom. A host of its own means the
-      // box the fill measures is always the box the reader sees.
-      const fillHost = control instanceof Element && control.matches(".lex-unit-field")
-        ? control
-        : input.parentElement?.matches?.(".lex-source-control-internal,.lex-unit-field")
-          ? input.parentElement
-          : (() => {
-            const host = element("span", {class: "lex-value-host"});
-            input.replaceWith(host);
-            host.append(input);
-            return host;
-          })();
-      fillHost?.prepend(fill);
-      requestAnimationFrame(paint);
-    }
+    if (!composite) installNumericControl(node, control, {readOnly, min, max, dataType});
 
     if (input && !readOnly && inputType !== "checkbox") {
       // Selecting the whole value on focus keeps a drag inside the field from

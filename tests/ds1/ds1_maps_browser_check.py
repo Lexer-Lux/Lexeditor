@@ -76,8 +76,8 @@ def main():
                     page.wait_for_selector('body[data-ds1-ready="true"]')
                     page.locator('[data-tab="maps"]').click()
                     page.wait_for_function("(n) => state.tab==='maps' && state.mapView && state.rows.length===n", arg=len(placements))
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"')
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"')
                     page.wait_for_selector('[data-maps-dir] .lex-column-list.lex-list-fill',
                                            timeout=30000)
                     assert page.locator('[data-maps-dir] .lex-column-list.lex-list-fill').count() == 1
@@ -90,8 +90,8 @@ def main():
                     assert set(counts) == {'npcs', 'drops', 'enemies'}, counts
                     if not root:
                         assert (counts['npcs'], counts['drops'], counts['enemies']) == (0, 0, 2), counts
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"')
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"')
                     assert page.locator('[data-maps-side] .lex-column-list.lex-list-fill').count() == 1
                     if not root:
                         titled = ["Rat", "Small Rat", "piece0",
@@ -99,7 +99,7 @@ def main():
                         assert sorted(page.evaluate("state.rows.map(r=>r.name)")) == sorted(titled)
                     else:
                         assert page.evaluate("state.rows.length") > 0
-                    page.get_by_role("searchbox", name="Search placements").fill(enemy["name"])
+                    page.get_by_role("searchbox", name="Search the world").fill(enemy["name"])
                     if not root:
                         page.wait_for_function("(e) => state.selected.endsWith(e.key) && state.row?.name===e.name",
                                                arg={"key": ":" + key.split(":")[1], "name": "Rat"})
@@ -148,8 +148,8 @@ def main():
                     npc.select_option(str(other_npc))
                     page.wait_for_function("(x) => state.pending===0 && state.row.fields.find(f=>f.key==='npcId').value===x", arg=other_npc)
                     if chest is not None:
-                        page.locator('[data-tabstrip-id="placements"]').click()
-                        box = page.get_by_role("searchbox", name="Search placements")
+                        page.locator('[data-tabstrip-id="enemies"]').click()
+                        box = page.get_by_role("searchbox", name="Search the world")
                         box.click(); box.press("ControlOrMeta+a"); box.press("Backspace"); box.fill(chest["name"])
                         if not root:
                             page.wait_for_function("(c) => state.selected.endsWith(':'+c.partId) && state.row?.name===c.name",

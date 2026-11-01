@@ -130,8 +130,8 @@ def main():
                     # Placements and Lights still render beside Messages.
                     page.locator('[data-tab="maps"]').click()
                     page.wait_for_function('state.tab==="maps" && state.mapView && !state.error')
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"')
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"')
                     page.wait_for_selector('[data-maps-dir] .lex-column-list')
                     page.locator('[data-tabstrip-id="lights"]').click()
                     page.wait_for_function('state.mapTab==="lights"')
