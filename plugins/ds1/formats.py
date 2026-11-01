@@ -5,6 +5,7 @@ are reused from Lexeditor's DS3 integration; no SoulsFormats code is used.
 """
 from dataclasses import dataclass
 from functools import lru_cache
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -474,8 +475,30 @@ def deflate(original, plain, *, max_size=MAX_ARCHIVE):
     inflate(original, max_size=max_size)
     if len(plain) > max_size:
         raise FormatError('Archive exceeds its size limit')
-    compressed = zlib.compress(bytes(plain), 9)
+    plain = bytes(plain)
     header = bytearray(original[:76])
+    # Author builds can repeat the same talk archive across many mods and
+    # rebuilds. Reuse compression by content, independently of mod freshness.
+    # The existing bounded disposable cache is shared by build workers.
+    from . import composition_cache
+    key = hashlib.sha256(b'ds1-dcx-zlib9\0' + zlib.ZLIB_RUNTIME_VERSION.encode() + b'\0' + plain).digest()
+    cache_root = None
+    try:
+        cache_root = composition_cache.user_root()
+        compressed = composition_cache.load(cache_root, key)
+        if compressed is not None:
+            struct.pack_into('>II', header, 28, len(plain), len(compressed))
+            candidate = bytes(header) + compressed
+            if inflate(candidate, max_size=max_size) == plain:
+                return candidate
+    except Exception:
+        pass  # Optional cache failures never prevent an ordinary build.
+    compressed = zlib.compress(plain, 9)
+    if cache_root is not None:
+        try:
+            composition_cache.store(cache_root, key, compressed)
+        except Exception:
+            pass
     struct.pack_into('>II', header, 28, len(plain), len(compressed))
     return bytes(header) + compressed
 
