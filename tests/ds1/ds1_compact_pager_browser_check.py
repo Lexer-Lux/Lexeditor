@@ -69,10 +69,10 @@ def main():
                                            timeout=60000)
                     page.wait_for_selector('[data-maps-side]', timeout=60000)
                     page.evaluate("window.__dirCalmWait = " + CALM)
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
-                    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Drops").click()
-                    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"', timeout=30000)
+                    page.locator("[data-maps-side] .lex-tabstrip-button", has_text="Drops").click()
+                    page.wait_for_function('state.mapTab==="drops"', timeout=30000)
                     # The All list's rows would satisfy a row count; the Local
                     # toggle only exists once the Drops list itself renders.
                     page.wait_for_selector("[data-maps-dir] [data-dir-local]", timeout=30000)
@@ -98,8 +98,8 @@ def main():
                     # bottom row still holds them beside the toggle.
                     page.evaluate("state.pageSize=2")
                     page.evaluate("state.dirPage=0")
-                    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Enemies").click()
-                    page.wait_for_function('state.dirTab==="enemies"', timeout=30000)
+                    page.locator("[data-maps-side] .lex-tabstrip-button", has_text="Enemies").click()
+                    page.wait_for_function('state.mapTab==="enemies"', timeout=30000)
                     page.wait_for_selector("[data-maps-dir] .lex-pager-controls", timeout=30000)
                     # The tab name changes before its async directory refresh.
                     # Read parent and children in one DOM snapshot, after the
@@ -134,8 +134,8 @@ def main():
                     page.wait_for_function('state.dirPage===1', timeout=30000)
                     second = page.locator("[data-maps-dir] .lex-list-row").first.inner_text()
                     assert first != second, (first, second)
-                    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Drops").click()
-                    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+                    page.locator("[data-maps-side] .lex-tabstrip-button", has_text="Drops").click()
+                    page.wait_for_function('state.mapTab==="drops"', timeout=30000)
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===2",
                         timeout=30000)

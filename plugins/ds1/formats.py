@@ -307,7 +307,7 @@ ATTACK_SUBTABS = (('attacks', 'Attacks', 'AtkParam_Npc'),
                   ('player-attacks', 'Player attacks', 'AtkParam_Pc'),
                   ('projectiles', 'Projectiles', 'Bullet'))
 WORLD_SUBTABS = (('drops', 'Drops', 'ItemLotParam'),
-                 ('treasure', 'Treasure', 'ObjActParam'))
+                 ('treasure', 'Interactions', 'ObjActParam'))
 NPCS_SUBTABS = (('npcs', 'NPCs', 'NpcParam'),
                 ('unowned-shops', 'Unowned shops', 'ShopLineupParam'))
 # Reviewed behavior and projectile fields. Costs, call targets and flight

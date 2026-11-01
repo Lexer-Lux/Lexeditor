@@ -3,6 +3,7 @@ edits, one document per map, with the same save/discard/stale rules as the
 parameter archive."""
 import hashlib
 import re
+import struct
 from pathlib import Path
 
 from core.plugin_files import atomic_write_group
@@ -610,7 +611,7 @@ class MapStore:
         return 'enemies', 'monsters'
 
     def _event_param_links(self, fields):
-        linked = [field for field in fields if field['key'] in EVENT_PARAM_LINKS]
+        linked = [field for field in fields if field['key'].rsplit(':', 1)[-1] in EVENT_PARAM_LINKS]
         if not linked:
             return []
         try:
@@ -619,7 +620,7 @@ class MapStore:
             document = None
         links = []
         for field in linked:
-            kind, table = EVENT_PARAM_LINKS[field['key']]
+            kind, table = EVENT_PARAM_LINKS[field['key'].rsplit(':', 1)[-1]]
             choices = document.link_choices(kind, table) if document else {'-1': 'None'}
             value = field['value']
             field.update(type='enum', enum=choices)
@@ -631,6 +632,27 @@ class MapStore:
                 link.update(tab='maps', sub='treasure')
             links.append(link)
         return links
+
+    def _contents_fields(self, map_name, part_key):
+        """A placed object's loot fields are owned by its linked treasure event."""
+        if part_key[0] not in (1, 9):
+            return []
+        doc = self.get(map_name)
+        part_index = next((i for i, part in enumerate(doc.parts)
+                           if (part['type'], part['id']) == part_key), None)
+        if part_index is None:
+            return []
+        from . import msb_events
+        fields = []
+        for event in doc.events:
+            if event['type'] != 4 or struct.unpack_from('<i', doc.plain, event['bhead']+4)[0] != part_index:
+                continue
+            for field in msb_events.read(doc, ('event4', event['seq']))['fields']:
+                if not field['key'].startswith('itemLot'):
+                    continue
+                field = dict(field, key=f"contents:{event['seq']}:{field['key']}", group='Contents')
+                fields.append(field)
+        return fields
 
     def read(self, map_name, key):
         if str(key).startswith("message:"):
@@ -655,6 +677,7 @@ class MapStore:
             if item["key"] == "npcId":
                 item["type"] = "enum"
                 item["enum"] = {str(row_id): names[row_id] for row_id in sorted(names)}
+        row['fields'].extend(self._contents_fields(map_name, part_key))
         row["recordLinks"] = self._event_param_links(row['fields'])
         if npc is not None:
             tab, sub = self._npc_tab(npc, types)
@@ -704,10 +727,20 @@ class MapStore:
                 ("message", int(str(key).split(":")[1])))
         if str(key).startswith("light:"):
             return self.get(map_name).light_modified(("light", int(str(key).split(":")[1])))
-        return self.get(map_name).placement_modified(parse_key(key))
+        doc = self.get(map_name)
+        if doc.placement_modified(parse_key(key)):
+            return True
+        return any(doc.placement_modified(('event4', int(field['key'].split(':')[1])))
+                   for field in self._contents_fields(map_name, parse_key(key)))
 
     def edit(self, map_name, key, field, value):
         self.writable()
+        if field.startswith('contents:'):
+            if field not in {item['key'] for item in self._contents_fields(map_name, parse_key(key))}:
+                raise MsbError('This object has no such treasure field')
+            _, sequence, member = field.split(':')
+            self.get(map_name).edit(("event4", int(sequence)), member, value)
+            return self.read(map_name, key)
         if str(key).startswith("message:"):
             seq = int(str(key).split(":")[1])
             self.get(map_name).edit_message(("message", seq), field, value)

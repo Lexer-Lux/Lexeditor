@@ -331,10 +331,10 @@ def test_map_layers_and_edits_in_rendered_editor(tmp_path, read_only):
                 }''')
                 assert page.evaluate('''() => {
                     const scene=document.querySelector('[data-viewport-host]')._viewportScene;
-                    let okay=true;scene.traverse(node=>{if(node.userData.collisionLayer&&!node.material.wireframe)okay=false});return okay;
+                    let okay=true;scene.traverse(node=>{if(node.isMesh&&node.userData.collisionLayer&&!node.material.wireframe)okay=false});return okay;
                 }''')
                 page.locator('[data-view-mode="regular"]').click()
-                page.locator('[data-tabstrip-id="placements"]').click()
+                page.locator('[data-tabstrip-id="enemies"]').click()
                 page.evaluate('selectPlacement("m10_02_00_00.msb:5:0",false)')
                 page.wait_for_selector('[data-field-key="hitFilter"]:visible')
                 assert page.locator('[data-field-key="startsDisabled"]:visible').get_attribute('type') == 'checkbox'

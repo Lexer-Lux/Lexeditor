@@ -9133,13 +9133,14 @@ main .lex-detail-field :is(input,select,textarea):disabled { pointer-events:none
    the host is hovered, half-visible then, full under the pointer or
    keyboard focus. An inline bar sits in the flow instead of overlaying. */
 .lex-hover-actions-host { position:relative; }
-.lex-hover-actions { position:absolute; z-index:5; display:flex; gap:4px; margin:0; padding:0;
+.lex-hover-actions { position:absolute; z-index:5; display:flex; flex-wrap:wrap; gap:4px; margin:0; padding:0;
   opacity:0; pointer-events:none; transition:opacity .12s ease; }
 .lex-hover-actions-tr { top:8px; right:8px; }
 .lex-hover-actions-tl { top:8px; left:8px; }
 .lex-hover-actions-br { bottom:8px; right:8px; }
 .lex-hover-actions-bl { bottom:8px; left:8px; }
 .lex-hover-actions-inline { position:static; }
+.lex-hover-actions:not(.lex-hover-actions-inline) { max-width:calc(100% - 16px); }
 /* An inline bar sits in the flow at its host's end: the host stacks its
    children so the bar stays inside the pane, where hovering it hovers
    the host. Left in block flow under a full-height list, the bar hung

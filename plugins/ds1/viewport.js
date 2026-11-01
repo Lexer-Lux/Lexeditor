@@ -277,10 +277,18 @@ window.Ds1Viewport = (() => {
       if (!collisionMats.has(cacheKey)) {
         const color = hitFilter === 15 ? 0xe5484d : hitFilter === 14 ? 0xf76b15
           : hitFilter === 13 ? 0x8e4ec6 : layer === "navigation" ? 0x6699ff : 0x12a594;
-        collisionMats.set(cacheKey, new THREE.MeshStandardMaterial({color, roughness: 0.9, metalness: 0,
-          side: THREE.DoubleSide, transparent: true, opacity: 0.45, depthWrite: false}));
+        collisionMats.set(cacheKey, new THREE.MeshBasicMaterial({color,
+          side: THREE.DoubleSide, transparent: true, opacity: 0.28, depthWrite: false,
+          polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}));
       }
       return collisionMats.get(cacheKey);
+    };
+    const collisionEdgeMaterial = (hitFilter, layer, hidden) => {
+      const key = `${hitFilter ?? 'x'}:${layer}:edges:${hidden}`;
+      if (!collisionMats.has(key)) collisionMats.set(key, new THREE.LineBasicMaterial({
+        color: collisionMaterial(hitFilter, layer).color, transparent: true,
+        opacity: hidden ? 0.18 : 0.85, depthTest: !hidden, depthWrite: false}));
+      return collisionMats.get(key);
     };
     function applyCollisionVisibility() {
       for (const placed of groups.values()) {
@@ -600,7 +608,9 @@ window.Ds1Viewport = (() => {
         const group = groups.get(key);
         if (!group) return;
         for (const mesh of group.children) {
-          if (mesh.userData.collisionLayer) mesh.material = collisionMaterial(hitFilter, mesh.userData.collisionLayer);
+          if (mesh.userData.collisionLayer) mesh.material = mesh.isLineSegments
+            ? collisionEdgeMaterial(hitFilter, mesh.userData.collisionLayer, mesh.userData.hiddenCollisionEdge)
+            : collisionMaterial(hitFilter, mesh.userData.collisionLayer);
         }
         viewModes.bindScene(scene);
         requestRender();
@@ -623,7 +633,9 @@ window.Ds1Viewport = (() => {
       canvas.remove();
       if (progress) progress.remove();
       delete host.dataset.ready;
-      for (const geos of geometries.values()) for (const entry of geos) entry.geo.dispose();
+      for (const geos of geometries.values()) for (const entry of geos) {
+        entry.geo.dispose(); entry.edgesGeo?.dispose();
+      }
       for (const group of groups.values()) if (group.userData.part?.kind === "Region") {
         for (const child of group.children) { child.geometry?.dispose(); child.material?.dispose(); }
       }
@@ -721,7 +733,9 @@ window.Ds1Viewport = (() => {
             for (const child of [...group.children]) if (child.userData.collisionLayer) group.remove(child);
             group.userData.collisionFilled = false;
           }
-          for (const entry of geometries.get(name) || []) entry.geo.dispose();
+          for (const entry of geometries.get(name) || []) {
+            entry.geo.dispose(); entry.edgesGeo?.dispose();
+          }
         }
         geometries.set(name, geos);
       }
@@ -744,8 +758,20 @@ window.Ds1Viewport = (() => {
             if (!entry.collisionLayer) continue;
             const mesh = new THREE.Mesh(entry.geo, collisionMaterial(part.hitFilter, entry.collisionLayer));
             mesh.userData.collisionLayer = entry.collisionLayer;
+            mesh.renderOrder = 10;
             mesh.visible = entry.collisionLayer === "navigation" ? showNavigation : entry.collisionLayer === "collisionHigh" ? showHigh : showLow;
             group.add(mesh);
+            entry.edgesGeo ||= new THREE.EdgesGeometry(entry.geo);
+            for (const hidden of [true, false]) {
+              const edges = new THREE.LineSegments(entry.edgesGeo,
+                collisionEdgeMaterial(part.hitFilter, entry.collisionLayer, hidden));
+              edges.userData.collisionLayer = entry.collisionLayer;
+              edges.userData.hiddenCollisionEdge = hidden;
+              edges.visible = mesh.visible;
+              edges.renderOrder = hidden ? 11 : 12;
+              edges.raycast = () => {}; // Decoration never intercepts placement picking.
+              group.add(edges);
+            }
           }
           group.userData.collisionFilled = group.children.length > 0;
           group.updateWorldMatrix(true, true);

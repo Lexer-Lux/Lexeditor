@@ -58,8 +58,8 @@ def test_map_undo_is_surgical():
                     page.locator('[data-tab="maps"]').click()
                     page.wait_for_function('state.tab==="maps" && state.mapView', timeout=60000)
                     page.wait_for_selector('[data-viewport-host][data-ready="true"]', timeout=30000)
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"')
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"')
                     page.get_by_role('searchbox', name='Search placements').fill('Rat')
                     page.wait_for_function(
                         'state.selected.endsWith(":0") && state.row?.name==="Rat"')

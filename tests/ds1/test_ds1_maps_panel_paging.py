@@ -115,22 +115,22 @@ def test_maps_side_panels_fit_and_page_inside():
                                 'tall => document.querySelector("[data-maps-side]")'
                                 '.getBoundingClientRect().height < tall',
                                 arg=side_tall, timeout=15000)
-                        page.locator('[data-tabstrip-id="placements"]').click()
-                        page.wait_for_function('state.mapTab==="placements"',
+                        page.locator('[data-tabstrip-id="enemies"]').click()
+                        page.wait_for_function('state.mapTab==="enemies"',
                                                timeout=30000)
-                        subtabs = (('drops', 'Drops'), ('treasure', 'Treasure'),
+                        subtabs = (('drops', 'Drops'), ('treasure', 'Interactions'),
                                    ('npcs', 'NPCs'), ('enemies', 'Enemies'))
                         for subtab, label in subtabs:
-                            page.locator('[data-maps-dir] .lex-subtab-button',
+                            page.locator('[data-maps-side] .lex-tabstrip-button',
                                          has_text=label).click()
-                            page.wait_for_function(f'state.dirTab==="{subtab}"',
+                            page.wait_for_function(f'state.mapTab==="{subtab}"',
                                                    timeout=30000)
                             panel_settled(page, '[data-maps-dir]', '.lex-column-list')
                             check_panel(page, '[data-maps-dir]', '.lex-column-list',
                                         f'directory/{subtab} at height {height}')
                         assert page.locator(
                             '#main .lex-pager:not(.lex-pager-inline)').count() == 0
-                        for tab in ('maps', 'placements'):
+                        for tab in ('maps', 'enemies'):
                             page.locator(f'[data-tabstrip-id="{tab}"]').click()
                             page.wait_for_function(f'state.mapTab==="{tab}"',
                                                    timeout=30000)
@@ -149,7 +149,7 @@ def test_maps_side_panels_fit_and_page_inside():
                                 '.getBoundingClientRect().height')
                     # Taller window, more rows per page: the page size is
                     # derived from the panel height, not fixed.
-                    assert sizes[('placements', 900)] > sizes[('placements', 600)], sizes
+                    assert sizes[('enemies', 900)] > sizes[('enemies', 600)], sizes
                     assert sizes[('maps', 900)] > sizes[('maps', 600)], sizes
                     # Paging still works through the in-panel bar.
                     page.set_viewport_size({'width': 1440, 'height': 900})
@@ -157,10 +157,10 @@ def test_maps_side_panels_fit_and_page_inside():
                         'tall => document.querySelector("[data-maps-side]")'
                         '.getBoundingClientRect().height >= tall - 1',
                         arg=side_tall, timeout=15000)
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
-                    page.locator('[data-maps-dir] .lex-subtab-button', has_text='All').click()
-                    page.wait_for_function('state.dirTab==="all"', timeout=30000)
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"', timeout=30000)
+                    page.locator('[data-maps-side] .lex-tabstrip-button', has_text='Enemies').click()
+                    page.wait_for_function('state.mapTab==="enemies"', timeout=30000)
                     panel_settled(page, '[data-maps-side]', '.lex-column-list')
                     keys = ("[data-maps-side] .lex-list-row:not(.lex-filler-row)",)
                     first = page.locator(keys[0]).evaluate_all(
@@ -168,7 +168,7 @@ def test_maps_side_panels_fit_and_page_inside():
                     assert len(first) > 1, first
                     page.locator('[data-maps-side]').get_by_role(
                         'button', name='Next page').click()
-                    page.wait_for_function('state.page===1', timeout=30000)
+                    page.wait_for_function('state.dirPage===1', timeout=30000)
                     panel_settled(page, '[data-maps-side]', '.lex-column-list')
                     second = page.locator(keys[0]).evaluate_all(
                         'nodes => nodes.map(node => node.dataset.key)')

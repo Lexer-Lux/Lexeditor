@@ -32,10 +32,10 @@ def open_maps(page, session):
     page.locator('button[data-tab="maps"]').click()
     page.wait_for_function('state.tab==="maps" && state.mapView && state.rows.length>0 && !state.error',
                           timeout=60000)
-    page.locator('[data-tabstrip-id="placements"]').click()
-    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
-    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Drops").click()
-    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+    page.locator('[data-tabstrip-id="enemies"]').click()
+    page.wait_for_function('state.mapTab==="enemies"', timeout=30000)
+    page.locator("[data-maps-side] .lex-tabstrip-button", has_text="Drops").click()
+    page.wait_for_function('state.mapTab==="drops"', timeout=30000)
     # The All list's rows would satisfy a row count; the Local toggle
     # only exists once the Drops list itself renders.
     page.wait_for_selector("[data-maps-dir] [data-dir-local]", timeout=30000)
@@ -67,8 +67,8 @@ def main():
                     box = page.locator("[data-dir-local] input")
                     assert page.locator(".lex-pager [data-dir-local]").count() == 1
                     assert page.locator("[data-maps-dir] .lex-compact-pager").count() == 1
-                    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Enemies").click()
-                    page.wait_for_function('state.dirTab==="enemies"', timeout=30000)
+                    page.locator("[data-maps-side] .lex-tabstrip-button", has_text="Enemies").click()
+                    page.wait_for_function('state.mapTab==="enemies"', timeout=30000)
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===3",
                         timeout=30000)
@@ -82,15 +82,15 @@ def main():
                     page.wait_for_function('state.mapTab==="maps"', timeout=30000)
                     page.locator("[data-maps-side] .lex-list-row", has_text=MAP_B).click()
                     page.wait_for_function(f'state.mapId==="{MAP_B}"', timeout=30000)
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
+                    page.locator('[data-tabstrip-id="enemies"]').click()
+                    page.wait_for_function('state.mapTab==="enemies"', timeout=30000)
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===1",
                         timeout=30000)
                     page.locator("[data-maps-dir] .lex-list-row").click()
                     page.wait_for_function(f'state.selected.startsWith("{MAP_B}")', timeout=30000)
-                    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Drops").click()
-                    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+                    page.locator("[data-maps-side] .lex-tabstrip-button", has_text="Drops").click()
+                    page.wait_for_function('state.mapTab==="drops"', timeout=30000)
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===0",
                         timeout=30000)
@@ -98,8 +98,8 @@ def main():
                     page.wait_for_function('state.mapTab==="maps"', timeout=30000)
                     page.locator("[data-maps-side] .lex-list-row", has_text=MAP_A).click()
                     page.wait_for_function(f'state.mapId==="{MAP_A}"', timeout=30000)
-                    page.locator('[data-tabstrip-id="placements"]').click()
-                    page.wait_for_function('state.mapTab==="placements"', timeout=30000)
+                    page.locator('[data-tabstrip-id="drops"]').click()
+                    page.wait_for_function('state.mapTab==="drops"', timeout=30000)
                     page.wait_for_function(
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===1",
                         timeout=30000)
@@ -119,9 +119,9 @@ def main():
                         "document.querySelectorAll('[data-maps-dir] .lex-list-row').length===0",
                         timeout=30000)
                     page.get_by_role("searchbox", name="Search the world").fill("")
-                    for tab in ("Treasure",):
-                        page.locator("[data-maps-dir] .lex-subtab-button", has_text=tab).click()
-                        page.wait_for_function(f'state.dirTab==="{tab.lower()}"', timeout=30000)
+                    for tab in ("treasure",):
+                        page.locator(f'[data-tabstrip-id="{tab}"]').click()
+                        page.wait_for_function(f'state.mapTab==="{tab}"', timeout=30000)
                         page.wait_for_function('!document.querySelector("[data-dir-local] input").disabled',
                                                timeout=30000)
                         # These synthetic maps contain no activation events.
@@ -130,8 +130,8 @@ def main():
                     # rows; the stacked pager still fits the 360px panel.
                     page.evaluate("state.pageSize=2")
                     page.evaluate("state.dirPage=0")
-                    page.locator("[data-maps-dir] .lex-subtab-button", has_text="Drops").click()
-                    page.wait_for_function('state.dirTab==="drops"', timeout=30000)
+                    page.locator("[data-maps-side] .lex-tabstrip-button", has_text="Drops").click()
+                    page.wait_for_function('state.mapTab==="drops"', timeout=30000)
                     page.locator("[data-dir-local] input").uncheck()
                     page.wait_for_selector(
                         "[data-maps-dir] .lex-pager-controls", timeout=30000)

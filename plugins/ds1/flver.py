@@ -367,6 +367,15 @@ class FlverDocument:
             raise FlverError('Mesh material index is invalid')
         faces = self._index_list(data, header['face_off'], header['face_count'],
                                  len(face_sets), 'face set')
+        # Face sets are alternate LODs, not additional surface geometry.
+        # DSR map pieces commonly carry levels 0, 1 and 2 per material.
+        # Motion-blur copies are alternate passes too. Drawing all of them
+        # overlays differently triangulated lightmap charts on the same wall.
+        regular = [face for face in faces if not face_sets[face]['flags'] & 0x80]
+        candidates = regular or list(faces)
+        if candidates:
+            level = min(face_sets[face]['flags'] & 3 for face in candidates)
+            faces = [face for face in candidates if face_sets[face]['flags'] & 3 == level]
         arrays = self._index_list(data, header['array_off'], header['array_count'],
                                   len(array_headers), 'vertex array')
         mesh = {'index': index, 'dynamic': header['dynamic'],
