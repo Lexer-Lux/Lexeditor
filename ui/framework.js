@@ -11092,7 +11092,7 @@ ${contents.path}`});
       // alert marks describe: re-read them so a rebuilt mod clears its
       // mark at once instead of waiting for Play.
       try { await options.save?.(); playThemeSound("save"); await mods.refresh(); }
-      catch (error) { showToast(error?.message || "Save failed.", true); }
+      catch (error) { if (!error?.reported) showAlert({title:"Save failed",message:error?.message || "Save failed."}); }
       finally { setSaveBusy(false); }
     };
     save.oncontextmenu = event => {
