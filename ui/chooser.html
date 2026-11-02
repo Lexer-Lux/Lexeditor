@@ -804,7 +804,7 @@
       const networking = await window.pywebview.api.networking_notice().catch(()=>null);
       if(networking?.show){
         setDialog("Internet features disabled",networking.message,[
-          button("OPEN PROGRAM FOLDER",()=>window.pywebview.api.open_networking_notice_action("folder")),
+          button("OPEN IN TEXT EDITOR",()=>window.pywebview.api.open_networking_notice_action("edit").catch(error=>setDialog("Could not open text editor",String(error),[button("OPEN PROGRAM FOLDER",()=>window.pywebview.api.open_networking_notice_action("folder")),button("CLOSE",closeDialog,true)]))),
           button("DRAFT EMAIL TO NEXUS SUPPORT",()=>window.pywebview.api.open_networking_notice_action("support")),
           button("CONTINUE",closeDialog,true)]);
         return;

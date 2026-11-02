@@ -349,7 +349,10 @@ class HostApi:
         return result
 
     def open_networking_notice_action(self, action: str) -> dict:
-        if action == 'folder':
+        if action == 'edit':
+            from core.runtime_bootstrap import open_text_file
+            open_text_file(ROOT/'disable_networking.py')
+        elif action == 'folder':
             from core.runtime_bootstrap import open_path
             open_path(ROOT)
         elif action == 'support':
