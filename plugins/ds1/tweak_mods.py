@@ -797,7 +797,7 @@ def build_fingerprint(folder: Path, *, produced=False, python_sources=None) -> s
     the script.
     """
     folder = Path(folder)
-    parts = {"source": script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision(),
+    parts = {"source": None if produced else script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision(),
              'installationEngine':_installation_revision()}
     try:
         manifest = script_mods._read_json(folder / script_mods.MANIFEST_FILE) or {}
@@ -829,7 +829,7 @@ def build_fingerprint(folder: Path, *, produced=False, python_sources=None) -> s
     if produced:
         # Record the source actually used, so an edit by another chat during
         # the build stays stale instead of being stamped as already installed.
-        parts['source'] = record.get('source', parts['source'])
+        parts['source'] = record.get('source') if _digest(record.get('source')) else script_mods.source_fingerprint(folder)
         parts['compiler'] = record.get('compiler', parts['compiler'])
     outputs = {}
     for dirname in ALLOWED_ROOTS:
@@ -852,9 +852,9 @@ def build_fingerprint(folder: Path, *, produced=False, python_sources=None) -> s
         # failure/recovery path, not silently treat it as an unchanged mod.
         parts['invalidManifest'] = _sha((folder / script_mods.MANIFEST_FILE).read_bytes())
         generated = {}
-    parts['generated'] = {relative: _sha((folder / relative).read_bytes())
-                          if (folder / relative).is_file() else None
-                          for relative in generated}
+    parts['generated'] = dict(generated) if produced else {
+        relative: _sha((folder / relative).read_bytes()) if (folder / relative).is_file() else None
+        for relative in generated}
     return _sha(json.dumps(parts, sort_keys=True, separators=(",", ":")).encode("utf-8"))
 
 
@@ -1350,7 +1350,7 @@ def launch_notice(game_root: Path) -> str:
     return "Online play is off: the installed loader needs updating."
 
 
-def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
+def needs_rebuild(game_root: Path, root: Path | None = None, *, stop_on_first=False) -> dict:
     """Whether the installed tweaks differ from the library, and which mods changed.
 
     Save rebuilds installed mods and repairs missing metadata for an owned
@@ -1367,6 +1367,15 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     if record is None:
         result['needed'] = bool(runtime['dll'] is not None and not runtime['foreignDll']
                                 or runtime['patch'] is not None)
+        return result
+    data_changed = False
+    if 'dataRecipe' in record:
+        try:
+            data_changed = record['dataRecipe'] != data_recipe(root)
+        except (ValueError, OSError):
+            data_changed = True
+    if stop_on_first and (data_changed or not runtime['active']):
+        result['needed'] = True
         return result
     modules_changed = False
     for path, expected in (record.get('modules') or {}).items():
@@ -1401,15 +1410,12 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
             continue
         if built.get(row["id"]) != digest:
             stale.append(row["id"])
+            if stop_on_first:
+                result['needed'], result['stale'] = True, stale
+                return result
     result["stale"] = sorted(stale)
     result["set"] = set(built) != {row["id"] for row in rows}
 
-    data_changed = False
-    if 'dataRecipe' in record:
-        try:
-            data_changed = record['dataRecipe'] != data_recipe(root)
-        except (ValueError, OSError):
-            data_changed = True
     result["needed"] = bool(stale) or result["set"] or modules_changed or data_changed or not runtime['active']
     return result
 

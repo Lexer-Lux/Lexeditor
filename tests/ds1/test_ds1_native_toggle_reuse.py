@@ -31,6 +31,9 @@ def test_direct_data_edit_stays_pending_until_its_bytes_are_installed(game, libr
     assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==17
     (folder/RELATIVE).write_bytes(make_archive(field_values={'EquipParamGoods':{100:{'sellValue':18}}}))
     assert tweak_mods.needs_rebuild(game,library)['needed']
+    with monkeypatch.context() as check:
+        check.setattr(tweak_mods,'build_fingerprint',lambda *args,**kwargs:pytest.fail('A known data change should finish the boolean freshness check'))
+        assert tweak_mods.needs_rebuild(game,library,stop_on_first=True)['needed']
     adapter.activate(paths,game)
     assert not tweak_mods.needs_rebuild(game,library)['needed']
     assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==18
@@ -42,6 +45,38 @@ def test_direct_data_edit_stays_pending_until_its_bytes_are_installed(game, libr
     adapter.activate(paths[:-1],game)
     assert not tweak_mods.needs_rebuild(game,library)['needed']
     assert (game/RELATIVE).read_bytes()==original
+
+
+def test_data_changed_during_composition_is_not_certified_as_installed(game,library,monkeypatch):
+    from plugins.ds1 import tweak_mods,mod_loader
+    from plugins.ds1.mod_support import Ds1ModAdapter
+    from plugins.ds1.store import RELATIVE
+    from plugins.ds1.formats import ItemDocument
+    from ds1_fixture import make_archive
+    monkeypatch.setenv(tweak_mods.MODS_ENV,str(library))
+    (game/RELATIVE).parent.mkdir(parents=True)
+    (game/RELATIVE).write_bytes(make_archive())
+    folder=library/'Data'
+    (folder/RELATIVE).parent.mkdir(parents=True)
+    (folder/'mod.json').write_text(json.dumps({'name':'Data','enabled':True,'order':30}))
+    def data(value):
+        return make_archive(field_values={'EquipParamGoods':{100:{'sellValue':value}}})
+    (folder/RELATIVE).write_bytes(data(17))
+    original=mod_loader.compose_installed
+    def compose(*args,**kwargs):
+        result=original(*args,**kwargs)
+        (folder/RELATIVE).write_bytes(data(18))
+        return result
+    adapter=Ds1ModAdapter();adapter.attach_context(library_root=library)
+    paths=[library/'Alpha',library/'Beta',folder]
+    with monkeypatch.context() as check:
+        check.setattr(mod_loader,'compose_installed',compose)
+        adapter.activate(paths,game)
+    assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==17
+    assert tweak_mods.needs_rebuild(game,library)['needed']
+    adapter.activate(paths,game)
+    assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==18
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
 
 
 def test_freshness_reads_shared_python_inputs_once_per_scan_and_checks_them_next_time(game,library,monkeypatch):
