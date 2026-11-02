@@ -24,6 +24,33 @@ def record(folder):
     return json.loads((folder/script_mods.MANIFEST_FILE).read_text())['build']
 
 
+def test_declared_parameter_fields_skip_unrelated_edits_but_track_values_and_rows(game):
+    from plugins.ds1.store import RELATIVE
+    from plugins.ds1.formats import ItemDocument
+    from ds1_fixture import make_archive
+    root,library,_built=game
+    target=root/RELATIVE
+    target.parent.mkdir(parents=True,exist_ok=True)
+    target.write_bytes(make_archive())
+    folder=mod(library,'reader','from plugins.ds1.formats import ItemDocument\n'
+        'def build(settings,context):\n'
+        '    raw=context.game_params(fields={"EquipParamGoods":["sellValue"]})\n'
+        '    return {"native/value.txt":str(ItemDocument(raw).value("EquipParamGoods",100,"sellValue"))}\n')
+    assert not build(folder,root,library).get('cached')
+    assert build(folder,root,library)['cached']
+    document=ItemDocument(target.read_bytes());document.edit('EquipParamGoods',100,'basicPrice',23)
+    target.write_bytes(document.export())
+    assert build(folder,root,library)['cached']
+    document.edit('EquipParamGoods',100,'sellValue',17);target.write_bytes(document.export())
+    assert not build(folder,root,library).get('cached')
+    assert (folder/'native/value.txt').read_text()=='17'
+    assert build(folder,root,library)['cached']
+    # A removed row affects the declared table even when the builder reads
+    # a different row; record enumeration is part of the dependency.
+    document.remove_row('EquipParamGoods',101);target.write_bytes(document.export())
+    assert not build(folder,root,library).get('cached')
+
+
 def test_compression_cache_does_not_make_builds_depend_on_deployment_or_menus(game, monkeypatch):
     from test_ds1_deflate_reuse import dcx
     root, library, _built = game
