@@ -4,6 +4,7 @@ This contains crashes and timeouts, not malicious code: enabled scripts remain
 trusted code with the user's filesystem access.
 """
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -103,6 +104,7 @@ def _build(request, dependencies):
     if params_path.is_file():
         context._params = params_path.read_bytes()
     try:
+        _seed_compression(Path(request['root']))
         outputs = script_mods.execute_script(Path(request['root']), request['settings'], context)
         for path,digest in dependencies.inputs().items():
             context._remember('python',path,digest)
@@ -129,6 +131,30 @@ def _build(request, dependencies):
         result = {'error': f'{type(error).__name__}: {str(error)[:4000]}',
                   'folders': [str(folder) for folder in getattr(error, 'folders', ())]}
     Path(request['result']).write_text(json.dumps(result), encoding='utf-8')
+
+
+def _seed_compression(root):
+    """Reuse this mod's owned outputs even after the disposable cache evicts them."""
+    from .tweak_mods import ALLOWED_ROOTS, checked
+    try:
+        outputs = script_mods._generated_files(root, ALLOWED_ROOTS)
+        remaining = RESULT_LIMIT
+        for relative, digest in outputs.items():
+            if not relative.endswith('.dcx'):
+                continue
+            path = checked(root/relative)
+            if not path.is_file() or path.stat().st_size > remaining:
+                continue
+            size = path.stat().st_size
+            with path.open('rb') as stream:
+                data = stream.read(size+1)
+            remaining -= len(data)
+            if len(data) != size or hashlib.sha256(data).hexdigest() != digest:
+                continue
+            from .formats import remember_compression
+            remember_compression(data)
+    except Exception:
+        pass  # Ownership validation in the parent still guards actual writes.
 
 
 if __name__ == '__main__':

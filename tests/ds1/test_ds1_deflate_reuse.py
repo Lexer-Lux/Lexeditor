@@ -1,6 +1,8 @@
 """Repeated author builds reuse compression; cache damage cannot stop a save."""
 import struct
 import zlib
+import json
+import hashlib
 
 import pytest
 from plugins.ds1 import formats, composition_cache
@@ -46,3 +48,38 @@ def test_unavailable_cache_does_not_fail_build_and_bounds_still_apply(monkeypatc
         formats.deflate(original,b'x'*2000,max_size=1000)
     with pytest.raises(formats.FormatError):
         formats.deflate(b'broken',plain)
+
+
+def test_generated_outputs_restore_evicted_compression_without_rebuilding_it(tmp_path,monkeypatch):
+    from plugins.ds1 import script_worker
+    plain=b'unchanged generated bonfire commands'*1000
+    produced=dcx(plain)
+    path=tmp_path/'script/talk/generated.talkesdbnd.dcx'
+    path.parent.mkdir(parents=True);path.write_bytes(produced)
+    (tmp_path/'.lexeditor-generated.json').write_text(json.dumps({'version':1,'files':{
+        'script/talk/generated.talkesdbnd.dcx':hashlib.sha256(produced).hexdigest()}}))
+    script_worker._seed_compression(tmp_path)
+    def no_compression(*_):raise AssertionError('owned output was recompressed after cache eviction')
+    original=dcx(b'vanilla bonfire commands'*1000)
+    monkeypatch.setattr(formats.zlib,'compress',no_compression)
+    assert formats.deflate(original,plain)==produced
+
+
+def test_unchanged_original_needs_neither_cache_nor_compression(monkeypatch):
+    plain=b'unchanged original'*100
+    original=dcx(plain)
+    def unnecessary(*_):raise AssertionError('unchanged original requested compression or cache')
+    monkeypatch.setattr(composition_cache,'load',unnecessary)
+    monkeypatch.setattr(formats.zlib,'compress',unnecessary)
+    assert formats.deflate(original,plain)==original
+
+
+def test_bad_seed_is_optional_and_cannot_poison_requested_content(tmp_path):
+    from plugins.ds1 import script_worker
+    path=tmp_path/'script/talk/broken.talkesdbnd.dcx'
+    path.parent.mkdir(parents=True);path.write_bytes(b'DCX\0broken')
+    (tmp_path/'.lexeditor-generated.json').write_text(json.dumps({'version':1,'files':{
+        'script/talk/broken.talkesdbnd.dcx':hashlib.sha256(path.read_bytes()).hexdigest()}}))
+    script_worker._seed_compression(tmp_path)
+    plain=b'valid output'*100
+    assert formats.inflate(formats.deflate(dcx(b'original'*100),plain))==plain

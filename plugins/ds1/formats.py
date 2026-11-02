@@ -470,18 +470,40 @@ def inflate(source, *, max_size=MAX_ARCHIVE):
     return plain
 
 
+def _compression_key(plain):
+    return hashlib.sha256(b'ds1-dcx-zlib9\0' + zlib.ZLIB_RUNTIME_VERSION.encode() + b'\0' + plain).digest()
+
+
+def remember_compression(source):
+    """Prime optional compression reuse from a verified generated archive."""
+    from . import composition_cache
+    try:
+        # Only seed ordinary-size high-compression streams. Large texture
+        # packs have their own exact installed-output reuse in texture_packs.
+        plain = inflate(source)
+        if len(source) < 78 or source[77] >> 6 != 3:
+            return
+        root, key = composition_cache.user_root(), _compression_key(plain)
+        if composition_cache.load(root, key) is None:
+            composition_cache.store(root, key, bytes(source[76:]))
+    except Exception:
+        pass  # Existing outputs only accelerate a build; never gate it.
+
+
 def deflate(original, plain, *, max_size=MAX_ARCHIVE):
     """Compress plain bytes into a DCX shaped like the original one."""
-    inflate(original, max_size=max_size)
+    original_plain = inflate(original, max_size=max_size)
     if len(plain) > max_size:
         raise FormatError('Archive exceeds its size limit')
     plain = bytes(plain)
+    if plain == original_plain:
+        return original
     header = bytearray(original[:76])
     # Author builds can repeat the same talk archive across many mods and
     # rebuilds. Reuse compression by content, independently of mod freshness.
     # The existing bounded disposable cache is shared by build workers.
     from . import composition_cache
-    key = hashlib.sha256(b'ds1-dcx-zlib9\0' + zlib.ZLIB_RUNTIME_VERSION.encode() + b'\0' + plain).digest()
+    key = _compression_key(plain)
     cache_root = None
     try:
         cache_root = composition_cache.user_root()
