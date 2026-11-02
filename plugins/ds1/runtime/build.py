@@ -40,11 +40,13 @@ SOURCES = ("lexeditor_ds1_loader.c", "lexeditor_ds1_loader.h", "lexeditor_ds1_mo
 DEBUG_SOURCES = SOURCES + ("lexeditor_ds1_debug.c",)
 DEBUG_PACKAGE = PACKAGE / "debug"
 ONLINE_PACKAGE = PACKAGE / "online"
-OVERHAUL_REVISION = "2a3d8cbe2acee663bef03c7be4f968dbb68f951f"
+OVERHAUL_REVISION = json.loads((HERE / 'overhaul/SOURCE.json').read_text(encoding='utf-8'))['revision']
 ONLINE_SOURCES = DEBUG_SOURCES + (
     "lexeditor_ds1_online.cpp", "lexeditor_ds1_saves.c",
     "overhaul/AntiAntiCheat.cpp", "overhaul/AntiAntiCheat.h", "overhaul/AntiAntiCheatASM.asm",
     "overhaul/GameData.h", "overhaul/SP/memory/injection/asm/x64.h", "overhaul/SOURCE.json",
+    "overhaul/AntiCheat.cpp", "overhaul/AntiCheat.h", "overhaul/AntiCheatASM.asm",
+    "overhaul/PlayerProtection.cpp", "overhaul/PlayerProtection.h", "overhaul/ServerMonitorASM.asm",
 )
 DEARXAN = "0.5.6"
 
@@ -131,9 +133,12 @@ def build_debug(dearxan: Path, output: Path, *, online: bool = False) -> None:
         if online:
             (work / "lexeditor_ds1_build.h").write_text(
                 f'#define LX_GAME_SHA256 "{supported_game_sha256()}"\n', encoding="ascii")
-        assembly = ('ml64 /nologo /c /FoAntiAntiCheatASM.obj overhaul/AntiAntiCheatASM.asm && ' if online else '')
+        assembly = ('ml64 /nologo /c /FoAntiAntiCheatASM.obj overhaul/AntiAntiCheatASM.asm && '
+                    'ml64 /nologo /c /FoAntiCheatASM.obj overhaul/AntiCheatASM.asm && '
+                    'ml64 /nologo /c /FoServerMonitorASM.obj overhaul/ServerMonitorASM.asm && ' if online else '')
         extra = ('/DLX_ONLINE_BUILD /std:c++17 /EHsc /Ioverhaul lexeditor_ds1_saves.c '
-                 'lexeditor_ds1_online.cpp overhaul/AntiAntiCheat.cpp AntiAntiCheatASM.obj ' if online else '')
+                 'lexeditor_ds1_online.cpp overhaul/AntiAntiCheat.cpp overhaul/AntiCheat.cpp '
+                 'overhaul/PlayerProtection.cpp AntiAntiCheatASM.obj AntiCheatASM.obj ServerMonitorASM.obj ' if online else '')
         command = (f'call "{find_vcvars()}" >nul && {assembly}cl /nologo /O2 /LD /MD /Brepro /DLX_DEBUG_BUILD '
                    f'/D_CRT_SECURE_NO_WARNINGS lexeditor_ds1_loader.c lexeditor_ds1_debug.c {extra}'
                    f'/link /Brepro /OUT:dinput8.dll "{lib / "dearxan.lib"}" ws2_32.lib ntdll.lib userenv.lib '

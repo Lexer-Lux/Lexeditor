@@ -4,10 +4,13 @@
  * No game executable on disk is modified. */
 #include "overhaul/GameData.h"
 #include "overhaul/AntiAntiCheat.h"
+#include "overhaul/AntiCheat.h"
+#include "overhaul/PlayerProtection.h"
 #include "overhaul/SP/memory/injection/asm/x64.h"
 #include <bcrypt.h>
 #include <cstdarg>
 #include "lexeditor_ds1_build.h" /* generated from exe_patches.VANILLA_SHA256 */
+extern "C" int lx_reserve_runtime_range(unsigned rva, unsigned size);
 
 static void report(const char *format, va_list args)
 {
@@ -37,6 +40,10 @@ void ConsoleWrite(const char *format, ...)
 
 bool sp::mem::patch_bytes(void *address, const void *bytes, size_t size)
 {
+    uintptr_t start = (uintptr_t)address;
+    if (start >= Game::ds1_base && start - Game::ds1_base <= UINT32_MAX &&
+        !lx_reserve_runtime_range((unsigned)(start - Game::ds1_base), (unsigned)size))
+        return false;
     DWORD old, ignored;
     if (!VirtualProtect(address, size, PAGE_EXECUTE_READWRITE, &old))
         return false;
@@ -47,11 +54,11 @@ bool sp::mem::patch_bytes(void *address, const void *bytes, size_t size)
 
 void sp::mem::code::x64::inject_jmp_14b(void *address, uint64_t *resume, size_t padding, void (*target)())
 {
-    unsigned char jump[15] = {0xff, 0x25, 0, 0, 0, 0};
-    if (padding > 1)
+    unsigned char jump[18] = {0xff, 0x25, 0, 0, 0, 0};
+    if (padding > 4)
         FATALERROR("Unsupported upstream hook padding");
     memcpy(jump + 6, &target, sizeof target);
-    jump[14] = 0x90;
+    memset(jump + 14, 0x90, padding);
     *resume = (uint64_t)address + 14 + padding;
     if (!sp::mem::patch_bytes(address, jump, 14 + padding))
         FATALERROR("Could not install multiplayer protection");
@@ -107,8 +114,10 @@ extern "C" void lx_online_start(void)
     for (size_t i = 0; i < _countof(offsets); ++i)
         if (memcmp((const void *)(Game::ds1_base + offsets[i]), originals[i], i ? 15 : 14))
             FATALERROR("Another patch changed a multiplayer protection hook; the game was stopped");
+    PlayerProtection::validate();
     AntiAntiCheat::start();
+    AntiCheat::start();
     if (!lx_save_install((unsigned char *)GetModuleHandleW(NULL)))
         FATALERROR("Save isolation could not be installed; the game was stopped");
-    lx_debug_log("Multiplayer protection installed; modded saves use DRAKS0005.lexeditor.sl2");
+    lx_debug_log("Anti-ban and player anti-cheat installed; modded saves use DRAKS0005.lexeditor.sl2");
 }
