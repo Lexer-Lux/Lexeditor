@@ -58,6 +58,28 @@ def test_github_default_and_local_notice_actions():
     network_policy.require_network()
 
 
+def test_windows_editor_uses_text_association_and_safe_argument_list(tmp_path,monkeypatch):
+    import ctypes
+    from core import runtime_bootstrap
+    if runtime_bootstrap.os.name != 'nt':
+        pytest.skip('Windows text-editor association')
+    target=tmp_path/'source with spaces.py'
+    target.write_text('print("do not execute")')
+    queries=[];launches=[]
+    class Query:
+        def __call__(self,flags,kind,extension,verb,buffer,size):
+            queries.append((extension,verb))
+            buffer.value=r'C:\Text Editor\editor.exe'
+            return 0
+    class Library:
+        AssocQueryStringW=Query()
+    monkeypatch.setattr(ctypes,'WinDLL',lambda *_:Library())
+    monkeypatch.setattr(runtime_bootstrap.subprocess,'Popen',lambda args:launches.append(args))
+    runtime_bootstrap.open_text_file(target)
+    assert queries==[('.txt','open')]
+    assert launches==[[r'C:\Text Editor\editor.exe',str(target.resolve())]]
+
+
 def test_child_service_core_import_installs_distribution_policy(tmp_path):
     shutil.copy2(ROOT/'disable_networking.py',tmp_path)
     configure(tmp_path,True)
@@ -95,9 +117,9 @@ def test_startup_notice_renders_and_actions_only_request_a_draft(tmp_path):
                 page.goto(f'http://127.0.0.1:{server.server_port}/ui/chooser.html')
                 page.evaluate("dispatchEvent(new Event('pywebviewready'))")
                 page.get_by_text('Internet features disabled',exact=True).wait_for()
-                page.get_by_role('button',name='OPEN PROGRAM FOLDER',exact=True).click()
+                page.get_by_role('button',name='OPEN IN TEXT EDITOR',exact=True).click()
                 page.get_by_role('button',name='DRAFT EMAIL TO NEXUS SUPPORT',exact=True).click()
-                assert page.evaluate('actions')==['folder','support']
+                assert page.evaluate('actions')==['edit','support']
                 page.screenshot(path=str(tmp_path/'network-notice.png'))
                 page.get_by_role('button',name='CONTINUE',exact=True).click()
                 assert not page.get_by_text('Internet features disabled',exact=True).is_visible()
