@@ -432,8 +432,10 @@ def source_fingerprint(root: Path) -> str:
                     raise ValueError('must be an object')
             except (ValueError,RecursionError) as error:
                 raise ScriptModError(f'mod.json is not readable JSON: {error}') from error
+            # Enablement and priority select/combine outputs; they are not
+            # authoring inputs. Context reads track actual mod dependencies.
             data = json.dumps({key: metadata.get(key) for key in
-                               ('id', 'name', 'enabled', 'order', 'script')}, sort_keys=True).encode('utf-8')
+                               ('id', 'name', 'script')}, sort_keys=True).encode('utf-8')
         digest.update(len(name).to_bytes(8, 'little') + name)
         digest.update(len(data).to_bytes(8, 'little') + data)
     return digest.hexdigest()
