@@ -193,37 +193,58 @@ class Ds1ModAdapter:
         started = perf_counter()
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library, cache_root=self._cache_root())
+            data_recipe = tweak_mods.data_recipe(library)
             prepared = perf_counter()
             from . import texture_packs
             main_texture = Path('menu/menu.tpf.dcx')
-            layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
-            menu_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
-                          if layout is not None and (game_root/main_texture).is_file() else None)
+            menu_inputs = sorted([item['managed'].relative,hashlib.sha256(item['after']).hexdigest()]
+                                 for item in plan['files'])
             ordered = self._ordered_mods(mods)
             try:
                 content = self._content_signature(ordered)
             except Exception:
                 content = None
             report = self._read_report(game_root, ordered)
+            raw_menus = mod_loader.has_menu_contributions(ordered)
+            if raw_menus:
+                menus_unchanged = bool(report and report.get('menuInputs') == menu_inputs)
+            else:
+                layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
+                declaration_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
+                                     if layout is not None and (game_root/main_texture).is_file() else None)
+                menus_unchanged = bool(report and report.get('menuTextureOrder') == declaration_order)
             reused = bool(report and report.get("installedOrder") == [str(folder.resolve()) for _name, folder in ordered]
-                          and report.get('menuTextureOrder') == menu_order
-                          and not mod_loader.has_menu_contributions(ordered))
+                          and menus_unchanged)
             if reused:
                 # Native settings can change while every data input and
                 # installed data file stays the same. Keep that deployment.
                 conflicts = [mod_loader.Conflict(Path(file), part, names)
                              for file, part, names in report["conflicts"]]
                 names = [name for name, _folder in ordered]
+                # prepare describes declaration-only menus. Reuse the exact
+                # installed combined menus when both declarations and raw
+                # data contributions match the successful deployment recipe.
+                for item in plan['files']:
+                    if raw_menus and item['after'] != item['before']:
+                        item['after'] = item['before']
+                        previous = item['previous'] or {}
+                        item['mods'] = previous.get('mods',item['mods'])
+                        item['inputs'] = previous.get('inputs')
             else:
                 data = self._mods(mods)
                 composition = mod_loader.compose_installed(game_root, data, cache_root=self._cache_root(),
                                                            menu_files=plan['files'])
                 conflicts, names = composition.conflicts, [mod.name for mod in data]
                 layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
-                menu_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
-                              if layout is not None and (game_root/main_texture).is_file() else None)
                 mod_loader.align_menu_textures(game_root,composition,layout)
+            layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
+            menu_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
+                          if layout is not None and (game_root/main_texture).is_file() else None)
             composed = perf_counter()
+            # The successful transaction owns this recipe. Conflict-cache
+            # refreshes cannot erase it or claim that later data edits are
+            # already installed merely because native script inputs match.
+            plan['runtime']['dataRecipe'] = data_recipe
             tweak_mods.commit(game_root, plan)
             try:
                 if not reused and composition.files:
@@ -242,7 +263,7 @@ class Ds1ModAdapter:
                    'deploymentSeconds': finished - composed, 'activationSeconds': finished - started,
                    'reusedInstalledData': reused, 'scripts': plan.get('scripts', []), 'menus': plan.get('menus', [])}
         self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content, timings=timings,
-                          menu_order=menu_order)
+                          menu_order=menu_order, menu_inputs=menu_inputs)
         return {"activated": [Path(path).name for path in mods],
                 "dataMods": names, "conflicts": len(conflicts), 'timings': timings}
 
@@ -364,7 +385,7 @@ class Ds1ModAdapter:
         return self._lines_for_order([(Path(file), part, names) for file, part, names in report["conflicts"]], ordered)
 
     def _save_report(self, game_root, ordered, conflicts, *, installed=False,
-                     expected_key=None, expected_content=None, timings=None, menu_order=None):
+                     expected_key=None, expected_content=None, timings=None, menu_order=None, menu_inputs=None):
         from core.plugin_files import atomic_write
         try:
             key = self._report_key(game_root, ordered)
@@ -377,6 +398,7 @@ class Ds1ModAdapter:
             if installed:
                 report["installedOrder"] = [str(folder.resolve()) for _name, folder in ordered]
                 report['menuTextureOrder'] = menu_order
+                report['menuInputs'] = menu_inputs
             if timings is not None:
                 report['timings'] = timings
             encoded = json.dumps(report).encode("utf-8")

@@ -226,7 +226,7 @@ def _sound_bank_path(relative):
 def _tweaks_flag() -> bool:
     """Whether the installed tweaks differ from the library (Save rebuilds them)."""
     try:
-        return bool(tweak_mods.needs_rebuild(STORE.game_root).get("needed"))
+        return bool(tweak_mods.needs_rebuild(STORE.game_root,stop_on_first=True).get("needed"))
     except Exception:
         # Freshness is optional request metadata, never a gate on record data.
         # An unreadable status cannot prove that the installed build is current.

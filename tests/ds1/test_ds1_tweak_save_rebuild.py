@@ -586,10 +586,10 @@ def test_an_unreadable_mod_counts_as_unchanged_not_stale(game, library, monkeypa
     tweak_mods.apply(game, library)
     real_fingerprint = tweak_mods.build_fingerprint
 
-    def flaky(folder):
+    def flaky(folder, **kwargs):
         if Path(folder).name == "Alpha":
             raise OSError("locked")
-        return real_fingerprint(folder)
+        return real_fingerprint(folder, **kwargs)
 
     monkeypatch.setattr(tweak_mods, "build_fingerprint", flaky)
     assert tweak_mods.needs_rebuild(game, library)["stale"] == []
@@ -705,6 +705,9 @@ def test_script_build_rechecks_original_game_files(game, library, monkeypatch):
 @pytest.mark.parametrize('managed', [tweak_mods.LAYOUT, *tweak_mods.ESD])
 def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkeypatch, managed):
     from plugins.ds1 import mod_loader
+    codec=tmp_path/'codec.py'
+    codec.write_bytes(b'codec-one')
+    monkeypatch.setattr(tweak_mods.menu_layout if managed==tweak_mods.LAYOUT else tweak_mods.menu_scripts,'__file__',str(codec))
     calls = []
     def compose(original, specs, *args):
         calls.append((original, specs))
@@ -720,6 +723,9 @@ def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkey
     tweak_mods._compose_menu(b'changed original', specs, managed, tmp_path)
     tweak_mods._compose_menu(b'vanilla', [{'owner': 'different', 'changes': []}], managed, tmp_path)
     monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-two')
+    tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
+    assert len(calls) == 3
+    codec.write_bytes(b'codec-two')
     tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
     assert len(calls) == 4
 

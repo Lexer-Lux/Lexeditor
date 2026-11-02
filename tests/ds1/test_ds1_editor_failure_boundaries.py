@@ -263,6 +263,9 @@ def test_editor_only_source_changes_do_not_invalidate_archive_outputs(monkeypatc
 
 
 def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path, monkeypatch):
+    codec=tmp_path/'codec.py'
+    codec.write_bytes(b'codec-one')
+    monkeypatch.setattr(tweak_mods.menu_layout,'__file__',str(codec))
     calls = []
     def compose(*args):
         calls.append(True)
@@ -274,6 +277,9 @@ def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path,
     assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
     assert len(calls) == 1
     monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'composer-two')
+    assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
+    assert len(calls) == 1
+    codec.write_bytes(b'codec-two')
     assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
     assert len(calls) == 2
 
@@ -722,7 +728,7 @@ def test_record_requests_do_not_rescan_optional_build_status(monkeypatch):
         monkeypatch.setattr(server,name,other)
     monkeypatch.setattr(server,'_warm_icon_table',lambda:None)
     scans = []
-    def unavailable(*_):
+    def unavailable(*_,**_kwargs):
         scans.append(True)
         raise AttributeError('Older interpreter lacks a filesystem method')
     monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
@@ -735,7 +741,7 @@ def test_record_requests_do_not_rescan_optional_build_status(monkeypatch):
 
 def test_unknown_build_status_stays_pending_without_failing_the_status_request(monkeypatch, caplog):
     from plugins.ds1 import server
-    def unavailable(*_):
+    def unavailable(*_,**_kwargs):
         raise AttributeError('Older interpreter lacks a filesystem method')
     monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
     assert server._tweaks_flag() is True

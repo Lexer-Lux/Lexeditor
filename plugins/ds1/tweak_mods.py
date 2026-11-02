@@ -394,12 +394,14 @@ class BuildContext:
     """What a DS1 tweak script gets from Lexeditor."""
 
     def __init__(self, enabled: dict[str, Path], game_root: Path | None = None,
-                 library_root: Path | None = None, *, cache_root=None):
+                 library_root: Path | None = None, *, cache_root=None, python_sources=None):
         self._enabled = enabled
         self.game_root = Path(game_root) if game_root is not None else None
         self._library_root = library_root
         self._cache_root = cache_root
+        self._python_sources = python_sources
         self._params: bytes | None = None
+        self._params_document = None
         self.current = ""
         self._inputs = {}
         self._source_hashes = {}
@@ -457,9 +459,17 @@ class BuildContext:
                         self.game_file(name)
                     elif kind == 'python':
                         from core.build_dependencies import fingerprint
-                        self._remember('python',name,fingerprint(name))
+                        if self._python_sources is None:
+                            value = fingerprint(name)
+                        else:
+                            if name not in self._python_sources:
+                                self._python_sources[name] = fingerprint(name)
+                            value = self._python_sources[name]
+                        self._remember('python',name,value)
                     elif kind == 'params':
                         self.game_params()
+                    elif kind == 'paramFields':
+                        self.game_params(fields=json.loads(name))
                     else:
                         return False
             return self._inputs == record['inputs']
@@ -517,13 +527,27 @@ class BuildContext:
         self._remember('file', path.as_posix(), _sha(data))
         return data
 
-    def game_params(self) -> bytes | None:
+    def game_params(self, *, fields=None) -> bytes | None:
         """The game's GameParam.parambnd.dcx as this Apply deploys it: vanilla
         with every active data mod combined over it in load order, so a tweak
         reads what the game will (another mod's curve or cost edits included).
-        None outside an Apply, when no game folder is known."""
+        None outside an Apply, when no game folder is known.
+
+        A builder reading only specific fields may declare {table:[fields]}.
+        This still returns the complete archive, but only those field values
+        and row identities invalidate its build. Omit fields for arbitrary
+        archive reads; declarations must cover everything the builder uses.
+        """
+        kind,name = 'params','game'
+        if fields is not None:
+            if (type(fields) is not dict or not 0<len(fields)<=32 or any(
+                    type(table) is not str or not isinstance(names,(list,tuple)) or not 0<len(names)<=128
+                    or any(type(field) is not str for field in names) for table,names in fields.items())):
+                raise ValueError('Parameter dependencies need table names and nonempty field lists')
+            fields={table:sorted(set(names)) for table,names in sorted(fields.items())}
+            kind,name='paramFields',json.dumps(fields,sort_keys=True,separators=(',',':'))
         if self.game_root is None:
-            self._remember('params', 'game', None)
+            self._remember(kind,name,None)
             return None
         if self._params is None:
             from . import deployment, mod_loader
@@ -531,7 +555,7 @@ class BuildContext:
             try:
                 source = checked(deployment.vanilla_source(self.game_root, mod_loader.RELATIVE))
                 if not source.is_file():
-                    self._remember('params', 'game', None)
+                    self._remember(kind,name,None)
                     return None
                 mods = mod_loader.active_mods(self._library_root or mods_root(), only=frozenset({mod_loader.RELATIVE}))
                 original = source.read_bytes()
@@ -551,7 +575,16 @@ class BuildContext:
                 except Exception:
                     pass
                 raise script_mods.ScriptModInfrastructureError(f'Could not read combined game parameters: {error}') from error
-        self._remember('params', 'game', _sha(self._params) if self._params is not None else None)
+        if fields is None:
+            value=_sha(self._params) if self._params is not None else None
+        else:
+            if self._params_document is None:
+                from .formats import ItemDocument
+                self._params_document=ItemDocument(self._params)
+            document=self._params_document
+            value=[(table,[(row.row_id,[document.value(table,row.row_id,field) for field in names])
+                           for row in document.params[table].rows]) for table,names in fields.items()]
+        self._remember(kind,name,value)
         return self._params
 
     def enabled(self, mod_id: str) -> bool:
@@ -652,7 +685,8 @@ def build_specs(root: Path | None = None, game_root: Path | None = None, *, cach
         raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
     rows = [row for row in tweak_rows(root) if row["enabled"]]
     ensure_loader_mod(root)
-    context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root, cache_root=cache_root)
+    context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root,
+                           cache_root=cache_root, python_sources={})
     script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError, timings=timings)
     from . import native_support, native_rules
     if game_root is not None and any((Path(row['path'])/native_rules.SETTINGS_FILE).is_file() for row in rows):
@@ -778,7 +812,7 @@ def native_spans(folder: Path, owner: str) -> dict[str, list[tuple[int, int]]]:
     return found
 
 
-def build_fingerprint(folder: Path, *, produced=False) -> str:
+def build_fingerprint(folder: Path, *, produced=False, python_sources=None) -> str:
     """What the last build of one tweak mod saw, hashed together.
 
     The switch, load order, name, settings, schema, script and built files:
@@ -789,8 +823,11 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
     the script.
     """
     folder = Path(folder)
-    parts = {"source": script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision(),
+    parts = {"source": None if produced else script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision(),
              'installationEngine':_installation_revision()}
+    # Priority changes require relinking/deployment, while the script's own
+    # authoring fingerprint still reuses the already built outputs.
+    parts['order'] = (script_mods._read_json(folder/'mod.json') or {}).get('order')
     try:
         manifest = script_mods._read_json(folder / script_mods.MANIFEST_FILE) or {}
         record = manifest.get('build') or {}
@@ -799,9 +836,15 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
         if (type(dependencies) is not dict or len(dependencies)>build_dependencies.MAX_INPUTS
                 or any(type(name) is not str or not _digest(value) for name,value in dependencies.items())):
             raise ValueError('Invalid compiler dependency record')
-        parts['python'] = dict(dependencies) if produced else {
-            name:_sha(json.dumps(build_dependencies.fingerprint(name),sort_keys=True,separators=(',',':')).encode())
-            for name in dependencies}
+        if produced:
+            parts['python'] = dict(dependencies)
+        else:
+            sources = {} if python_sources is None else python_sources
+            for name in dependencies:
+                if name not in sources:
+                    sources[name] = build_dependencies.fingerprint(name)
+            parts['python'] = {name:_sha(json.dumps(sources[name],sort_keys=True,separators=(',',':')).encode())
+                               for name in dependencies}
     except (script_mods.ScriptModError,OSError,ValueError,TypeError,AttributeError,RuntimeError):
         parts['python'] = None  # An invalid optional cache requests a rebuild.
         record = {}
@@ -815,7 +858,7 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
     if produced:
         # Record the source actually used, so an edit by another chat during
         # the build stays stale instead of being stamped as already installed.
-        parts['source'] = record.get('source', parts['source'])
+        parts['source'] = record.get('source') if _digest(record.get('source')) else script_mods.source_fingerprint(folder)
         parts['compiler'] = record.get('compiler', parts['compiler'])
     outputs = {}
     for dirname in ALLOWED_ROOTS:
@@ -838,9 +881,9 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
         # failure/recovery path, not silently treat it as an unchanged mod.
         parts['invalidManifest'] = _sha((folder / script_mods.MANIFEST_FILE).read_bytes())
         generated = {}
-    parts['generated'] = {relative: _sha((folder / relative).read_bytes())
-                          if (folder / relative).is_file() else None
-                          for relative in generated}
+    parts['generated'] = dict(generated) if produced else {
+        relative: _sha((folder / relative).read_bytes()) if (folder / relative).is_file() else None
+        for relative in generated}
     return _sha(json.dumps(parts, sort_keys=True, separators=(",", ":")).encode("utf-8"))
 
 
@@ -1336,7 +1379,7 @@ def launch_notice(game_root: Path) -> str:
     return "Online play is off: the installed loader needs updating."
 
 
-def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
+def needs_rebuild(game_root: Path, root: Path | None = None, *, stop_on_first=False) -> dict:
     """Whether the installed tweaks differ from the library, and which mods changed.
 
     Save rebuilds installed mods and repairs missing metadata for an owned
@@ -1354,15 +1397,28 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
         result['needed'] = bool(runtime['dll'] is not None and not runtime['foreignDll']
                                 or runtime['patch'] is not None)
         return result
+    data_changed = False
+    if 'dataRecipe' in record:
+        try:
+            data_changed = record['dataRecipe'] != data_recipe(root)
+        except (ValueError, OSError):
+            data_changed = True
+    if stop_on_first and (data_changed or not runtime['active']):
+        result['needed'] = True
+        return result
     modules_changed = False
     for path, expected in (record.get('modules') or {}).items():
         try:
-            from .runtime_mods import read
+            from .runtime_mods import MAX_SIZE
             target = Path(path)
             if target.name != 'runtime.lxd' or target.parent.parent.resolve() != Path(root or mods_root()).resolve():
                 modules_changed = True
                 continue
-            if _sha(read(checked(Path(path)).parent)) != expected:
+            # Committed modules were structurally validated when built. A
+            # freshness probe only needs bounded reads and the exact receipt
+            # hash; reparsing every native patch on every request is costly.
+            payload = _bounded_file(target, MAX_SIZE, cache=True)
+            if not isinstance(payload, bytes) or _sha(payload) != expected:
                 modules_changed = True
         except (ValueError, OSError):
             modules_changed = True
@@ -1372,9 +1428,10 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
         return result
     built = record.get("built") or {}
     stale = []
+    python_sources = {}  # One content read per shared helper in this scan.
     for row in rows:
         try:
-            digest = build_fingerprint(Path(row["path"]))
+            digest = build_fingerprint(Path(row["path"]), python_sources=python_sources)
         except (ValueError, OSError):
             # tweak_rows just read this mod fine; a lock landing between
             # that and this read is transient interference, not a change.
@@ -1382,11 +1439,29 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
             continue
         if built.get(row["id"]) != digest:
             stale.append(row["id"])
+            if stop_on_first:
+                result['needed'], result['stale'] = True, stale
+                return result
     result["stale"] = sorted(stale)
     result["set"] = set(built) != {row["id"] for row in rows}
 
-    result["needed"] = bool(stale) or result["set"] or modules_changed or not runtime['active']
+    result["needed"] = bool(stale) or result["set"] or modules_changed or data_changed or not runtime['active']
     return result
+
+
+def data_recipe(root: Path | None = None) -> str:
+    """The ordered data contributions last installed, including direct edits.
+
+    Reuse the conflict report's bounded file discovery and change stamps;
+    polling freshness never parses or recompresses the archives themselves.
+    """
+    from core import mods_service
+    from .mod_support import Ds1ModAdapter
+    ordered = [(row['name'], Path(row['path']))
+               for row in mods_service.library_rows(Path(root or mods_root())) if row['enabled']]
+    recipe = ([str(folder.resolve()) for _name, folder in ordered],
+              Ds1ModAdapter._content_signature(ordered))
+    return _sha(json.dumps(recipe, sort_keys=True, separators=(',', ':')).encode('utf-8'))
 
 
 def _bounded_file(path: Path, limit: int, *, cache=False):
@@ -1470,7 +1545,7 @@ def _runtime_batch(game_root: Path, writes: dict, *, expected=None) -> dict:
 
 
 def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project,
-                   built: dict | None = None, *, library=None, modules=None, expected=None) -> dict:
+                   built: dict | None = None, *, library=None, modules=None, expected=None, data_recipe=None) -> dict:
     """Install, replace or remove the loader and its patch description.
 
     With the loader mod on, the loader goes in even with no tweak to apply."""
@@ -1491,6 +1566,8 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     record = {"version": 1, "mods": list(mods), "project": _project(project),
               "patchSha256": _sha(patch), "dllSha256": _sha(loader),
               "built": dict(built or {}), 'modules': dict(modules or {})}
+    if data_recipe is not None:
+        record['dataRecipe'] = data_recipe
     # A malformed record may have held an unrecoverable legacy project recipe.
     # Keep that fact visible after rebuilding healthy folder contributions.
     _old_record, recovery = runtime_record(game_root)
@@ -1806,7 +1883,7 @@ def commit(game_root: Path, plan: dict) -> None:
         # Keep the successful receipt for a later data-deployment rollback.
         runtime['receipt'] = _write_runtime(game_root, runtime['patch'], runtime['mods'], runtime['project'], runtime.get('built'),
                                             library=runtime.get('library'), modules=runtime.get('modules'),
-                                            expected=runtime.get('expected'))
+                                            expected=runtime.get('expected'), data_recipe=runtime.get('dataRecipe'))
         done.append({'runtime':runtime['receipt']})
     except Exception as failure:
         try:

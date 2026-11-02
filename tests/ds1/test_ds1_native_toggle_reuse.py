@@ -4,6 +4,106 @@ from pathlib import Path
 import sys
 import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from test_ds1_tweak_save_rebuild import game, library  # noqa: F401
+
+
+def test_direct_data_edit_stays_pending_until_its_bytes_are_installed(game, library, monkeypatch):
+    from plugins.ds1 import tweak_mods
+    from plugins.ds1.mod_support import Ds1ModAdapter
+    from plugins.ds1.store import RELATIVE
+    from plugins.ds1.formats import ItemDocument
+    from ds1_fixture import make_archive
+    monkeypatch.setenv(tweak_mods.MODS_ENV,str(library))
+    (game/RELATIVE).parent.mkdir(parents=True)
+    original=make_archive()
+    (game/RELATIVE).write_bytes(original)
+    folder=library/'Data'
+    (folder/RELATIVE).parent.mkdir(parents=True)
+    (folder/'mod.json').write_text(json.dumps({'name':'Data','enabled':True,'order':30}))
+    (folder/RELATIVE).write_bytes(make_archive(field_values={'EquipParamGoods':{100:{'sellValue':17}}}))
+    adapter=Ds1ModAdapter();adapter.attach_context(library_root=library)
+    paths=[library/'Alpha',library/'Beta',folder]
+    adapter.activate(paths,game)
+    from plugins.ds1 import runtime_mods
+    with monkeypatch.context() as check:
+        check.setattr(runtime_mods,'inspect',lambda *_:pytest.fail('Freshness reparsed a committed native module'))
+        assert not tweak_mods.needs_rebuild(game,library)['needed']
+    assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==17
+    (folder/RELATIVE).write_bytes(make_archive(field_values={'EquipParamGoods':{100:{'sellValue':18}}}))
+    assert tweak_mods.needs_rebuild(game,library)['needed']
+    with monkeypatch.context() as check:
+        check.setattr(tweak_mods,'build_fingerprint',lambda *args,**kwargs:pytest.fail('A known data change should finish the boolean freshness check'))
+        assert tweak_mods.needs_rebuild(game,library,stop_on_first=True)['needed']
+    adapter.activate(paths,game)
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==18
+    adapter._report_path().unlink()
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    metadata=json.loads((folder/'mod.json').read_text());metadata['enabled']=False
+    (folder/'mod.json').write_text(json.dumps(metadata))
+    assert tweak_mods.needs_rebuild(game,library)['needed']
+    adapter.activate(paths[:-1],game)
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    assert (game/RELATIVE).read_bytes()==original
+
+
+def test_data_changed_during_composition_is_not_certified_as_installed(game,library,monkeypatch):
+    from plugins.ds1 import tweak_mods,mod_loader
+    from plugins.ds1.mod_support import Ds1ModAdapter
+    from plugins.ds1.store import RELATIVE
+    from plugins.ds1.formats import ItemDocument
+    from ds1_fixture import make_archive
+    monkeypatch.setenv(tweak_mods.MODS_ENV,str(library))
+    (game/RELATIVE).parent.mkdir(parents=True)
+    (game/RELATIVE).write_bytes(make_archive())
+    folder=library/'Data'
+    (folder/RELATIVE).parent.mkdir(parents=True)
+    (folder/'mod.json').write_text(json.dumps({'name':'Data','enabled':True,'order':30}))
+    def data(value):
+        return make_archive(field_values={'EquipParamGoods':{100:{'sellValue':value}}})
+    (folder/RELATIVE).write_bytes(data(17))
+    original=mod_loader.compose_installed
+    def compose(*args,**kwargs):
+        result=original(*args,**kwargs)
+        (folder/RELATIVE).write_bytes(data(18))
+        return result
+    adapter=Ds1ModAdapter();adapter.attach_context(library_root=library)
+    paths=[library/'Alpha',library/'Beta',folder]
+    with monkeypatch.context() as check:
+        check.setattr(mod_loader,'compose_installed',compose)
+        adapter.activate(paths,game)
+    assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==17
+    assert tweak_mods.needs_rebuild(game,library)['needed']
+    adapter.activate(paths,game)
+    assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==18
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+
+
+def test_freshness_reads_shared_python_inputs_once_per_scan_and_checks_them_next_time(game,library,monkeypatch):
+    from plugins.ds1 import tweak_mods
+    from core import build_dependencies
+    monkeypatch.setenv(tweak_mods.MODS_ENV,str(library))
+    for name in ('Alpha','Beta'):
+        path=library/name/'script/tweak.py'
+        path.write_text('from plugins.ds1 import formats\n'+path.read_text())
+    tweak_mods.apply(game,library)
+    original=build_dependencies.fingerprint
+    calls=[]
+    changed={'value':False}
+    def fingerprint(name):
+        calls.append(name)
+        return '0'*64 if changed['value'] and name=='plugins/ds1/formats.py' else original(name)
+    monkeypatch.setattr(build_dependencies,'fingerprint',fingerprint)
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    assert calls.count('plugins/ds1/formats.py')==1
+    calls.clear();changed['value']=True
+    assert tweak_mods.needs_rebuild(game,library)['stale']==['alpha','beta']
+    assert calls.count('plugins/ds1/formats.py')==1
+    changed['value']=False
+    for _ in range(2):
+        calls.clear()
+        tweak_mods.build_specs(library,game)
+        assert calls.count('plugins/ds1/formats.py')==1
 
 
 def test_menu_recipe_tracks_its_codec_without_global_editor_revision(tmp_path, monkeypatch):
@@ -55,16 +155,16 @@ def test_native_toggle_reuses_installed_data_without_composition(tmp_path, monke
     (data/RELATIVE).parent.mkdir(parents=True)
     (data/RELATIVE).write_bytes(b'data input')
     monkeypatch.setattr(mods_service, 'library_rows', lambda root: [
-        {'name':'Iframe Display', 'path':str(native)}, {'name':'Data', 'path':str(data)}])
+        {'name':'Iframe Display', 'path':str(native), 'enabled':True}, {'name':'Data', 'path':str(data), 'enabled':True}])
     adapter = mod_support.Ds1ModAdapter()
     adapter.attach_context(library_root=library)
     monkeypatch.setattr(adapter, '_report_path', lambda: tmp_path/'report.json')
     ordered = adapter._ordered_mods([data])
-    adapter._save_report(game, ordered, [], installed=True)
+    adapter._save_report(game, ordered, [], installed=True, menu_inputs=[])
     assert adapter._ordered_mods([native, data]) == ordered
     monkeypatch.setattr(tweak_mods, 'ensure_game_closed', lambda: None)
     monkeypatch.setattr(tweak_mods, 'locked', lambda root: nullcontext())
-    monkeypatch.setattr(tweak_mods, 'prepare', lambda *args, **kwargs: {'files':[]})
+    monkeypatch.setattr(tweak_mods, 'prepare', lambda *args, **kwargs: {'files':[], 'runtime':{}})
     monkeypatch.setattr(tweak_mods, 'commit', lambda *args: None)
     def no_composition(*args, **kwargs):
         pytest.fail('A native toggle must not recompose or redeploy unchanged game data')
@@ -153,7 +253,7 @@ def test_prepared_texture_order_invalidates_only_the_installed_pair_reuse(tmp_pa
     tweak_mods.LAYOUT.live(game).write_bytes(layout['value'])
     monkeypatch.setattr(tweak_mods,'ensure_game_closed',lambda:None)
     def prepare(*args,**kwargs):
-        return {'files':[{'managed':tweak_mods.LAYOUT,'before':tweak_mods.LAYOUT.live(game).read_bytes(),
+        return {'runtime':{},'files':[{'managed':tweak_mods.LAYOUT,'before':tweak_mods.LAYOUT.live(game).read_bytes(),
                           'after':layout['value']}]}
     monkeypatch.setattr(tweak_mods,'prepare',prepare)
     monkeypatch.setattr(tweak_mods,'commit',lambda root,plan:tweak_mods.LAYOUT.live(root).write_bytes(plan['files'][0]['after']))

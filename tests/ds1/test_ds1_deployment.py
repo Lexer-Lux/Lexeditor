@@ -138,6 +138,10 @@ def test_later_write_failure_restores_the_entire_batch(tmp_path, monkeypatch, op
         deployment.apply(game,mod)
         store.edit('EquipParamGoods',100,'sellValue',43)
         store.save()
+        # Reapply now skips identical files. Change the map too so this still
+        # exercises a failure after a real second write and its batch rollback.
+        if operation == 'reapply':
+            (mod/MAP).write_bytes(build_msb(parts=(("enemy",2,0,0,120000,(4.0,5.0,6.0)),)))
     before = {relative:(game/relative).read_bytes() for relative in (RELATIVE,MAP)}
     markers = {relative:deployment._read_marker(deployment._marker_path(game,relative))
                for relative in before}
