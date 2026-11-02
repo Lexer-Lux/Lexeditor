@@ -24,7 +24,10 @@ def test_direct_data_edit_stays_pending_until_its_bytes_are_installed(game, libr
     adapter=Ds1ModAdapter();adapter.attach_context(library_root=library)
     paths=[library/'Alpha',library/'Beta',folder]
     adapter.activate(paths,game)
-    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    from plugins.ds1 import runtime_mods
+    with monkeypatch.context() as check:
+        check.setattr(runtime_mods,'inspect',lambda *_:pytest.fail('Freshness reparsed a committed native module'))
+        assert not tweak_mods.needs_rebuild(game,library)['needed']
     assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==17
     (folder/RELATIVE).write_bytes(make_archive(field_values={'EquipParamGoods':{100:{'sellValue':18}}}))
     assert tweak_mods.needs_rebuild(game,library)['needed']

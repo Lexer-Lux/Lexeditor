@@ -1357,12 +1357,16 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     modules_changed = False
     for path, expected in (record.get('modules') or {}).items():
         try:
-            from .runtime_mods import read
+            from .runtime_mods import MAX_SIZE
             target = Path(path)
             if target.name != 'runtime.lxd' or target.parent.parent.resolve() != Path(root or mods_root()).resolve():
                 modules_changed = True
                 continue
-            if _sha(read(checked(Path(path)).parent)) != expected:
+            # Committed modules were structurally validated when built. A
+            # freshness probe only needs bounded reads and the exact receipt
+            # hash; reparsing every native patch on every request is costly.
+            payload = _bounded_file(target, MAX_SIZE, cache=True)
+            if not isinstance(payload, bytes) or _sha(payload) != expected:
                 modules_changed = True
         except (ValueError, OSError):
             modules_changed = True
