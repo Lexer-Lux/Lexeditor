@@ -30,7 +30,7 @@ def inputs():
         library += [Path(directory)/name for name in names if name.endswith('.py')]
     engine = [(path,Path('engine')/path.relative_to(ROOT)) for directory in ('core','plugins/ds1')
               for path in (ROOT/directory).glob('*.py')]
-    engine += [(ROOT/name,Path('engine')/name) for name in ('plugins/__init__.py','plugins/ds3/formats.py')
+    engine += [(ROOT/name,Path('engine')/name) for name in ('disable_networking.py','plugins/__init__.py','plugins/ds3/formats.py')
                if (ROOT/name).is_file()]
     engine += [(path,Path('engine')/path.relative_to(ROOT)) for path in (ROOT/'plugins/ds1/metadata').rglob('*') if path.is_file()]
     for source,_ in binaries+engine:

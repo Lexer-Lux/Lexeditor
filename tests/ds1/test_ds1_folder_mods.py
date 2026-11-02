@@ -663,6 +663,12 @@ def test_standalone_data_merger_combines_records_and_disables_only_broken_mod(tm
 
 
 @pytest.mark.skipif(os.name != 'nt', reason='Windows private runtime')
+def test_standalone_package_includes_the_root_network_policy_module():
+    from plugins.ds1 import runtime_package
+    _python,_version,_binaries,_library,engine=runtime_package.inputs()
+    assert (runtime_package.ROOT/'disable_networking.py',Path('engine/disable_networking.py')) in engine
+
+
 def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path):
     from plugins.ds1 import runtime_package,record_edits,esd,formats
     from dataclasses import replace
