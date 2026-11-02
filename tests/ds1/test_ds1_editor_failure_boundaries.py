@@ -728,7 +728,7 @@ def test_record_requests_do_not_rescan_optional_build_status(monkeypatch):
         monkeypatch.setattr(server,name,other)
     monkeypatch.setattr(server,'_warm_icon_table',lambda:None)
     scans = []
-    def unavailable(*_):
+    def unavailable(*_,**_kwargs):
         scans.append(True)
         raise AttributeError('Older interpreter lacks a filesystem method')
     monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
@@ -741,7 +741,7 @@ def test_record_requests_do_not_rescan_optional_build_status(monkeypatch):
 
 def test_unknown_build_status_stays_pending_without_failing_the_status_request(monkeypatch, caplog):
     from plugins.ds1 import server
-    def unavailable(*_):
+    def unavailable(*_,**_kwargs):
         raise AttributeError('Older interpreter lacks a filesystem method')
     monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
     assert server._tweaks_flag() is True

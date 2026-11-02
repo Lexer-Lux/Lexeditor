@@ -213,7 +213,7 @@ def test_editor_activation_and_later_data_failure_roll_back_menu(menu,monkeypatc
     monkeypatch.setattr(adapter,'_report_path',lambda:folder.parent/'report.json')
     monkeypatch.setattr(mods_service,'library_rows',lambda *_:[{**row,'path':str(row['path'])} for row in rows])
     monkeypatch.setattr(tweak_mods,'ensure_game_closed',lambda:None)
-    monkeypatch.setattr(tweak_mods,'prepare',lambda *_args,**_kwargs:{'files':plan(game,[spec])})
+    monkeypatch.setattr(tweak_mods,'prepare',lambda *_args,**_kwargs:{'runtime':{},'files':plan(game,[spec])})
     monkeypatch.setattr(tweak_mods,'commit',lambda root,p:write(root,p['files']))
     monkeypatch.setattr(tweak_mods,'rollback',lambda root,p:tweak_mods._undo(root,p['files']))
     for _ in range(2):
