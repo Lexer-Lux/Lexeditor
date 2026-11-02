@@ -401,6 +401,7 @@ class BuildContext:
         self._cache_root = cache_root
         self._python_sources = python_sources
         self._params: bytes | None = None
+        self._params_document = None
         self.current = ""
         self._inputs = {}
         self._source_hashes = {}
@@ -467,6 +468,8 @@ class BuildContext:
                         self._remember('python',name,value)
                     elif kind == 'params':
                         self.game_params()
+                    elif kind == 'paramFields':
+                        self.game_params(fields=json.loads(name))
                     else:
                         return False
             return self._inputs == record['inputs']
@@ -524,13 +527,27 @@ class BuildContext:
         self._remember('file', path.as_posix(), _sha(data))
         return data
 
-    def game_params(self) -> bytes | None:
+    def game_params(self, *, fields=None) -> bytes | None:
         """The game's GameParam.parambnd.dcx as this Apply deploys it: vanilla
         with every active data mod combined over it in load order, so a tweak
         reads what the game will (another mod's curve or cost edits included).
-        None outside an Apply, when no game folder is known."""
+        None outside an Apply, when no game folder is known.
+
+        A builder reading only specific fields may declare {table:[fields]}.
+        This still returns the complete archive, but only those field values
+        and row identities invalidate its build. Omit fields for arbitrary
+        archive reads; declarations must cover everything the builder uses.
+        """
+        kind,name = 'params','game'
+        if fields is not None:
+            if (type(fields) is not dict or not 0<len(fields)<=32 or any(
+                    type(table) is not str or not isinstance(names,(list,tuple)) or not 0<len(names)<=128
+                    or any(type(field) is not str for field in names) for table,names in fields.items())):
+                raise ValueError('Parameter dependencies need table names and nonempty field lists')
+            fields={table:sorted(set(names)) for table,names in sorted(fields.items())}
+            kind,name='paramFields',json.dumps(fields,sort_keys=True,separators=(',',':'))
         if self.game_root is None:
-            self._remember('params', 'game', None)
+            self._remember(kind,name,None)
             return None
         if self._params is None:
             from . import deployment, mod_loader
@@ -538,7 +555,7 @@ class BuildContext:
             try:
                 source = checked(deployment.vanilla_source(self.game_root, mod_loader.RELATIVE))
                 if not source.is_file():
-                    self._remember('params', 'game', None)
+                    self._remember(kind,name,None)
                     return None
                 mods = mod_loader.active_mods(self._library_root or mods_root(), only=frozenset({mod_loader.RELATIVE}))
                 original = source.read_bytes()
@@ -558,7 +575,16 @@ class BuildContext:
                 except Exception:
                     pass
                 raise script_mods.ScriptModInfrastructureError(f'Could not read combined game parameters: {error}') from error
-        self._remember('params', 'game', _sha(self._params) if self._params is not None else None)
+        if fields is None:
+            value=_sha(self._params) if self._params is not None else None
+        else:
+            if self._params_document is None:
+                from .formats import ItemDocument
+                self._params_document=ItemDocument(self._params)
+            document=self._params_document
+            value=[(table,[(row.row_id,[document.value(table,row.row_id,field) for field in names])
+                           for row in document.params[table].rows]) for table,names in fields.items()]
+        self._remember(kind,name,value)
         return self._params
 
     def enabled(self, mod_id: str) -> bool:
