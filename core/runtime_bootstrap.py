@@ -85,6 +85,34 @@ def open_path(path: Path) -> None:
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def open_text_file(path: Path) -> None:
+    """Use a text-editor association, never the executable .py association."""
+    target = Path(path).resolve(strict=True)
+    if not target.is_file():
+        raise ValueError('Choose a text file')
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+        query = ctypes.WinDLL('shlwapi').AssocQueryStringW
+        query.argtypes = [wintypes.DWORD, ctypes.c_int, wintypes.LPCWSTR,
+                          wintypes.LPCWSTR, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+        query.restype = ctypes.c_long
+        buffer = ctypes.create_unicode_buffer(32768)
+        size = wintypes.DWORD(len(buffer))
+        # ASSOCSTR_EXECUTABLE (2), using the user's plain-text association.
+        result = query(0, 2, '.txt', 'open', buffer, ctypes.byref(size))
+        editor = buffer.value if result == 0 and buffer.value else 'notepad.exe'
+        subprocess.Popen([editor, str(target)])
+    elif sys.platform == 'darwin':
+        subprocess.Popen(['open', '-t', str(target)])
+    else:
+        import shutil
+        launcher = shutil.which('sensible-editor')
+        if not launcher:
+            raise OSError('No default text editor was found. Open disable_networking.py in your text editor.')
+        subprocess.Popen([launcher, str(target)])
+
+
 if __name__ == '__main__':
     if not dispatch_service(sys.argv[1:]):
         raise SystemExit('An allowed plugin service is required.')
