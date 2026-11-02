@@ -572,7 +572,8 @@ def align_menu_textures(game_root: Path, composition: Composition, layout: bytes
     supplements = [payload(Path(f'menu/menu_{index}.tpf.dcx')) for index in range(6)
                    if Path(f'menu/menu_{index}.tpf.dcx') in composition.files
                    or (game_root/f'menu/menu_{index}.tpf.dcx').is_file()]
-    combined = texture_packs.align_menu(layout,payload(main),supplements)
+    combined = texture_packs.align_menu(layout,payload(main),supplements,
+                                       current=_read_data(game_root/main,main))
     if combined != deployment.vanilla_source(game_root,main).read_bytes():
         composition.files[main] = combined
     else:

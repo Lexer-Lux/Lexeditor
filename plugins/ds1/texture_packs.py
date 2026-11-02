@@ -109,7 +109,7 @@ def menu_texture_names(layout_data):
     return [layout.string(struct.unpack_from('<i', directory, i * 16)[0]) for i in range(count)]
 
 
-def align_menu(layout_data, main, supplements=()):
+def align_menu(layout_data, main, supplements=(), *, current=None):
     """The combined menu's texture indices address an identically ordered pack."""
     from . import formats
     names = menu_texture_names(layout_data)
@@ -130,6 +130,16 @@ def align_menu(layout_data, main, supplements=()):
     if ordered == rows:
         return main
     result = write(header, ordered)
+    # Texture packs are large and already contain compressed DDS payloads.
+    # Verify the complete desired bytes against the installed pack before
+    # recompressing, independently of the disposable output cache.
+    if current is not None and current.startswith(b'DCX\0') == main.startswith(b'DCX\0'):
+        try:
+            installed = formats.inflate(current, max_size=MAX_ASSET_BYTES) if current.startswith(b'DCX\0') else current
+            if installed == result:
+                return current
+        except FormatError:
+            pass
     return formats.deflate(main, result, max_size=MAX_ASSET_BYTES) if main.startswith(b'DCX\0') else result
 
 
