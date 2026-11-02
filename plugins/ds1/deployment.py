@@ -788,6 +788,16 @@ def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Pat
             )
         marker = _reconcile(marker, marker_path, live)
 
+    # A changed mod can leave most combined archives byte-identical. The
+    # baseline and live file were validated above; update ownership metadata
+    # without replacing the installed archive again.
+    if marker.get('enabled') and marker.get('activeHash') == new_hash and _hash_file(live) == new_hash:
+        ownership = {'sourceHash': source_hash, 'activeProjectRoot': str(project_root)}
+        if any(marker.get(key) != value for key, value in ownership.items()):
+            marker.update(ownership)
+            _write_marker(marker_path, marker)
+        return
+
     # Record the intent durably before the live file is ever touched, so an
     # interruption after the write below is recognized next time, not guessed at.
     marker.update({"pendingHash": new_hash, "pendingKind": "apply"})

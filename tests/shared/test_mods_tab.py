@@ -298,7 +298,15 @@ def test_a_mods_settings_and_a_downloadable_module(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
     page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
+    assert page.get_by_role("spinbutton", name="Amount").count() == 0
+    page.get_by_role("tab", name="Settings", exact=True).click()
     page.get_by_role("spinbutton", name="Amount").wait_for()
+    assert page.get_by_role("textbox", name="Author", exact=True).count() == 0
+    page.get_by_role("tab", name="Details", exact=True).click()
+    page.get_by_role("textbox", name="Author", exact=True).wait_for()
+    assert page.get_by_role("spinbutton", name="Amount").count() == 0
+    page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Mine", exact=True).click()
+    assert page.get_by_role("tab", name="Settings", exact=True).is_disabled()
     page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Extra").click()
     page.get_by_role("button", name="Download", exact=True).click()
     page.wait_for_function("window.calls.some(c => c[0] === 'lexmod_download')")
@@ -365,6 +373,7 @@ def test_vanilla_still_switches_mods_and_reads_text_boxes(page):
     page.get_by_role("checkbox", name="Switch Combat").click()
     page.wait_for_function("window.calls.some(c => c[0] === 'set_mod_enabled')")
     page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Combat").click()
+    page.get_by_role("tab", name="Settings", exact=True).click()
     page.get_by_role("spinbutton", name="Amount").fill("4")
     page.get_by_role("spinbutton", name="Amount").press("Tab")
     page.wait_for_function("window.calls.some(c => c[0] === 'save_mod_settings')")
@@ -496,6 +505,7 @@ def test_a_bundles_components_are_ordinary_settings_that_save(page):
     mount(page, bundle=True)
     page.locator('[data-tab="mods"]').click()
     page.locator(".lex-mods-page .lex-barrelled-master .lex-column-list").get_by_text("Collection").click()
+    page.get_by_role("tab", name="Settings", exact=True).click()
     combat = page.get_by_role("checkbox", name="Combat", exact=True)
     combat.wait_for()
     assert combat.is_checked()
@@ -750,7 +760,7 @@ def test_mods_detail_lists_files_with_loader_marks(page):
     assert read.nth(0).locator(".lex-boolean-mark").get_attribute("aria-label") == "Yes"
     assert read.nth(1).locator(".lex-boolean-mark.false").inner_text() == "\u00d7"
     assert read.nth(1).locator(".lex-boolean-mark").get_attribute("aria-label") == "No"
-    assert rows.nth(0).get_attribute("data-lex-title") == "The mod loader reads this file when the mod is on"
+    assert rows.nth(0).get_attribute("data-lex-title") == "Used when building or loading this mod"
     assert detail.get_by_role("searchbox", name="Search files").count() == 1
 
 
