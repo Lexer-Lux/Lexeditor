@@ -799,6 +799,9 @@ def build_fingerprint(folder: Path, *, produced=False, python_sources=None) -> s
     folder = Path(folder)
     parts = {"source": None if produced else script_mods.source_fingerprint(folder), 'compiler': _script_compiler_revision(),
              'installationEngine':_installation_revision()}
+    # Priority changes require relinking/deployment, while the script's own
+    # authoring fingerprint still reuses the already built outputs.
+    parts['order'] = (script_mods._read_json(folder/'mod.json') or {}).get('order')
     try:
         manifest = script_mods._read_json(folder / script_mods.MANIFEST_FILE) or {}
         record = manifest.get('build') or {}

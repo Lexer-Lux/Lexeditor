@@ -92,7 +92,8 @@ def test_child_service_core_import_installs_distribution_policy(tmp_path):
     subprocess.run([sys.executable,str(probe)],cwd=tmp_path,check=True,capture_output=True)
 
 
-def test_startup_notice_renders_and_actions_only_request_a_draft(tmp_path):
+@pytest.mark.parametrize('notice_supported',[True,False])
+def test_startup_notice_renders_and_actions_only_request_a_draft(tmp_path,notice_supported):
     import functools
     import json
     import threading
@@ -108,14 +109,21 @@ def test_startup_notice_renders_and_actions_only_request_a_draft(tmp_path):
             browser=p.chromium.launch(headless=True)
             try:
                 page=browser.new_page(viewport={'width':1440,'height':900})
+                errors=[]
+                page.on('pageerror',lambda error:errors.append(str(error)))
                 page.add_init_script(f'''window.actions=[];window.pywebview={{api:new Proxy({{
                   lexeditor_settings:async()=>({json.dumps(settings)}),plugins:async()=>[],
                   loading_quote:async()=>({{quote:''}}),window_state:async()=>({{maximized:false}}),
                   networking_notice:async()=>({json.dumps(payload)}),
                   open_networking_notice_action:async action=>{{actions.push(action);return {{opened:true}};}}
-                }},{{get:(t,k)=>t[k]||(async()=>false)}})}};''')
+                }},{{get:(t,k)=>k==='networking_notice'&&!{json.dumps(notice_supported)}?undefined:t[k]||(async()=>false)}})}};''')
                 page.goto(f'http://127.0.0.1:{server.server_port}/ui/chooser.html')
                 page.evaluate("dispatchEvent(new Event('pywebviewready'))")
+                if not notice_supported:
+                    page.wait_for_timeout(200)
+                    assert not errors
+                    assert not page.get_by_text('Internet features disabled',exact=True).is_visible()
+                    return
                 page.get_by_text('Internet features disabled',exact=True).wait_for()
                 page.get_by_role('button',name='OPEN IN TEXT EDITOR',exact=True).click()
                 page.get_by_role('button',name='DRAFT EMAIL TO NEXUS SUPPORT',exact=True).click()
@@ -123,6 +131,7 @@ def test_startup_notice_renders_and_actions_only_request_a_draft(tmp_path):
                 page.screenshot(path=str(tmp_path/'network-notice.png'))
                 page.get_by_role('button',name='CONTINUE',exact=True).click()
                 assert not page.get_by_text('Internet features disabled',exact=True).is_visible()
+                assert not errors
             finally:
                 browser.close()
     finally:
