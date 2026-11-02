@@ -116,6 +116,8 @@ def test_editor_and_packaged_engine_share_semantic_cache_revision(tmp_path,monke
         assert revision(second) == expected
         (second/'plugins/ds1/mod_usage.py').write_text('changed Files usage reporting')
         assert revision(second) == expected
+        (second/'plugins/ds1/runtime_package.py').write_text('changed release packaging')
+        assert revision(second) == expected
         (second/'plugins/ds1/mod_loader.py').write_text('changed composer')
         assert revision(second) != expected
     finally:
@@ -157,3 +159,25 @@ def test_busy_cache_is_not_mistaken_for_corruption(tmp_path):
         composition_cache.store(tmp_path,b'new',b'new output')
     connection.close()
     assert composition_cache.load(tmp_path,b'old') == b'old output'
+
+
+def test_eviction_reuses_pages_with_a_physical_disk_cap(tmp_path,monkeypatch):
+    monkeypatch.setattr(composition_cache,'LIMIT',32*1024)
+    monkeypatch.setattr(composition_cache,'_DATABASE_OVERHEAD',16*1024)
+    # Exercise migration from the old full-vacuum database as well as repeated
+    # bounded evictions. Payloads differ so no content reuse can hide writes.
+    path=tmp_path/'composed.sqlite3'
+    with sqlite3.connect(path) as database:
+        database.execute('PRAGMA auto_vacuum = FULL')
+        database.execute('CREATE TABLE outputs (key BLOB PRIMARY KEY, data BLOB, checksum BLOB, touched INTEGER)')
+    database.close()
+    for index in range(24):
+        key=str(index).encode()
+        payload=bytes([index])*12*1024
+        composition_cache.store(tmp_path,key,payload)
+        assert composition_cache.load(tmp_path,key)==payload
+        assert path.stat().st_size<=48*1024
+    with composition_cache._database(tmp_path) as database:
+        assert database.execute('PRAGMA auto_vacuum').fetchone()[0]==2
+        assert database.execute('SELECT sum(length(data)) FROM outputs').fetchone()[0]<=32*1024
+        assert database.execute('PRAGMA max_page_count').fetchone()[0]*database.execute('PRAGMA page_size').fetchone()[0]<=48*1024

@@ -38,7 +38,11 @@ def _reset(root):
 def _open(root):
     connection = sqlite3.connect(root/'composed.sqlite3',timeout=0.1)
     try:
-        connection.execute('PRAGMA auto_vacuum = FULL')
+        # Reuse evicted pages instead of moving every remaining large BLOB
+        # at each commit. A hard page cap bounds the physical file too.
+        connection.execute('PRAGMA auto_vacuum = INCREMENTAL')
+        page_size = connection.execute('PRAGMA page_size').fetchone()[0]
+        connection.execute(f'PRAGMA max_page_count = {max(1,(LIMIT+_DATABASE_OVERHEAD)//page_size)}')
         objects = connection.execute("SELECT type,name FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 2").fetchall()
         if any(row != ('table','outputs') for row in objects):
             raise _BadCache('The disposable cache contains an unexpected schema object')
@@ -53,8 +57,14 @@ def _open(root):
 
 
 def _corrupt(error):
-    code = getattr(error,'sqlite_errorcode',0) & 0xff
-    return isinstance(error,_BadCache) or code in (sqlite3.SQLITE_CORRUPT,sqlite3.SQLITE_NOTADB)
+    if isinstance(error,_BadCache):
+        return True
+    code = getattr(error,'sqlite_errorcode',None)
+    if code is not None:
+        return code & 0xff in (11,26)  # SQLITE_CORRUPT, SQLITE_NOTADB.
+    # Python 3.10 lacks SQLite's error-code attributes. A busy/locked cache
+    # must still be left intact, rather than mistaken for corruption.
+    return str(error) in ('file is not a database','database disk image is malformed')
 
 
 @contextmanager
