@@ -339,6 +339,29 @@ class HostApi:
         from core import app_update
         return app_update.check(ROOT)
 
+    def networking_notice(self) -> dict:
+        from core.network_policy import notice
+        result = notice()
+        if result['disabled']:
+            with self._lock:
+                result['show'] = not getattr(self, '_networking_notice_shown', False)
+                self._networking_notice_shown = True
+        return result
+
+    def open_networking_notice_action(self, action: str) -> dict:
+        if action == 'folder':
+            from core.runtime_bootstrap import open_path
+            open_path(ROOT)
+        elif action == 'support':
+            from urllib.parse import urlencode
+            query = urlencode({'subject': 'Please reconsider the automatic-update restriction',
+                'body': 'Please reconsider the rule against automatic updates for utilities hosted on Nexus Mods. '
+                        'Optional updates make it easier to receive fixes and keep software current.'})
+            webbrowser.open('mailto:support@nexusmods.com?' + query)
+        else:
+            raise ValueError('Unknown networking notice action')
+        return {'opened': True}
+
     def app_update_result(self) -> dict:
         from core.runtime_bootstrap import user_data_dir
         path = user_data_dir() / "updates" / "last-result.json"
