@@ -1,11 +1,12 @@
 """Dark Souls Remastered detection and isolated item projects."""
 from pathlib import Path
 
-from core.plugin_api import GamePlugin
+from core.plugin_api import GamePlugin, PluginHelper
 from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession
 
 from .mod_support import Ds1ModAdapter
+from . import runtime_protection
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -38,4 +39,8 @@ def launch() -> int:
 PLUGIN = GamePlugin(**plugin_defaults(__file__), check=check, launch=launch,
                     session_factory=DS1Session, installation=install_spec(__file__),
                     mod_adapter=Ds1ModAdapter(),
+                    helpers=(PluginHelper(key='crow', name="Crow anti-cheat and anti-ban",
+                        pinned=runtime_protection.source()['revision'][:12],
+                        status_for_root=runtime_protection.status, upstream=runtime_protection.upstream,
+                        required=False),),
                     projects=project_spec(__file__, default_root=Path.home() / 'Lexeditor Mods' / 'Dark Souls Remastered'))

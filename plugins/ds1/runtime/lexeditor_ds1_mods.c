@@ -104,12 +104,27 @@ int lx_link_module(const unsigned char *data, size_t size, unsigned base,
     return 1;
 }
 
-typedef struct { unsigned low, high; } lx_claim_t;
+typedef struct { unsigned low, high, owner; } lx_claim_t;
 static lx_claim_t lx_claims[LX_MAX_CLAIMS];
 static unsigned lx_claim_count, lx_code_cursor;
+static char lx_claim_owners[LX_MAX_MODS + 2][256] = {"loader multiplayer protection"};
+static unsigned lx_claim_owner_count = 1;
+
+/* Reserve installed runtime protection before user patches are considered.
+ * Upstream can patch overlapping integrity-check instructions more than once. */
+int lx_reserve_runtime_range(unsigned rva, unsigned size)
+{
+    if (!size || rva > UINT_MAX - size) return 0;
+    for (unsigned i = 0; i < lx_claim_count; ++i)
+        if (lx_claims[i].low <= rva && lx_claims[i].high >= rva + size) return 1;
+    if (lx_claim_count == LX_MAX_CLAIMS) return 0;
+    lx_claims[lx_claim_count++] = (lx_claim_t){rva, rva + size};
+    return 1;
+}
 
 static int lx_check_claims(const unsigned char *patch, size_t size,
-                          const unsigned char *module, char *message, size_t capacity, int remember)
+                          const unsigned char *module, char *message, size_t capacity, int remember,
+                          const char *owner)
 {
     lx_claim_t pending[MAX_RECORDS * 2];
     unsigned count = 0;
@@ -149,9 +164,24 @@ static int lx_check_claims(const unsigned char *patch, size_t size,
         return fail(message, capacity, "Native mod claim limit reached");
     for (unsigned i = 0; i < count; ++i)
         for (unsigned j = 0; j < lx_claim_count; ++j)
-            if (pending[i].low < lx_claims[j].high && lx_claims[j].low < pending[i].high)
-                return fail(message, capacity, "Conflicts with another enabled mod's code or state");
+            if (pending[i].low < lx_claims[j].high && lx_claims[j].low < pending[i].high) {
+                unsigned low = pending[i].low > lx_claims[j].low ? pending[i].low : lx_claims[j].low;
+                unsigned high = pending[i].high < lx_claims[j].high ? pending[i].high : lx_claims[j].high;
+                snprintf(message, capacity, "Conflicts with %.128s at memory RVA %X-%X; skipped",
+                         lx_claim_owners[lx_claims[j].owner], low, high - 1);
+                return 0;
+            }
+    unsigned owner_index = 1;
+    for (; owner_index < lx_claim_owner_count; ++owner_index)
+        if (!strcmp(lx_claim_owners[owner_index], owner)) break;
+    if (owner_index == lx_claim_owner_count) {
+        if (owner_index == LX_MAX_MODS + 2)
+            return fail(message, capacity, "Native mod owner limit reached");
+        snprintf(lx_claim_owners[owner_index], sizeof lx_claim_owners[owner_index], "%s", owner);
+        ++lx_claim_owner_count;
+    }
     if (remember) {
+        for (unsigned i = 0; i < count; ++i) pending[i].owner = owner_index;
         memcpy(lx_claims + lx_claim_count, pending, count * sizeof *pending);
         lx_claim_count += count;
     }
@@ -655,9 +685,9 @@ static void lx_load_mod_folders(void)
 #ifndef LX_ONLINE_BUILD
             if (okay && !lx_block_network()) {okay = 0; snprintf(message, sizeof message, "Network isolation failed; skipped");}
 #endif
-            if (okay) okay = lx_check_claims(patch, size, mod->data, message, sizeof message, 0);
+            if (okay) okay = lx_check_claims(patch, size, mod->data, message, sizeof message, 0, mod->name);
             if (okay) okay = lx_apply(image, patch, size, message, sizeof message);
-            if (okay) lx_check_claims(patch, size, mod->data, message, sizeof message, 1);
+            if (okay) lx_check_claims(patch, size, mod->data, message, sizeof message, 1, mod->name);
             if (patch) HeapFree(GetProcessHeap(), 0, patch);
             mod->applied = okay;
             mod->valid = okay;

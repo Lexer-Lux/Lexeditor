@@ -4,8 +4,16 @@ Request: "I think you know what to make ... make it." The agreed behavior is
 mod loading with multiplayer protection, a separate Cloud-compatible modded
 save, bounded backups, and no cleaner or conversion back to vanilla.
 
+Follow-up request: "Include his anti-cheat." Include the upstream player
+protections, independently of the already included anti-ban implementation.
+
 - [x] Vendor the reporting protection, not the PvP gameplay changes.
-- [x] Keep mod loading and merging, apply changes only in memory.
+- [x] Include Crow's player anti-cheat: packet/effect filtering, NPC/boss guards,
+  name-crash mitigation and teleport-backstab protection.
+- [x] Track vanilla Steam sessions without replacing matchmaking or transport.
+- [x] Reserve protection writes so enabled native mods cannot overwrite them.
+- [x] Report pinned Crow source and upstream changes in the developer helper panel.
+- [x] Keep mod loading and merging; apply executable patches only in memory.
 - [x] Redirect the game's specific `DRAKS0005.sl2` open to
   `DRAKS0005.lexeditor.sl2` in the same account folder.
 - [x] Copy vanilla only when the modded save is absent. Never overwrite a
@@ -23,15 +31,25 @@ Online runtime is AGPL-3.0-only. `overhaul/AntiAntiCheat.cpp`,
 `AntiAntiCheat.h` and `AntiAntiCheatASM.asm` come from MetalCrow's
 [Dark Souls 1 PvP Fixes and Overhaul](https://github.com/metal-crow/Dark-Souls-1-Overhaul),
 commit `2a3d8cbe2acee663bef03c7be4f968dbb68f951f` (Beta36/Antiban A36).
-The implementation credits MetalCrow and Ainsley Harriott. Corresponding source,
+Player-protection source `AntiCheat.cpp`, `AntiCheat.h`, `AntiCheatASM.asm` and
+`ServerMonitorASM.asm` comes from the same revision and credits MetalCrow,
+Ainsley Harriott, Ashley and Sean Pesce. Corresponding source,
 adapter and build instructions ship here; complete license is in `../credits.md`.
-The sole edit to the copied implementation bounds the array-compaction loop,
-which previously read one element beyond the supplied array.
+Local changes are recorded in `overhaul/SOURCE.json`: bounded reporting-array
+compaction, name scanning and invader tracking, null-target guards, and a vanilla
+session adapter in place of the Overhaul networking replacement.
 
-The two adapter headers implement only the small patch/log API that this source
-uses. No PvP changes, mode switching, UI, networking replacement or upstream save
+The adapter tracks lobby-enter callbacks through the game's Steam callback import.
+Only hosts with other lobby members use the NPC/boss guard; offline play and guests
+retain normal damage behavior. Server break-in notifications identify invaders for
+packet filtering, and roles are cleared on lobby changes and peer departure. A
+notification arriving before its peer joins expires after 30 seconds. Tracking is
+bounded to 64 peers. The game-shipped flat Steam exports supply lobby ownership and
+membership. Steam interface versions are fixed to those in the supported game.
+
+No PvP balance changes, mode switching, UI, networking replacement or upstream save
 manager are included. The online DLL also links dearxan 0.5.6, already used by
-the debug loader. Its callback installs reporting and save hooks before applying
+the debug loader. Its callback installs reporting, player-protection and save hooks before applying
 the reader's tweaks. The offline debug DLL remains available to developer tools.
 
 Build (Visual Studio C++ Build Tools and unpacked dearxan release required):
@@ -41,7 +59,7 @@ Build (Visual Studio C++ Build Tools and unpacked dearxan release required):
 Add `--check` to reproduce the shipped DLL without replacing it. The package
 manifest records source and binary SHA-256, dearxan version and upstream revision.
 The supported executable hash is the same as `exe_patches.VANILLA_SHA256`;
-upstream assembly requires image base 0x140000000. Files on disk are never patched.
+upstream assembly requires image base 0x140000000. The executable on disk is never patched.
 
 ## Behavior and verification limits
 
@@ -58,6 +76,16 @@ existing Cloud-restored contents, refusal on links/oversize/write failures and
 unrelated files. A C++ fixture exercises the actual upstream report whitelist,
 restoration of local flags and removal of the detection flag. This does not prove
 that FromSoftware's private servers accept every custom character or item.
+
+The player-protection fixture runs the imported packet/effect and NPC/boss guard
+functions with synthetic sessions. It checks offline/guest behavior, ordinary
+damage and movement, hostile effects, name markup, invader joins/departures and
+lobby changes. It does not execute the game-side assembly hooks or establish live
+multiplayer acceptance. Replacement transports such as Seamless Co-op are not
+verified compatible. The guards retain upstream's vanilla entity/effect IDs and
+eight-unit teleport-backstab threshold; mods intentionally changing those meanings
+can conflict even without overlapping executable writes. No general cheat detector
+or account-ban service is added.
 
 Steam's published DSR rules match `*.sl2` in its account save directories
 ([configuration](https://steamdb.info/app/570940/ufs/)); Auto-Cloud synchronizes

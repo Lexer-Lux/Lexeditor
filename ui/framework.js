@@ -11503,6 +11503,15 @@ ${contents.path}`});
       });
     };
     const startFirstRun = async () => {
+      const networking = await callWindow("networking_notice").catch(() => null);
+      if (networking?.show) await modsDialog("Internet features disabled", close => [
+        element("p", {text: networking.message}),
+        actionRow([
+          element("button", {type:"button",text:"Open program folder",
+            onclick:()=>callWindow("open_networking_notice_action","folder").catch(error=>showToast(String(error)))}),
+          element("button", {type:"button",text:"Draft email to Nexus support",
+            onclick:()=>callWindow("open_networking_notice_action","support").catch(error=>showToast(String(error)))}),
+          element("button", {type:"button",text:"Continue",onclick:()=>close(true)})])]);
       callWindow("lexmod_update", options.plugin.id).catch(() => {});
       try { await firstRun(options.plugin.id, options.plugin.name); } catch (_error) {}
       try { await offerUnmanagedMods(); } catch (_error) {}

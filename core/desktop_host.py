@@ -19,7 +19,7 @@ from core.font_manager import font_status, install_missing_fonts
 from core.game_installation import GameInstallationManager
 from core.game_version import game_version
 from core.github_integration import GitHubIntegration, WORKFLOW_FALLBACK_COLORS
-from core.plugin_api import GamePlugin, GitHubRepository, PluginSession
+from core.plugin_api import GamePlugin, GitHubRepository, PluginSession, plugin_helpers
 from core.plugin_manifest import loading_quotes as plugin_quotes
 from core.plugin_manifest import manifest_in, plugin_directories
 from core.project_manager import ProjectManager
@@ -338,6 +338,29 @@ class HostApi:
         """Check the latest published release only when the user asks."""
         from core import app_update
         return app_update.check(ROOT)
+
+    def networking_notice(self) -> dict:
+        from core.network_policy import notice
+        result = notice()
+        if result['disabled']:
+            with self._lock:
+                result['show'] = not getattr(self, '_networking_notice_shown', False)
+                self._networking_notice_shown = True
+        return result
+
+    def open_networking_notice_action(self, action: str) -> dict:
+        if action == 'folder':
+            from core.runtime_bootstrap import open_path
+            open_path(ROOT)
+        elif action == 'support':
+            from urllib.parse import urlencode
+            query = urlencode({'subject': 'Please reconsider the automatic-update restriction',
+                'body': 'Please reconsider the rule against automatic updates for utilities hosted on Nexus Mods. '
+                        'Optional updates make it easier to receive fixes and keep software current.'})
+            webbrowser.open('mailto:support@nexusmods.com?' + query)
+        else:
+            raise ValueError('Unknown networking notice action')
+        return {'opened': True}
 
     def app_update_result(self) -> dict:
         from core.runtime_bootstrap import user_data_dir
@@ -1039,23 +1062,22 @@ class HostApi:
         else:
             rows = []
             for plugin_id, plugin in sorted(self._plugins.items()):
-                if not (plugin.helper_name and (plugin.helper_upstream or plugin.helper_status or plugin.helper_status_for_root)):
-                    continue
-                row = {"pluginId": plugin_id, "plugin": plugin.name,
-                       "helper": plugin.helper_name, "pinned": plugin.helper_pinned}
-                try:
-                    if plugin.helper_upstream is None:
-                        raise RuntimeError("No upstream release provider is registered.")
-                    row.update(plugin.helper_upstream() or {})
-                except Exception as error:
-                    row["error"] = str(error)
-                row["behind"] = bool(row.get("behind"))
-                # Existing managers report a repository rather than a release URL.
-                source, latest = str(row.get("source", "")), str(row.get("latest", ""))
-                if not row.get("releaseNotes") and source.startswith("https://github.com/") and latest:
-                    from urllib.parse import quote
-                    row["releaseNotes"] = source.rstrip("/") + "/releases/tag/" + quote(latest, safe="")
-                rows.append(row)
+                for spec in plugin_helpers(plugin):
+                    row = {"pluginId": plugin_id, "plugin": plugin.name, "helperKey": spec.key,
+                           "helper": spec.name, "pinned": spec.pinned}
+                    try:
+                        if spec.upstream is None:
+                            raise RuntimeError("No upstream release provider is registered.")
+                        row.update(spec.upstream() or {})
+                    except Exception as error:
+                        row["error"] = str(error)
+                    row["behind"] = bool(row.get("behind"))
+                    # Existing managers report a repository rather than a release URL.
+                    source, latest = str(row.get("source", "")), str(row.get("latest", ""))
+                    if not row.get("releaseNotes") and source.startswith("https://github.com/") and latest:
+                        from urllib.parse import quote
+                        row["releaseNotes"] = source.rstrip("/") + "/releases/tag/" + quote(latest, safe="")
+                    rows.append(row)
             # ReShade is not a plugin's helper: it is one copy shared by every
             # game. It is checked and cached with the rest all the same, so a
             # refresh means the same thing for every row on the panel.
@@ -1070,7 +1092,9 @@ class HostApi:
             plugin = self._plugins[row["pluginId"]]
             try:
                 snapshot = self._installations.snapshot(row["pluginId"])
-                helper = snapshot.get("helper") or {}
+                candidates = snapshot.get("helpers")
+                helper = (next((item for item in candidates if item.get("key") == row.get("helperKey")), {})
+                          if isinstance(candidates, list) else snapshot.get("helper") or {})
                 if not snapshot.get("root"):
                     helper = {}
                 row["installedVersion"] = str(helper.get("version", ""))
