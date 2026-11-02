@@ -193,6 +193,7 @@ class Ds1ModAdapter:
         started = perf_counter()
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library, cache_root=self._cache_root())
+            data_recipe = tweak_mods.data_recipe(library)
             prepared = perf_counter()
             from . import texture_packs
             main_texture = Path('menu/menu.tpf.dcx')
@@ -243,7 +244,7 @@ class Ds1ModAdapter:
             # The successful transaction owns this recipe. Conflict-cache
             # refreshes cannot erase it or claim that later data edits are
             # already installed merely because native script inputs match.
-            plan['runtime']['dataRecipe'] = tweak_mods.data_recipe(library)
+            plan['runtime']['dataRecipe'] = data_recipe
             tweak_mods.commit(game_root, plan)
             try:
                 if not reused and composition.files:
