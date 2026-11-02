@@ -24,6 +24,41 @@ def record(folder):
     return json.loads((folder/script_mods.MANIFEST_FILE).read_text())['build']
 
 
+def test_compression_cache_does_not_make_builds_depend_on_deployment_or_menus(game, monkeypatch):
+    from test_ds1_deflate_reuse import dcx
+    root, library, _built = game
+    original = dcx(b'original archive' * 100)
+    folder = mod(library, 'compression', 'from plugins.ds1 import formats\n'
+        f'ORIGINAL={original!r}\n'
+        'def build(settings,context):\n'
+        '    return {"native/archive.bin":formats.deflate(ORIGINAL,b"new archive"*100)}\n')
+    assert not build(folder, root, library).get('cached')
+    dependencies = record(folder)['inputs']['python']
+    assert 'plugins/ds1/composition_cache.py' in dependencies
+    assert 'plugins/ds1/tweak_paths.py' in dependencies
+    assert not {'plugins/ds1/tweak_mods.py','plugins/ds1/menu_layout.py',
+                'plugins/ds1/menu_scripts.py','plugins/ds1/deployment.py'} & dependencies.keys()
+    original_fingerprint = build_dependencies.fingerprint
+    monkeypatch.setattr(build_dependencies, 'fingerprint', lambda path:
+        'changed deployment' if path == 'plugins/ds1/tweak_mods.py' else original_fingerprint(path))
+    assert build(folder, root, library)['cached']
+    monkeypatch.setattr(build_dependencies, 'fingerprint', lambda path:
+        'changed compression' if path == 'plugins/ds1/formats.py' else original_fingerprint(path))
+    assert not build(folder, root, library).get('cached')
+
+
+def test_cache_path_guard_remains_shared_and_rejects_hardlinks(tmp_path):
+    import os
+    from plugins.ds1 import tweak_paths
+    assert tweak_mods.checked is tweak_paths.checked
+    assert tweak_mods.TweakError is tweak_paths.TweakError
+    target = tmp_path/'archive'
+    target.write_bytes(b'original')
+    os.link(target, tmp_path/'linked')
+    with pytest.raises(tweak_mods.TweakError, match='hard link'):
+        tweak_mods.checked(target)
+
+
 def test_used_helper_change_rebuilds_its_consumer_and_preserves_unrelated_cache(game,monkeypatch):
     root,library,_built = game
     first = mod(library,'first','from plugins.ds1 import load_bands\n'
