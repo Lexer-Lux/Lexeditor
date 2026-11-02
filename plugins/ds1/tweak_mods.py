@@ -33,7 +33,6 @@ import keyword
 import os
 from pathlib import Path
 from time import perf_counter
-import stat
 import sys
 import struct
 from typing import Callable
@@ -43,6 +42,7 @@ from core.plugin_files import atomic_write
 from core.process_probe import live_processes
 
 from . import exe_patches, menu_dim, menu_layout, menu_scripts
+from .tweak_paths import TweakError, checked
 
 ALLOWED_ROOTS = ("native", "layout", "esd", "menu-dim", "script", "msg", "event")
 ALLOWED_ROOTS += ("param",)
@@ -62,10 +62,6 @@ def _exclusive(game_root: Path):
     from core.file_lock import exclusive
     with exclusive(path):
         yield
-
-
-class TweakError(script_mods.ScriptModError):
-    """A tweak operation failed; the message identifies any recovery needed."""
 
 
 @dataclass(frozen=True)
@@ -92,21 +88,6 @@ def mods_root() -> Path:
         return Path(override)
     from core.mod_library import default_user_library_root
     return default_user_library_root() / "ds1"
-
-
-def checked(path: Path) -> Path:
-    """Refuse links and junctions on a protected path before following it."""
-    path = Path(os.path.abspath(path))
-    for entry in (path, *path.parents):
-        try:
-            info = entry.lstat()
-        except FileNotFoundError:
-            continue
-        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
-            raise TweakError("A protected tweak path contains a symlink or junction")
-        if entry == path and stat.S_ISREG(info.st_mode) and info.st_nlink != 1:
-            raise TweakError("A protected tweak file has more than one hard link")
-    return path
 
 
 def _read(path: Path, managed: "Managed | None" = None) -> bytes:
@@ -298,13 +279,13 @@ LOADER_DESCRIPTION = ("Installs Lexeditor's loader, which applies executable pat
 
 
 def loader_credits() -> str:
-    """Keep the mod's runtime notices sourced from the canonical plugin credits."""
-    text = Path(__file__).with_name("credits.md").read_text(encoding="utf-8")
-    headings = ("Executable tweak loader", "Debug mode (runtime/lexeditor_ds1_debug.c)",
-                "Online loader protection")
-    sections = {part.split("\n", 1)[0]: "## " + part.strip()
-                for part in text.split("\n## ")[1:]}
-    return "\n\n".join(sections[heading] for heading in headings)
+    """Short attribution here; complete notices stay in the plugin's legal credits."""
+    return ("MetalCrow and Ainsley Harriott — anti-ban code from Dark Souls 1 PvP Fixes and Overhaul (AGPLv3).\n"
+            "https://github.com/metal-crow/Dark-Souls-1-Overhaul\n\n"
+            "tremwil — dearxan, used to disable Arxan (MIT / Apache-2.0).\n"
+            "https://github.com/tremwil/dearxan\n\n"
+            "Full license notices: Lexeditor → Information → Credits → Dark Souls Remastered.\n"
+            "https://github.com/Lexer-Lux/Lexeditor/blob/master/plugins/ds1/credits.md")
 
 
 def _loader_folder(root: Path) -> Path | None:

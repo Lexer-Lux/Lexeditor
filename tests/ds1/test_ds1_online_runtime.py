@@ -82,7 +82,9 @@ def test_existing_loader_description_is_updated_without_resetting_switch(tmp_pat
     folder = tweak_mods.ensure_loader_mod(tmp_path)
     metadata = json.loads((folder / 'mod.json').read_text())
     assert 'MetalCrow' in metadata['credits'] and 'Ainsley Harriott' in metadata['credits']
-    assert 'tremwil' in metadata['credits'] and 'GNU AFFERO GENERAL PUBLIC LICENSE' in metadata['credits']
+    assert 'tremwil' in metadata['credits'] and 'AGPLv3' in metadata['credits']
+    assert len(metadata['credits']) < 1000
+    assert 'GNU AFFERO GENERAL PUBLIC LICENSE' not in metadata['credits']
     del metadata['credits']  # Upgrade an existing loader created before credits were included.
     metadata.update(description='keeps the game offline', enabled=True, author='reader')
     (folder / 'mod.json').write_text(json.dumps(metadata))

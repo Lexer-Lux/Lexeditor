@@ -26,7 +26,7 @@ def _files(root):
 
 
 def _reset(root):
-    from .tweak_mods import checked
+    from .tweak_paths import checked
     for path in _files(root):
         checked(path)
         if path.exists():
@@ -59,7 +59,7 @@ def _corrupt(error):
 
 @contextmanager
 def _database(root):
-    from .tweak_mods import checked
+    from .tweak_paths import checked
     root = Path(root)
     checked(root)
     for path in _files(root):
