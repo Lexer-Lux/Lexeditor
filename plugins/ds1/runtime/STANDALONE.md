@@ -11,6 +11,10 @@ data priority. Lower numbers apply first; if two mods change the same field,
 the higher number wins. A missing order is 1000; equal orders sort by mod name.
 Different fields combine, including fields inside the same game archive.
 The loader records data conflicts in `lexeditor-ds1-load.json`.
+Each conflict names the competing mods, the current winner, and the exact
+`mod.json` paths to edit. Close the game, edit `order`, then launch again.
+For example, `"order": 2000` wins over `"order": 1000` for conflicting data.
+Use different numbers when choosing a winner, rather than relying on name sorting.
 
 Native hooks cannot use this field-merging rule. If two modules claim
 incompatible code or hooks, the later conflicting module is skipped and named

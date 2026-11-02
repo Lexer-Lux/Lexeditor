@@ -356,7 +356,13 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
         report = {'version':1,'loaded':[row['id'] for row in rows if row['path'].resolve() in data_folders],
                   'disabled':disabled,'targets':targets,
                   'warnings':[warning] if warning else [],
-                  'conflicts':[str(conflict.part) for conflict in composition.conflicts][:128]}
+                  'conflicts':[
+                      f"{conflict.file}: {conflict.part}: {', '.join(conflict.mods)} change this. "
+                      f"{conflict.mods[-1]} currently wins. To change data priority, edit the integer "
+                      f"'order' in {', '.join(str(mod.folder / 'mod.json') for mod in data if mod.name in conflict.mods)}. "
+                      "Higher numbers win. Close the game before editing, then launch it again. "
+                      "Priority cannot combine incompatible runtime hooks."
+                      for conflict in composition.conflicts[:128]]}
         report['signature'] = _identity(rows,game,targets)
         raw = (json.dumps(report,indent=2)+'\n').encode()
         if len(raw) > MAX_REPORT:
