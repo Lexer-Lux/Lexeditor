@@ -1385,8 +1385,29 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
     result["stale"] = sorted(stale)
     result["set"] = set(built) != {row["id"] for row in rows}
 
-    result["needed"] = bool(stale) or result["set"] or modules_changed or not runtime['active']
+    data_changed = False
+    if 'dataRecipe' in record:
+        try:
+            data_changed = record['dataRecipe'] != data_recipe(root)
+        except (ValueError, OSError):
+            data_changed = True
+    result["needed"] = bool(stale) or result["set"] or modules_changed or data_changed or not runtime['active']
     return result
+
+
+def data_recipe(root: Path | None = None) -> str:
+    """The ordered data contributions last installed, including direct edits.
+
+    Reuse the conflict report's bounded file discovery and change stamps;
+    polling freshness never parses or recompresses the archives themselves.
+    """
+    from core import mods_service
+    from .mod_support import Ds1ModAdapter
+    ordered = [(row['name'], Path(row['path']))
+               for row in mods_service.library_rows(Path(root or mods_root())) if row['enabled']]
+    recipe = ([str(folder.resolve()) for _name, folder in ordered],
+              Ds1ModAdapter._content_signature(ordered))
+    return _sha(json.dumps(recipe, sort_keys=True, separators=(',', ':')).encode('utf-8'))
 
 
 def _bounded_file(path: Path, limit: int, *, cache=False):
@@ -1470,7 +1491,7 @@ def _runtime_batch(game_root: Path, writes: dict, *, expected=None) -> dict:
 
 
 def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], project,
-                   built: dict | None = None, *, library=None, modules=None, expected=None) -> dict:
+                   built: dict | None = None, *, library=None, modules=None, expected=None, data_recipe=None) -> dict:
     """Install, replace or remove the loader and its patch description.
 
     With the loader mod on, the loader goes in even with no tweak to apply."""
@@ -1491,6 +1512,8 @@ def _write_runtime(game_root: Path, patch: bytes | None, mods: list[str], projec
     record = {"version": 1, "mods": list(mods), "project": _project(project),
               "patchSha256": _sha(patch), "dllSha256": _sha(loader),
               "built": dict(built or {}), 'modules': dict(modules or {})}
+    if data_recipe is not None:
+        record['dataRecipe'] = data_recipe
     # A malformed record may have held an unrecoverable legacy project recipe.
     # Keep that fact visible after rebuilding healthy folder contributions.
     _old_record, recovery = runtime_record(game_root)
@@ -1806,7 +1829,7 @@ def commit(game_root: Path, plan: dict) -> None:
         # Keep the successful receipt for a later data-deployment rollback.
         runtime['receipt'] = _write_runtime(game_root, runtime['patch'], runtime['mods'], runtime['project'], runtime.get('built'),
                                             library=runtime.get('library'), modules=runtime.get('modules'),
-                                            expected=runtime.get('expected'))
+                                            expected=runtime.get('expected'), data_recipe=runtime.get('dataRecipe'))
         done.append({'runtime':runtime['receipt']})
     except Exception as failure:
         try:

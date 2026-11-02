@@ -4,6 +4,41 @@ from pathlib import Path
 import sys
 import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from test_ds1_tweak_save_rebuild import game, library  # noqa: F401
+
+
+def test_direct_data_edit_stays_pending_until_its_bytes_are_installed(game, library, monkeypatch):
+    from plugins.ds1 import tweak_mods
+    from plugins.ds1.mod_support import Ds1ModAdapter
+    from plugins.ds1.store import RELATIVE
+    from plugins.ds1.formats import ItemDocument
+    from ds1_fixture import make_archive
+    monkeypatch.setenv(tweak_mods.MODS_ENV,str(library))
+    (game/RELATIVE).parent.mkdir(parents=True)
+    original=make_archive()
+    (game/RELATIVE).write_bytes(original)
+    folder=library/'Data'
+    (folder/RELATIVE).parent.mkdir(parents=True)
+    (folder/'mod.json').write_text(json.dumps({'name':'Data','enabled':True,'order':30}))
+    (folder/RELATIVE).write_bytes(make_archive(field_values={'EquipParamGoods':{100:{'sellValue':17}}}))
+    adapter=Ds1ModAdapter();adapter.attach_context(library_root=library)
+    paths=[library/'Alpha',library/'Beta',folder]
+    adapter.activate(paths,game)
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==17
+    (folder/RELATIVE).write_bytes(make_archive(field_values={'EquipParamGoods':{100:{'sellValue':18}}}))
+    assert tweak_mods.needs_rebuild(game,library)['needed']
+    adapter.activate(paths,game)
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    assert ItemDocument((game/RELATIVE).read_bytes()).value('EquipParamGoods',100,'sellValue')==18
+    adapter._report_path().unlink()
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    metadata=json.loads((folder/'mod.json').read_text());metadata['enabled']=False
+    (folder/'mod.json').write_text(json.dumps(metadata))
+    assert tweak_mods.needs_rebuild(game,library)['needed']
+    adapter.activate(paths[:-1],game)
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    assert (game/RELATIVE).read_bytes()==original
 
 
 def test_menu_recipe_tracks_its_codec_without_global_editor_revision(tmp_path, monkeypatch):
@@ -55,7 +90,7 @@ def test_native_toggle_reuses_installed_data_without_composition(tmp_path, monke
     (data/RELATIVE).parent.mkdir(parents=True)
     (data/RELATIVE).write_bytes(b'data input')
     monkeypatch.setattr(mods_service, 'library_rows', lambda root: [
-        {'name':'Iframe Display', 'path':str(native)}, {'name':'Data', 'path':str(data)}])
+        {'name':'Iframe Display', 'path':str(native), 'enabled':True}, {'name':'Data', 'path':str(data), 'enabled':True}])
     adapter = mod_support.Ds1ModAdapter()
     adapter.attach_context(library_root=library)
     monkeypatch.setattr(adapter, '_report_path', lambda: tmp_path/'report.json')
@@ -64,7 +99,7 @@ def test_native_toggle_reuses_installed_data_without_composition(tmp_path, monke
     assert adapter._ordered_mods([native, data]) == ordered
     monkeypatch.setattr(tweak_mods, 'ensure_game_closed', lambda: None)
     monkeypatch.setattr(tweak_mods, 'locked', lambda root: nullcontext())
-    monkeypatch.setattr(tweak_mods, 'prepare', lambda *args, **kwargs: {'files':[]})
+    monkeypatch.setattr(tweak_mods, 'prepare', lambda *args, **kwargs: {'files':[], 'runtime':{}})
     monkeypatch.setattr(tweak_mods, 'commit', lambda *args: None)
     def no_composition(*args, **kwargs):
         pytest.fail('A native toggle must not recompose or redeploy unchanged game data')
@@ -153,7 +188,7 @@ def test_prepared_texture_order_invalidates_only_the_installed_pair_reuse(tmp_pa
     tweak_mods.LAYOUT.live(game).write_bytes(layout['value'])
     monkeypatch.setattr(tweak_mods,'ensure_game_closed',lambda:None)
     def prepare(*args,**kwargs):
-        return {'files':[{'managed':tweak_mods.LAYOUT,'before':tweak_mods.LAYOUT.live(game).read_bytes(),
+        return {'runtime':{},'files':[{'managed':tweak_mods.LAYOUT,'before':tweak_mods.LAYOUT.live(game).read_bytes(),
                           'after':layout['value']}]}
     monkeypatch.setattr(tweak_mods,'prepare',prepare)
     monkeypatch.setattr(tweak_mods,'commit',lambda root,plan:tweak_mods.LAYOUT.live(root).write_bytes(plan['files'][0]['after']))
