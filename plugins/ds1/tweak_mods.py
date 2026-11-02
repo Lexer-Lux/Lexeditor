@@ -394,11 +394,12 @@ class BuildContext:
     """What a DS1 tweak script gets from Lexeditor."""
 
     def __init__(self, enabled: dict[str, Path], game_root: Path | None = None,
-                 library_root: Path | None = None, *, cache_root=None):
+                 library_root: Path | None = None, *, cache_root=None, python_sources=None):
         self._enabled = enabled
         self.game_root = Path(game_root) if game_root is not None else None
         self._library_root = library_root
         self._cache_root = cache_root
+        self._python_sources = python_sources
         self._params: bytes | None = None
         self.current = ""
         self._inputs = {}
@@ -457,7 +458,13 @@ class BuildContext:
                         self.game_file(name)
                     elif kind == 'python':
                         from core.build_dependencies import fingerprint
-                        self._remember('python',name,fingerprint(name))
+                        if self._python_sources is None:
+                            value = fingerprint(name)
+                        else:
+                            if name not in self._python_sources:
+                                self._python_sources[name] = fingerprint(name)
+                            value = self._python_sources[name]
+                        self._remember('python',name,value)
                     elif kind == 'params':
                         self.game_params()
                     else:
@@ -652,7 +659,8 @@ def build_specs(root: Path | None = None, game_root: Path | None = None, *, cach
         raise TweakError(str(error), folders=getattr(error, 'folders', ())) from error
     rows = [row for row in tweak_rows(root) if row["enabled"]]
     ensure_loader_mod(root)
-    context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root, cache_root=cache_root)
+    context = BuildContext({row["id"]: Path(row["path"]) for row in rows}, game_root, root,
+                           cache_root=cache_root, python_sources={})
     script_mods.build_batch(rows, context, allowed_roots=ALLOWED_ROOTS, error=TweakError, timings=timings)
     from . import native_support, native_rules
     if game_root is not None and any((Path(row['path'])/native_rules.SETTINGS_FILE).is_file() for row in rows):
@@ -778,7 +786,7 @@ def native_spans(folder: Path, owner: str) -> dict[str, list[tuple[int, int]]]:
     return found
 
 
-def build_fingerprint(folder: Path, *, produced=False) -> str:
+def build_fingerprint(folder: Path, *, produced=False, python_sources=None) -> str:
     """What the last build of one tweak mod saw, hashed together.
 
     The switch, load order, name, settings, schema, script and built files:
@@ -799,9 +807,15 @@ def build_fingerprint(folder: Path, *, produced=False) -> str:
         if (type(dependencies) is not dict or len(dependencies)>build_dependencies.MAX_INPUTS
                 or any(type(name) is not str or not _digest(value) for name,value in dependencies.items())):
             raise ValueError('Invalid compiler dependency record')
-        parts['python'] = dict(dependencies) if produced else {
-            name:_sha(json.dumps(build_dependencies.fingerprint(name),sort_keys=True,separators=(',',':')).encode())
-            for name in dependencies}
+        if produced:
+            parts['python'] = dict(dependencies)
+        else:
+            sources = {} if python_sources is None else python_sources
+            for name in dependencies:
+                if name not in sources:
+                    sources[name] = build_dependencies.fingerprint(name)
+            parts['python'] = {name:_sha(json.dumps(sources[name],sort_keys=True,separators=(',',':')).encode())
+                               for name in dependencies}
     except (script_mods.ScriptModError,OSError,ValueError,TypeError,AttributeError,RuntimeError):
         parts['python'] = None  # An invalid optional cache requests a rebuild.
         record = {}
@@ -1376,9 +1390,10 @@ def needs_rebuild(game_root: Path, root: Path | None = None) -> dict:
         return result
     built = record.get("built") or {}
     stale = []
+    python_sources = {}  # One content read per shared helper in this scan.
     for row in rows:
         try:
-            digest = build_fingerprint(Path(row["path"]))
+            digest = build_fingerprint(Path(row["path"]), python_sources=python_sources)
         except (ValueError, OSError):
             # tweak_rows just read this mod fine; a lock landing between
             # that and this read is transient interference, not a change.

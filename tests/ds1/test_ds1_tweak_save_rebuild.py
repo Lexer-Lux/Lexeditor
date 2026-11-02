@@ -586,10 +586,10 @@ def test_an_unreadable_mod_counts_as_unchanged_not_stale(game, library, monkeypa
     tweak_mods.apply(game, library)
     real_fingerprint = tweak_mods.build_fingerprint
 
-    def flaky(folder):
+    def flaky(folder, **kwargs):
         if Path(folder).name == "Alpha":
             raise OSError("locked")
-        return real_fingerprint(folder)
+        return real_fingerprint(folder, **kwargs)
 
     monkeypatch.setattr(tweak_mods, "build_fingerprint", flaky)
     assert tweak_mods.needs_rebuild(game, library)["stale"] == []

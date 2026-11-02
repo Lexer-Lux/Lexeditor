@@ -44,6 +44,33 @@ def test_direct_data_edit_stays_pending_until_its_bytes_are_installed(game, libr
     assert (game/RELATIVE).read_bytes()==original
 
 
+def test_freshness_reads_shared_python_inputs_once_per_scan_and_checks_them_next_time(game,library,monkeypatch):
+    from plugins.ds1 import tweak_mods
+    from core import build_dependencies
+    monkeypatch.setenv(tweak_mods.MODS_ENV,str(library))
+    for name in ('Alpha','Beta'):
+        path=library/name/'script/tweak.py'
+        path.write_text('from plugins.ds1 import formats\n'+path.read_text())
+    tweak_mods.apply(game,library)
+    original=build_dependencies.fingerprint
+    calls=[]
+    changed={'value':False}
+    def fingerprint(name):
+        calls.append(name)
+        return '0'*64 if changed['value'] and name=='plugins/ds1/formats.py' else original(name)
+    monkeypatch.setattr(build_dependencies,'fingerprint',fingerprint)
+    assert not tweak_mods.needs_rebuild(game,library)['needed']
+    assert calls.count('plugins/ds1/formats.py')==1
+    calls.clear();changed['value']=True
+    assert tweak_mods.needs_rebuild(game,library)['stale']==['alpha','beta']
+    assert calls.count('plugins/ds1/formats.py')==1
+    changed['value']=False
+    for _ in range(2):
+        calls.clear()
+        tweak_mods.build_specs(library,game)
+        assert calls.count('plugins/ds1/formats.py')==1
+
+
 def test_menu_recipe_tracks_its_codec_without_global_editor_revision(tmp_path, monkeypatch):
     from plugins.ds1 import tweak_mods, menu_layout, menu_scripts, formats, esd, mod_loader
     for module in (menu_layout, menu_scripts, formats, esd):
@@ -98,7 +125,7 @@ def test_native_toggle_reuses_installed_data_without_composition(tmp_path, monke
     adapter.attach_context(library_root=library)
     monkeypatch.setattr(adapter, '_report_path', lambda: tmp_path/'report.json')
     ordered = adapter._ordered_mods([data])
-    adapter._save_report(game, ordered, [], installed=True)
+    adapter._save_report(game, ordered, [], installed=True, menu_inputs=[])
     assert adapter._ordered_mods([native, data]) == ordered
     monkeypatch.setattr(tweak_mods, 'ensure_game_closed', lambda: None)
     monkeypatch.setattr(tweak_mods, 'locked', lambda root: nullcontext())
