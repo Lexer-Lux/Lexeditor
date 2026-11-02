@@ -7,9 +7,17 @@
     "OverhaulDLL/src/AntiAntiCheat.cpp": "365ae0ca7ec2f85c8405270fae94030dbf137bd5dd4973dcc942f919c532dab6",
     "OverhaulDLL/include/AntiAntiCheat.h": "4ea2dda4c63ccb13eb304625b87fccea2045ddb8ddd2041a51a33dc10a0baf4c",
     "OverhaulDLL/src/AntiAntiCheatASM.asm": "90e19ef1232ffa3fdc343f7504ae36008234c5e8c6de0b79269ff34edbe1dd80",
-    "LICENSE.txt": "e1ec41f30b86470d5176560801f478778af6ecdd44420ca5321ca57a2df5629f"
+    "LICENSE.txt": "e1ec41f30b86470d5176560801f478778af6ecdd44420ca5321ca57a2df5629f",
+    "OverhaulDLL/src/AntiCheat/AntiCheat.cpp": "56f81d71cf107fc5e3f40699d7bffc8586d419659eaae0a12380ddb7f17da32f",
+    "OverhaulDLL/include/AntiCheat.h": "51b5881c45e1c0c9849d862e063d697de7d507da3a4b55114dbe44329cfe6da6",
+    "OverhaulDLL/src/AntiCheatASM.asm": "77cadec169f2b9f44f7815b936771544cc991c564c78d4b2200defb68b5e3c47",
+    "OverhaulDLL/src/ServerMonitorASM.asm": "48c44dd8d157991888ac338b49c63b026a8ec34b12df2e5334017407a7eb4dfa"
   },
   "changes": [
-    "Bound the flag array compaction loop to avoid reading past the input array."
+    "Bound the flag array compaction loop to avoid reading past the input array.",
+    "Adapt AntiCheat to vanilla Steam session callbacks instead of the Overhaul networking replacement.",
+    "Use minimal asserted character layouts; reject null character/control pointers in NPC guards.",
+    "Cap name sanitization at 32 wide characters, including its look-ahead.",
+    "Bound invader tracking and validate Steam IDs; clear tracking on lobby changes and peer departure."
   ]
 }

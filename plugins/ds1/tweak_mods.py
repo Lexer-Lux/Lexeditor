@@ -280,7 +280,8 @@ LOADER_DESCRIPTION = ("Installs Lexeditor's loader, which applies executable pat
 
 def loader_credits() -> str:
     """Short attribution here; complete notices stay in the plugin's legal credits."""
-    return ("MetalCrow and Ainsley Harriott — anti-ban code from Dark Souls 1 PvP Fixes and Overhaul (AGPLv3).\n"
+    return ("MetalCrow, Ainsley Harriott, Ashley and Sean Pesce — anti-ban and player anti-cheat code "
+            "from Dark Souls 1 PvP Fixes and Overhaul (AGPLv3).\n"
             "https://github.com/metal-crow/Dark-Souls-1-Overhaul\n\n"
             "tremwil — dearxan, used to disable Arxan (MIT / Apache-2.0).\n"
             "https://github.com/tremwil/dearxan\n\n"
@@ -327,6 +328,11 @@ def ensure_loader_mod(root: Path | None = None) -> Path:
         if not metadata.get("credits"):
             metadata["credits"] = loader_credits()
             changed = True
+        else:
+            old = "MetalCrow and Ainsley Harriott — anti-ban code from Dark Souls 1 PvP Fixes and Overhaul (AGPLv3)."
+            if metadata["credits"].startswith(old):
+                metadata["credits"] = loader_credits().split('\n', 1)[0] + metadata["credits"][len(old):]
+                changed = True
         if changed:
             atomic_write(found / "mod.json", (json.dumps(metadata, indent=2) + "\n").encode("utf-8"))
         _drop_debug_flag(folder)

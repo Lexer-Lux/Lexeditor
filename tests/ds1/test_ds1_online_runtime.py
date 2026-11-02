@@ -42,7 +42,10 @@ def test_shipped_sources_and_online_dll_match():
     source = json.loads((RUNTIME / 'overhaul/SOURCE.json').read_text())
     assert source['revision'] == build.OVERHAUL_REVISION
     for name, upstream in [('AntiAntiCheat.h', 'OverhaulDLL/include/AntiAntiCheat.h'),
-                           ('AntiAntiCheatASM.asm', 'OverhaulDLL/src/AntiAntiCheatASM.asm')]:
+                           ('AntiAntiCheatASM.asm', 'OverhaulDLL/src/AntiAntiCheatASM.asm'),
+                           ('AntiCheat.h', 'OverhaulDLL/include/AntiCheat.h'),
+                           ('AntiCheatASM.asm', 'OverhaulDLL/src/AntiCheatASM.asm'),
+                           ('ServerMonitorASM.asm', 'OverhaulDLL/src/ServerMonitorASM.asm')]:
         assert hashlib.sha256((RUNTIME / 'overhaul' / name).read_bytes()).hexdigest() == source['upstreamSha256'][upstream]
     assert 'GNU AFFERO GENERAL PUBLIC LICENSE' in (RUNTIME.parent / 'credits.md').read_text()
 
@@ -66,7 +69,85 @@ def test_native_upstream_filters_keep_matchmaking_but_remove_equipment_reports(t
     assert result.returncode == 0 and result.stdout.strip() == 'report filters passed', result
 
 
-def test_install_and_remove_preserve_saves_and_describe_new_runtime(tmp_path):
+def test_native_player_protections_preserve_legitimate_gameplay(tmp_path):
+    if sys.platform != 'win32':
+        pytest.skip('Windows runtime')
+    try:
+        vcvars = build_module().find_vcvars()
+    except SystemExit:
+        pytest.skip('MSVC is needed for the player-protection fixture')
+    source = Path(__file__).with_name('runtime_player_protection_harness.cpp')
+    script = tmp_path / 'build.bat'
+    script.write_text(f'@echo off\ncall "{vcvars}" >nul\n'
+                      f'cl /nologo /EHsc /std:c++17 /D_CRT_SECURE_NO_WARNINGS '
+                      f'/I"{RUNTIME / "overhaul"}" "{source}" /Fe:protect.exe\n', encoding='utf-8')
+    subprocess.run(['cmd', '/c', str(script)], cwd=tmp_path, check=True, capture_output=True, creationflags=FLAGS)
+    result = subprocess.run([str(tmp_path / 'protect.exe')], cwd=tmp_path, capture_output=True,
+                            text=True, timeout=10, creationflags=FLAGS)
+    assert result.returncode == 0 and result.stdout.strip() == 'player protections passed', result
+
+
+def test_native_mods_cannot_claim_installed_protection_ranges(tmp_path):
+    if sys.platform != 'win32':
+        pytest.skip('Windows runtime')
+    zig = build_module().find_zig(None)
+    exe = tmp_path/'claims.exe'
+    subprocess.run([zig, 'cc', '-target', 'x86_64-windows-gnu', '-O1', '-o', str(exe),
+                    str(Path(__file__).with_name('runtime_protection_claims_harness.c')), '-lshell32'],
+                   check=True, capture_output=True, creationflags=FLAGS)
+    result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10, creationflags=FLAGS)
+    assert result.returncode == 0 and result.stdout.strip() == 'protection ranges passed', result
+
+
+def test_crow_dashboard_reports_updates_without_installing(tmp_path):
+    from plugins.ds1 import runtime_protection
+    from plugins.ds1.plugin import PLUGIN
+    from core.plugin_api import plugin_helpers
+    spec, = plugin_helpers(PLUGIN)
+    assert not spec.required and not spec.install and not spec.install_for_root
+    pinned = runtime_protection.source()['revision']
+    rows = runtime_protection.upstream(fetch=lambda url: {
+        'sha': '1' * 40, 'commit': {'committer': {'date': '2026-11-02T00:00:00Z'}}})
+    assert rows['behind'] and rows['pinned'] == pinned[:12]
+    assert rows['releaseNotes'].endswith(f'{pinned}...'+ '1'*40)
+    assert not runtime_protection.upstream(fetch=lambda url: {
+        'sha': pinned, 'commit': {'committer': {'date': '2026-11-02T00:00:00Z'}}})['behind']
+    assert not runtime_protection.status(tmp_path)['installed']
+    (tmp_path/'dinput8.dll').write_bytes(b'foreign loader')
+    assert runtime_protection.status(tmp_path)['integrity'] == 'different loader'
+    (tmp_path/'dinput8.dll').write_bytes(tweak_mods.loader_bytes(online=True))
+    assert runtime_protection.status(tmp_path)['installed']
+
+
+def test_dashboard_uses_each_helpers_own_version_and_preserves_failed_lookups():
+    import threading
+    from unittest.mock import Mock
+    from core.desktop_host import HostApi
+    from core.plugin_api import GamePlugin, PluginHelper
+    upstream = Mock(return_value={'latest': 'new', 'behind': True})
+    plugin = GamePlugin('example', 'Example', '#fff', lambda: [], lambda: 0, helpers=(
+        PluginHelper('crow', 'Crow', upstream=upstream, pinned='old', required=False),
+        PluginHelper('other', 'Other', upstream=Mock(side_effect=OSError('offline')), pinned='v2', required=False)))
+    host = object.__new__(HostApi)
+    host._plugins = {'example': plugin}
+    host._lock = threading.RLock()
+    host._helper_versions = None
+    host._github = Mock()
+    host._github.visible_repository.return_value = True
+    host._installations = Mock()
+    host._installations.snapshot.return_value = {'root': '/game', 'helpers': [
+        {'key': 'crow', 'installed': True, 'version': 'old'},
+        {'key': 'other', 'installed': True, 'version': 'v2'}]}
+    host._reshade_helper_row = lambda: {'helper': 'ReShade'}
+    first, second, _ = host.helper_versions()['helpers']
+    assert first['installedVersion'] == 'old' and first['behind']
+    assert second['installedVersion'] == 'v2' and second['error'] == 'offline'
+    assert host.helper_versions()['cached']
+    upstream.assert_called_once()
+
+
+def test_install_and_remove_preserve_saves_and_describe_new_runtime(tmp_path, monkeypatch):
+    monkeypatch.setattr(tweak_mods, 'ensure_game_closed', lambda: None)  # synthetic installation only
     assert tweak_mods.launch_notice(tmp_path) == ''
     save = tmp_path / 'DRAKS0005.lexeditor.sl2'
     save.write_bytes(b'progress')
@@ -97,6 +178,13 @@ def test_existing_loader_description_is_updated_without_resetting_switch(tmp_pat
     (folder / 'mod.json').write_text(json.dumps(fresh))
     tweak_mods.ensure_loader_mod(tmp_path)
     assert json.loads((folder / 'mod.json').read_text())['credits'] == fresh['credits']
+    fresh['credits'] = ('MetalCrow and Ainsley Harriott — anti-ban code from Dark Souls 1 PvP Fixes and Overhaul (AGPLv3).'
+                       '\nReader additions remain here.')
+    (folder/'mod.json').write_text(json.dumps(fresh))
+    tweak_mods.ensure_loader_mod(tmp_path)
+    upgraded = json.loads((folder/'mod.json').read_text())['credits']
+    assert 'Ashley' in upgraded and 'Sean Pesce' in upgraded and 'player anti-cheat' in upgraded
+    assert upgraded.endswith('Reader additions remain here.')
 
 
 @pytest.fixture(scope='module')

@@ -146,6 +146,11 @@ int lx_save_install(unsigned char *image)
             if (IMAGE_SNAP_BY_ORDINAL64(names->u1.Ordinal)) continue;
             IMAGE_IMPORT_BY_NAME *import = (IMAGE_IMPORT_BY_NAME *)(image + names->u1.AddressOfData);
             if (strcmp((const char *)import->Name, "CreateFileW") != 0) continue;
+#ifdef LX_ONLINE_BUILD
+            extern int lx_reserve_runtime_range(unsigned rva, unsigned size);
+            if (!lx_reserve_runtime_range((unsigned)((unsigned char *)&slots->u1.Function - image),
+                                          sizeof slots->u1.Function)) return 0;
+#endif
             DWORD old, ignored;
             if (!VirtualProtect(&slots->u1.Function, sizeof slots->u1.Function, PAGE_READWRITE, &old)) return 0;
             slots->u1.Function = (ULONGLONG)(uintptr_t)save_create_file;

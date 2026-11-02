@@ -843,6 +843,11 @@
     "ds1": {
       "contributions": [
         {
+          "name": "MetalCrow, Ainsley Harriott, Ashley and Sean Pesce / Dark Souls 1 PvP Fixes and Overhaul",
+          "role": "AGPLv3 anti-ban reporting filters and player anti-cheat protections adapted into the online loader. Pinned source and local changes are recorded in runtime/overhaul/SOURCE.json.",
+          "url": "https://github.com/metal-crow/Dark-Souls-1-Overhaul"
+        },
+        {
           "name": "Vawser and Smithbox contributors",
           "role": "Dark Souls Remastered detection reference and MIT-licensed DS1 item, NPC, attack, behavior and projectile definitions, annotations, row names and enums. No upstream executable code or dependencies are copied.",
           "url": "https://github.com/vawser/Smithbox"

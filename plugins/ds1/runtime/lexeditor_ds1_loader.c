@@ -651,8 +651,9 @@ static void apply_from_file(void)
     CloseHandle(file);
     if (!ok)
         snprintf(message, sizeof message, "Could not read lexeditor-ds1-patch.bin; nothing was changed");
-    else if (lx_apply((unsigned char *)GetModuleHandleW(NULL), data, read, message, sizeof message))
-        lx_check_claims(data, read, NULL, message, sizeof message, 1);
+    else if (lx_check_claims(data, read, NULL, message, sizeof message, 0, "combined native patches") &&
+             lx_apply((unsigned char *)GetModuleHandleW(NULL), data, read, message, sizeof message))
+        lx_check_claims(data, read, NULL, message, sizeof message, 1, "combined native patches");
     if (data)
         HeapFree(GetProcessHeap(), 0, data);
     write_log(message);

@@ -228,16 +228,23 @@ is not integrated yet, so headings use an engraved serif fallback. Menu UI event
 ## Online loader protection
 
 The online runtime vendors MetalCrow and Ainsley Harriott's anti-ban implementation
+and player anti-cheat protections credited to MetalCrow, Ainsley Harriott, Ashley
+and Sean Pesce
 from Dark Souls 1 PvP Fixes and Overhaul, commit
 `2a3d8cbe2acee663bef03c7be4f968dbb68f951f` (Beta36 / Antiban A36).
 Repository: https://github.com/metal-crow/Dark-Souls-1-Overhaul
 
 Copied files: `OverhaulDLL/src/AntiAntiCheat.cpp`,
-`OverhaulDLL/include/AntiAntiCheat.h`, `OverhaulDLL/src/AntiAntiCheatASM.asm`.
+`OverhaulDLL/include/AntiAntiCheat.h`, `OverhaulDLL/src/AntiAntiCheatASM.asm`,
+`OverhaulDLL/src/AntiCheat/AntiCheat.cpp`, `OverhaulDLL/include/AntiCheat.h`,
+`OverhaulDLL/src/AntiCheatASM.asm` and `OverhaulDLL/src/ServerMonitorASM.asm`.
 Their original SHA-256 hashes and the original license hash are recorded in
 `runtime/overhaul/SOURCE.json`. The C++ array compaction bounds are corrected
 locally to avoid an out-of-bounds read. The adapter and save isolation code are
-new. No upstream balance changes or multiplayer mode system are included.
+new. The player-protection adapter uses vanilla Steam session callbacks instead
+of the upstream networking replacement, bounds name scanning and invader tracking,
+and checks hook bytes before installation. No upstream balance changes or
+multiplayer mode system are included.
 
 The combined online DLL is distributed under GNU AGPL version 3. Its complete
 corresponding source and reproducible build instructions are in `runtime/` in
