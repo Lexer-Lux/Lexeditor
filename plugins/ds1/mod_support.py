@@ -224,6 +224,10 @@ class Ds1ModAdapter:
                               if layout is not None and (game_root/main_texture).is_file() else None)
                 mod_loader.align_menu_textures(game_root,composition,layout)
             composed = perf_counter()
+            # The successful transaction owns this recipe. Conflict-cache
+            # refreshes cannot erase it or claim that later data edits are
+            # already installed merely because native script inputs match.
+            plan['runtime']['dataRecipe'] = tweak_mods.data_recipe(library)
             tweak_mods.commit(game_root, plan)
             try:
                 if not reused and composition.files:
