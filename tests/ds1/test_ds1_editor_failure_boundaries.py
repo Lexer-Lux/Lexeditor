@@ -263,6 +263,9 @@ def test_editor_only_source_changes_do_not_invalidate_archive_outputs(monkeypatc
 
 
 def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path, monkeypatch):
+    codec=tmp_path/'codec.py'
+    codec.write_bytes(b'codec-one')
+    monkeypatch.setattr(tweak_mods.menu_layout,'__file__',str(codec))
     calls = []
     def compose(*args):
         calls.append(True)
@@ -274,6 +277,9 @@ def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path,
     assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
     assert len(calls) == 1
     monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'composer-two')
+    assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
+    assert len(calls) == 1
+    codec.write_bytes(b'codec-two')
     assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
     assert len(calls) == 2
 
