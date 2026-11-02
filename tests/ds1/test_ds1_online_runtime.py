@@ -159,7 +159,7 @@ def test_install_and_remove_preserve_saves_and_describe_new_runtime(tmp_path, mo
     assert save.read_bytes() == b'progress'
 
 
-def test_existing_loader_description_is_updated_without_resetting_switch(tmp_path):
+def test_existing_loader_description_is_preserved_without_resetting_switch(tmp_path):
     folder = tweak_mods.ensure_loader_mod(tmp_path)
     metadata = json.loads((folder / 'mod.json').read_text())
     assert 'MetalCrow' in metadata['credits'] and 'Ainsley Harriott' in metadata['credits']
@@ -172,7 +172,7 @@ def test_existing_loader_description_is_updated_without_resetting_switch(tmp_pat
     assert tweak_mods.ensure_loader_mod(tmp_path) == folder
     fresh = json.loads((folder / 'mod.json').read_text())
     assert fresh['enabled'] and fresh['author'] == 'reader'
-    assert fresh['description'] == tweak_mods.LOADER_DESCRIPTION
+    assert fresh['description'] == 'keeps the game offline'
     assert fresh['credits'] == tweak_mods.loader_credits()
     fresh['credits'] += '\nAdditional attribution from the reader.'
     (folder / 'mod.json').write_text(json.dumps(fresh))
@@ -185,6 +185,22 @@ def test_existing_loader_description_is_updated_without_resetting_switch(tmp_pat
     upgraded = json.loads((folder/'mod.json').read_text())['credits']
     assert 'Ashley' in upgraded and 'Sean Pesce' in upgraded and 'player anti-cheat' in upgraded
     assert upgraded.endswith('Reader additions remain here.')
+
+
+@pytest.mark.parametrize('description', ['', 'My long description\n\nINSTALLATION\nHand-written instructions.'])
+def test_loader_scan_keeps_user_description_and_does_not_rewrite_metadata(tmp_path, monkeypatch, description):
+    folder = tweak_mods.ensure_loader_mod(tmp_path)
+    path = folder/'mod.json'
+    metadata = json.loads(path.read_text())
+    metadata['description'] = description
+    path.write_text(json.dumps(metadata))
+    before = path.read_bytes()
+    def unexpected_write(*_args, **_kwargs):
+        pytest.fail('An unchanged loader scan rewrote the user metadata')
+    monkeypatch.setattr(tweak_mods, 'atomic_write', unexpected_write)
+    for _ in range(3):
+        assert tweak_mods.ensure_loader_mod(tmp_path) == folder
+    assert path.read_bytes() == before
 
 
 @pytest.fixture(scope='module')

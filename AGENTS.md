@@ -92,6 +92,11 @@ work, even if your tool does not load skills on its own.
 
 ## Git and publishing
 
+- Before preparing or publishing a Nexus Mods upload, remind Lexer to check
+  Nexus support's pending reply about user-triggered updates and the proposed
+  networking-disabled distribution. Do not treat the auto-update wording as
+  confirmation that manual updates or the re-enable mechanism are accepted.
+
 - Branches are fine; leftovers are not. When a task is done and verified, merge
   its branch into local master and delete the branch, its worktree and any stash
   in the same session, no go-ahead needed: local master is the default place
