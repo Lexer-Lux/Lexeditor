@@ -32,6 +32,21 @@ def test_private_directories_are_pruned_before_scanning(tmp_path,monkeypatch):
     assert script_mods.consumed_files(root) == [Path('mod.json'),Path('script/tweak.py')]
 
 
+def test_load_order_and_enablement_do_not_change_authoring_fingerprint(tmp_path):
+    root = project(tmp_path)
+    path = root/'mod.json'
+    data = json.loads(path.read_text())
+    baseline = script_mods.source_fingerprint(root)
+    for order, enabled in [(17, True), (16, True), (16, False)]:
+        path.write_text(json.dumps({**data, 'order': order, 'enabled': enabled}))
+        assert script_mods.source_fingerprint(root) == baseline
+    path.write_text(json.dumps({**data, 'script': {'version': 2}}))
+    assert script_mods.source_fingerprint(root) != baseline
+    path.write_text(json.dumps(data))
+    (root/'script/tweak.py').write_text('def build(settings,context): return {"native/x":"changed"}')
+    assert script_mods.source_fingerprint(root) != baseline
+
+
 def test_node_limit_fails_instead_of_caching_an_incomplete_source_set(tmp_path,monkeypatch):
     root = project(tmp_path)
     (root/'script/second.py').write_text('')

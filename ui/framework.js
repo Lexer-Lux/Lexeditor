@@ -16373,7 +16373,6 @@ ${contents.path}`});
           }});
         settingsPanels.push(...panels);
       }
-      if (settingsPanels.length) sections.push(detailSection({title: "SETTINGS", body: settingsPanels}));
       sections.push(
         detailSection({title: "DETAILS", body: [
           detailField({label: "NAME", property: "name", control: textControl(row, "name", "Name")}),
@@ -16535,6 +16534,7 @@ ${contents.path}`});
       // A loader note still counts as content, so it stays enabled.
       const recordsEmpty = recordsEmptyNow();
       if (modDetailTab === "records" && recordsEmpty) modDetailTab = "details";
+      if (modDetailTab === "settings" && !settingsPanels.length) modDetailTab = "details";
       // The header carries this mod's actions, so it stays first and the tab
       // bar below it never moves: flags ride the header's "!" badge.
       return detailPanel({title: row.name, actions, tabsBelowHeading: true, body: [tabbedPanel({
@@ -16543,6 +16543,9 @@ ${contents.path}`});
         paginate: false,
         tabs: [
           {id: "details", label: "Details"},
+          {id: "settings", label: "Settings",
+            ...(!settingsPanels.length ? {disabled: true,
+              disabledReason: "This mod has no configurable settings."} : {})},
           {id: "files", label: "Files",
             help: "Every file in the mod folder. The lit ones are the files the mod loader reads when the mod is on."},
           {id: "records", label: "Records",
@@ -16551,7 +16554,8 @@ ${contents.path}`});
             help: "Every row and text entry this mod changes compared to the game's own files. Maps, models and other files show under Files instead."},
         ],
         change: id => { modDetailTab = id; draw(); },
-        content: modDetailTab === "details" ? [...stateNotes, ...sections] : modDetailTab === "files" ? filesWrap : recordsWrap,
+        content: modDetailTab === "details" ? [...stateNotes, ...sections]
+          : modDetailTab === "settings" ? settingsPanels : modDetailTab === "files" ? filesWrap : recordsWrap,
       })], paginate: false});
     };
     const draw = () => {
