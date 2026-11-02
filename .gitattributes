@@ -6,7 +6,9 @@ plugins/ds1/runtime/package/** -text
 # Keep the pinned upstream anti-ban source bytes unchanged across checkouts.
 plugins/ds1/runtime/overhaul/AntiAntiCheat* -text
 plugins/ds1/runtime/overhaul/AntiCheat* -text
-plugins/ds1/runtime/overhaul/ServerMonitorASM.asm -text
+# Preserve upstream assembly whitespace as well as bytes for provenance checks.
+plugins/ds1/runtime/overhaul/AntiCheatASM.asm whitespace=-blank-at-eol
+plugins/ds1/runtime/overhaul/ServerMonitorASM.asm -text whitespace=-blank-at-eol
 
 # The vendored Shader Injector release is SHA-256 locked. Line endings must
 # not change. Its licence text lives in plugins/ff7r2/credits.md and is
