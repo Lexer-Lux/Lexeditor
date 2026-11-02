@@ -833,17 +833,47 @@ def test_rollback_never_puts_a_legacy_patched_executable_back(tmp_path, monkeypa
                                'after': b'vanilla', 'previous': {}}])
 
 
-def test_deployment_warning_does_not_lock_editor(page):
+def test_deployment_failure_stops_save_and_stays_in_a_modal(page, tmp_path):
     mount(page)
     source = (ROOT / 'plugins/ds1/editor.js').read_text('utf-8')
     start = source.index('function reportTweakRebuild(')
     end = source.index('\nasync function save()', start)
     page.add_script_tag(content=source[start:end])
-    page.evaluate('reportTweakRebuild({tweaksError:"Fixture disk failure"})')
-    assert page.locator('.lex-dialog').count() == 0
-    page.get_by_text('Changes saved; deployment failed. Fixture disk failure', exact=True).wait_for()
+    page.evaluate('''()=>{
+      window.followup=false;
+      try {reportTweakRebuild({tweaksError:"Fixture disk failure"});followup=true;}
+      catch(error){LexeditorUI.showAlert({title:error.title,message:error.message});}
+    }''')
+    assert not page.evaluate('followup')
+    dialog=page.get_by_role('alertdialog',name='Changes saved, but deployment failed',exact=True)
+    dialog.wait_for()
+    assert 'Fixture disk failure' in dialog.inner_text()
+    assert 'project changes were saved' in dialog.inner_text()
+    page.screenshot(path=str(tmp_path/'deployment-failure.png'))
+    dialog.get_by_role('button',name='Close',exact=True).click()
     page.locator('[data-tab="mods"]').click()
     page.get_by_role('textbox', name='Author').fill('Still editable')
+
+
+def test_menu_alignment_uses_texture_pack_bounds_for_read_and_write(monkeypatch):
+    from plugins.ds1 import texture_packs, formats
+    from test_ds1_assets import make_tpf, make_dds
+    from test_ds1_deflate_reuse import dcx
+    image=make_dds()
+    main=dcx(make_tpf([('A',image)]))
+    split=dcx(make_tpf([('B',image)]))
+    monkeypatch.setattr(texture_packs,'menu_texture_names',lambda _:['B','A'])
+    inflate,deflate=formats.inflate,formats.deflate
+    # Scale the generic archive bound down, so a real two-texture pack
+    # exercises the same failure without allocating a 65 MiB fixture.
+    monkeypatch.setattr(formats,'inflate',lambda data,max_size=256:inflate(data,max_size=max_size))
+    monkeypatch.setattr(formats,'deflate',lambda original,data,max_size=256:deflate(original,data,max_size=max_size))
+    result=texture_packs.align_menu(b'layout',main,[split])
+    plain=inflate(result,max_size=texture_packs.MAX_ASSET_BYTES)
+    assert len(plain)>256
+    _,rows=texture_packs.read(plain)
+    assert [row.name for row in rows]==['B','A']
+    assert all(row.data==image for row in rows)
 
 
 @pytest.mark.parametrize('outcome', ['success', 'failure', 'disabled'])
