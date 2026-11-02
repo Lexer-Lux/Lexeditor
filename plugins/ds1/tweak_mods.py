@@ -322,7 +322,7 @@ def ensure_loader_mod(root: Path | None = None) -> Path:
         # Backfill absent runtime credits, preserving any reader-written credits.
         metadata = mod_metadata._stored(found)
         changed = False
-        if metadata.get("description") != LOADER_DESCRIPTION:
+        if "description" not in metadata:
             metadata["description"] = LOADER_DESCRIPTION
             changed = True
         if not metadata.get("credits"):
@@ -331,8 +331,10 @@ def ensure_loader_mod(root: Path | None = None) -> Path:
         else:
             old = "MetalCrow and Ainsley Harriott — anti-ban code from Dark Souls 1 PvP Fixes and Overhaul (AGPLv3)."
             if metadata["credits"].startswith(old):
-                metadata["credits"] = loader_credits().split('\n', 1)[0] + metadata["credits"][len(old):]
-                changed = True
+                updated = loader_credits().split('\n', 1)[0] + metadata["credits"][len(old):]
+                if updated != metadata["credits"]:
+                    metadata["credits"] = updated
+                    changed = True
         if changed:
             atomic_write(found / "mod.json", (json.dumps(metadata, indent=2) + "\n").encode("utf-8"))
         _drop_debug_flag(folder)
