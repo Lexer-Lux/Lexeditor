@@ -81,7 +81,7 @@ async function api(path,body){
   if("tweaksNeedRebuild" in result)state.tweaksNeedRebuild=result.tweaksNeedRebuild;
   return result;
 }
-const notify=error=>LexeditorUI.showAlert({title:"Dark Souls",message:error.message||String(error)});
+const notify=error=>{LexeditorUI.showAlert({title:error.title||"Dark Souls",message:error.message||String(error)});if(error&&typeof error==="object")error.reported=true;};
 const failMount=(status,text)=>error=>{status.textContent=text;notify(error);};
 const fieldHistory={undoStack:[],redoStack:[],transaction:null,
   get applying(){return this.transaction?.phase==='applying';},
@@ -597,7 +597,11 @@ async function deploymentAction(action){
   finally{state.deployBusy=false;render();}
 }
 function reportTweakRebuild(result){
-  if(result.tweaksError)LexeditorUI.showToast("Changes saved; deployment failed. " + result.tweaksError,{tone:"warning"});
+  if(result.tweaksError){
+    const error=new Error(result.tweaksError+"\n\nYour project changes were saved, but deployment did not complete. The installed tweaks still need rebuilding.");
+    error.title="Changes saved, but deployment failed";
+    throw error;
+  }
   else if(result.disabledMods?.length)LexeditorUI.showToast("Changes saved. Other enabled mods rebuilt. " + result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});
   else if(result.tweaksDeferred)LexeditorUI.showToast("Changes saved. Close the game, then save again to rebuild the tweaks.");
   else if(result.tweaksRebuilt)LexeditorUI.showToast("Changes saved and tweaks rebuilt.");
@@ -607,7 +611,9 @@ function reportTweakRebuild(result){
 async function save(){
   await edits;
   try{
-    const result=await api("/api/save",{});attackPreviews.clear();await refreshState();
+    const result=await api("/api/save",{});
+    if(result.tweaksError)reportTweakRebuild(result);
+    attackPreviews.clear();await refreshState();
     if(state.tab==='maps'&&state.mapTab==='collision')await refreshCollision();
     if(state.tab==="tweaks"){await loadTweaks();render();}else shell.refresh();
     if(!reportTweakRebuild(result))LexeditorUI.showToast("Changes saved to the mod project.");

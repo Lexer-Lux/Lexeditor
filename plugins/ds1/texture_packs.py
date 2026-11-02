@@ -113,11 +113,11 @@ def align_menu(layout_data, main, supplements=()):
     """The combined menu's texture indices address an identically ordered pack."""
     from . import formats
     names = menu_texture_names(layout_data)
-    plain = formats.inflate(main) if main.startswith(b'DCX\0') else main
+    plain = formats.inflate(main, max_size=MAX_ASSET_BYTES) if main.startswith(b'DCX\0') else main
     header, rows = read(plain)
     available = {row.name: row for row in rows}
     for payload in supplements:
-        data = formats.inflate(payload) if payload.startswith(b'DCX\0') else payload
+        data = formats.inflate(payload, max_size=MAX_ASSET_BYTES) if payload.startswith(b'DCX\0') else payload
         _, extra = read(data)
         for row in extra:
             available.setdefault(row.name, row)
@@ -130,7 +130,7 @@ def align_menu(layout_data, main, supplements=()):
     if ordered == rows:
         return main
     result = write(header, ordered)
-    return formats.deflate(main, result) if main.startswith(b'DCX\0') else result
+    return formats.deflate(main, result, max_size=MAX_ASSET_BYTES) if main.startswith(b'DCX\0') else result
 
 
 def merge(original, variants, *, conflicts_only=False):
