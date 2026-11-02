@@ -801,6 +801,14 @@
     LexeditorHost.installCallbacks();
     window.addEventListener("pywebviewready",load,{once:true});
     window.addEventListener("pywebviewready",async()=>{
+      const networking = await window.pywebview.api.networking_notice().catch(()=>null);
+      if(networking?.show){
+        setDialog("Internet features disabled",networking.message,[
+          button("OPEN PROGRAM FOLDER",()=>window.pywebview.api.open_networking_notice_action("folder")),
+          button("DRAFT EMAIL TO NEXUS SUPPORT",()=>window.pywebview.api.open_networking_notice_action("support")),
+          button("CONTINUE",closeDialog,true)]);
+        return;
+      }
       try{const result=await window.pywebview.api.app_update_result();if(result?.message)setDialog(result.success?"Lexeditor updated":"Update failed",result.message,[button("CLOSE",closeDialog,true)]);}catch(error){console.warn("Could not read update result",error);}
     },{once:true});
   </script>
