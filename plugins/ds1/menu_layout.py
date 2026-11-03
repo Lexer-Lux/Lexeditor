@@ -36,10 +36,12 @@ beyond its rectangle.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from array import array
 from bisect import bisect_right, insort
 import hashlib
 from pathlib import Path
 import struct
+import sys
 
 from . import formats
 from core.mod_builds import ModBuildError
@@ -496,11 +498,19 @@ class Drb:
         """Move every object's and dialog's shape and control reference at or after `at`."""
         for tag, size in (("DLGO", DLGO_SIZE), ("DLG", DLG_SIZE)):
             data, count = self.sections[tag]
-            for index in range(count):
-                for field in (4, 8):
-                    value = struct.unpack_from("<i", data, index * size + field)[0]
+            words = array('i')
+            words.frombytes(data)
+            if sys.byteorder != 'little':
+                words.byteswap()
+            stride = size // 4
+            for field in (1, 2):
+                for index in range(field, count * stride, stride):
+                    value = words[index]
                     if value >= at:
-                        struct.pack_into("<i", data, index * size + field, value + 8)
+                        words[index] = value + 8
+            if sys.byteorder != 'little':
+                words.byteswap()
+            data[:] = words.tobytes()
 
     def _strings_end(self) -> int:
         if self._strings_used is not None:

@@ -8,10 +8,8 @@ import json
 import os
 from pathlib import Path, PureWindowsPath
 import shutil
-import stat
 import tempfile
 import uuid
-import zipfile
 
 
 MOD_FILE = "mod.json"  # Same metadata file used by the FF8 mod composer.
@@ -227,41 +225,24 @@ def file_tree(root: Path) -> list[Path]:
 
 
 @contextmanager
-def package_root(source: Path):
+def package_root(source: Path, *, allow_executables=False):
     """Expand only ZIPs; never run package code or follow package links."""
     source = Path(source)
     if source.is_symlink() or (source.exists() and
             getattr(source.lstat(), "st_file_attributes", 0) & 0x400):
-        raise ValueError("Choose a real folder or ZIP, not a link")
+        raise ValueError("Choose a real folder or archive, not a link")
     if source.is_dir():
         file_tree(source)
         yield source
         return
-    if source.suffix.casefold() not in {".zip", ".ctp"}:
-        raise ValueError("Choose a folder, ZIP archive, or CTP archive")
+    from core.archive_import import ARCHIVE_EXTENSIONS, extract
+    if not source.name.casefold().endswith(ARCHIVE_EXTENSIONS):
+        raise ValueError("Choose a folder or a supported archive (ZIP, RAR, 7z or TAR)")
     with tempfile.TemporaryDirectory(prefix="lexeditor-mod-import-") as temporary:
         root = Path(temporary)
-        with zipfile.ZipFile(source) as archive:
-            entries = archive.infolist()
-            if len(entries) > MAX_FILES or sum(e.file_size for e in entries) > MAX_BYTES:
-                raise ValueError("The archive exceeds the import size limit")
-            if sum(e.file_size for e in entries) > shutil.disk_usage(root).free:
-                raise OSError("There is not enough space to open this archive")
-            seen = set()
-            for entry in entries:
-                path = relative_path(entry.filename.rstrip("/"))
-                key = path.as_posix().casefold()
-                if key in seen or stat.S_ISLNK(entry.external_attr >> 16):
-                    raise ValueError(f"Duplicate path or link in archive: {path}")
-                seen.add(key)
-                target = root / path
-                if entry.is_dir():
-                    target.mkdir(parents=True, exist_ok=True)
-                else:
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    with archive.open(entry) as src, target.open("xb") as dst:
-                        shutil.copyfileobj(src, dst, 1024 * 1024)
+        extract(source, root, max_files=MAX_FILES, max_bytes=MAX_BYTES, allow_executables=allow_executables)
         yield root
+
 
 
 class ModLibrary:
@@ -353,11 +334,11 @@ class ModLibrary:
 
     @staticmethod
     def select_files(files: list[Path], selected: list[str] | None) -> list[Path]:
-        if selected is None:
-            return files
-        choices = [relative_path(value) for value in selected]
+        choices = files if selected is None else [relative_path(value) for value in selected]
         if len(set(choices)) != len(choices) or not set(choices).issubset(files):
             raise ValueError("Choose existing files once each")
+        if any(path.suffix.casefold() == '.exe' for path in choices):
+            raise ValueError('Executable installers are not imported as mods; select the mod data files')
         return choices
 
     def inspect(self, source: Path, adapter, data_root: str = "", selected: list[str] | None = None) -> dict:
@@ -368,9 +349,18 @@ class ModLibrary:
             files = self.select_files(file_tree(root), selected)
             from core.bundled_mods import inspect_bundle
             result = inspect_bundle(root, files, adapter)
+            info = metadata(root)
+            if 'name' in info.get('missing', []):
+                info['name'] = Path(data_root).name if data_root else Path(source).name
+                if not data_root and not Path(source).is_dir():
+                    from core.archive_import import ARCHIVE_EXTENSIONS
+                    for suffix in sorted(ARCHIVE_EXTENSIONS, key=len, reverse=True):
+                        if info['name'].casefold().endswith(suffix):
+                            info['name'] = info['name'][:-len(suffix)]
+                            break
             return {**result, "files": [p.as_posix() for p in file_tree(package)],
                     "rootFiles": [p.as_posix() for p in file_tree(root)],
-                    "dataRoot": data_root, "metadata": metadata(root)}
+                    "dataRoot": data_root, "metadata": info}
 
     def import_mod(self, plugin_id: str, source: Path, adapter, name: str,
                    data_root: str = "", selected: list[str] | None = None,

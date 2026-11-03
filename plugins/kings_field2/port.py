@@ -177,7 +177,7 @@ def install(root: Path) -> dict:
                 fetch_file(url, archive, limit=PIN["bytes"], label="Downloading Lexer's Verdite2 fork…")
                 if archive.stat().st_size != PIN["bytes"] or digest(archive) != PIN["sha256"]:
                     raise ValueError("The fork download did not match the pinned size and SHA-256")
-                with package_root(archive) as package:
+                with package_root(archive, allow_executables=True) as package:
                     files = file_tree(package)
                     if any(name.as_posix() in (RECEIPT, BACKUP) for name in files):
                         raise ValueError("The fork archive contains private installer state")

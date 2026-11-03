@@ -4,6 +4,7 @@ Every game gets the same Mods tab, leftmost: its mods in a table, the
 selected one's details beside it, and Lexer's Mod modules not downloaded yet
 greyed at the end. The first-run screen offers Lexer's Mod once per game.
 """
+import pytest
 from test_shared_ui_feedback import framework, page
 
 HOST = """(options) => {
@@ -46,6 +47,7 @@ HOST = """(options) => {
           : row).map(row => options.alerts && row.folder === 'Combat' && row.enabled
           ? {...row, alerts: ['This mod changed since the last build.']} : row), canManage: true,
       remote: [{folder: 'Extra', name: 'Extra', author: 'Lexer', description: 'More.', enabled: true, remote: true}],
+      archiveExtensions: ['.zip','.rar','.7z'],
       lexmod: {repository: 'Lexer-Lux/X', url: 'https://github.com/Lexer-Lux/X', error: ''}}),
     lexmod_update: async () => ({updated: false}),
     save_mod_details: async (plugin, path, details) => {
@@ -111,7 +113,7 @@ HOST = """(options) => {
      notEditable: "This mod has no files the editor can open."},
   ]});
   window.shell = LexeditorUI.mountShell({host: '#shell', plugin: {id: 'game', name: 'Test Game'},
-    tabs: [{id: 'items', label: 'Items'}, {id: 'tweaks', label: 'Tweaks'}],
+    tabs: options.noTweaks ? [{id: 'settings', label: 'Settings'}] : [{id: 'items', label: 'Items'}, {id: 'tweaks', label: 'Tweaks'}],
     activeTab: () => 'items', navigate: tab => { navigated.push(tab); document.querySelector('#main').textContent = 'plugin page ' + tab; },
     ...(options.vanilla ? {readonly: () => true, projectActiveSource: () => 'vanilla'} : {}),
     ...(options.save ? {save: async () => { window.saved = true; }, dirtyCount: () => 1} : {})});
@@ -120,11 +122,11 @@ HOST = """(options) => {
 
 
 def mount(page, first_run=False, lexmod=False, vanilla=False, conflicts=False, alerts=False, bundle=False, save=False, projects=False,
-          requires=False, versions=False, error_row=False):
+          requires=False, versions=False, error_row=False, no_tweaks=False):
     framework(page)
     page.evaluate(HOST, {"firstRun": first_run, "lexmod": lexmod, "vanilla": vanilla, "conflicts": conflicts,
                        "alerts": alerts, "bundle": bundle, "save": save, "projects": projects, "requires": requires,
-                       "versions": versions, "errorRow": error_row})
+                       "versions": versions, "errorRow": error_row, "noTweaks": no_tweaks})
     page.wait_for_timeout(250)
 
 
@@ -319,7 +321,7 @@ def test_the_plus_button_offers_create_and_add(page):
     # Creation lives in the detail header: no add button in the list.
     assert page.locator(".lex-mods-page .lex-table-add").count() == 0
     page.locator(".lex-mods-page .lex-detail-panel-actions").get_by_role("button", name="Add a mod").click()
-    for label in ("Create a new mod", "Add a folder…", "Add a ZIP…", "Cancel"):
+    for label in ("Create a new mod", "Add a folder…", "Add an archive…", "Cancel"):
         page.get_by_role("button", name=label, exact=True).wait_for()
     page.get_by_role("button", name="Cancel", exact=True).click()
 
@@ -364,6 +366,58 @@ def test_first_run_no_thanks_skips_the_download(page):
     page.get_by_role("button", name="No thanks").click()
     page.get_by_role("heading", name="Mods", exact=True).wait_for()
     assert not calls(page, "lexmod_download")
+
+
+def test_native_first_run_skips_nonexistent_tweaks_and_can_close(page):
+    mount(page, first_run=True, no_tweaks=True)
+    page.get_by_role("heading", name="Mods", exact=True).wait_for()
+    page.get_by_role("button", name="Next", exact=True).click()
+    page.get_by_role("heading", name="Please enjoy!", exact=True).wait_for()
+    page.get_by_role("button", name="Close setup", exact=True).click()
+    assert page.locator(".lex-first-run").count() == 0
+    assert calls(page, "finish_onboarding")
+
+
+@pytest.mark.parametrize('folder,extension', [(False,'zip'),(False,'rar'),(False,'7z'),(True,'')])
+def test_real_drop_lifetime_preserves_file_and_folder_handles_without_reordering(page, folder, extension):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role('checkbox', name='Mine enabled').wait_for()
+    page.evaluate("""({folder,extension}) => {
+      pywebview.api.begin_mod_upload=async()=>{
+        await new Promise(resolve=>setTimeout(resolve,15));
+        return {token:'drop',root:'C:/upload',maxFiles:100000,maxBytes:1000000};
+      };
+      pywebview.api.upload_mod_chunk=async(...args)=>calls.push(['upload_mod_chunk',args]);
+      pywebview.api.end_mod_upload=async(...args)=>calls.push(['end_mod_upload',args]);
+      pywebview.api.inspect_mod_package=async(...args)=>{
+        calls.push(['inspect_mod_package',args]);
+        return {valid:true,files:['mod.json'],rootFiles:['mod.json'],packages:['Mod'],metadata:{name:'Dropped'}};
+      };
+      const data=new DataTransfer();
+      const file=new File(['{}'],folder?'mod.json':'mod.'+extension);
+      const item=data.items.add(file);
+      if(folder){
+        const child={isFile:true,isDirectory:false,file:callback=>callback(file)};
+        const entry={name:'My mod',isDirectory:true,isFile:false,createReader:()=>{
+          let read=false;
+          return {readEntries:callback=>{callback(read?[]:[child]);read=true;}};
+        }};
+        window.restoreEntry=DataTransferItem.prototype.webkitGetAsEntry;
+        DataTransferItem.prototype.webkitGetAsEntry=()=>entry;
+      }
+      document.querySelectorAll('.lex-mods-page .lex-column-list-row')[1].dispatchEvent(
+        new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:data}));
+      data.items.clear(); // Real drop stores become protected after dispatch.
+      if(folder) DataTransferItem.prototype.webkitGetAsEntry=window.restoreEntry;
+    }""", {'folder':folder,'extension':extension})
+    page.get_by_role('button', name='Import mod', exact=True).wait_for()
+    assert page.get_by_role('button', name='Import mod', exact=True).is_enabled()
+    assert not calls(page,'move_mod')
+    assert calls(page,'inspect_mod_package')[-1][1] == ('C:/upload/My mod' if folder else 'C:/upload/mod.'+extension)
+    assert calls(page,'upload_mod_chunk')[-1][1] == ('My mod/mod.json' if folder else 'mod.'+extension)
+    page.get_by_role('button', name='Cancel', exact=True).click()
+    page.wait_for_function("window.calls.some(([name])=>name==='end_mod_upload')")
 
 
 def test_vanilla_still_switches_mods_and_reads_text_boxes(page):
@@ -530,7 +584,7 @@ def test_saving_clears_a_rebuilt_mods_alert_mark(page):
 
 
 def test_mods_detail_switch_fits_its_header(page):
-    # The enable switch is square and never outgrows a short header.
+    # A labelled two-position switch remains recognizable when it is off.
     mount(page)
     page.locator('[data-tab="mods"]').click()
     switch = page.get_by_role("checkbox", name="Mine enabled")
@@ -550,10 +604,10 @@ def test_mods_detail_switch_fits_its_header(page):
             actions: rect(document.querySelector(".lex-mods-page .lex-detail-panel-actions"))};
         }""")
         box, head, actions = geometry["box"], geometry["head"], geometry["actions"]
-        assert box["width"] == box["height"] > 0, box
+        assert box["width"] > box["height"] > 0, box
         # Compact and fixed, roomy header or short: the name owns the
         # heading's width, and controls no longer grow with it.
-        assert abs(box["height"] - 28) <= 1, (box, head)
+        assert box["height"] <= 28, (box, head)
         assert box["y"] >= head["y"] - 1 and box["y"] + box["height"] <= head["y"] + head["height"] + 1, (box, head)
         assert box["x"] >= head["x"] and box["x"] + box["width"] <= head["x"] + head["width"], (box, head)
         # A short header keeps the same fixed switch without clipping it.
@@ -565,9 +619,7 @@ def test_mods_detail_switch_fits_its_header(page):
         page.wait_for_timeout(150)
 
 
-def test_mods_detail_switch_tick_scales_with_its_box(page):
-    # The drawn tick keeps the 10:6:2 proportions of the 18px box it was
-    # drawn for, roomy or short, instead of sitting tiny in a big switch.
+def test_mods_detail_switch_thumb_and_off_label_are_visible(page):
     mount(page)
     page.locator('[data-tab="mods"]').click()
     page.get_by_role("checkbox", name="Mine enabled").wait_for()
@@ -580,18 +632,41 @@ def test_mods_detail_switch_tick_scales_with_its_box(page):
           const box = document.querySelector('.lex-mods-page .lex-detail-panel-actions input[type="checkbox"]');
           const tick = getComputedStyle(box, '::before');
           return {side: box.getBoundingClientRect().width, width: parseFloat(tick.width),
-                  height: parseFloat(tick.height), stroke: parseFloat(tick.borderBottomWidth)};
+                  height: parseFloat(tick.height), stroke: parseFloat(tick.borderBottomWidth), visibility:tick.visibility};
         }""")
-        side = geometry["side"]
-        assert abs(geometry["width"] / side - 0.55) <= 0.06, geometry
-        assert abs(geometry["height"] / side - 0.33) <= 0.06, geometry
-        assert abs(geometry["stroke"] / side - 0.11) <= 0.04, geometry
+        assert geometry["width"] == geometry["height"] > 0, geometry
+        assert geometry["stroke"] == 0, geometry
+        assert geometry["visibility"] == "visible", geometry
         page.evaluate("""() => {
           const head = document.querySelector(".lex-mods-page .lex-detail-panel-heading");
           head.style.padding = "0";
           head.querySelector(".lex-detail-panel-title").style.fontSize = "10px";
         }""")
         page.wait_for_timeout(150)
+    page.get_by_role("cell", name="Combat", exact=True).click()
+    assert page.locator(".lex-header-switch-off").is_visible()
+    assert not page.get_by_role("checkbox", name="Combat enabled").is_checked()
+
+
+def test_mod_header_shows_pending_until_switch_succeeds(page, tmp_path):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    control = page.get_by_role("checkbox", name="Mine enabled")
+    control.wait_for()
+    page.evaluate("""() => {
+      const apply = pywebview.api.set_mod_enabled;
+      pywebview.api.set_mod_enabled = (...args) => new Promise(resolve => {
+        window.finishSwitch = () => resolve(apply(...args));
+      });
+    }""")
+    control.click()
+    page.locator('.lex-header-switch-pending').wait_for(state="visible")
+    assert control.is_checked()  # The requested off state is not confirmed yet.
+    page.screenshot(path=str(tmp_path / "mod-switch-applying.png"))
+    page.evaluate("window.finishSwitch()")
+    page.locator('.lex-header-switch-off').wait_for(state="visible")
+    assert not page.get_by_role("checkbox", name="Mine enabled").is_checked()
+    page.screenshot(path=str(tmp_path / "mod-switch-off.png"))
 
 
 def test_dropdown_unavailable_rows_show_lock_and_buttons(page, tmp_path):
@@ -972,7 +1047,7 @@ def test_mod_flags_ride_the_header_badge_and_the_tab_bar_never_moves(page):
     assert above()
     assert abs(bar.bounding_box()["y"] - parked) < 0.5
     actions = page.locator(".lex-mods-page .lex-detail-panel-actions")
-    assert actions.evaluate("el => el.lastElementChild.getAttribute('aria-label')") == "Combat enabled"
+    assert actions.evaluate("el => el.lastElementChild.querySelector('input').getAttribute('aria-label')") == "Combat enabled"
     badge.hover()
     popover = page.locator(".lex-help-popover")
     popover.get_by_text("This mod changed since the last build.").wait_for()

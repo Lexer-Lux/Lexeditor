@@ -1,4 +1,5 @@
 """Preservation, native-mod coexistence, and rollback for Verdite3 integration."""
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -42,7 +43,7 @@ def test_non_steam_game_validates_without_steam_discovery_or_art_requests(tmp_pa
     covers = CoverArtCache({PLUGIN.plugin_id: PLUGIN}, root=tmp_path,
                           fetcher=unexpected_fetch, steam_roots=())
     assert not covers._threads
-    assert covers._states[PLUGIN.plugin_id]["state"] == "unavailable"
+    assert covers._states[PLUGIN.plugin_id]["state"] == "ready"
 
 
 @pytest.fixture
@@ -128,103 +129,87 @@ def test_running_game_is_never_modified(setup, monkeypatch):
 
 
 def test_activation_and_removal_preserve_native_mods_and_settings(setup):
-    game, data, library = setup
-    source = mod(library)
-    native = data / "mods/map"
-    native.mkdir()
-    (native / "mod.json").write_text('{"id":"external.map","name":"Native map"}')
-    original = (native / "mod.json").read_bytes()
-    original_settings = (data / "settings.json").read_bytes()
-    original_interface = (data / "interface.ini").read_bytes()
+    game, data, _ = setup
+    source = mod(data / "mods")
+    before = {path.relative_to(source): path.read_bytes() for path in source.rglob("*") if path.is_file()}
+    settings = (data / "settings.json").read_bytes()
     adapter = NativeSourceModAdapter(MODEL)
-    result = adapter.activate([source], game)
-    assert result["mods"] == ["external.map", "example"]
-    assert (data / "mods/lexeditor-example/Mod.cs").read_bytes() == (source / "Mod.cs").read_bytes()
-    assert not (data / RECOVERY).exists()
-    active = model.ini_values((data / "interface.ini").read_text(encoding="utf-8-sig"))
-    assert active["mods.example.enabled"] == "True"
-    assert active["mods.example.priority"] == "1"
+    assert adapter.library_root(game) == data / "mods"
+    adapter.activate([source], game)
+    assert adapter.library_state(game)[source.name]["enabled"] is True
     adapter.activate([], game)
-    assert not (data / "mods/lexeditor-example").exists()
-    settings = json.loads((data / "settings.json").read_text())
-    assert settings == {"ActiveMods": ["obsolete-not-a-loader-setting"], "Unmodeled": {"keep": 42}}
-    assert (data / "settings.json").read_bytes() == original_settings
-    assert (data / "interface.ini").read_bytes() == original_interface
-    assert (native / "mod.json").read_bytes() == original
+    assert adapter.library_state(game)[source.name]["enabled"] is False
+    assert {path.relative_to(source): path.read_bytes() for path in source.rglob("*") if path.is_file()} == before
+    assert (data / "settings.json").read_bytes() == settings
+    assert not (data / LEDGER).exists()
+    assert not (data / RECOVERY).exists()
 
 
-def test_external_mod_edits_refuse_replacement(setup):
-    game, data, library = setup
-    source = mod(library)
+def test_external_mod_edits_are_preserved_when_toggling(setup):
+    game, data, _ = setup
+    source = mod(data / "mods")
     adapter = NativeSourceModAdapter(MODEL)
     adapter.activate([source], game)
-    target = data / "mods/lexeditor-example/Mod.cs"
+    target = source / "Mod.cs"
     target.write_text("// player's changes\n")
-    with pytest.raises(ValueError, match="changed outside"):
-        adapter.activate([], game)
+    adapter.activate([], game)
+    adapter.activate([source], game)
     assert target.read_text() == "// player's changes\n"
 
 
 def test_duplicate_native_id_and_binary_packages_are_refused(setup):
-    game, data, library = setup
-    source = mod(library)
-    native = data / "mods/native-example"
-    native.mkdir()
+    game, data, _ = setup
+    source = mod(data / "mods")
+    native = mod(data / "mods", "duplicate")
     (native / "mod.json").write_text('{"id":"example","name":"Existing native mod"}')
-    with pytest.raises(ValueError, match="already exists"):
+    with pytest.raises(ValueError, match="Two native mod folders"):
         NativeSourceModAdapter(MODEL).activate([source], game)
-    (source / "game.exe").write_bytes(b"synthetic")
     report = NativeSourceModAdapter(MODEL).inspect(source, [Path("mod.json"), Path("Mod.cs"), Path("game.exe")])
     assert not report["valid"]
 
 
-def test_failed_configuration_write_rolls_back_mod_files_and_active_ids(setup, monkeypatch):
-    game, data, library = setup
-    first, second = mod(library, "first"), mod(library, "second")
+def test_failed_configuration_write_preserves_mod_files_and_active_ids(setup, monkeypatch):
+    game, data, _ = setup
+    first, second = mod(data / "mods", "first"), mod(data / "mods", "second")
     adapter = NativeSourceModAdapter(MODEL)
     adapter.activate([first], game)
-    old_settings = (data / "settings.json").read_bytes()
-    old_interface = (data / "interface.ini").read_bytes()
-    original_write = model.atomic_write
-    failed = False
-
-    def fail_once(path, raw):
-        nonlocal failed
-        if path == data / LEDGER and not failed:
-            failed = True
-            raise OSError("synthetic interrupted write")
-        original_write(path, raw)
-
-    monkeypatch.setattr(MODEL, "atomic_write", fail_once)
+    before = (data / "interface.ini").read_bytes()
+    def fail(path, raw):
+        raise OSError("synthetic interrupted write")
+    monkeypatch.setattr(adapter.model, "atomic_write", fail)
     with pytest.raises(OSError, match="synthetic interrupted"):
         adapter.activate([second], game)
-    assert (data / "mods/lexeditor-first/Mod.cs").is_file()
-    assert not (data / "mods/lexeditor-second").exists()
-    assert (data / "settings.json").read_bytes() == old_settings
-    assert (data / "interface.ini").read_bytes() == old_interface
-    assert not (data / RECOVERY).exists()
+    assert (first / "Mod.cs").is_file() and (second / "Mod.cs").is_file()
+    assert (data / "interface.ini").read_bytes() == before
 
 
-def test_recovery_preserves_edited_backup_without_replacing_deployed_mod(setup, monkeypatch):
-    game, data, library = setup
-    first, second = mod(library, "first"), mod(library, "second")
-    adapter = NativeSourceModAdapter(MODEL)
-    adapter.activate([first], game)
-    original_write = model.atomic_write
+def legacy_recovery(data, *, committed=False):
+    """An interrupted transaction written by the retired copy-based loader."""
+    from core.native_source_mods import _tree
+    recovery = data / RECOVERY
+    (recovery / "mods").mkdir(parents=True)
+    backup = mod(recovery / "mods", "lexeditor-first")
+    old = {backup.name: {"files": _tree(backup)}}
+    raw = (data / "interface.ini").read_bytes()
+    (recovery / "interface.before").write_bytes(raw)
+    (recovery / "ledger.before").write_bytes(b"")
+    fingerprint = lambda value: hashlib.sha256(value).hexdigest()
+    state = {"phase": "committed" if committed else "applying", "old": old, "new": {},
+             "before": {"interface.ini": fingerprint(raw), LEDGER: fingerprint(b"")},
+             "after": {"interface.ini": fingerprint(raw), LEDGER: fingerprint(b"")}}
+    (recovery / "transaction.json").write_text(json.dumps(state))
+    return recovery
 
-    def interrupt_with_edited_backup(path, raw):
-        if path == data / LEDGER:
-            backup = data / RECOVERY / "mods/lexeditor-first/Mod.cs"
-            backup.write_text("// recovered player edits\n")
-            raise OSError("synthetic interrupted write")
-        original_write(path, raw)
 
-    monkeypatch.setattr(MODEL, "atomic_write", interrupt_with_edited_backup)
+def test_legacy_recovery_preserves_edited_backup(setup):
+    game, data, _ = setup
+    recovery = legacy_recovery(data)
+    backup = recovery / "mods/lexeditor-first/Mod.cs"
+    backup.write_text("// recovered player edits\n")
     with pytest.raises(ValueError, match="Recovery copy.*edited"):
-        adapter.activate([second], game)
-    assert (data / RECOVERY / "mods/lexeditor-first/Mod.cs").read_text() == "// recovered player edits\n"
-    assert (data / "mods/lexeditor-second/Mod.cs").is_file()
-    assert not (data / "mods/lexeditor-first").exists()
+        NativeSourceModAdapter(MODEL).recover(game)
+    assert backup.read_text() == "// recovered player edits\n"
+
 
 
 def test_distance_and_semantic_fade_are_independent_and_keep_custom_band(setup):
@@ -269,7 +254,7 @@ def test_native_enable_flags_priorities_and_prior_values_are_restored(setup):
     original = path.read_bytes()
     path.write_bytes(model.updated_ini(original, {"mods.z.enabled": "False", "mods.z.priority": "-7"}))
     before = path.read_bytes()
-    z, a = mod(library, "z"), mod(library, "a")
+    z, a = mod(data / "mods", "z"), mod(data / "mods", "a")
     adapter = NativeSourceModAdapter(MODEL)
     adapter.activate([z, a], game)
     values = model.ini_values(path.read_text(encoding="utf-8-sig"))
@@ -279,13 +264,18 @@ def test_native_enable_flags_priorities_and_prior_values_are_restored(setup):
     adapter.activate([a, z], game)
     values = model.ini_values(path.read_text(encoding="utf-8-sig"))
     assert values["mods.a.priority"] == "1" and values["mods.z.priority"] == "2"
+    before_metadata = (z / "mod.json").read_bytes()
+    adapter.reorder_mod(z, -1, game)
+    assert (z / "mod.json").read_bytes() == before_metadata
     adapter.activate([], game)
-    assert path.read_bytes() == before
+    values = model.ini_values(path.read_text(encoding="utf-8-sig"))
+    assert values["mods.z.enabled"] == "False" and values["mods.a.enabled"] == "False"
+    assert values["mods.z.priority"] == "1" and values["mods.a.priority"] == "2"
 
 
 def test_interface_write_failure_restores_files_and_native_flags(setup, monkeypatch):
     game, data, library = setup
-    first, second = mod(library, "first"), mod(library, "second")
+    first, second = mod(data / "mods", "first"), mod(data / "mods", "second")
     adapter = NativeSourceModAdapter(MODEL)
     adapter.activate([first], game)
     before = (data / "interface.ini").read_bytes()
@@ -301,8 +291,8 @@ def test_interface_write_failure_restores_files_and_native_flags(setup, monkeypa
     with pytest.raises(OSError, match="synthetic interface write failure"):
         adapter.activate([second], game)
     assert (data / "interface.ini").read_bytes() == before
-    assert (data / "mods/lexeditor-first/Mod.cs").is_file()
-    assert not (data / "mods/lexeditor-second").exists()
+    assert (first / "Mod.cs").is_file()
+    assert (second / "Mod.cs").is_file()
     assert not (data / RECOVERY).exists()
 
 
@@ -312,7 +302,7 @@ def test_private_native_fixture_helper_uses_adapter_and_refuses_player_paths(set
     game, data, library = setup
     source = mod(library)
     with pytest.raises(ValueError, match="below %TEMP%"):
-        prepare(game, data, [source])
+        prepare(game, Path(tempfile.gettempdir()) / "kf3-forbidden-fixture", [source])
     scratch = Path(tempfile.gettempdir()) / "lexeditor-dev"
     scratch.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="kf3-loader-fixture-", dir=scratch) as name:

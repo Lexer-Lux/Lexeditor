@@ -177,6 +177,7 @@ def workflow_files(target: str | None = None) -> dict[str, str]:
     if target is not None and target not in PLUGINS:
         raise ValueError(f"Unknown plugin: {target}")
     files = {} if target else {
+        "archive-runtime.yml": run_path(str(ROOT / "tools/archive_runtime_workflow.py"))["WORKFLOW"],
         "ff8-stock-build.yml": run_path(str(ROOT / "tools/ff8_native_workflow.py"))["WORKFLOW"]}
     for plugin in ([target] if target else PLUGINS):
         paths = [f"plugins/{plugin}/**", f"tests/{plugin}/**"] + shared

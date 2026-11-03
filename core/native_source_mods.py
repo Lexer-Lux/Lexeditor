@@ -1,11 +1,9 @@
-"""Deploy source-mod folders through a configured native port loader."""
+"""Manage source mods in the native port loader's own folder."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 import re
 import shutil
-import tempfile
 
 from core.mod_library import digest, file_tree
 from core.native_port_settings import NativePortSettings, ini_values, updated_ini
@@ -13,10 +11,6 @@ from core.native_port_settings import NativePortSettings, ini_values, updated_in
 LEDGER = ".lexeditor-native-mods.json"
 RECOVERY = ".lexeditor-native-recovery"
 IDENTITY = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\Z")
-
-
-def _json(value) -> bytes:
-    return (json.dumps(value, indent=2) + "\n").encode("utf-8")
 
 
 def _tree(folder: Path) -> dict[str, str]:
@@ -58,13 +52,6 @@ class NativeSourceModAdapter:
         report = self.inspect(root, file_tree(root))
         if not report["valid"]:
             raise ValueError("; ".join(report["problems"]))
-
-    @staticmethod
-    def _verify(native: Path, entries: dict) -> None:
-        for name, entry in entries.items():
-            folder = native / _folder(name)
-            if not folder.is_dir() or _tree(folder) != entry["files"]:
-                raise ValueError(f"Deployed mod {name} changed outside Lexeditor; preserve those changes before replacing it")
 
     def recover(self, game_root: Path) -> None:
         """Restore an interrupted transaction; refuse anything edited since it began."""
@@ -125,88 +112,102 @@ class NativeSourceModAdapter:
                 (data / name).unlink(missing_ok=True)
         shutil.rmtree(recovery)
 
+    def library_root(self, game_root: Path) -> Path:
+        return self.model.data_root() / "mods"
+
+    def library_state(self, game_root: Path) -> dict:
+        native = self.library_root(game_root)
+        values = ini_values(self.model.read_bytes(self.model.data_root() / "interface.ini").decode("utf-8-sig"))
+        result = {}
+        for folder in native.iterdir() if native.is_dir() else []:
+            if not folder.is_dir() or folder.name.startswith(".") or not (folder / "mod.json").is_file():
+                continue
+            try:
+                identity = self.model.read_json(folder / "mod.json")["id"]
+                key = f"mods.{identity}.enabled".casefold()
+                row = {"enabled": values.get(key, "False").casefold() == "true"}
+                if self.priority_key:
+                    try:
+                        row["order"] = int(values.get(self.priority_key.format(id=identity).casefold(), "1000"))
+                    except ValueError:
+                        row.update(order=1000, alerts=["The native loader priority is invalid. Reorder this mod to repair it."])
+                result[folder.name] = row
+            except (OSError, ValueError, KeyError, TypeError):
+                result[folder.name] = {"enabled": False}
+        return result
+
     def activate(self, mods: list[Path], game_root: Path) -> dict:
+        """Change native loader flags; source folders always stay in place."""
+        from core.mod_builds import ModBuildError
         with self.model.lock:
             self.model.ensure_closed()
             if not self.model.installation(Path(game_root))["supported"]:
                 raise ValueError("Locate a supported native port installation for this game")
             self.recover(game_root)
-            data = self.model.data_root()
-            native = data / "mods"
-            native.mkdir(parents=True, exist_ok=True)
-            ledger = self.model.read_json(data / LEDGER)
-            old = ledger.get("folders", {})
-            self._verify(native, old)
-            raw_interface = self.model.read_bytes(data / "interface.ini")
-            values = ini_values(raw_interface.decode("utf-8-sig"))
-            new = {}
+            native = self.library_root(game_root).resolve()
             identities = set()
             changes = {}
             for priority, folder in enumerate(mods, 1):
-                report = self.inspect(folder, file_tree(folder))
-                if not report["valid"]:
-                    raise ValueError("; ".join(report["problems"]))
-                info = self.model.read_json(folder / "mod.json")
-                identity = info["id"]
+                if folder.resolve().parent != native:
+                    raise ValueError("Choose mods from the game's native mods folder")
+                try:
+                    report = self.inspect(folder, file_tree(folder))
+                    if not report["valid"]:
+                        raise ValueError("; ".join(report["problems"]))
+                    identity = self.model.read_json(folder / "mod.json")["id"]
+                except (OSError, ValueError, KeyError) as error:
+                    raise ModBuildError([folder], str(error)) from error
                 if identity.casefold() in identities:
                     raise ValueError(f"Two selected mods use the native id {identity}")
                 identities.add(identity.casefold())
-                name = "lexeditor-" + identity
-                if (native / name).exists() and name not in old:
-                    raise ValueError(f"{name} already exists outside Lexeditor")
-                keys = {f"mods.{identity}.enabled".casefold(): "True"}
-                if self.priority_key is not None:
-                    keys[self.priority_key.format(id=identity).casefold()] = str(priority)
-                before = old[name]["before"] if name in old else {key: values.get(key) for key in keys}
-                new[name] = {"id": identity, "source": str(folder.resolve()), "files": _tree(folder), "before": before}
-                changes.update(keys)
-            for folder in native.iterdir():
-                if folder.is_dir() and folder.name not in old and (folder / "mod.json").is_file():
-                    identity = self.model.read_json(folder / "mod.json").get("id", "")
-                    if str(identity).casefold() in identities:
-                        raise ValueError(f"Native mod {identity} already exists outside Lexeditor")
-            for name in old.keys() - new.keys():
-                changes.update(old[name]["before"])
-            after_interface = updated_ini(raw_interface, changes)
-            after_ledger = _json({"folders": new})
-            required = sum((folder / path).stat().st_size for folder in mods for path in file_tree(folder))
-            if shutil.disk_usage(data).free < required + 4 * self.model.MAX_CONFIG:
-                raise OSError("There is not enough free space to stage the enabled source mods")
-            recovery = data / RECOVERY
-            with tempfile.TemporaryDirectory(prefix=".lexeditor-native-stage-", dir=data) as temporary:
-                staged = Path(temporary)
-                for name, entry in new.items():
-                    shutil.copytree(Path(entry["source"]), staged / name)
-                    if _tree(staged / name) != entry["files"]:
-                        raise ValueError(f"{name} changed while being prepared; nothing was deployed")
-                recovery.mkdir()
-                (recovery / "mods").mkdir()
-                self.model.atomic_write(recovery / "interface.before", raw_interface)
-                raw_ledger = self.model.read_bytes(data / LEDGER)
-                self.model.atomic_write(recovery / "ledger.before", raw_ledger)
-                transaction = {"phase": "applying", "old": old, "new": new,
-                               "before": {"interface.ini": self.model.fingerprint(raw_interface), LEDGER: self.model.fingerprint(raw_ledger)},
-                               "after": {"interface.ini": self.model.fingerprint(after_interface), LEDGER: self.model.fingerprint(after_ledger)}}
-                self.model.atomic_write(recovery / "transaction.json", _json(transaction))
+                changes[f"mods.{identity}.enabled".casefold()] = "True"
+                if self.priority_key:
+                    changes[self.priority_key.format(id=identity).casefold()] = str(priority)
+            # An enabled native ID would load every folder declaring that ID.
+            # Reject duplicates before changing the one configuration file.
+            discovered = set()
+            for folder in native.iterdir() if native.is_dir() else []:
+                if not folder.is_dir() or folder.name.startswith(".") or not (folder / "mod.json").is_file():
+                    continue
                 try:
-                    for name in old:
-                        (native / name).rename(recovery / "mods" / name)
-                    for name in new:
-                        (staged / name).rename(native / name)
-                    self.model.atomic_write(data / "interface.ini", after_interface)
-                    self.model.atomic_write(data / LEDGER, after_ledger)
-                    transaction["phase"] = "committed"
-                    self.model.atomic_write(recovery / "transaction.json", _json(transaction))
-                except BaseException:
-                    self.recover(game_root)
-                    raise
-                self.recover(game_root)
-            return {"activated": [folder.name for folder in mods], "mods": self.active_mod_ids(game_root), "dataRoot": str(data)}
+                    identity = self.model.read_json(folder / "mod.json").get("id", "").casefold()
+                except (OSError, ValueError, AttributeError):
+                    continue
+                if identity in identities and identity in discovered:
+                    raise ValueError(f"Two native mod folders use the id {identity}")
+                discovered.add(identity)
+            data = self.model.data_root()
+            raw = self.model.read_bytes(data / "interface.ini")
+            values = ini_values(raw.decode("utf-8-sig"))
+            for key in values:
+                if key.startswith("mods.") and key.endswith(".enabled"):
+                    changes.setdefault(key, "False")
+            # Missing flags mean off in the native loader. Do not manufacture
+            # metadata flags, copies, or a second deployment ledger.
+            self.model.atomic_write(data / "interface.ini", updated_ini(raw, changes))
+            return {"activated": [folder.name for folder in mods],
+                    "mods": self.active_mod_ids(game_root), "dataRoot": str(data)}
 
     def active_mod_ids(self, game_root: Path) -> list[str]:
         values = ini_values(self.model.read_bytes(self.model.data_root() / "interface.ini").decode("utf-8-sig"))
         return [key[len("mods."):-len(".enabled")] for key, value in values.items()
                 if key.startswith("mods.") and key.endswith(".enabled") and value.casefold() == "true"]
+
+    def reorder_mod(self, folder: Path, delta: int, game_root: Path) -> None:
+        from core import mods_service
+        if self.priority_key is None:
+            raise ValueError("This native loader determines mod order from dependencies and IDs")
+        with self.model.lock:
+            self.model.ensure_closed()
+            root = self.library_root(game_root)
+            rows = mods_service.library_rows(root, self.library_state(game_root))
+            folders = [Path(row["path"]).resolve() for row in rows]
+            index = folders.index(folder.resolve())
+            folders.insert(min(max(index + delta, 0), len(folders) - 1), folders.pop(index))
+            changes = {self.priority_key.format(id=self.model.read_json(each / "mod.json")["id"]).casefold(): str(position)
+                       for position, each in enumerate(folders, 1)}
+            ini = self.model.data_root() / "interface.ini"
+            self.model.atomic_write(ini, updated_ini(self.model.read_bytes(ini), changes))
 
     def standalone_mods(self, game_root: Path) -> list[dict]:
         native = self.model.data_root() / "mods"

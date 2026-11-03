@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -33,7 +34,14 @@ def prepare(game_root: Path, data_root: Path, mods: list[Path]) -> dict:
     with patch.dict(os.environ, {MODEL.native["dataEnv"]: str(data_root)}), \
             patch("core.native_port_settings.live_processes", return_value=[]):
         adapter = NativeSourceModAdapter(MODEL)
-        result = adapter.activate([path.resolve() for path in mods], game_root)
+        native = data_root / "mods"
+        native.mkdir(exist_ok=True)
+        sources = []
+        for path in mods:
+            folder = native / ("lexeditor-" + path.name)
+            shutil.copytree(path, folder)
+            sources.append(folder)
+        result = adapter.activate(sources, game_root)
         settings_after = settings_path.read_bytes() if settings_path.exists() else None
         if settings_after != settings_before:
             raise AssertionError("Source-mod deployment changed the fixture's runtime settings.json")

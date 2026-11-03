@@ -17,6 +17,11 @@ description: Starting, scoping or filing issues for a Lexeditor game plugin. Use
 ## Plugin requirements
 
 - A Data Map screen covering every area of the game's data (see AGENTS.md).
+- If the game, its loader, or its engine fork already has an established mods
+  directory, use that directory as the plugin's canonical mod library and
+  manage existing mods in place. Use Lexeditor's global mods directory only
+  when the game has no established location. Do not prompt to relocate mods
+  from their correct game directory into a second Lexeditor library.
 - The installation descriptor names the game's own executable (`executable=`),
   relative to the installation root and set by hand: the process that
   renders, not whatever Play starts. ReShade's folder is derived from it, so a

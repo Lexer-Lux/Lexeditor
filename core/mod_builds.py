@@ -55,7 +55,10 @@ def activate_with_recovery(adapter, mods: list[Path], game_root: Path) -> dict:
             for folder in active:
                 if folder in removed:
                     try:
-                        mods_service.set_enabled(folder, False)
+                        # Native loaders persist switches in their own INI on
+                        # the successful retry, never in a competing mod.json.
+                        if not callable(getattr(adapter, "library_state", None)):
+                            mods_service.set_enabled(folder, False)
                     except ValueError:
                         # Unreadable metadata is already an off/error library
                         # row. Preserve it for repair instead of overwriting it.

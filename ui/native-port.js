@@ -130,7 +130,7 @@
     if (problem) notices.push(UI.notice({tone: "error", title: "Could not save settings", message: problem}));
     if (!state.game.supported) notices.push(UI.notice({tone: "warning", title: "Set up " + (state.game.runtime?.runtime || plugin.portName),
       message: state.game.runtime?.message || state.game.error || "Choose the " + plugin.portName + " installation on the main menu."}));
-    else if (state.game.running) notices.push(UI.notice({tone: "warning", title: plugin.portName + " is running", message: "Close the game, then refresh this page before changing settings."}));
+    else if (state.game.running) notices.push(UI.notice({tone: "warning", title: plugin.portName + " is running", message: "Settings unlock automatically when the game closes."}));
     const body = [...(state.preferences.controls ? [controlsSection()] : []),
       ...[...new Set(state.preferences.fields.map(spec => spec.section))].map(section =>
         UI.detailSection({title: section, body: state.preferences.fields.filter(spec => spec.section === section).map(field)}))];
@@ -178,6 +178,13 @@
     plugin: {id: plugin.pluginId, name: plugin.name, theme: {accent: plugin.accent}},
     tabs: [{id: "settings", label: "Settings", help: "Changes the port's saved controls. Close the game before saving so it cannot replace your changes."}],
     activeTab: () => tab, navigate, readonly, dirtyCount: dirty, save,
+    gameProcessChanged: status => {
+      if (!state || state.game.running === status.running) return;
+      const stopped = state.game.running && !status.running;
+      state.game.running = status.running;
+      render();
+      if (stopped) refresh().catch(showError);
+    },
     discard: async () => { values = copy(saved); problem = ""; render(); },
     pendingChanges: () => UI.pendingChangeList(saved, values, "Settings"),
     info: () => navigate("info"), infoActive: () => tab === "info",

@@ -23,4 +23,5 @@ def launch():
 
 
 PLUGIN = GamePlugin(**plugin_defaults(__file__), check=check, launch=launch,
-                    session_factory=session, installation=install_spec(__file__), mod_adapter=Kf1ModAdapter())
+                    session_factory=session, installation=install_spec(__file__), mod_adapter=Kf1ModAdapter(),
+                    cover_art=ROOT / "assets" / "covers" / "kf1.jpg")
