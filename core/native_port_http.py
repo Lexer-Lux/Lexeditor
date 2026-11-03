@@ -25,8 +25,8 @@ def data_map(model: NativePortSettings) -> dict:
         {"filename": "Disc: " + model.native["configIdentity"][0], "controls": "Items, characters, enemies, maps, scripts, models, textures and audio.",
          "notes": "Disc records do not have structured editors here.",
          "status": "not-integrated", "coverage": "unavailable", "target": None, "openable": False},
-        {"filename": "Remaster packs", "controls": "Native materials, lighting, atmosphere and scene authoring.",
-         "notes": "Use the native Remaster Editor. Pack editing is not integrated into Lexeditor.",
+        {"filename": "Native asset packs", "controls": "Replacement textures, audio and other assets supported by the port.",
+         "notes": "Pack editing is not integrated into Lexeditor.",
          "status": "not-integrated", "coverage": "unavailable", "target": None, "openable": False},
     ]}
 
