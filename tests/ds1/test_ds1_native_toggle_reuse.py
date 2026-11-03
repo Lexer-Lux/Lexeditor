@@ -136,7 +136,7 @@ def test_menu_recipe_tracks_its_codec_without_global_editor_revision(tmp_path, m
     specs = [{'owner': 'UI', 'nodes': [], 'moves': []}]
     identity = tweak_mods._menu_identity(b'original', specs, tweak_mods.LAYOUT)
     assert identity is not None
-    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'unrelated editor change')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda **_kwargs: b'unrelated editor change')
     assert tweak_mods._menu_identity(b'original', specs, tweak_mods.LAYOUT) == identity
     Path(menu_layout.__file__).write_bytes(b'changed layout codec')
     assert tweak_mods._menu_identity(b'original', specs, tweak_mods.LAYOUT) != identity

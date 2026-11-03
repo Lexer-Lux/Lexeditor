@@ -140,7 +140,7 @@ def test_archive_outputs_survive_restart_and_only_changed_file_rebuilds(monkeypa
     from plugins.ds1 import mod_loader
     monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
     monkeypatch.setattr(mod_loader, '_compose_cache_bytes', 0)
-    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-v1')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda **_kwargs: b'compiler-v1')
     first, second = Path('script/talk/first.dcx'), Path('script/talk/second.dcx')
     originals = {first: b'original-a', second: b'original-b'}
     mods = [mod_loader.Mod('A', tmp_path / 'mod', {first: b'edit-a', second: b'edit-b'})]
@@ -166,7 +166,7 @@ def test_archive_outputs_survive_restart_and_only_changed_file_rebuilds(monkeypa
     assert changed.files[second] == expected.files[second]
     assert calls == [first, second, first]
     restart()
-    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-v2')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda **_kwargs: b'compiler-v2')
     mod_loader.compose_installed(tmp_path, mods, cache_root=tmp_path / 'cache')
     assert calls[-2:] == [first, second]
 
