@@ -27,7 +27,16 @@ def port(tmp_path, monkeypatch):
     root.mkdir()
     assembly = b"synthetic supported assembly"
     (root / "KingsField1.dll").write_bytes(assembly)
-    (root / "lexeditor-port.json").write_text(json.dumps({"game": "kf1", "settingsVersion": 1, "assemblySha256": sha256(assembly).hexdigest()}))
+    profiles = {"version": 1}
+    for name, interact in (("classic", "F"), ("modern", "E")):
+        profiles[name] = {"Keys": {"Cross": "Tab", "Circle": interact}, "Keys2": {},
+                          "Pad": {"Square": [2] if name == "classic" else [2, 10, 101]}, "PadAnalog": {},
+                          "view": {"kf1.pad.layout": "1", "kf1.controls.holdrun": "1" if name == "modern" else "0"}}
+    asset = json.dumps(profiles).encode()
+    (root / "content/config").mkdir(parents=True)
+    (root / "content/config/controls.json").write_bytes(asset)
+    (root / "lexeditor-port.json").write_text(json.dumps({"game": "kf1", "settingsVersion": 1,
+        "assemblySha256": sha256(assembly).hexdigest(), "controlsSha256": sha256(asset).hexdigest()}))
     (root / "interface.ini").write_text("[RecompOne]\nunknown.setting=keep\nkf1.renderdistance=16\nkf1.renderdistance.fade=3\n\n[Window][Game]\nPos=1,2\n")
     (root / "settings.json").write_text(json.dumps({"CdPath": "user-disc.cue", "CardAPath": "my-save.sav", "Keys": {"Cross": "Tab"}, "unknown": 42}))
     (root / "carda.sav").write_bytes(b"SAVE-DO-NOT-CHANGE")
@@ -89,16 +98,40 @@ def test_invalid_distance_is_rejected(port, distance):
 
 def test_controls_preserve_saves_and_other_settings(port):
     before = settings.payload()
-    settings.write_settings(port, {"kf1.pad.layout": "1", "kf1.controls.holdrun": "1"}, expected=before["sha256"], controls=True)
+    body = {"sha256": before["sha256"], "controlsSha256": before["controls"]["sha256"], "profile": "modern"}
+    with pytest.raises(ValueError, match="custom bindings"):
+        settings.setup_controls(body)
+    settings.setup_controls({**body, "replaceCustom": True})
     config = json.loads((port / "settings.json").read_text())
     assert config["CdPath"] == "user-disc.cue"
     assert config["CardAPath"] == "my-save.sav"
     assert config["unknown"] == 42
-    assert config["Keys"] == {"Cross": "Tab", "Circle": "E", "R3": "ShiftLeft"}
-    assert config["Pad"]["Square"] == [10, 101]
-    assert config["Pad"]["Triangle"] == [9, 100, 2]
-    assert config["Pad"]["R3"] == [1]
+    assert config["Keys"] == {"Cross": "Tab", "Circle": "E"}
+    assert config["Pad"]["Square"] == [2, 10, 101]
+    assert settings.payload()["controls"]["selected"] == "modern"
     assert (port / "carda.sav").read_bytes() == b"SAVE-DO-NOT-CHANGE"
+
+
+def test_keep_bindings_and_stale_input_protection(port):
+    before = settings.payload()
+    bindings = (port / "settings.json").read_bytes()
+    settings.setup_controls({"sha256": before["sha256"], "controlsSha256": before["controls"]["sha256"], "profile": "keep"})
+    assert (port / "settings.json").read_bytes() == bindings
+    assert settings.payload()["controls"]["setupComplete"]
+    state = settings.payload()
+    (port / "settings.json").write_text(json.dumps({"Keys": {"Circle": "Custom"}}))
+    with pytest.raises(ValueError, match="Input bindings changed"):
+        settings.setup_controls({"sha256": state["sha256"], "controlsSha256": state["controls"]["sha256"], "profile": "classic", "replaceCustom": True})
+
+
+def test_classic_comes_from_pinned_native_asset(port):
+    state = settings.payload()
+    settings.setup_controls({"sha256": state["sha256"], "controlsSha256": state["controls"]["sha256"], "profile": "classic", "replaceCustom": True})
+    assert settings.payload()["controls"]["selected"] == "classic"
+    assert json.loads((port / "settings.json").read_text())["Keys"]["Circle"] == "F"
+    (port / "content/config/controls.json").write_text("{}")
+    with pytest.raises(ValueError, match="control profiles changed"):
+        settings.payload()
 
 
 def test_native_mod_library_activation_and_removal_need_no_copies(port, tmp_path):
@@ -172,8 +205,12 @@ def test_rendered_settings_save_and_reload(port):
                 assert field.input_value() == "24"
                 assert not page.get_by_role("checkbox", name="Smooth distance fade", exact=True).is_checked()
                 page.wait_for_function("!document.documentElement.classList.contains('lex-loading-live')")
-                page.get_by_role("button", name="Apply Lexer's controls", exact=True).click()
-                page.wait_for_timeout(250)
+                page.get_by_role("button", name="Run control setup again", exact=True).click()
+                assert page.get_by_role("combobox", name="Control preset", exact=True).input_value() == "keep"
+                page.get_by_role("combobox", name="Control preset", exact=True).select_option("modern")
+                page.get_by_role("button", name="Finish control setup", exact=True).click()
+                page.get_by_role("button", name="Replace bindings", exact=True).click()
+                page.get_by_role("button", name="Run control setup again", exact=True).wait_for()
                 assert json.loads((port / "settings.json").read_text())["Keys"]["Circle"] == "E"
                 assert not errors
             finally:

@@ -1,6 +1,6 @@
 "use strict";
 const {el,detailPanel,actionRow,stack,notice}=LexeditorUI;
-let tab="settings",config=null,saved=null,error="",mapRows=[],query="";
+let tab="settings",config=null,saved=null,error="",mapRows=[],query="",setup=false,profile="keep";
 const mapState={page:0,query:"",status:"",sort:["filename",1]};
 async function request(path,body){
   const response=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -13,7 +13,12 @@ async function reload(){config=await request("/api/settings");saved=structuredCl
 async function save(){try{config=await request("/api/settings",{sha256:config.sha256,values:values()});saved=structuredClone(values());error="";render();}catch(problem){error=problem.message;render();}}
 async function controls(){
   try{if(dirty())throw new Error("Save or discard your display changes before applying the controls.");
-    config=await request("/api/settings/controls",{sha256:config.sha256});saved=structuredClone(values());error="";render();
+    let replaceCustom=false;
+    if(profile!=="keep"&&config.controls.selected==="custom"){
+      replaceCustom=await LexeditorUI.confirmAction({title:"Replace custom bindings?",message:"This replaces your keyboard and controller bindings with the selected preset.",confirmLabel:"Replace bindings",cancelLabel:"Keep my bindings"});
+      if(!replaceCustom)return;
+    }
+    config=await request("/api/settings/controls",{sha256:config.sha256,controlsSha256:config.controls.sha256,profile,replaceCustom});saved=structuredClone(values());setup=false;error="";render();
   }catch(problem){error=problem.message;render();}
 }
 function render(){
@@ -33,9 +38,12 @@ function render(){
   }else{
     const view=LexeditorUI.platformConfigView({config,query,showHeader:false,search:value=>{query=value;},change:(id,value)=>{fields().find(field=>field.id===id).value=value;shell.refresh();}});
     main.replaceChildren(stack(error?notice(error):null,
-      actionRow(el("button",{type:"button",onclick:controls},"Apply Lexer's controls"),
-        LexeditorUI.infoHelp("RT and RB attack. LT, LB, Square and Q use the equipped spell or item, including the map. Cross and E interact. Hold Circle or Left Shift to run. Triangle or Tab opens the menu. Cross confirms and Circle backs out in menus."),
-        el("button",{type:"button",onclick:()=>reload().catch(problem=>{error=problem.message;render();})},"Reload")),view));
+      detailPanel({title:"Controls",help:"Classic Controls restores the baseline upstream port bindings. Modern Controls adds RT/RB attack, LT/LB cast, Cross/E interact and Circle/Left Shift held run. Original Select/Tab menu and Triangle/Q item or spell bindings stay available; equipped maps use the same item action. Cross confirms and Circle backs out in menus. F2 remains optional Debug Tools; this port has no Remaster Editor.",body:[
+        setup?stack(el("label",{},"Control preset",el("select",{"aria-label":"Control preset",onchange:event=>{profile=event.target.value;}},
+          ...[["keep","Keep current bindings"],["classic","Classic Controls"],["modern","Modern Controls"]].map(([value,label])=>el("option",{value,selected:profile===value},label)))),
+          actionRow(el("button",{type:"button",onclick:controls},"Finish control setup"),el("button",{type:"button",onclick:()=>{setup=false;render();}},"Cancel")))
+        :actionRow(el("button",{type:"button",onclick:()=>{setup=true;profile="keep";render();}},"Run control setup again")),
+      ]}),actionRow(el("button",{type:"button",onclick:()=>reload().catch(problem=>{error=problem.message;render();})},"Reload")),view));
   }
   shell.refresh();
 }

@@ -19,8 +19,8 @@ FIELDS = (
      "description": "Use 8–30 with Renderer set to Retained, or 0 for the original reach. Original visible cells remain. Fog becomes black beyond about 9.17."},
     {"id": "kf1.renderdistance.fade", "label": "Smooth distance fade", "kind": "boolean", "default": True,
      "description": "Fades geometry near the view edge. This does not change view distance or the game's fog shading."},
-    {"id": "kf1.controls.holdrun", "label": "Hold to run", "kind": "boolean", "default": True,
-     "description": "Doubles movement while Run is held. The control preset binds Circle and Left Shift to Run."},
+    {"id": "kf1.controls.holdrun", "label": "Hold to run", "kind": "boolean", "default": False,
+     "description": "Doubles movement while Run is held. Modern Controls binds Circle and Left Shift to Run."},
 )
 
 
@@ -31,7 +31,7 @@ def game_root() -> Path:
 
 def read_file(root: Path, name: str) -> bytes:
     path = root / name
-    if is_link(root) or is_link(path):
+    if is_link(root) or any(is_link(parent) for parent in (path, *path.parents) if parent == root or root in parent.parents):
         raise ValueError("Settings cannot use linked files")
     if not path.exists():
         return b""
@@ -88,29 +88,76 @@ def update_ini(data: bytes, changes: dict[str, str]) -> bytes:
     return "".join(lines).encode()
 
 
-def write_settings(root: Path, changes: dict[str, str], *, expected: str | None = None, controls: bool = False) -> None:
+def control_profiles(root: Path) -> dict:
+    data = read_file(root, "content/config/controls.json")
+    marker = json.loads(read_file(root, "lexeditor-port.json"))
+    if sha256(data).hexdigest() != marker.get("controlsSha256"):
+        raise ValueError("The port's control profiles changed; repair its installation before running setup")
+    profiles = json.loads(data)
+    if not isinstance(profiles, dict) or profiles.get("version") != 1:
+        raise ValueError("Unsupported native control profiles")
+    for name in ("classic", "modern"):
+        profile = profiles.get(name)
+        if not isinstance(profile, dict) or any(not isinstance(profile.get(key), dict) for key in ("Keys", "Keys2", "Pad", "PadAnalog", "view")):
+            raise ValueError("The port's control profiles are invalid")
+    return profiles
+
+
+def current_controls(root: Path, profiles: dict, ini: dict[str, str]) -> dict:
+    data = read_file(root, "settings.json")
+    config = json.loads(data)
+    if not isinstance(config, dict):
+        raise ValueError("The port's input settings are invalid; repair them in its F1 menu")
+    selected = "custom"
+    for name in ("classic", "modern"):
+        profile = profiles[name]
+        if all(config.get(key) == profile[key] for key in ("Keys", "Keys2", "Pad", "PadAnalog")) and all(
+            ini.get(key, "1" if key == "kf1.pad.layout" else "0") == value for key, value in profile["view"].items()
+        ):
+            selected = name
+            break
+    return {"selected": selected, "sha256": sha256(data).hexdigest(), "setupComplete": ini.get("kf1.controls.setup") == "1"}
+
+
+def write_settings(root: Path, changes: dict[str, str], *, expected: str | None = None,
+                   profile: str | None = None, expected_controls: str | None = None, replace_custom: bool = False) -> None:
     verify_port(root)
     stopped()
+    present = {root / "interface.ini": (root / "interface.ini").exists()}
     original = read_file(root, "interface.ini")
     if expected is not None and sha256(original).hexdigest() != expected:
         raise ValueError("Port settings changed; reload before saving")
-    outputs = {root / "interface.ini": update_ini(original, changes)}
-    if controls:
+    changes = dict(changes)
+    outputs = {}
+    snapshots = {root / "interface.ini": original}
+    if profile is not None:
+        if profile not in ("keep", "classic", "modern"):
+            raise ValueError("Choose Keep current bindings, Classic Controls or Modern Controls")
+        profiles = control_profiles(root)
+        current = current_controls(root, profiles, parse_ini(original))
+        if not isinstance(expected_controls, str) or current["sha256"] != expected_controls:
+            raise ValueError("Input bindings changed; reload before running setup")
         data = read_file(root, "settings.json")
+        if sha256(data).hexdigest() != expected_controls:
+            raise ValueError("Input bindings changed; reload before running setup")
         config = json.loads(data)
-        if not isinstance(config, dict) or any(not isinstance(config.get(name, {}), dict) for name in ("Keys", "Pad", "PadAnalog")):
-            raise ValueError("The port's input settings are invalid; repair them in its F1 menu")
-        # Native pad configuration plus the port's Western face permutation.
-        config.setdefault("Keys", {}).update(Circle="E", R3="ShiftLeft")
-        for name in ("Pad", "PadAnalog"):
-            config.setdefault(name, {}).update(Cross=[0], Circle=[1, 3], Square=[10, 101], Triangle=[9, 100, 2], L1=[], R1=[], L2=[], R2=[], R3=[1])
-        outputs[root / "settings.json"] = (json.dumps(config, indent=2) + "\n").encode()
+        if profile != "keep":
+            if current["selected"] == "custom" and not replace_custom:
+                raise ValueError("Confirm replacing your custom bindings before applying a preset")
+            selected = profiles[profile]
+            config.update({key: selected[key] for key in ("Keys", "Keys2", "Pad", "PadAnalog")})
+            changes.update(selected["view"])
+            outputs[root / "settings.json"] = (json.dumps(config, indent=2) + "\n").encode()
+            snapshots[root / "settings.json"] = data
+            present[root / "settings.json"] = True
+        changes["kf1.controls.setup"] = "1"
+    outputs[root / "interface.ini"] = update_ini(original, changes)
     expected_hashes = {}
     for path in list(outputs):
-        before = read_file(root, path.name)
-        expected_hashes[path] = sha256(before).hexdigest() if path.exists() else None
+        before = snapshots[path]
+        expected_hashes[path] = sha256(before).hexdigest() if present[path] else None
         # Bounded recovery: one original and the immediately previous version.
-        if path.exists():
+        if present[path]:
             for suffix in (".lexeditor-original", ".lexeditor-previous"):
                 backup = root / (path.name + suffix)
                 if suffix.endswith("original") and backup.exists():
@@ -137,7 +184,19 @@ def payload(root: Path | None = None) -> dict:
             field["value"] = float(raw) if raw is not None else field["default"]
         fields.append(field)
     return {"available": True, "runtime": "Verdite1", "path": str(root / "interface.ini"),
-            "sha256": sha256(data).hexdigest(), "sections": [{"label": "Display and controls", "fields": fields}]}
+            "sha256": sha256(data).hexdigest(), "controls": current_controls(root, control_profiles(root), values),
+            "sections": [{"label": "Display and controls", "fields": fields}]}
+
+
+def setup_controls(body: dict) -> dict:
+    if not isinstance(body.get("sha256"), str):
+        raise ValueError("Reload the settings before running setup")
+    if body.get("profile", "keep") not in ("keep", "classic", "modern"):
+        raise ValueError("Choose Keep current bindings, Classic Controls or Modern Controls")
+    with LOCK:
+        write_settings(game_root(), {}, expected=body["sha256"], profile=body.get("profile", "keep"),
+                       expected_controls=body.get("controlsSha256"), replace_custom=body.get("replaceCustom") is True)
+        return payload()
 
 
 def save(body: dict) -> dict:

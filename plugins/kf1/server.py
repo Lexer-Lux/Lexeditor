@@ -15,7 +15,7 @@ DATA_MAP = [
     {"filename": "interface.ini", "controls": "Native display and control settings", "status": "partial", "coverage": "view", "target": "settings",
      "notes": "View distance, smooth distance fade and hold to run are editable. Other native settings remain in the port's F1 menu."},
     {"filename": "settings.json", "controls": "Keyboard and controller bindings", "status": "partial", "coverage": "view", "target": "settings",
-     "notes": "Apply the requested control preset here. Individual bindings remain editable in the port's Input settings."},
+     "notes": "Control setup offers Classic Controls, Modern Controls or keeping your bindings. Individual bindings remain editable in the port's Input settings."},
     {"filename": "mods/*/mod.json and C# sources", "controls": "Native runtime mods", "status": "partial", "coverage": "view", "target": "mods",
      "notes": "The shared Mods tab imports and enables native source mods. Hook compatibility needs testing for each mod."},
     {"filename": "KF/B1 through KF/B5", "controls": "Floors, models, encounters and scripts", "status": "not-integrated",
@@ -71,12 +71,7 @@ class Handler(PluginRequestHandler):
             if not isinstance(body, dict):
                 raise ValueError("Settings request must be an object")
             if path == "/api/settings/controls":
-                if not isinstance(body.get("sha256"), str):
-                    raise ValueError("Reload the settings before applying controls")
-                with settings.LOCK:
-                    settings.write_settings(settings.game_root(), {"kf1.pad.layout": "1", "kf1.controls.holdrun": "1"},
-                                            expected=body["sha256"], controls=True)
-                self.send_json(settings.payload())
+                self.send_json(settings.setup_controls(body))
             else:
                 self.send_json(settings.save(body))
         except (OSError, ValueError, TypeError) as error:
