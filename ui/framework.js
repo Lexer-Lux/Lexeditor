@@ -17421,6 +17421,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       const pane = scoped[0].closest('.lex-tweak-card-grid') || scoped[0].parentElement?.parentElement;
       if (pane?.style.getPropertyValue('--lex-detail-label-floor'))
         pane.style.removeProperty('--lex-detail-label-floor');
+      scoped.forEach(placeBooleanHelp);
       return;
     }
     if (!labels.length) return;
@@ -17428,7 +17429,10 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const pane = labels[0].closest('.lex-tweak-card-grid') || labels[0].parentElement?.parentElement;
     const cap = Math.min(...labels.map(label => label.parentElement.clientWidth)) / 2;
     if (!floorOver(pane, cap) && !labels.some(label => shrunkWithRoom(label, pane, cap))
-      && labels.every(label => fitted.get(label) === scopedFieldKey(label, base) && labelFits(label))) return;
+      && labels.every(label => fitted.get(label) === scopedFieldKey(label, base) && labelFits(label))) {
+      labels.forEach(placeBooleanHelp);
+      return;
+    }
     labels.forEach(label => {
       label.style.fontSize = '';
       const nameText = label.querySelector(':scope > .lex-detail-field-label-text');
@@ -17443,6 +17447,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       const floorNow = parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor')) || 0;
       if (floorNow > cap) pane.style.setProperty('--lex-detail-label-floor', `${Math.ceil(cap)}px`);
       else labels.forEach(label => fitted.set(label, scopedFieldKey(label, base)));
+      labels.forEach(placeBooleanHelp);
       return;
     }
     // A name that only fits on three lines asks for the room first: the
@@ -17473,6 +17478,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
         else pane.style.removeProperty('--lex-detail-label-floor');
       }
       if (labels.every(labelFits)) {
+        labels.forEach(placeBooleanHelp);
         labels.forEach(label => fitted.set(label, scopedFieldKey(label, base)));
         return;
       }
