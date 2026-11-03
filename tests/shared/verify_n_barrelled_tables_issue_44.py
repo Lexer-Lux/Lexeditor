@@ -38,13 +38,14 @@ def main() -> int:
     require('`lex-barrel-control${openBarrelControlKey' in FRAMEWORK
             and ".lex-barrel-control.open" in CSS,
             "the shared Table panel needs one compact control that stays open for repeated changes")
-    require("dividerAccessories: [barrelControl]" in FRAMEWORK
+    require("dividerAccessories: [[barrelControl, columnControl]]" in FRAMEWORK
             and "options.dividerAccessories" in FRAMEWORK,
             "the barrel control must belong to the shared divider rail")
     require('"aria-label": "Decrease table barrels"' in FRAMEWORK
             and '"aria-label": "Increase table barrels"' in FRAMEWORK,
             "minus and plus controls need explicit accessible actions")
-    require("masterNodes = barrelRows.map" in FRAMEWORK and "masterNodes[0]" in FRAMEWORK,
+    require("return barrelRows.map" in FRAMEWORK and "masterNodes = buildMasters()" in FRAMEWORK
+            and "masterNodes[0]" in FRAMEWORK,
             "selection and fitted row measurement must use the shared barrel masters")
     require("if (pages > 1 || hasBottomTools) {" in FRAMEWORK and "const pagerNode = pager(" in FRAMEWORK,
             "the bottom bar must remain when it owns search or filters, even when one barrel group fits")
@@ -82,9 +83,10 @@ def main() -> int:
     require("rotate(-90deg)" in CSS
             and ".lex-panel-layout-divider:hover > .lex-barrel-control" in CSS,
             "the divider rail must reveal the rotated barrel control")
-    require('divider.addEventListener("contextmenu"' in FRAMEWORK
+    require('root.classList.add("lex-panel-layout-static")' in FRAMEWORK
+            and 'divider.addEventListener("contextmenu"' not in FRAMEWORK
             and 'divider.addEventListener("dblclick"' not in FRAMEWORK,
-            "right-click, not double-click, must reset a panel split")
+            "automatic panel dividers must not expose a saved split or reset gesture")
     require("const barrelPanelMinimum =" in FRAMEWORK
             and "minLeft: barrelPanelMinimum" in FRAMEWORK,
             "the table-panel pixel minimum must grow with the barrel count")

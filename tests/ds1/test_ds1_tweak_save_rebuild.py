@@ -496,7 +496,7 @@ def test_save_does_not_disable_mods_for_an_unattributed_deployment_error(game, l
                for name in ("Alpha", "Beta"))
 
 
-def test_failed_mod_notice_does_not_block_the_editor(tmp_path):
+def test_failed_mod_notice_stays_until_closed_then_editor_remains_usable(tmp_path):
     from playwright.sync_api import sync_playwright
     root = Path(__file__).resolve().parents[2]
     source = (root / "plugins/ds1/editor.js").read_text(encoding="utf-8")
@@ -516,10 +516,14 @@ def test_failed_mod_notice_does_not_block_the_editor(tmp_path):
             page.evaluate('''reportTweakRebuild({disabledMods: [{name: "Estus Rework",
               error: "Its build returned an unsupported file."}]})''')
             assert page.get_by_text('Changes saved. Other enabled mods rebuilt.', exact=False).is_visible()
+            dialog = page.get_by_role('alertdialog', name='Some mods were switched off', exact=True)
+            assert dialog.is_visible()
+            assert 'Estus Rework was switched off: Its build returned an unsupported file.' in dialog.inner_text()
+            page.screenshot(path=str(tmp_path / "disabled-mod-notice.png"))
+            dialog.get_by_role('button', name='Close', exact=True).click()
             assert page.locator('.lex-dialog-backdrop').count() == 0
             assert not page.evaluate('document.body.inert')
             page.locator('#edit').click()
-            page.screenshot(path=str(tmp_path / "disabled-mod-notice.png"))
         finally:
             browser.close()
 

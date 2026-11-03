@@ -89,9 +89,9 @@ require("LexeditorUI.pagedListDetail" in CRAFTING, "RDR2 Crafting bypasses the s
 require("LexeditorUI.masterDetail" not in CRAFTING and "previousScroll" not in CRAFTING,
         "RDR2 Crafting still uses its old scrolling list-detail path")
 require("craftPageSize" in RDR2, "RDR2 Crafting does not retain its measured page size")
-require("Math.max(32, Number(options.fit?.minRowHeight) || 0)" in PAGED_PRESET
-        and "const pageSize = Math.min(requestedPageSize, fitCapacity?.capacity || requestedPageSize)" in PAGED_PRESET,
-        "shared list masters must bound capacity using a readable minimum row height")
+require("const pageSize = requestedPageSize;" in PAGED_PRESET
+        and "fixedRows: fitMinimum ? requestedPageSize" in PAGED_PRESET,
+        "shared list masters must preserve the row count chosen in the pager")
 require(".lex-list.lex-fitted-page[data-lex-fixed-rows] > .lex-list-row" in FRAMEWORK_CSS
         and "height:var(--lex-fitted-row-height)" in FRAMEWORK_CSS,
         "all shared fitted list masters must apply their measured row height")
