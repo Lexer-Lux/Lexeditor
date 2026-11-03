@@ -221,7 +221,7 @@ def main():
         assert abs(axes['columnLeft'] - axes['cellLeft']) <= 1, axes
         assert axes['columnBottom'] < axes['cellTop'], axes
         region_column = [value.strip().lstrip("#").strip() for value in table.locator(
-            ".lex-column-list-row > [data-column-key='regionId']").all_inner_texts()]
+            ".lex-column-list-row:not(.lex-filler-row) > [data-column-key='regionId']").all_inner_texts()]
         assert region_column == ["1", "2", "3"], region_column
         # Rules uses the shared table fill behavior at different panel heights.
         for height in (950, 720):
@@ -348,12 +348,12 @@ def main():
                           for value in master.locator(".lex-column-list-head-cell").all_inner_texts()]
         assert master_headers == ["GROUP", "FORMATIONS", "ENEMIES", "RULES"], master_headers
         rule_counts = [value.strip() for value in master.locator(
-            ".lex-column-list-row > [data-column-key='ruleCount']").all_inner_texts()]
+            ".lex-column-list-row:not(.lex-filler-row) > [data-column-key='ruleCount']").all_inner_texts()]
         # Group 0 started with two rules; the cell edit above moved one of them
         # to group 2, and the list counts what the data now says.
         assert rule_counts == ["1", "2", "2", "none"], rule_counts
         identities = ["".join(value.split()) for value in master.locator(
-            ".lex-column-list-row > [data-column-key='id']").all_inner_texts()]
+            ".lex-column-list-row:not(.lex-filler-row) > [data-column-key='id'] .lex-record-id").all_inner_texts()]
         assert identities == ["#0", "#1", "#2", "#3"], identities
         detail = page.locator(".ff8-encounter-group-detail")
         assert "Encounter group" in detail.locator(".lex-detail-panel-title").inner_text()
@@ -405,7 +405,7 @@ def main():
         for index,(_,text) in enumerate(shares):
             assert text==f'Slot {index+1}',shares
         chances=page.locator('.ff8-encounter-group-detail .ff8-encounter-initial-chances')
-        actual=chances.locator('.lex-column-list-row').evaluate_all("""rows=>rows.map(row=>[
+        actual=chances.locator('.lex-column-list-row:not(.lex-filler-row)').evaluate_all("""rows=>rows.map(row=>[
           row.querySelector('[data-column-key="id"]').textContent,
           row.querySelector('[data-column-key="chance"]').textContent,
           row.querySelector('[data-column-key="slots"]').textContent])""")
@@ -415,7 +415,7 @@ def main():
                         ['#4','14.0625%','5'],['#5','14.0625%','6']],actual
         page.evaluate("state.data.world.rows.find(row=>row.kind==='group'&&row.id===0).initialOutcomes=[0,0,0,0,0,0,0,256];renderEncounters()")
         custom=page.locator('.ff8-encounter-group-detail .ff8-encounter-initial-chances')
-        assert custom.locator('.lex-column-list-row [data-column-key="chance"]').all_text_contents()==['0%','100%','0%','0%','0%','0%']
+        assert custom.locator('.lex-column-list-row:not(.lex-filler-row) [data-column-key="chance"]').all_text_contents()==['0%','100%','0%','0%','0%','0%']
         shot('saved-chances')
         page.evaluate("delete state.data.world.rows.find(row=>row.kind==='group'&&row.id===0).initialOutcomes;renderEncounters()")
         rows=page.locator('.ff8-encounter-group-detail .ff8-encounter-formation-row')
