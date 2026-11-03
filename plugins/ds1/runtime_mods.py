@@ -172,7 +172,7 @@ def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes | dict])
 
 def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root: Path | None = None) -> Path:
     """Export built contributions without developer files or local paths."""
-    from core import mod_metadata, mod_requires, script_mods
+    from core import mod_metadata, mod_requires, script_mods, mod_licenses
     from core.mod_library import relative_path
     from . import assets, menu_dim, mod_loader, tweak_mods, record_edits, native_support, native_rules
     folder, destination = Path(folder), Path(destination)
@@ -180,6 +180,7 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
     if not (folder/mod_metadata.FILE).is_file():
         raise FileNotFoundError(folder/mod_metadata.FILE)
     metadata = mod_metadata._stored(folder)
+    license_files = mod_licenses.files(folder)
     scripted = script_mods.is_script_mod(folder)
     if scripted:
         manifest = script_mods._read_json(folder/script_mods.MANIFEST_FILE) or {}
@@ -280,6 +281,8 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
         public = {key: metadata[key] for key in (*mod_metadata.FIELDS, 'id', 'version', 'requires') if key in metadata}
         public.update(id=mod_id, name=metadata.get('name') or mod_id, enabled=True, order=metadata.get('order', 1000),
                       requires=mod_requires.needs(folder))
+        if license_files:
+            public['licenseFiles'] = [path.as_posix() for path in license_files]
         encoded = (json.dumps(public, indent=2, ensure_ascii=False)+'\n').encode('utf-8')
         if len(encoded) > 65536:
             raise ValueError('The release metadata exceeds the loader size limit')
@@ -301,6 +304,7 @@ def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root:
             output.write_bytes(source.read_bytes())
         if rules is not None:
             native_support.check_source(target,native_support.RULES_FILE,json.loads(rules))
+        mod_licenses.copy(folder, target)
     except Exception:
         import shutil
         if target.resolve().parent != destination.resolve():
