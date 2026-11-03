@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import os
 import hashlib
+import shutil
 import stat
 import tempfile
 import time
 import urllib.request
 from pathlib import Path
-from typing import Callable
+from typing import BinaryIO, Callable
 
 Progress = Callable[[int, int, str], None]
 USER_AGENT = "Lexeditor/1.0"
@@ -45,12 +46,13 @@ def is_link(path: Path) -> bool:
     return stat.S_ISLNK(info.st_mode) or bool(getattr(info, 'st_file_attributes', 0) & 0x400)
 
 
-def atomic_write(path: Path, data: bytes) -> None:
+def atomic_write(path: Path, data: bytes | bytearray | memoryview | BinaryIO) -> None:
     """Write the whole file or none of it.
 
     A half-written game file is worse than no file: the game loads it, and the
     player has no way to tell what happened. Write beside the target, flush to
-    the disk, then replace in one step.
+    the disk, then replace in one step. Streams copy from their current
+    position in bounded chunks, without materializing a rollback file.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -66,7 +68,10 @@ def atomic_write(path: Path, data: bytes) -> None:
     handle, name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(handle, "wb") as stream:
-            stream.write(data)
+            if isinstance(data, (bytes, bytearray, memoryview)):
+                stream.write(data)
+            else:
+                shutil.copyfileobj(data, stream, 64 * 1024)
             stream.flush()
             os.fsync(stream.fileno())
         deadline = time.monotonic() + 2

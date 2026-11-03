@@ -315,14 +315,14 @@ class ScriptModTests(unittest.TestCase):
         (self.mod/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
         self.build()
         target = self.mod/'hext/ff8/en_nv/patch.txt'
-        read = Path.read_bytes
-        def unavailable(path):
+        open_file = Path.open
+        def unavailable(path, *args, **kwargs):
             if path == target:
                 raise PermissionError('snapshot file is busy')
-            return read(path)
+            return open_file(path, *args, **kwargs)
         class Context(list):
             pass
-        with mock.patch.object(Path, 'read_bytes', unavailable):
+        with mock.patch.object(Path, 'open', unavailable):
             with self.assertRaises(script_mods.ScriptModError) as caught:
                 script_mods.build_batch([script_mods.catalog_row(self.mod)], Context(), allowed_roots=('hext','direct'))
         self.assertFalse(caught.exception.folders)
@@ -368,6 +368,103 @@ class ScriptModTests(unittest.TestCase):
         snapshot.assert_not_called()
         restore.assert_not_called()
         self.assertEqual(target.read_text(), 'external edit')
+
+    def test_large_generated_rollback_streams_and_closes_temporary_files(self):
+        self.build()
+        target = self.mod/'hext/ff8/en_nv/patch.txt'
+        block = b'original bytes ' * 4096
+        with target.open('wb') as stream:
+            for _ in range(128):
+                stream.write(block)
+        original_hash = hashlib.sha256(block * 128).hexdigest()
+        script_mods.save_values(self.mod, {'amount': 60})
+        open_file, temporary, write = Path.open, tempfile.TemporaryFile, script_mods.atomic_write
+        snapshots, reads = [], []
+        class BoundedReader:
+            def __init__(inner, source):
+                inner.source = source
+            def __enter__(inner):
+                return inner
+            def __exit__(inner, *args):
+                return inner.source.__exit__(*args)
+            def read(inner, count=-1):
+                self.assertGreaterEqual(count, 0)
+                self.assertLessEqual(count, 64 * 1024)
+                reads.append(count)
+                return inner.source.read(count)
+        def bounded(path, *args, **kwargs):
+            source = open_file(path, *args, **kwargs)
+            return BoundedReader(source) if path == target and args == ('rb',) else source
+        def snapshot(*args, **kwargs):
+            result = temporary(*args, **kwargs)
+            snapshots.append(result)
+            return result
+        def fail_manifest(path, data):
+            if path == self.mod/script_mods.MANIFEST_FILE:
+                raise OSError('manifest storage failed')
+            return write(path, data)
+        with mock.patch.object(Path, 'open', bounded), \
+                mock.patch.object(script_mods.tempfile, 'TemporaryFile', snapshot), \
+                mock.patch.object(script_mods, 'atomic_write', side_effect=fail_manifest):
+            with self.assertRaisesRegex(script_mods.ScriptModInfrastructureError, 'manifest storage failed'):
+                self.build()
+        self.assertTrue(reads)
+        self.assertTrue(snapshots)
+        self.assertTrue(all(stream.closed for stream in snapshots))
+        self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), original_hash)
+        self.assertFalse((self.mod/'direct/extra.bin').exists())
+
+    def test_successful_batch_closes_its_rollback_files(self):
+        (self.mod/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+        self.build()
+        temporary, snapshots = tempfile.TemporaryFile, []
+        def snapshot(*args, **kwargs):
+            result = temporary(*args, **kwargs)
+            snapshots.append(result)
+            return result
+        class Context(list):
+            pass
+        with mock.patch.object(script_mods.tempfile, 'TemporaryFile', snapshot):
+            script_mods.build_batch([script_mods.catalog_row(self.mod)], Context(),
+                                   allowed_roots=('hext','direct'))
+        self.assertTrue(snapshots)
+        self.assertTrue(all(stream.closed for stream in snapshots))
+
+    def test_failed_streamed_write_preserves_target_and_cleans_partial_file(self):
+        target = self.dir/'output.bin'
+        target.write_bytes(b'previous')
+        class BrokenStream:
+            first = True
+            def read(inner, count):
+                self.assertEqual(count, 64 * 1024)
+                if inner.first:
+                    inner.first = False
+                    return b'partial replacement'
+                raise OSError('rollback input unreadable')
+        with self.assertRaisesRegex(OSError, 'rollback input unreadable'):
+            script_mods.atomic_write(target, BrokenStream())
+        self.assertEqual(target.read_bytes(), b'previous')
+        self.assertFalse(list(self.dir.glob('output.bin.*.tmp')))
+
+    def test_partial_snapshot_failure_closes_files_before_any_generated_write(self):
+        self.build()
+        target = self.mod/'hext/ff8/en_nv/patch.txt'
+        previous = target.read_bytes()
+        temporary, snapshots = tempfile.TemporaryFile, []
+        def snapshot(*args, **kwargs):
+            result = temporary(*args, **kwargs)
+            snapshots.append(result)
+            return result
+        def interrupted(source, destination, length):
+            destination.write(b'partial snapshot')
+            raise OSError('snapshot storage unavailable')
+        with mock.patch.object(script_mods.tempfile, 'TemporaryFile', snapshot), \
+                mock.patch.object(script_mods.shutil, 'copyfileobj', side_effect=interrupted):
+            with self.assertRaisesRegex(script_mods.ScriptModInfrastructureError, 'snapshot storage unavailable'):
+                self.build()
+        self.assertTrue(snapshots)
+        self.assertTrue(all(stream.closed for stream in snapshots))
+        self.assertEqual(target.read_bytes(), previous)
 
 
 if __name__ == "__main__":
