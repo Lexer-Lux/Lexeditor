@@ -726,12 +726,14 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
             continue
         else:
             payload = candidate.read_bytes()
-        source_hash = hashlib.sha256(candidate.read_bytes() if own else payload).hexdigest()
+        source_payload = candidate.read_bytes() if own and composed is not None else payload
+        source_hash = hashlib.sha256(source_payload).hexdigest()
         if transform is not None and relative == RELATIVE:
             payload = transform(payload)
             if not isinstance(payload, bytes) or len(payload) > MAX_ARCHIVE:
                 raise ValueError("The parameter transformation returned invalid output")
-        payload_hash = hashlib.sha256(payload).hexdigest()
+        payload_hash = source_hash if payload is source_payload else hashlib.sha256(payload).hexdigest()
+        del source_payload
         live = game_root / relative
         _assert_no_reparse_points(live, game_root)
         installed = _read_marker(_marker_path(game_root, relative))
@@ -743,8 +745,10 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
         # verifies the live file, preserved original and ownership journal.
         if not unchanged:
             _check_asset_like(game_root, relative, payload) if reader is None else reader(payload)
-        sources[relative] = (candidate, payload, source_hash)
-    desired = {relative:hashlib.sha256(row[1]).hexdigest() for relative,row in sources.items()}
+        # Payloads are immutable bytes. Carry their verified identity through
+        # the transaction instead of hashing the same buffer at each stage.
+        sources[relative] = (candidate, payload, source_hash, payload_hash)
+    desired = {relative:row[3] for relative,row in sources.items()}
     for relative,_reader in targets:
         if relative not in sources:
             marker = _read_marker(_marker_path(game_root,relative))
@@ -763,7 +767,7 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
 
 
 def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Path, new_bytes: bytes,
-                source_hash: str) -> None:
+                source_hash: str, new_hash: str | None = None) -> None:
     relative = _target_relative(relative)
     live = game_root / relative
     backup = _backup_path(game_root, relative)
@@ -772,7 +776,8 @@ def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Pat
         _assert_no_reparse_points(path, game_root)
     if source.resolve() == live.resolve():
         raise RuntimeError("The mod project's saved archive and the installed file must not be the same path.")
-    new_hash = hashlib.sha256(new_bytes).hexdigest()
+    if new_hash is None:
+        new_hash = hashlib.sha256(new_bytes).hexdigest()
     marker = _read_marker(marker_path)
 
     if marker is None:

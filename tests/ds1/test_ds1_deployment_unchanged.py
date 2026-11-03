@@ -1,5 +1,7 @@
 """Repeated application preserves identical installed files and still validates ownership."""
 import pytest
+import hashlib
+import json
 from test_ds1_deployment import project, make_archive, RELATIVE
 from plugins.ds1 import deployment
 
@@ -73,3 +75,19 @@ def test_external_change_after_comparison_is_still_preserved(tmp_path, monkeypat
     with pytest.raises(RuntimeError):
         deployment.apply(game, mod, composed={RELATIVE: payload})
     assert (game/RELATIVE).read_bytes() == b'external edit'
+
+
+@pytest.mark.parametrize('combined', [False, True])
+def test_transformed_payload_keeps_distinct_source_and_installed_identities(tmp_path, combined):
+    game, mod = project(tmp_path)
+    source = make_archive(field_values={'EquipParamGoods': {100: {'basicPrice': 17}}})
+    transformed = make_archive(field_values={'EquipParamGoods': {100: {'basicPrice': 18}}})
+    (mod / RELATIVE).parent.mkdir(parents=True, exist_ok=True)
+    (mod / RELATIVE).write_bytes(source)
+    options = {'composed': {RELATIVE: source}} if combined else {}
+    result = deployment.apply(game, mod, transform=lambda _payload: transformed, **options)
+    marker = json.loads(deployment._marker_path(game, RELATIVE).read_text())
+    assert marker['sourceHash'] == hashlib.sha256(source).hexdigest()
+    assert marker['activeHash'] == hashlib.sha256(transformed).hexdigest()
+    assert (game / RELATIVE).read_bytes() == transformed
+    assert result['enabled'] and not result['stale']
