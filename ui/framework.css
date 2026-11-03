@@ -9029,7 +9029,7 @@ body { text-shadow: var(--lex-text-shadow, none); }
   position:relative;
   flex:0 0 16px;
   display:grid;
-  place-items:center;
+  place-items:center start;
   width:16px;
   z-index:5;
 }
