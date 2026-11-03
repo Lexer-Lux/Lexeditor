@@ -50,6 +50,12 @@ def mod_row(folder: Path) -> dict:
         row.update({'lexmod': None, 'script': None, 'components': None})
         return row
     marker = folder / lexmods.MARKER
+    from core import mod_licenses
+    try:
+        row['licenseFiles'] = [path.as_posix() for path in mod_licenses.files(folder)]
+    except (ValueError, OSError) as error:
+        row['licenseFiles'] = []
+        row['error'] = str(error)
     row["lexmod"] = None
     if marker.is_file():
         try:

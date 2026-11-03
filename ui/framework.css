@@ -675,9 +675,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    before anything overlaps. It keeps a slot for the picker's menu button,
    and when its own width runs short the picker drops its label. */
 .lex-shell-start > .lex-shell-left-actions { flex: 1 1 auto; container-type: inline-size; min-width: 40px; }
-@container (max-width: 130px) {
-  .lex-project-select { padding: 4px 26px 4px 4px; }
-  .lex-project-select > :is(.lex-project-name, .lex-project-path) { display: none; }
+@container (max-width: 240px) {
+  .lex-shell-left-actions .lex-project-select { padding: 4px 26px 4px 4px; }
+  /* The source name already identifies the selection. Give it the compact
+     face instead of squeezing it beside the redundant path or helper hint. */
+  .lex-project-select > .lex-project-path { display: none; }
 }
 /* The end cell's controls sit against the window's right edge. */
 .lex-shell-end > .lex-shell-right-actions { margin-left: auto; }
@@ -1673,33 +1675,36 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
 }
 
 [data-window-action="minimize"] .lex-window-icon::before {
-  top: 18px;
-  left: 12px;
+  top: 60%;
+  left: 50%;
   width: 10px;
+  transform:translateX(-50%);
   border-top: 1px solid currentColor;
 }
 
 [data-window-action="maximize"] .lex-window-icon::before {
-  top: 12px;
-  left: 12px;
+  top: 50%;
+  left: 50%;
   width: 9px;
   height: 9px;
   border: 1px solid currentColor;
+  transform:translate(-50%,-50%);
 }
 
 body[data-window-maximized="true"] [data-window-action="maximize"] .lex-window-icon::before {
-  top: 14px;
-  left: 11px;
+  top: calc(50% + 1px);
+  left: calc(50% - 1px);
   width: 8px;
   height: 8px;
 }
 
 body[data-window-maximized="true"] [data-window-action="maximize"] .lex-window-icon::after {
-  top: 11px;
-  left: 14px;
+  top: calc(50% - 1px);
+  left: calc(50% + 1px);
   width: 8px;
   height: 8px;
   border: 1px solid currentColor;
+  transform:translate(-50%,-50%);
   /* The back square of the restore glyph is a cutout of the front square, so
      it must be filled with the button's own surface. Filling it with the
      panel colour painted a bright patch on themes whose shell button is dark
@@ -1714,21 +1719,21 @@ body[data-window-maximized="true"] [data-window-action="maximize"]:hover .lex-wi
 
 [data-window-action="close"] .lex-window-icon::before {
 
-  top: 17px;
-  left: 11px;
+  top: 50%;
+  left: 50%;
   width: 12px;
   border-top: 1px solid currentColor;
 
- transform: rotate(45deg);
+ transform:translate(-50%,-50%) rotate(45deg);
 }
 [data-window-action="close"] .lex-window-icon::after {
 
-  top: 17px;
-  left: 11px;
+  top: 50%;
+  left: 50%;
   width: 12px;
   border-top: 1px solid currentColor;
 
- transform: rotate(-45deg);
+ transform:translate(-50%,-50%) rotate(-45deg);
 }
 
 .lex-window-resize-handle {
@@ -7161,37 +7166,42 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    150% UI scale), keep the centred history/save/play group clear of the right
    settings/help rail. Controls remain usable; only their chrome compacts. */
 @media (max-width:850px) {
+  .lex-shell-command-row {
+    --lex-compact-command-size:min(30px, calc(var(--lex-command-row-height) - 6px));
+  }
   .lex-shell-command-row,
   .lex-shell-start,
   .lex-shell-end,
   .lex-shell-center-actions,
   .lex-shell-right-actions { gap:4px; }
   .lex-shell-command-row :is(.lex-history-button,.lex-save-icon,.lex-game-process) {
-    width:30px;
-    min-width:30px;
-    height:30px;
-    min-height:30px;
+    width:var(--lex-compact-command-size);
+    min-width:var(--lex-compact-command-size);
+    height:var(--lex-compact-command-size);
+    min-height:var(--lex-compact-command-size);
   }
   #global-save.lex-command-primary,
   #global-game-process.lex-command-primary {
-    width:30px;
-    min-width:30px;
-    height:30px;
-    min-height:30px;
+    width:var(--lex-compact-command-size);
+    min-width:var(--lex-compact-command-size);
+    height:var(--lex-compact-command-size);
+    min-height:var(--lex-compact-command-size);
   }
   .lex-shell-command-row :is(.lex-settings-button,.lex-help-button,
     .lex-developer-button,.lex-shortcuts-button,.lex-info-button,.lex-github-tab) {
-    --lex-menu-icon:28px;
+    --lex-menu-icon:min(28px, var(--lex-compact-command-size));
   }
   .lex-ui-scale { gap:2px; margin-right:2px; }
   .lex-ui-scale input[type="range"] { width:36px; max-width:36px; }
-  .lex-window-button { width:32px; min-width:32px; }
-  .lex-shell-start > .lex-brand-slot { zoom:.75; }
+  .lex-shell-command-row .lex-window-button { width:var(--lex-compact-command-size); min-width:var(--lex-compact-command-size); height:var(--lex-compact-command-size); min-height:0; }
+  .lex-shell-start > .lex-brand-slot { padding-block:0; padding-inline:4px; }
+  .lex-shell-start .lex-brand-button h1 { font-size:min(24px, calc(var(--lex-command-row-height) - 8px)); }
+  .lex-shell-command-row :is(.lex-history-button,.lex-save-icon,.lex-game-process) > svg { width:75%; height:75%; }
+  .lex-shell-command-row .lex-project-select { min-height:0; padding-block:0; }
 }
 /* A 900 px window at 150% UI scale is 600 CSS px: the three groups need
    about 620 even compacted, so the wordmark scales down with the row. */
 @media (max-width:650px) {
-  .lex-shell-start > .lex-brand-slot { zoom:.6; }
   /* The smallest window this row has to survive still needs about twenty
      pixels: the scale slider keeps a handle wide enough to grab and gives up
      the rest of its track, and the percentage needs one character less. */
@@ -7199,9 +7209,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   .lex-ui-scale output { width:3ch; }
   .lex-shell-command-row :is(.lex-settings-button,.lex-help-button,
     .lex-developer-button,.lex-shortcuts-button,.lex-info-button,.lex-github-tab) {
-    --lex-menu-icon:26px;
+    --lex-menu-icon:min(26px, var(--lex-compact-command-size));
   }
-  .lex-window-button { width:30px; min-width:30px; }
+  .lex-shell-command-row .lex-window-button { width:var(--lex-compact-command-size); min-width:var(--lex-compact-command-size); }
 }
 
 @media (max-width:700px) {
