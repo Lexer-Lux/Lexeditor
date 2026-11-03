@@ -31,6 +31,7 @@ import inspect
 import json
 import keyword
 import os
+import time
 from pathlib import Path
 from time import perf_counter
 import sys
@@ -937,6 +938,7 @@ def _move_aside(game_root: Path, live: Path, error: Exception) -> Path:
         raise TweakError('Lexeditor never moves a game executable') from error
     _clear_moved_aside(game_root)
     limit = MAX_LOCKED_SMALL if live.is_file() and live.stat().st_size <= SMALL_FILE else MAX_LOCKED
+    failure = error
     for index in range(limit):
         try:
             target = checked(live.with_name(live.name + LOCKED_SUFFIX + (f"-{index}" if index else "")))
@@ -944,12 +946,19 @@ def _move_aside(game_root: Path, live: Path, error: Exception) -> Path:
             continue  # An unsafe leftover occupies this slot; preserve it.
         if target.exists():
             continue
-        try:
-            os.replace(live, target)
-            return target
-        except OSError:
-            break
-    raise TweakError(f"Windows will not let Lexeditor replace or move {live.name}. {STUCK_GAME}") from error
+        deadline = time.monotonic() + 2
+        while True:
+            try:
+                os.replace(live, target)
+                return target
+            except OSError as move_error:
+                failure = move_error
+                if getattr(move_error, 'winerror', None) not in (5, 32, 33) or time.monotonic() >= deadline:
+                    break
+                time.sleep(.05)
+        break
+    raise TweakError(f"Could not replace or move {live.name}. Close programs using this file, then retry. "
+                     f"Windows reported: {failure}") from failure
 
 
 def _clear_moved_aside(game_root: Path) -> None:

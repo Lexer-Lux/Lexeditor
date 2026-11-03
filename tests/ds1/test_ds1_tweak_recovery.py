@@ -180,6 +180,57 @@ def test_owned_runtime_removal_preserves_modified_executable_and_pinned_copies(g
     assert not (root/(tweak_mods.RUNTIME_DLL+tweak_mods.LOCKED_SUFFIX)).exists()
 
 
+def test_owned_readonly_loader_can_be_removed_without_touching_executable(game):
+    root, library, _built = game
+    tweak_mods._write_runtime(root, b'', [], None, library=library)
+    loader = root / tweak_mods.RUNTIME_DLL
+    os.chmod(loader, 0o444)
+    before = copies(root)
+    try:
+        result = tweak_mods.restore(root, library)
+        assert not loader.exists() and not result['canRestore']
+        assert copies(root) == before
+    finally:
+        if loader.exists():
+            os.chmod(loader, 0o666)
+
+
+def test_move_aside_retries_temporary_windows_sharing_violation(game, monkeypatch):
+    root, _library, _built = game
+    live = root / tweak_mods.RUNTIME_DLL
+    live.write_bytes(b'owned loader')
+    replace = os.replace
+    attempts, delays = [], []
+    def pinned(source, target):
+        attempts.append(target)
+        if len(attempts) < 3:
+            error = PermissionError(13, 'Sharing violation')
+            error.winerror = 32
+            raise error
+        return replace(source, target)
+    monkeypatch.setattr(os, 'replace', pinned)
+    monkeypatch.setattr(tweak_mods.time, 'sleep', delays.append)
+    moved = tweak_mods._move_aside(root, live, PermissionError('in use'))
+    assert moved.read_bytes() == b'owned loader' and not live.exists()
+    assert len(attempts) == 3 and delays == [.05, .05]
+
+
+def test_move_aside_stops_retrying_and_reports_actual_windows_error(game, monkeypatch):
+    root, _library, _built = game
+    live = root / tweak_mods.RUNTIME_DLL
+    live.write_bytes(b'owned loader')
+    error = PermissionError(13, 'Fixture sharing violation')
+    error.winerror = 32
+    monkeypatch.setattr(os, 'replace', lambda *_: (_ for _ in ()).throw(error))
+    clock = iter([0, 3])
+    monkeypatch.setattr(tweak_mods.time, 'monotonic', lambda: next(clock))
+    with pytest.raises(tweak_mods.TweakError, match='Fixture sharing violation') as caught:
+        tweak_mods._move_aside(root, live, PermissionError('in use'))
+    assert caught.value.__cause__ is error
+    assert 'crashed game' not in str(caught.value)
+    assert live.read_bytes() == b'owned loader'
+
+
 def test_cooperating_writers_do_not_enter_together(game):
     with tweak_mods._exclusive(game[0]):
         with pytest.raises(OSError):
