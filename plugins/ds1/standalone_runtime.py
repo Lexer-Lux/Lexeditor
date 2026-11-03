@@ -297,7 +297,10 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
             failures = prior.get('disabled') if valid else None
             valid = valid and type(failures) is list and all(type(row) is dict and all(
                 type(row.get(key)) is str for key in ('id','name','error')) for row in failures)
-            if valid and type(prior.get('signature')) is str and prior['signature'] == _identity(rows,game,prior['targets']):
+            available = {row['id'] for row in rows} | {'lexeditor-loader'}
+            if (valid and type(prior.get('signature')) is str
+                    and prior['signature'] == _identity(rows,game,prior['targets'])
+                    and all(set(mod_requires.declared(row['path'])) <= available for row in rows)):
                 enabled = {row['id'] for row in rows}
                 remaining = [row for row in failures if row['id'] not in enabled]
                 if remaining != failures:
@@ -312,7 +315,11 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
             try:
                 available = {row['id'] for row in rows} | {'lexeditor-loader'}
                 for row in rows:
-                    if any(need not in available for need in mod_requires.declared(row['path'])):
+                    try:
+                        required = mod_requires.declared(row['path'])
+                    except (ValueError,OSError) as error:
+                        raise ModBuildError([row['path']],f"{row['name']}: {error}") from error
+                    if any(need not in available for need in required):
                         raise ModBuildError([row['path']],f"{row['name']}: a required mod is unavailable")
                 data, composition, files, patch, record = prepare(game,rows,roots)
                 break
@@ -323,7 +330,15 @@ def _run(game: Path, roots: list[Path], before_write) -> dict:
                 for row in rows:
                     if row['path'].resolve() in failed:
                         before_write()
-                        mods_service.set_enabled(row['path'],False)
+                        try:
+                            mods_service.set_enabled(row['path'],False)
+                        except ValueError:
+                            # Discovery may race another program editing the
+                            # declaration. An unreadable mod is already off;
+                            # keep its bytes for repair, as editor recovery does.
+                            current = mods_service.mod_row(row['path'])
+                            if current.get('enabled') or not current.get('error'):
+                                raise
                         disabled.append({'id':row['id'],'name':row['name'],'error':str(error)})
                 rows = [row for row in rows if row['path'].resolve() not in failed]
         done = []

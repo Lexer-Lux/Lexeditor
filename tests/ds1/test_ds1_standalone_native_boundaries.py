@@ -197,3 +197,45 @@ def test_combined_native_module_budget_is_attributed_without_stopping_healthy_da
     report = standalone_runtime._run(root,[library],lambda:None)
     assert [row['id'] for row in report['disabled']] == ['second']
     assert report['loaded'] == ['healthy']
+
+
+@pytest.mark.parametrize('requires,error', [
+    ('not-a-list','requires must list mod ids'), (None,'requires must list mod ids'),
+    (42,'requires must list mod ids'), ([''],'requires must list mod ids'),
+    (['missing'],'a required mod is unavailable')])
+@pytest.mark.parametrize('cached', [False, True])
+def test_invalid_requirement_declaration_only_disables_its_mod_and_dependents(world, requires, error, cached):
+    root,library = world
+    bad = mod(library,'bad');module(bad)
+    dependent = mod(library,'dependent')
+    declaration = json.loads((dependent/'mod.json').read_text())
+    (dependent/'mod.json').write_text(json.dumps({**declaration,'requires':['bad']}))
+    if cached:
+        standalone_runtime._run(root,[library],lambda:None)
+        assert standalone_runtime._run(root,[library],lambda:None)['reused']
+    declaration = json.loads((bad/'mod.json').read_text())
+    (bad/'mod.json').write_text(json.dumps({**declaration,'requires':requires}))
+    report = standalone_runtime._run(root,[library],lambda:None)
+    assert [row['id'] for row in report['disabled']] == ['bad','dependent']
+    assert error in report['disabled'][0]['error']
+    assert report['loaded'] == ['healthy']
+    assert (root/'menu/fixture.bin').read_bytes() == b'healthy mod'
+    assert json.loads((library/'healthy/mod.json').read_text())['enabled'] is True
+    for folder in (bad,dependent):
+        assert json.loads((folder/'mod.json').read_text())['enabled'] is False
+
+
+def test_metadata_damaged_after_discovery_is_preserved_without_stopping_healthy_mods(world, monkeypatch):
+    root,library = world
+    bad = mod(library,'bad');module(bad)
+    discover = standalone_runtime.discover
+    def damaged_after_discovery(*args):
+        rows = discover(*args)
+        (bad/'mod.json').write_bytes(b'{damaged metadata')
+        return rows
+    monkeypatch.setattr(standalone_runtime,'discover',damaged_after_discovery)
+    report = standalone_runtime._run(root,[library],lambda:None)
+    assert [row['id'] for row in report['disabled']] == ['bad']
+    assert report['loaded'] == ['healthy']
+    assert (root/'menu/fixture.bin').read_bytes() == b'healthy mod'
+    assert (bad/'mod.json').read_bytes() == b'{damaged metadata'
