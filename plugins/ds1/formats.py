@@ -539,9 +539,10 @@ def members(plain):
     # 20-byte records with no unpacked size, every observed member stored
     # plain). Names parse the same; the per-member bounds checks below
     # still apply either way.
-    if len(plain) < 32 or plain[:4] != b'BND3' or plain[12:16] not in (b'\x74\0\0\0', b'\x70\0\0\0'):
+    # The material binders use 0x54 with the same 24-byte records as 0x74.
+    if len(plain) < 32 or plain[:4] != b'BND3' or plain[12:16] not in (b'\x74\0\0\0', b'\x54\0\0\0', b'\x70\0\0\0'):
         raise FormatError('Unsupported BND3 format; expected PC Remastered parameters')
-    wide = plain[12:16] == b'\x74\0\0\0'
+    wide = plain[12:16] in (b'\x74\0\0\0', b'\x54\0\0\0')
     stride = 24 if wide else 20
     count, names_end = struct.unpack_from('<II', plain, 16)
     directory_end = 32 + count * stride
@@ -596,7 +597,7 @@ def pack(template, items):
     # A rebuilt binder keeps its template's record width: repacking an
     # older 20-byte binder with 24-byte records would corrupt it, and the
     # header (version and width word) carries over untouched below.
-    wide = template[12:16] == b'\x74\0\0\0'
+    wide = template[12:16] in (b'\x74\0\0\0', b'\x54\0\0\0')
     stride = 24 if wide else 20
     count = struct.unpack_from('<I', template, 16)[0]
     directory_end = 32 + count * stride

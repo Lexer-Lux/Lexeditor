@@ -104,9 +104,8 @@ window.Ds1Viewport = (() => {
     const isCutout = mesh => (mesh.mat_def || "").toLowerCase().includes("_alp");
     const effect = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 1, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false});
-    // [We] water has a height map but no diffuse. Its height field is
-    // bound below; color/transparency still use a preview fallback until
-    // the material-definition parameters are decoded.
+    // [We] water has a height map but no diffuse. Its MTD supplies the
+    // color, alpha and wave amplitude; this is only the missing-MTD fallback.
     const isWater = mesh => (mesh.mat_def || "").toLowerCase().includes("water");
     const water = new THREE.MeshStandardMaterial({color: 0x2f6f9e, roughness: 0.35, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.65, depthWrite: false});
@@ -160,10 +159,12 @@ window.Ds1Viewport = (() => {
       const image = mesh.map && mesh.uv && png ? texCache.get(textureKey(mesh.map, png)) : null;
       const normalPng = mesh.normal && mesh.uv && texturesByName?.[mesh.normal];
       const normal = normalPng ? texCache.get(textureKey(mesh.normal, normalPng, 0)) : null;
-      if (!image && !normal) return plain;
+      const wet = waterMesh && !image && Array.isArray(mesh.water?.color) &&
+        mesh.water.color.length === 4 && mesh.water.color.every(Number.isFinite) ? mesh.water : null;
+      if (!image && !normal && !wet) return plain;
       const litPng = mesh.light && mesh.uv1 && texturesByName && texturesByName[mesh.light];
       const lit = !fx && litPng ? texCache.get(textureKey(mesh.light, litPng, 1)) : null;
-      const key = `${image ? texKey(mesh.map, png) : "-"}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}|${lit ? texKey(mesh.light, litPng) : "-"}|${cutout ? "c" : "o"}|${waterMesh ? "w" : "o"}|${normal ? texKey(mesh.normal, normalPng) : "-"}`;
+      const key = `${image ? texKey(mesh.map, png) : "-"}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}|${lit ? texKey(mesh.light, litPng) : "-"}|${cutout ? "c" : "o"}|${waterMesh ? "w" : "o"}|${normal ? texKey(mesh.normal, normalPng) : "-"}|${JSON.stringify(wet)}`;
       if (!matCache.has(key)) {
         // Baked meshes keep the scene rig exactly like the game: map
         // times light, plus the rig's direct light over it. The bake
@@ -187,6 +188,13 @@ window.Ds1Viewport = (() => {
                 side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide, ...cut})
             : new THREE.MeshStandardMaterial({map: image, roughness: 0.95, metalness: 0,
                 side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide, ...cut});
+        if (wet) {
+          textured.color.setRGB(...wet.color.slice(0, 3));
+          textured.opacity = Math.min(1, Math.max(0, wet.color[3]));
+          if (Number.isFinite(wet.waveHeight)) textured.bumpScale = wet.waveHeight;
+          if (Number.isFinite(wet.specularPower))
+            textured.roughness = Math.sqrt(2 / (Math.max(0, wet.specularPower) + 2));
+        }
         if (normal) {
           if (waterMesh && !image) {
             // [We] water uses a grayscale height field, unlike the packed
