@@ -35,6 +35,7 @@ function el(tag, attrs={}, ...children){
 }
 const panel=o=>el("section",{},el("h2",{},o.title),o.identity||null,o.body);
 const stub={el,clone:structuredClone,columnPreferences:()=>({}),recordId:id=>String(id),infoHelp:t=>t,
+  textArea:options=>el("textarea",options),
   detailPanel:panel,detailSection:panel,detailField:o=>{const control=o.control;
     if(control instanceof Element&&["INPUT","SELECT","TEXTAREA","OUTPUT"].includes(control.tagName)
       &&!control.getAttribute("aria-label")&&o.label)control.setAttribute("aria-label",String(o.label));
