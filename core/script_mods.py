@@ -67,7 +67,7 @@ class ScriptModRollbackError(ScriptModError):
 
 
 class ScriptModInfrastructureError(ScriptModError):
-    """The execution service is unavailable, rather than a defective mod."""
+    """Execution, transport or output storage failed, rather than the mod."""
 
 
 # --- discovery -------------------------------------------------------------
@@ -337,9 +337,12 @@ def _generated_files(root: Path, allowed_roots: tuple[str, ...] | None) -> dict[
 
 def _snapshot(root: Path, keys) -> dict[str, bytes | None]:
     result = {}
-    for key in keys:
-        target = _contained_target(root, PurePosixPath(key))
-        result[key] = target.read_bytes() if target.is_file() else None
+    try:
+        for key in keys:
+            target = _contained_target(root, PurePosixPath(key))
+            result[key] = target.read_bytes() if target.is_file() else None
+    except OSError as error:
+        raise ScriptModInfrastructureError(f'Could not preserve generated mod files: {error}') from error
     return result
 
 
@@ -506,6 +509,8 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
             restore_generated(root, snapshot, allowed_roots=allowed_roots)
         except ScriptModError as rollback_error:
             raise ScriptModRollbackError(f"Build failed: {error}; {rollback_error}") from error
+        if isinstance(error, OSError):
+            raise ScriptModInfrastructureError(f'Could not save generated mod files: {error}') from error
         raise
     return {"files": sorted(planned), "written": written, "removed": removed}
 
@@ -546,7 +551,8 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
         try:
             snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
         except Exception as failure:
-            raise error(f"{row['name']}: {failure}", folders=[row['path']]) from failure
+            folders = [] if isinstance(failure, ScriptModInfrastructureError) else [row['path']]
+            raise error(f"{row['name']}: {failure}", folders=folders) from failure
     built = []
     try:
         for row in rows:
