@@ -36,6 +36,7 @@ def test_shared_add_saves_and_reopens_every_supported_table(tmp_path):
                     page.evaluate('table=>navigate(table)', table)
                     new_id = max(row.row_id for row in baseline.params[table].rows) + 1
                     name = 'Created ' + table
+                    page.locator(".lex-barrelled-master").hover()
                     page.locator('.lex-table-add').click()
                     page.get_by_label('New record ID', exact=True).fill(str(new_id))
                     page.get_by_label('New record name', exact=True).fill(name)
