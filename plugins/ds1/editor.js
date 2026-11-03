@@ -594,12 +594,22 @@ async function deploymentAction(action){
   if(action==="apply"&&state.nativeRules?.migration)confirmations.apply.message+=" "+state.nativeRules.migration;
   const ok=await confirmAction({...confirmations[action],cancelLabel:"Cancel"});
   if(!ok)return;
-  state.deployBusy=true;render();
-  try{const result=await api("/api/deployment/"+action,{});await loadDeployment();
+  const progressOwner={};
+  state.deployBusy=true;
+  LexeditorUI.setEditorBusy(progressOwner,action==="disable"?"Restoring original files":"Applying enabled mods");
+  try{
+    render();
+    const result=await LexeditorUI.observeOperation({
+      run:operationId=>api("/api/deployment/"+action,{operationId}),
+      read:id=>api('/api/operation-progress?id='+encodeURIComponent(id)),
+      progress:label=>LexeditorUI.setEditorBusy(progressOwner,label),
+    });
+    LexeditorUI.setEditorBusy(progressOwner,"Refreshing deployment status");
+    await loadDeployment();
     if(result.disabledMods?.length)LexeditorUI.showAlert({title:"Some mods were switched off",
       message:result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n")});}
   catch(error){notify(error);}
-  finally{state.deployBusy=false;render();}
+  finally{state.deployBusy=false;LexeditorUI.setEditorBusy(progressOwner,null);render();}
 }
 function reportTweakRebuild(result){
   if(result.tweaksError){

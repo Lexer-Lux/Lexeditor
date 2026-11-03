@@ -1047,6 +1047,55 @@ def test_save_uses_live_stage_feedback_and_does_not_refresh_after_failure(page, 
         assert page.locator('[role="alertdialog"]').count() == 0
 
 
+@pytest.mark.parametrize('action', ['apply', 'disable'])
+@pytest.mark.parametrize('failure', [None, 'request', 'refresh'])
+def test_manual_deployment_has_live_feedback_and_always_unlocks(page, tmp_path, action, failure):
+    mount(page)
+    source = (ROOT / 'plugins/ds1/editor.js').read_text('utf-8')
+    start = source.index('async function deploymentAction(')
+    end = source.index('\nfunction reportTweakRebuild(', start)
+    page.add_script_tag(content=source[start:end])
+    page.evaluate('''action=>{
+      window.state={deployBusy:false,dirty:0,pending:0};
+      window.confirmAction=async()=>true;window.render=()=>{};
+      window.notify=error=>LexeditorUI.showAlert({title:'Deployment failed',message:error.message});
+      window.refreshes=0;window.requests=0;
+      window.loadDeployment=()=>{refreshes++;return new Promise((resolve,reject)=>{
+        window.finishRefresh=resolve;window.failRefresh=reject;
+      })};
+      window.api=(path,body)=>{
+        if(path.startsWith('/api/operation-progress')){
+          if(new URL(path,location.href).searchParams.get('id')!==operationId)throw Error('Wrong operation');
+          return Promise.resolve({running:true,label:'Fixture deployment stage'});
+        }
+        requests++;window.operationId=body.operationId;
+        return new Promise((resolve,reject)=>{window.finishDeploy=resolve;window.failDeploy=reject});
+      };
+      window.job=deploymentAction(action).then(()=>window.deployDone=true);
+    }''', action)
+    page.get_by_text('Fixture deployment stage', exact=True).wait_for(timeout=1500)
+    assert page.evaluate('document.body.inert && state.deployBusy')
+    assert len(page.evaluate('operationId')) == 32
+    page.evaluate('(action)=>{deploymentAction(action);void 0}', action)
+    assert page.evaluate('requests') == 1
+    page.screenshot(path=str(tmp_path / f'{action}-busy.png'))
+    if failure == 'request':
+        page.evaluate('failDeploy(Error("Fixture sharing violation"));void 0')
+    else:
+        page.evaluate('finishDeploy({});void 0')
+        page.wait_for_function('typeof finishRefresh==="function"')
+        assert page.evaluate('document.body.inert && state.deployBusy')
+        page.evaluate('failRefresh(Error("Fixture status failure"));void 0' if failure == 'refresh'
+                      else 'finishRefresh();void 0')
+    page.wait_for_function('window.deployDone && !document.body.inert && !state.deployBusy')
+    assert page.evaluate('refreshes') == (0 if failure == 'request' else 1)
+    if failure:
+        dialog = page.get_by_role('alertdialog', name='Deployment failed')
+        assert ('Fixture sharing violation' if failure == 'request' else 'Fixture status failure') in dialog.inner_text()
+        page.screenshot(path=str(tmp_path / f'{action}-failure.png'))
+        dialog.get_by_role('button', name='Close', exact=True).click()
+
+
 def test_deployment_failure_stops_save_and_stays_in_a_modal(page, tmp_path):
     mount(page)
     source = (ROOT / 'plugins/ds1/editor.js').read_text('utf-8')
