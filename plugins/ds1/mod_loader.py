@@ -42,7 +42,6 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 import struct
 from threading import Lock
-import zlib
 
 from plugins.ds3.formats import DS3FormatError, ParamView
 
@@ -1151,10 +1150,7 @@ def _compose_texts(vanilla: bytes, mods: list[tuple[str, bytes]], *, relative=te
     if conflicts_only or not changed:
         return vanilla, result
     plain = texts.build_bnd3(base.plain, entries)
-    compressed = zlib.compress(plain, 9)
-    header = bytearray(vanilla[:76])
-    struct.pack_into(">II", header, 28, len(plain), len(compressed))
-    return bytes(header) + compressed, result
+    return deflate(vanilla, plain), result
 
 
 # --- Maps ------------------------------------------------------------------
