@@ -21,6 +21,8 @@ FIELDS = (
      "description": "Fades geometry near the view edge. This does not change view distance or the game's fog shading."},
     {"id": "kf1.controls.holdrun", "label": "Hold to run", "kind": "boolean", "default": False,
      "description": "Doubles movement while Run is held. Modern Controls binds Circle and Left Shift to Run."},
+    {"id": "kf1.autoreload.enabled", "label": "Reload last save after death", "kind": "boolean", "default": True,
+     "description": "Uses the last slot saved or loaded this session. Revival items still work. Without a usable save, the normal death sequence continues."},
 )
 
 

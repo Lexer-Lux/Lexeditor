@@ -28,6 +28,47 @@ separate at `0x800A079C`; MP is at `0x800A0796`. The native charge recovery rema
 active. A sprint policy receives actual displacement after the player stage and
 the logic tick duration, independent of rendering frequency.
 
+Native weapon-power recovery (`0x80016BC0`) adds
+`2 * (floor((physicalPower << 6) / (weaponChargeRate + 1)) + 1)` per logic
+tick, clamped to 5000 before Better Sprint's deduction. The inputs are physical
+power u16 `0x800A07A6` and byte +1 of the equipped weapon record pointed to by
+`0x800A07E8`. Short Sword's rate is 10 and Knight Sword's is 18. At power 20,
+Short Sword recovers 234 per tick; at power 30 it recovers 350. A 100% sprint
+drain removes 333/334 at 15 Hz, so the latter plateaus at 4666/4667 after native
+recovery refills it every tick. This was reproduced at fixed position and does
+not establish a location-dependent cause. Rendering at 30, 60 and 144 FPS kept
+those amounts unchanged.
+
+## Built-in death reload
+
+`kf1.autoreload.enabled` is a native port setting, default true, shown under
+F1 → Gameplay and exposed by Lexeditor. It replaces ordinary respawn at
+`0x800154B0`, caller RA `0x8001869C`, only for dead state 255 and HP zero.
+Native revival takes priority when byte `0x8009DDB7` is 1 and inventory item
+47 at `0x800652D7` is present. The native reader and writer take logical slots
+1..3; four physical banks rotate underneath them. The last successful native
+save/load chooses the slot for this session; actual New Game clears it.
+
+The menu's buffers at pointers `0x800668D8/E0` belong to its stack frame.
+Auto reload remembers the successful operation's 0x280-byte header, reserves
+fresh stack storage for header and 0x2580-byte payload, and restores pointers
+and CPU context afterward. Native reader failure leaves player state unchanged
+and resumes ordinary respawn. Successful reads use the native post-load arm
+at `0x800189A4..0x80018A04`, then state 254 and the original reverse fade.
+Private checks observed cross-floor loading, inventory and equipment restore,
+revival priority, missing/changed-card fallback and saved off after restart.
+
+## Color Bars
+
+The separate user-library mod retains red HP and makes MP blue. Power orange
+is RGB 245,143,69 (`#F58F45`), Magic cyan RGB 49,160,167 (`#31A0A7`), sampled
+from the colored gauge-name underlines on printed page 15 of the official
+KF2 manual. Median core-row ink excludes paper and antialiasing pixels.
+HUD records at `0x80055C5C`, stride 14, are emitted through `0x8001E480`
+at caller RA `0x8001FA18`. Reusing their packet coordinates as flat G4 colors
+preserves fill lengths and gold frames; the red original textures cannot
+be made cyan by texture multiplication. Native color quantization still applies.
+
 ## Gamepad look and enemy turning
 
 Native yaw/pitch defaults are 3, movement sensitivity 1. The previous look

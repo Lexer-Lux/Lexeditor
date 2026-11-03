@@ -65,6 +65,17 @@ def test_distance_and_fade_are_independent_and_preserve_native_files(port):
     assert len(list(port.glob("interface.ini.lexeditor-*"))) == 2
 
 
+def test_auto_reload_defaults_on_and_preserves_saved_off(port):
+    state = settings.payload()
+    values = {field["id"]: field["value"] for field in state["sections"][0]["fields"]}
+    assert values["kf1.autoreload.enabled"] is True
+    values["kf1.autoreload.enabled"] = False
+    settings.save({"sha256": state["sha256"], "values": values})
+    current = {field["id"]: field["value"] for field in settings.payload()["sections"][0]["fields"]}
+    assert current["kf1.autoreload.enabled"] is False
+    assert settings.parse_ini((port / "interface.ini").read_bytes())["kf1.autoreload.enabled"] == "0"
+
+
 def test_stale_saves_and_live_game_are_refused(port, monkeypatch):
     state = settings.payload()
     values = {field["id"]: field["value"] for field in state["sections"][0]["fields"]}
