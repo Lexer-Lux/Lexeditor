@@ -7,11 +7,13 @@
   const toolbar = document.querySelector("#toolbar");
   let tab = "settings", state = null, values = {}, saved = {}, map = null;
   let busy = false, problem = "";
+  let controlSetup = false, controlProfile = "keep";
   let mapQuery = "", mapStatus = "", mapPage = 0, mapSort = ["filename", 1];
   const copy = value => JSON.parse(JSON.stringify(value));
   const changes = () => Object.fromEntries(Object.entries(values).filter(([key, value]) => value !== saved[key]));
   const dirty = () => Object.keys(changes()).length;
   const readonly = () => busy || !state?.game.supported || state?.game.running;
+  const controlsBlocked = () => readonly() || dirty() || !state?.preferences.controls;
 
   async function api(path, payload) {
     const response = await fetch(path, payload === undefined ? {} : {
@@ -49,20 +51,76 @@
     finally { busy = false; render(); }
   }
 
+  async function finishControlSetup() {
+    if (controlsBlocked()) return;
+    const controls = state.preferences.controls;
+    const fingerprint = state.preferences.fingerprint;
+    const profile = controlProfile;
+    busy = true;
+    render();
+    try {
+      let replaceCustom = false;
+      if (profile !== "keep" && controls.selected === "custom") {
+        replaceCustom = await UI.confirmAction({title: "Replace custom bindings?",
+          message: "This replaces your keyboard and controller bindings with the selected preset.",
+          confirmLabel: "Replace bindings", cancelLabel: "Keep my bindings"});
+        if (!replaceCustom) return;
+      }
+      accept(await api("/api/control-setup", {fingerprint, controlsSha256: controls.sha256, profile, replaceCustom}));
+      controlSetup = false;
+      problem = "";
+    } catch (error) { problem = error.message; }
+    finally { busy = false; render(); }
+  }
+
+  function controlsSection() {
+    const controls = state.preferences.controls;
+    const button = (label, action) => {
+      const control = document.createElement("button");
+      control.type = "button"; control.textContent = label;
+      control.disabled = controlsBlocked(); control.addEventListener("click", action);
+      return control;
+    };
+    const names = {classic: "Classic Controls", modern: "Modern Controls", custom: "Custom bindings"};
+    const body = [UI.detailField({label: "Current controls", control: UI.readonlyField(names[controls.selected] || controls.selected)})];
+    if (controlSetup) {
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", "Control preset"); select.disabled = controlsBlocked();
+      for (const [value, label] of [["keep", "Keep current bindings"], ["classic", "Classic Controls"], ["modern", "Modern Controls"]]) {
+        const option = document.createElement("option");
+        option.value = value; option.textContent = label; select.append(option);
+      }
+      select.value = controlProfile;
+      select.addEventListener("change", () => { controlProfile = select.value; });
+      const cancel = button("Cancel", () => { controlSetup = false; render(); });
+      cancel.disabled = busy;
+      body.push(UI.detailField({label: "Control preset", control: select}),
+        UI.actionRow(button("Finish control setup", finishControlSetup), cancel));
+    } else {
+      body.push(UI.actionRow(button("Run control setup again", () => {
+        if (controlsBlocked()) return;
+        controlSetup = true; controlProfile = "keep"; render();
+      })));
+    }
+    return UI.detailSection({title: "Controls", help: controls.help ? UI.infoHelp(controls.help) : null, body});
+  }
+
   function field(spec) {
     const control = document.createElement("input");
     control.type = spec.kind === "boolean" ? "checkbox" : "number";
     control.setAttribute("aria-label", spec.label);
-    control.disabled = readonly();
+    control.disabled = readonly() || controlSetup;
     if (spec.kind === "boolean") control.checked = values[spec.key];
     else {
       control.min = spec.min; control.max = spec.max; control.step = spec.step;
       control.value = values[spec.key];
     }
     control.addEventListener("change", () => {
+      control.setCustomValidity(spec.kind !== "boolean" && spec.nonzeroMin && control.valueAsNumber !== 0 && control.valueAsNumber < spec.nonzeroMin
+        ? `${spec.label} must be zero or at least ${spec.nonzeroMin}.` : "");
       if (!control.checkValidity()) { control.reportValidity(); return; }
       values[spec.key] = spec.kind === "boolean" ? control.checked : control.valueAsNumber;
-      shell.refresh();
+      if (state.preferences.controls) render(); else shell.refresh();
     });
     return UI.detailField({label: spec.label, description: spec.help, control});
   }
@@ -71,10 +129,11 @@
     const notices = [];
     if (problem) notices.push(UI.notice({tone: "error", title: "Could not save settings", message: problem}));
     if (!state.game.supported) notices.push(UI.notice({tone: "warning", title: "Set up " + (state.game.runtime?.runtime || plugin.portName),
-      message: state.game.runtime?.message || "Choose the " + plugin.portName + " installation on the main menu."}));
+      message: state.game.runtime?.message || state.game.error || "Choose the " + plugin.portName + " installation on the main menu."}));
     else if (state.game.running) notices.push(UI.notice({tone: "warning", title: plugin.portName + " is running", message: "Close the game, then refresh this page before changing settings."}));
-    const body = [...new Set(state.preferences.fields.map(spec => spec.section))].map(section =>
-      UI.detailSection({title: section, body: state.preferences.fields.filter(spec => spec.section === section).map(field)}));
+    const body = [...(state.preferences.controls ? [controlsSection()] : []),
+      ...[...new Set(state.preferences.fields.map(spec => spec.section))].map(section =>
+        UI.detailSection({title: section, body: state.preferences.fields.filter(spec => spec.section === section).map(field)}))];
     const button = document.createElement("button");
     button.type = "button"; button.textContent = "Refresh";
     button.disabled = busy || dirty(); button.addEventListener("click", () => refresh().catch(showError));
@@ -90,7 +149,8 @@
           state.game.runtime.installed ? state.game.runtime.pinned || state.game.runtime.version : "Not installed")})] : []),
         UI.detailField({label: "Settings and saves", control: UI.readonlyField(state.game.dataRoot)})
       ]}),
-      UI.modLoaderSection(plugin.modLoading)
+      UI.modLoaderSection(plugin.modLoading),
+      UI.creditsPanel(plugin.pluginId)
     ]}));
   }
 
