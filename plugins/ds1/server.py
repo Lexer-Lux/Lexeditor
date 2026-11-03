@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urlparse
 
 from core import mod_watch, operation_progress
 from core.plugin_http import PluginRequestHandler
-from . import assets, deployment, data_map, fsb, icons, scripts, shops, theme, record_edits
+from . import assets, deployment, data_map, fsb, icons, scripts, shops, theme, record_edits, mod_loader
 from . import anim
 from .attacks import body_hitbox, hitbox_slots
 from .map_store import MapStore, parse_key
@@ -238,6 +238,7 @@ _MOD_CHANGES_LOCK = threading.Lock()
 _MOD_CHANGES_CACHE = {"revision": None, "flag": False}
 
 
+@mod_loader.discovery_scope()
 def _rebuild_tweaks_on_save() -> dict:
     """Build changed tweaks into the installed game as part of Save.
 

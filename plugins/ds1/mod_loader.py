@@ -115,6 +115,9 @@ MAX_DISCOVERY_FILES = 32000
 @contextmanager
 def discovery_scope():
     """Reuse bounded directory discovery within one activation, never across requests."""
+    if _discovery.get() is not None:
+        yield
+        return
     token = _discovery.set({})
     try:
         yield

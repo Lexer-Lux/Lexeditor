@@ -26,6 +26,40 @@ def make_script(library, name='Healthy', source=None, **metadata):
     return root
 
 
+def test_save_shares_discovery_until_builder_invalidation(tmp_path, monkeypatch):
+    from plugins.ds1 import server, assets
+    folder = tmp_path / 'Mod'
+    (folder / 'menu').mkdir(parents=True)
+    (folder / 'menu/first.bin').write_bytes(b'first')
+    scans = []
+    original = assets.scan_project
+    def scan(*args, **kwargs):
+        scans.append(args[0])
+        return original(*args, **kwargs)
+    monkeypatch.setattr(assets, 'scan_project', scan)
+    monkeypatch.setattr(tweak_mods, 'mods_root', lambda: tmp_path)
+    monkeypatch.setattr(tweak_mods, 'game_closed', lambda: True)
+    monkeypatch.setattr(Ds1ModAdapter, 'active_mod_ids', lambda *_: ['Mod'])
+    def freshness():
+        files = mod_loader.content_files(folder, 'Mod')
+        return len(files) == 1
+    monkeypatch.setattr(server, '_tweaks_flag', freshness)
+    def activate(*_):
+        with mod_loader.discovery_scope():
+            assert len(mod_loader.content_files(folder, 'Mod')) == 1
+            (folder / 'menu/second.bin').write_bytes(b'second')
+            mod_loader.invalidate_discovery()
+            assert len(mod_loader.content_files(folder, 'Mod')) == 2
+        return {'disabledMods': []}
+    monkeypatch.setattr(mod_builds, 'activate_with_recovery', activate)
+    result = server._rebuild_tweaks_on_save()
+    assert result['tweaksRebuilt'] and not result['tweaksNeedRebuild']
+    assert len(scans) == 2  # Before build, then after its explicit invalidation.
+    (folder / 'menu/third.bin').write_bytes(b'third')
+    assert len(mod_loader.content_files(folder, 'Mod')) == 3
+    assert len(scans) == 3  # No discovery snapshot survives the request.
+
+
 def test_worker_preserves_bytes_and_observed_dependencies(tmp_path):
     root = make_script(tmp_path, source='def build(settings, context):\n    context.enabled("other")\n    return {"native/result.txt": bytes([0, 255])}\n')
     context = tweak_mods.BuildContext({}, library_root=tmp_path)
