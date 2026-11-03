@@ -15,8 +15,10 @@ Modern retains Select/Tab menu and Triangle/Q equipped item or spell actions
 This archive has no Remaster Editor. F2 belongs to the optional Debug Tools mod.
 
 Retail has no sprint stamina pool or drain. Held run scales collision movement
-by two before collision resolution. Lexer chose to use weapon power for Better
-Sprint, so its actual vanilla drain default is zero. Current weapon power is
+by two before collision resolution. Lexer chose weapon power for Better Sprint
+and a default drain of 100% of the full gauge per second of actual sprint
+movement. Zero removes drain; the percentage is not a multiplier of a vanilla
+sprint rate. Current weapon power is
 u16 at `0x800A0798`, full at 5000, and is also used by attacks. Magic charge is
 separate at `0x800A079C`; MP is at `0x800A0796`. The native charge recovery remains
 active. A sprint policy receives actual displacement after the player stage and
