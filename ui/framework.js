@@ -16332,12 +16332,17 @@ ${contents.path}`});
     };
     const download = async (row, button, note) => {
       button.disabled = true;
+      note.textContent = "Starting download…";
       try {
         await callWindow("lexmod_download", pluginId, [row.folder], ...(row.repository ? [row.repository] : []));
         const result = await watchDownload(pluginId, progress => { note.textContent = progressText(progress); });
         if (result.state === "failed") throw new Error(result.error);
         await load(); selected = data.rows.find(item => item.folder === row.folder)?.path || null; draw();
-      } catch (error) { button.disabled = false; failure("Could not download the module", error); }
+      } catch (error) {
+        note.textContent = "";
+        button.disabled = false;
+        failure("Could not download the module", error);
+      }
     };
     const detail = () => {
       const row = rows().find(item => keyOf(item) === selected);
