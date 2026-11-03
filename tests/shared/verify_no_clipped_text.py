@@ -271,6 +271,7 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
     project = tempfile.TemporaryDirectory(prefix="lex-clip-project-", ignore_cleanup_errors=True)
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     browser = None
+    cdp = None
     found: list[dict] = []
     try:
         with session_for(plugin, project.name) as session:
@@ -316,12 +317,14 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                 ".map(b=>b.dataset.tab))"))
             for tab in tabs or [None]:
               try:
+                print(f'clipping audit: {plugin}/{tab or "default"} at {width}x{height}', flush=True)
                 if tab:
                     cdp.eval(
                         "(()=>{const b=[...document.querySelectorAll('nav button[data-tab]')]"
                         f".find(x=>x.dataset.tab==={json.dumps(tab)});if(b)b.click();}})()")
                     settle_load(cdp)
                 def measure(path):
+                    print(f'clipping view: {plugin}/{tab or "default"} {path}', flush=True)
                     wait_eval(cdp, "document.fonts.status==='loaded'", 30)
                     for probe, defect in ((PROBE, None), (EMPTY_PROBE, "empty-tab"),
                         (CHROME_PROBE, "boxed-header-control"),
@@ -346,7 +349,11 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                               "reason": f"{type(error).__name__}: {error}"[:160]})
                 continue
     finally:
+        if cdp:
+            cdp.close()
         browser_guard.kill_tree(browser)
+        profile.cleanup()
+        project.cleanup()
     return found
 
 
@@ -359,6 +366,7 @@ def main() -> int:
     findings: list[dict] = []
     for plugin in plugins:
         for width, height in ((1600, 950), (1280, 720)):
+            print(f'starting clipping audit: {plugin} at {width}x{height}', flush=True)
             findings.extend(sweep(plugin, width, height))
     pagerless = [row for row in findings if row.get("defect") == "table-without-pager"]
     boxed = [row for row in findings if row.get("defect") == "boxed-header-control"]
