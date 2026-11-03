@@ -22,6 +22,43 @@ separate at `0x800A079C`; MP is at `0x800A0796`. The native charge recovery rema
 active. A sprint policy receives actual displacement after the player stage and
 the logic tick duration, independent of rendering frequency.
 
+## Gamepad look and enemy turning
+
+Native yaw/pitch defaults are 3, movement sensitivity 1. The previous look
+defaults were 1; saved `kf1.analog.turn` and `kf1.analog.pitch` values keep
+their values, and neither Classic nor Modern setup replaces them. The values
+are direct multipliers, not menu indices: full yaw is 28 units per logic tick
+at 1 and 84 at 3, in a 4096-unit revolution. The current native logic rate is
+15 Hz, yielding 36.91 versus 110.74 degrees/second. The unchanged seven-unit
+acceleration takes four ticks to reach 28 and twelve to reach 84. Native pitch
+requests 10 times sensitivity per tick and retains the +/-191 angle clamp.
+
+Creature type definitions start at `0x8006BD98`, stride 152; byte +0x1E is
+the angular step. Area 1's twelve slots read 64,64,64,64,32,80,75,75,80,52,0,0.
+The angular approach helper is `0x80014A64`. Calls returning to `0x8002ED74`
+use the type step during movement; `0x8002ED58` uses floor(3*step/2) while
+sliding; `0x800304A0` uses the type step while returning home. Each writes the
+creature's yaw at +0x2E toward its target at +0x3A. Creature records start at
+`0x8006C4B8`, stride 72; current creature/type pointers are `0x8006E8D4`/D0.
+
+`EnemyTurning` scales only those three callers' step arguments by the effective
+configured gamepad yaw sensitivity, bounded 1..4 to match the existing stick
+overspeed cap. Disabled analog/look, disabled tank movement, sensitivity <=1
+and non-finite values use ratio 1. Default 3 therefore changes the area's
+nonzero normal enemy steps from 32..80 to 96..240, retaining each type's
+steady angular advantage over the player. Sliding is scaled after its native
+adjustment. Zero stays zero; native wraparound and target clamping still run.
+Mouse movement, deflection, pitch and optional sustained-stick acceleration do
+not change this ratio. Doors/effects and scripted attack spins are excluded;
+movement, attack, animation, damage and AI data are not rewritten.
+
+Private-card native checks measured the actual 28/84 player yaw plateaus and
+passed 2,255 helper/mode/preservation assertions. A separate process loaded
+custom 1.25/2.5 unchanged, and live type-8 creatures used normal/sliding steps
+100/150 at custom yaw 1.25, then 240/360 at yaw 3 (original 80/120). Full-down
+stick retained pitch clamp 191. This verifies numerical behavior, not combat
+feel. Native source commit: `8f3b57ac367609c7a8311214ee6fe3efd18e8336`.
+
 ## Interactions and persistence
 
 Placed objects start at `0x8006EDE0`, stride 44. Type at +0 indexes an eight-byte
