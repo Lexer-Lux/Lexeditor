@@ -441,12 +441,13 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
       return {static: root.classList.contains('lex-panel-layout-static'),
         template: root.style.getPropertyValue('--lex-panel-layout-template'),
         pointer: getComputedStyle(n).pointerEvents,
+        hasControls: Boolean(n.querySelector(':scope > .lex-barrel-control')),
         panes: [...root.querySelectorAll(':scope > .lex-panel-layout-pane')]
           .map(node => node.getBoundingClientRect().width)};
     }""")
     assert static["static"], static
     assert "minmax(" in static["template"], static
-    assert static["pointer"] == "none", static
+    assert static["pointer"] == ("auto" if static["hasControls"] else "none"), static
     divider.focus()
     divider.press("Shift+ArrowRight")
     page.wait_for_timeout(150)
