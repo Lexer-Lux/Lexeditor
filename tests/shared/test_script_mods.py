@@ -320,11 +320,54 @@ class ScriptModTests(unittest.TestCase):
             if path == target:
                 raise PermissionError('snapshot file is busy')
             return read(path)
+        class Context(list):
+            pass
         with mock.patch.object(Path, 'read_bytes', unavailable):
             with self.assertRaises(script_mods.ScriptModError) as caught:
-                script_mods.build_batch([script_mods.catalog_row(self.mod)], [], allowed_roots=('hext','direct'))
+                script_mods.build_batch([script_mods.catalog_row(self.mod)], Context(), allowed_roots=('hext','direct'))
         self.assertFalse(caught.exception.folders)
         self.assertEqual(target.read_text(), '00 = 0A')
+
+    def test_batch_reuses_each_build_snapshot(self):
+        second = make_mod(self.dir / 'library', 'Second')
+        for root in (self.mod, second):
+            (root/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+            self.build(root)
+            script_mods.save_values(root, {'amount': 60})
+        class Context(list):
+            pass
+        with mock.patch.object(script_mods, '_snapshot', wraps=script_mods._snapshot) as snapshot:
+            result = script_mods.build_batch(
+                [script_mods.catalog_row(root) for root in (self.mod, second)],
+                Context(), allowed_roots=('hext','direct'))
+        self.assertEqual(snapshot.call_count, 2)
+        self.assertEqual(len(result), 2)
+        for root in (self.mod, second):
+            self.assertEqual((root/'direct/extra.bin').read_bytes(), bytes([60]))
+
+    def test_batch_failure_never_snapshots_or_restores_a_cache_hit(self):
+        second = make_mod(self.dir / 'library', 'Second')
+        for root in (self.mod, second):
+            (root/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+            self.build(root)
+        target = self.mod/'hext/ff8/en_nv/patch.txt'
+        class Context:
+            def cached_build(inner, root, previous):
+                return root == self.mod
+            def run_script(inner, root, current):
+                # An external edit during the later build must survive its failure.
+                target.write_text('external edit')
+                raise ValueError('broken second mod')
+        with mock.patch.object(script_mods, '_snapshot', wraps=script_mods._snapshot) as snapshot, \
+                mock.patch.object(script_mods, 'restore_generated') as restore:
+            with self.assertRaisesRegex(script_mods.ScriptModError, 'broken second mod') as caught:
+                script_mods.build_batch(
+                    [script_mods.catalog_row(root) for root in (self.mod, second)],
+                    Context(), allowed_roots=('hext','direct'))
+        self.assertEqual(caught.exception.folders, (second,))
+        snapshot.assert_not_called()
+        restore.assert_not_called()
+        self.assertEqual(target.read_text(), 'external edit')
 
 
 if __name__ == "__main__":

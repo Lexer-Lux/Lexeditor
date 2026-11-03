@@ -346,19 +346,11 @@ def _snapshot(root: Path, keys) -> dict[str, bytes | None]:
     return result
 
 
-def snapshot_generated(root: Path, *, allowed_roots: tuple[str, ...]) -> dict[str, bytes | None]:
-    """Keep an operation-local copy of validated generated files and ownership."""
-    previous = _generated_files(Path(root), allowed_roots)
-    return _snapshot(Path(root), [*previous, MANIFEST_FILE])
-
-
 def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
-                      new_files=(), allowed_roots: tuple[str, ...]) -> None:
+                      allowed_roots: tuple[str, ...]) -> None:
     """Undo one build using its in-memory snapshot, reporting every failure."""
-    restored = {key: None for key in new_files if key not in snapshot}
-    restored.update(snapshot)
     errors = []
-    for key, contents in restored.items():
+    for key, contents in snapshot.items():
         try:
             path = PurePosixPath(key) if key == MANIFEST_FILE else _safe_output(key, allowed_roots)
             target = _contained_target(Path(root), path)
@@ -444,11 +436,14 @@ def source_fingerprint(root: Path) -> str:
     return digest.hexdigest()
 
 
-def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
+def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...],
+          rollback: dict | None = None) -> dict:
     """Run a tweak mod's script and write what it returns into the mod.
 
     Only files this build or an earlier one generated are replaced or
     removed: a file the reader put in the mod by hand is never overwritten.
+    A batch retains this build's snapshot in rollback after a successful
+    commit. Cache hits need no snapshot because they change no files.
     """
     root = Path(root)
     previous = _generated_files(root, allowed_roots)
@@ -512,6 +507,8 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
         if isinstance(error, OSError):
             raise ScriptModInfrastructureError(f'Could not save generated mod files: {error}') from error
         raise
+    if rollback is not None:
+        rollback[root] = snapshot
     return {"files": sorted(planned), "written": written, "removed": removed}
 
 
@@ -546,13 +543,6 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
         conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
         if conflicts:
             raise error(f"{row['name']} conflicts with {', '.join(conflicts)}", folders=[row['path']])
-        if row.get('prebuilt'):
-            continue
-        try:
-            snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
-        except Exception as failure:
-            folders = [] if isinstance(failure, ScriptModInfrastructureError) else [row['path']]
-            raise error(f"{row['name']}: {failure}", folders=folders) from failure
     built = []
     try:
         for row in rows:
@@ -560,19 +550,19 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
                 continue
             context.current = row["name"]
             started = perf_counter()
-            result = build(Path(row["path"]), context, allowed_roots=allowed_roots)
+            result = build(Path(row["path"]), context, allowed_roots=allowed_roots,
+                           rollback=snapshots)
             if timings is not None:
                 timings.append({'mod': row['name'], 'seconds': perf_counter() - started,
                                 'cached': result.get('cached', False)})
             built.append({"id": row["id"], "files": result["files"]})
     except Exception as failure:
         failures = []
-        for result in reversed(built):
+        for root, snapshot in reversed(snapshots.items()):
             try:
-                restore_generated(enabled[result["id"]], snapshots[result["id"]],
-                                  new_files=result["files"], allowed_roots=allowed_roots)
+                restore_generated(root, snapshot, allowed_roots=allowed_roots)
             except Exception as rollback_error:
-                failures.append(f"{result['id']}: {rollback_error}")
+                failures.append(f"{root.name}: {rollback_error}")
         suffix = "; rollback failed: " + "; ".join(failures) if failures else ""
         folders = [] if failures or isinstance(failure, (ScriptModRollbackError, ScriptModInfrastructureError)) else (
             failure.folders if isinstance(failure, ModBuildError) and failure.folders else [row['path']])
