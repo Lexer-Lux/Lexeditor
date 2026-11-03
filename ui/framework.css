@@ -2725,6 +2725,9 @@ main > :is(.lex-panel-layout,.lex-detail-panel) { height:100%; }
 
 .lex-column-list .lex-column-cell-content { width:100%; }
 .lex-column-cell-content:not(:has(input,select,textarea,.lex-choice-field)) { padding-block:.15em; box-sizing:border-box; }
+/* Plain labels already reserve their own glyph padding. Padding their
+   wrapper again consumes most of a deliberately dense row's text space. */
+.lex-column-cell-content:has(> .lex-column-cell-text:only-child) { padding-block:0; }
 .lex-column-list-cell:has(.lex-source-control) .lex-column-cell-content { width:100%; }
 /* An editable cell is the control, as in a spreadsheet: the box is the whole
    cell and its value sits where a read-only cell's text sits. The control
@@ -3170,7 +3173,7 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 /* The fitted row includes cell padding. Reserve it before sizing the text;
    window height alone says nothing about the space this table receives. */
 .lex-page-sized-table .lex-column-list-cell {
-  padding-block:2px;
+  padding-block:clamp(0px,calc((var(--lex-fitted-row-height,32px) - 16px) / 2),2px);
 }
 
 .lex-pager-controls {
