@@ -184,7 +184,7 @@ def test_disk_archive_cache_is_bounded_and_rejects_damaged_outputs(monkeypatch, 
     assert composition_cache.load(tmp_path, b'c') == b'cccc'
     composition_cache.store(tmp_path, b'oversized', b'x' * 9)
     assert composition_cache.load(tmp_path, b'oversized') is None
-    with sqlite3.connect(tmp_path / 'composed.sqlite3') as database:
+    with sqlite3.connect(tmp_path / composition_cache.CACHE_FILE) as database:
         assert database.execute('SELECT sum(length(data)), count(*) FROM outputs').fetchone() == (8, 2)
         database.execute('UPDATE outputs SET data = ? WHERE key = ?', (b'bad', b'b'))
     assert composition_cache.load(tmp_path, b'b') is None
