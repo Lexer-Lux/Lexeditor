@@ -13,6 +13,7 @@ from __future__ import annotations
 DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import argparse
 import base64
+import inspect
 import os
 from pathlib import Path
 import shutil
@@ -66,17 +67,11 @@ STUB = """
 
 
 def session_for(plugin_id: str, project: str | None):
-    """Return the plugin's own session class, not the shared base class."""
+    """Use the same registered service factory as the desktop host."""
     module = __import__(f"plugins.{plugin_id}.plugin", fromlist=["PLUGIN"])
-    from core.service_session import LocalPluginSession
-    candidates = [getattr(module, name) for name in dir(module)]
-    session_class = next(
-        (value for value in candidates
-         if isinstance(value, type) and issubclass(value, LocalPluginSession)
-         and value is not LocalPluginSession),
-        None)
-    if session_class is None:
-        raise SystemExit(f"no session class in plugins/{plugin_id}/plugin.py")
+    factory = module.PLUGIN.session_factory
+    if factory is None:
+        raise SystemExit(f"no hosted session in plugins/{plugin_id}/plugin.py")
     variable = {
         "bannerlord": "LEXEDITOR_BANNERLORD_PROJECT",
         "ff8": "LEXEDITOR_FF8_PROJECT", "ff7": "LEXEDITOR_FF7_PROJECT",
@@ -109,10 +104,7 @@ def session_for(plugin_id: str, project: str | None):
         extra_env["LEXEDITOR_BANNERLORD_ROOT"] = str(game)
     # --live passes no project, so the plugin resolves its own real one from the
     # environment the desktop shell would give it.
-    try:
-        return session_class(extra_env)
-    except TypeError:
-        return session_class()
+    return factory(extra_env=extra_env) if "extra_env" in inspect.signature(factory).parameters else factory()
 
 
 def main() -> int:

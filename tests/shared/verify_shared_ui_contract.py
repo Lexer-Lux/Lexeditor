@@ -146,9 +146,8 @@ for plugin in sorted((ROOT / "plugins").iterdir()):
             f"{plugin.name} does not render the shared MOD LOADER section")
     if "modLoaderSection(plugin.modLoading)" in editor:
         from core.native_port_http import loader_details
-        import importlib
-        model = importlib.import_module(f"plugins.{plugin.name}.model").MODEL
-        details = loader_details(model, ROOT)
+        from core.plugin_manifest import manifest_in
+        details = loader_details(manifest_in(plugin), ROOT)
         for field in ("loader", "output", "order", "safety", "removal"):
             require(isinstance(details.get(field), str) and bool(details[field].strip()),
                     f"{plugin.name} shared mod loader payload is missing {field}")
