@@ -383,21 +383,19 @@ with sync_playwright() as p:
             duplicate = page.evaluate("[...document.querySelectorAll('nav button[data-tab]')].some(b=>b.querySelectorAll('.lex-tab-shortcut,.lex-tab-ordinal').length>1)")
             assert not duplicate, (width, "duplicate shortcut badge")
 
-            # Common detail-label lane remains ~10% without allowing a long
-            # label to increase a simple row's height.
+            # Names share the compact label lane; a pane-wide readable floor
+            # may widen it without allowing a long name to grow a row's height.
             page.evaluate("navigate('one')")
             field = page.locator('.lex-detail-field').first
             label = field.locator('.lex-detail-field-label').first
             field_box = field.bounding_box(); label_box = label.bounding_box()
             label_ratio = label_box['width'] / field_box['width'] if field_box['width'] else 0
             page.screenshot(path=str(OUT / f"{prefix}-label-lanes.png"))
-            # The lane is ten percent of the row wherever ten percent can hold a
-            # property name, and a font-relative floor below that. In a narrow
-            # panel the tenth is a twenty-pixel column that cuts every label off,
-            # so the floor takes over and the ratio rises - by design, and the
-            # reason the band is a band rather than one number. The upper edge is
-            # the floor's own share at the narrowest panel this page renders.
-            assert .07 <= label_ratio <= .20, (width, "label lane is not approximately 10%", label_ratio)
+            floor = field.evaluate("node=>parseFloat(getComputedStyle(node).getPropertyValue('--lex-detail-label-floor'))||0")
+            # A widened lane must be justified by the actual shared fitting
+            # floor, and that floor may never take more than half the row.
+            assert .07 <= label_ratio <= .5 + 1 / field_box['width'], (width, label_ratio, floor)
+            assert label_box['width'] <= max(.20 * field_box['width'], floor) + 2, (width, label_ratio, floor)
             # Test label fitting with two otherwise identical rows. Different
             # control types legitimately reserve different vertical space (for
             # example a provenance/ref rail), so comparing arbitrary gallery
