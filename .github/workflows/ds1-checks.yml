@@ -37,6 +37,7 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install -r requirements-test.txt
+      - run: python -m pip install ziglang==0.14.1
       - run: python -m playwright install chromium
       - run: python tools/check_plugin.py ds1
         env:

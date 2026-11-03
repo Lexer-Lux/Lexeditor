@@ -81,6 +81,11 @@ def find_zig(explicit: str | None) -> str:
     for candidate in (explicit, os.environ.get("LEXEDITOR_ZIG"), shutil.which("zig")):
         if candidate and Path(candidate).is_file():
             return str(candidate)
+    distribution = importlib.util.find_spec('ziglang')
+    if distribution is not None and distribution.origin:
+        candidate = Path(distribution.origin).with_name('zig.exe' if os.name == 'nt' else 'zig')
+        if candidate.is_file():
+            return str(candidate)
     dev = Path(tempfile.gettempdir()) / "lexeditor-dev"
     found = sorted(dev.glob("zig-*/zig.exe")) if dev.is_dir() else []
     if found:
