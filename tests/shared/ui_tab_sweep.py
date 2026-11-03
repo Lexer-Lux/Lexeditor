@@ -10,14 +10,16 @@ def wait_for_loading_clear(evaluate, timeout=20.0):
     LexeditorUI.loadingPanel while it loads, which replaces the tab bar
     the sweep clicks through. Measuring early flags a loading screen as
     an empty tab and loses the bar the sweep restores afterwards, so the
-    caller settles first and then waits here. A load that never finishes
-    is reported by the probes (empty tab) rather than by this wait.
+    caller settles first and then waits here. The caller reports a load that
+    never finishes as a coverage failure rather than measuring its spinner.
     Returns True when the screen cleared, False on timeout.
     """
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            if not evaluate("!!document.querySelector('.lex-panel-loading')"):
+            if not evaluate("[...document.querySelectorAll('.lex-panel-loading')].some(node=>{"
+                            "const box=node.getBoundingClientRect(),style=getComputedStyle(node);"
+                            "return box.width>0&&box.height>0&&style.visibility!=='hidden'&&style.display!=='none';})"):
                 return True
         except Exception:
             return True

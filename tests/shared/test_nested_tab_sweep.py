@@ -73,3 +73,26 @@ def test_loading_wait_times_out_without_raising(page):
     assert wait_for_loading_clear(page.evaluate, timeout=0.3) is False
     assert page.locator('.lex-panel-loading').count() == 1
 
+
+def test_loading_wait_ignores_hidden_panels(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      document.querySelector('main').replaceChildren(U.el('div',{},'Loaded content'),
+        U.el('div',{hidden:true},U.loadingPanel({label:'Hidden tab'})));
+    }''')
+    assert wait_for_loading_clear(page.evaluate, timeout=0.3) is True
+
+
+def test_clipping_audit_rejects_a_visible_stuck_loading_screen(page, monkeypatch):
+    import pytest
+    from types import SimpleNamespace
+    import verify_no_clipped_text as audit
+    framework(page)
+    page.evaluate("()=>document.querySelector('main').replaceChildren("
+                  "LexeditorUI.loadingPanel({label:'Loading fixture records'}))")
+    monkeypatch.setattr(audit, 'wait_for_loading_clear',
+                        lambda evaluate: wait_for_loading_clear(evaluate, timeout=0.05))
+    with pytest.raises(AssertionError, match='Loading did not finish'):
+        audit.settle_load(SimpleNamespace(eval=page.evaluate))
+

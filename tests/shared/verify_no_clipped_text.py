@@ -257,13 +257,13 @@ def settle_load(cdp) -> None:
 
     The click lands first (a handler may await before it shows its
     loading state), then the wait holds until the shared loading panel
-    is gone. Measuring early flags a loading screen as an empty tab and
-    loses the tab bar the nested sweep restores afterwards. A load that
-    never finishes proceeds anyway; the probes report it as an empty
-    tab rather than stalling the sweep.
+    is gone. Measuring early loses the tab bar the nested sweep restores
+    afterwards. A visible load that never finishes is an explicit coverage
+    failure: its spinner label is not loaded content.
     """
     time.sleep(.55)
-    wait_for_loading_clear(cdp.eval)
+    if not wait_for_loading_clear(cdp.eval):
+        raise AssertionError('Loading did not finish; this tab could not be measured')
 
 
 def sweep(plugin: str, width: int, height: int) -> list[dict]:
