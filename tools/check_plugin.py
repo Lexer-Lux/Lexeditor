@@ -153,7 +153,7 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install -r requirements-test.txt
-      - run: python -m playwright install chromium
+{toolchain}      - run: python -m playwright install chromium
       - run: python tools/check_plugin.py {argument}
 {check_env}"""
 
@@ -187,6 +187,8 @@ def workflow_files(target: str | None = None) -> dict[str, str]:
                      + plugin + "-evidence\n") if capture else ""
         files[f"{plugin}-checks.yml"] = WORKFLOW.format(
             title=f"{plugin} checks", filter="paths", argument=plugin, env="", check_env=check_env, branches="[master]",
+            toolchain=''.join(f"      - run: python -m pip install {requirement}\n"
+                              for requirement in CONFIG.get('ci_requirements', {}).get(plugin, [])),
             paths="\n".join(f"      - '{path}'" for path in paths))
         if capture:
             files[f"{plugin}-checks.yml"] += EVIDENCE_STEP.format(plugin=plugin)
@@ -194,7 +196,7 @@ def workflow_files(target: str | None = None) -> dict[str, str]:
         return files
     ignored = ["plugins/**", "worklog/**", "codex/**", "**.md"]
     files["global-checks.yml"] = WORKFLOW.format(
-        title="global checks", filter="paths-ignore", argument="--global", check_env="", branches="[master]",
+        title="global checks", filter="paths-ignore", argument="--global", check_env="", toolchain="", branches="[master]",
         # tests/shared/test_plugin_issues.py reads the public issue tracker.
         env="    env:\n      GH_TOKEN: ${{ github.token }}\n",
         paths="\n".join(f"      - '{path}'" for path in ignored))
