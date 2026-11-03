@@ -27,7 +27,7 @@ def test_categories_do_not_have_nested_columns_or_gaps(page):
       document.querySelector('main').append(view);
     }''')
     page.wait_for_timeout(150)
-    assert page.locator('.lex-tweaks-scroll').evaluate('n=>getComputedStyle(n).overflowY')=='hidden'
+    assert page.locator('.lex-tweaks-scroll').evaluate('n => n.scrollHeight <= n.clientHeight + 1')
     for subs in page.locator('.lex-tweak-column .settings-subs').all():
         boxes=subs.locator('.settings-sub').evaluate_all('ns=>ns.map(n=>n.getBoundingClientRect().toJSON())')
         assert abs(boxes[0]['left']-boxes[1]['left'])<1
