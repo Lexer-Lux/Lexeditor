@@ -59,7 +59,55 @@ custom 1.25/2.5 unchanged, and live type-8 creatures used normal/sliding steps
 stick retained pitch clamp 191. This verifies numerical behavior, not combat
 feel. Native source commit: `8f3b57ac367609c7a8311214ee6fe3efd18e8336`.
 
-## Interactions and persistence
+## Extended visible distance
+
+View distance is 0 for the original stencil/fog, or 8..30 cells. The whole
+100-by-100 area is already loaded; extending visibility does not load more
+collision data. Original DQA=-17600, DQB=20971520 and H=200 reach black near
+18333 units (9.17 cells). For an extended distance, retained world depth cue
+scales DQA by max(1, cells*2000/18333.333); native fog mode and dynamic dimming
+remain active. Map cache identity includes that scale. First-person arms keep
+their original cue. Fade remains a separate toggle and does not change cells.
+
+Native model placement subtracts low shorts, wrapping relative positions past
+32767. The render scope uses each table's full s32 record/camera coordinates
+and adds the rotated missing multiples of 65536 only to the frame-local
+placement result at `0x8004DADC`. Gameplay records and GTE registers are not
+rewritten. This covers interaction, actor, flipbook, creature and person
+submitters even with smoothing disabled. Translucent cached depth is unsigned
+u16; world sprites recompute their flat cue from scaled DQA and the exact
+read-only H/SZ3 quotient. Max 30 stays below the 65536 depth plane.
+
+Installed-source commit `c4e516a9cc1312fd97302af1a50fa82dd14ad146` visibly
+adds farther rooms at 30 versus 15 in matched rendered views. Full-coordinate
+placements and far-sprite nonzero visibility were checked in the installed
+host. Both settings frontends preserve distance/fade across restart and retain
+custom controls and unknown settings.
+
+## Pickup preview and optional feedback
+
+Native pickup inspection `0x800292F8` copies ten u16 glyphs from
+`0x80058DC0 + 20*itemId` into its frame-local font descriptor. `0x80058E60`
+is entry eight, not the table base. Loose items and container contents share
+this preview. Better UI moves only that native name to y=216 through font
+`0x80029DE0`, RA `0x80029420`; declining retains the item and disabling restores
+native y=36 on the next draw.
+
+Hit Feedback brackets actual native damage `0x8002D120` and computes
+actual HP lost / definition maximum HP * maximum duration, capped at that
+maximum. Default .6 seconds, range 0..5, zero disables; overlapping hits retain
+the later expiry. Actor HP is u16 +0x14 and definition max HP is +0x80.
+Tint is scoped to actor submission and restores all changed lighting after
+submission/unload. Spawn, restore and overlay changes clear timers.
+
+Auto Pick Up All handles semantic operations 64 (loose item) and 65 (gold),
+using native item confirmation/capacity or the original gold queue/addition.
+Only settled drops at the player's feet qualify. Containers 8/9, hidden-height
+items, moving drops and full inventory are excluded. These are separate mods
+in the user's library, with separate toggles; their payloads do not belong in
+Lexeditor source.
+
+## Interaction records and persistence
 
 Placed objects start at `0x8006EDE0`, stride 44. Type at +0 indexes an eight-byte
 definition at `0x8006E8E0`; its first byte is the semantic operation. Real doors
