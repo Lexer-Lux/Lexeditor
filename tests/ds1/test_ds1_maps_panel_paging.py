@@ -43,23 +43,32 @@ PANEL_STATE = """(pair) => {
 
 
 def panel_settled(page, panel, list_selector):
+    # mapTab changes before the asynchronous detail request replaces the
+    # list. Waiting on it alone measures the previous tab, sometimes just
+    # before the newly mounted table performs its first fitted-page pass.
+    page.wait_for_function('''() => document.querySelector(
+        '[data-maps-side] [data-tabstrip-id="'+state.mapTab+'"][aria-selected="true"]')''',
+        timeout=15000)
     page.wait_for_function(
         '(pair) => { const state = (' + PANEL_STATE + ')(pair);'
         ' return state !== null && state.scrollable === false; }',
         arg=[panel, list_selector], timeout=15000)
-    # The fitted page size converges a beat after the rows render: a tab
-    # rebuilt with the previous height's size looks settled until the
-    # refit lands, so wait for the count to stop changing.
+    # Require the same mounted list and fitting geometry to remain stable
+    # over several frames, rather than accepting two equal counts from a
+    # detached predecessor. Continued scrollbar oscillation still times out.
     page.wait_for_function(
         '(pair) => {'
         ' const root = document.querySelector(pair[0]);'
         ' const node = root ? root.querySelector(pair[1]) : null;'
         ' if (!node) return false;'
-        ' const rows = node.querySelectorAll(".lex-list-row:not(.lex-filler-row)").length;'
+        ' const current = (' + PANEL_STATE + ')(pair);'
+        ' const signature = JSON.stringify(current);'
         ' const key = pair[0] + "|" + pair[1];'
         ' const last = (window.__lex_paging_last_count || {})[key];'
-        ' (window.__lex_paging_last_count = window.__lex_paging_last_count || {})[key] = rows;'
-        ' return last === rows; }',
+        ' const stable = last?.node === node && last.signature === signature && !current.scrollable;'
+        ' const frames = stable ? last.frames + 1 : 0;'
+        ' (window.__lex_paging_last_count = window.__lex_paging_last_count || {})[key] = {node,signature,frames};'
+        ' return frames >= 8; }',
         arg=[panel, list_selector], timeout=15000)
 
 
