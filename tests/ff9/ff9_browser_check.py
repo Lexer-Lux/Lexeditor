@@ -416,7 +416,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.evaluate("state.datasetChoice.abilities='ability-beatrix-1'")
             page.evaluate("navigate('abilities')")
             page.wait_for_function("state.datasets['ability-beatrix-1']?.rows?.length===4")
-            ability_rows = page.locator(".ff9-table .lex-column-list-row")
+            ability_rows = page.locator(".ff9-table .lex-column-list-row:not(.lex-filler-row)")
             expect(ability_rows).to_have_count(4)
             expect(ability_rows.filter(has_text="Empty slot 1")).to_have_count(1)
             expect(ability_rows.filter(has_text="Empty slot 2")).to_have_count(1)
