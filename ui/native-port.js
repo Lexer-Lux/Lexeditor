@@ -30,7 +30,9 @@
 
   async function refresh() {
     if (dirty() || busy) return;
-    state = await api("/api/state");
+    const loaded = await api("/api/state");
+    if (dirty() || busy) return;
+    state = loaded;
     accept(state.preferences);
     problem = "";
     render();

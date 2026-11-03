@@ -41,7 +41,8 @@ def setup(tmp_path, monkeypatch):
     for name in ("Verdite3.exe", "RecompOne.Runtime.dll"):
         (game / "bin" / name).write_bytes(b"synthetic only")
     (game / "content/config/kf3.json").write_text('{"game":{"id":"SLUS-00255","name":"KingsField3"}}')
-    (data / "settings.json").write_text(json.dumps({"ActiveMods": ["external.map"], "Unmodeled": {"keep": 42}}))
+    (data / "settings.json").write_text(json.dumps({"ActiveMods": ["obsolete-not-a-loader-setting"], "Unmodeled": {"keep": 42}}))
+    (data / "interface.ini").write_bytes(b"\xef\xbb\xbf[RecompOne]\r\nmods.external.map.enabled=True\r\nmods.external.map.priority=17\r\nother=keep\r\n[Window][Output]\r\nPos=12,34\r\n")
     monkeypatch.setenv("LEXEDITOR_KF3_DATA", str(data))
     monkeypatch.setenv("LEXEDITOR_KF3_ROOT", str(game))
     monkeypatch.setattr(model, "live_processes", lambda _: [])
@@ -59,6 +60,7 @@ def mod(library, name="example"):
 def test_ini_noop_is_byte_exact_and_changes_preserve_other_sections():
     raw = b"\xef\xbb\xbf; head\r\n[RecompOne]\r\n  kf3.mouse.turn =1\r\nMystery = keep\r\n[Window][Output]\r\nPos=12,34\r\n"
     assert model.updated_ini(raw, {}) == raw
+    assert model.updated_ini(b"[RecompOne]\nother=keep", {"absent": None}) == b"[RecompOne]\nother=keep"
     output = model.updated_ini(raw, {"kf3.mouse.turn": "2", "kf3.mouse.look": "3"})
     assert output == raw.replace(b"kf3.mouse.turn =1", b"kf3.mouse.turn =2").replace(b"[Window]", b"kf3.mouse.look=3\r\n[Window]")
 
@@ -105,15 +107,22 @@ def test_activation_and_removal_preserve_native_mods_and_settings(setup):
     native.mkdir()
     (native / "mod.json").write_text('{"id":"external.map","name":"Native map"}')
     original = (native / "mod.json").read_bytes()
+    original_settings = (data / "settings.json").read_bytes()
+    original_interface = (data / "interface.ini").read_bytes()
     adapter = NativeSourceModAdapter(MODEL)
     result = adapter.activate([source], game)
     assert result["mods"] == ["external.map", "example"]
     assert (data / "mods/lexeditor-example/Mod.cs").read_bytes() == (source / "Mod.cs").read_bytes()
     assert not (data / RECOVERY).exists()
+    active = model.ini_values((data / "interface.ini").read_text(encoding="utf-8-sig"))
+    assert active["mods.example.enabled"] == "True"
+    assert active["mods.example.priority"] == "1"
     adapter.activate([], game)
     assert not (data / "mods/lexeditor-example").exists()
     settings = json.loads((data / "settings.json").read_text())
-    assert settings == {"ActiveMods": ["external.map"], "Unmodeled": {"keep": 42}}
+    assert settings == {"ActiveMods": ["obsolete-not-a-loader-setting"], "Unmodeled": {"keep": 42}}
+    assert (data / "settings.json").read_bytes() == original_settings
+    assert (data / "interface.ini").read_bytes() == original_interface
     assert (native / "mod.json").read_bytes() == original
 
 
@@ -148,6 +157,7 @@ def test_failed_configuration_write_rolls_back_mod_files_and_active_ids(setup, m
     adapter = NativeSourceModAdapter(MODEL)
     adapter.activate([first], game)
     old_settings = (data / "settings.json").read_bytes()
+    old_interface = (data / "interface.ini").read_bytes()
     original_write = model.atomic_write
     failed = False
 
@@ -164,6 +174,7 @@ def test_failed_configuration_write_rolls_back_mod_files_and_active_ids(setup, m
     assert (data / "mods/lexeditor-first/Mod.cs").is_file()
     assert not (data / "mods/lexeditor-second").exists()
     assert (data / "settings.json").read_bytes() == old_settings
+    assert (data / "interface.ini").read_bytes() == old_interface
     assert not (data / RECOVERY).exists()
 
 
@@ -225,6 +236,49 @@ def test_kf2_disc_identity_is_not_accepted_as_kf3(setup):
     assert not MODEL.installation(game)["supported"]
 
 
+def test_native_enable_flags_priorities_and_prior_values_are_restored(setup):
+    game, data, library = setup
+    path = data / "interface.ini"
+    original = path.read_bytes()
+    path.write_bytes(model.updated_ini(original, {"mods.z.enabled": "False", "mods.z.priority": "-7"}))
+    before = path.read_bytes()
+    z, a = mod(library, "z"), mod(library, "a")
+    adapter = NativeSourceModAdapter(MODEL)
+    adapter.activate([z, a], game)
+    values = model.ini_values(path.read_text(encoding="utf-8-sig"))
+    assert values["mods.z.enabled"] == "True" and values["mods.a.enabled"] == "True"
+    assert values["mods.z.priority"] == "1" and values["mods.a.priority"] == "2"
+    assert values["mods.external.map.priority"] == "17"
+    adapter.activate([a, z], game)
+    values = model.ini_values(path.read_text(encoding="utf-8-sig"))
+    assert values["mods.a.priority"] == "1" and values["mods.z.priority"] == "2"
+    adapter.activate([], game)
+    assert path.read_bytes() == before
+
+
+def test_interface_write_failure_restores_files_and_native_flags(setup, monkeypatch):
+    game, data, library = setup
+    first, second = mod(library, "first"), mod(library, "second")
+    adapter = NativeSourceModAdapter(MODEL)
+    adapter.activate([first], game)
+    before = (data / "interface.ini").read_bytes()
+    write = MODEL.atomic_write
+    failed = False
+    def fail_once(path, raw):
+        nonlocal failed
+        if path == data / "interface.ini" and not failed:
+            failed = True
+            raise OSError("synthetic interface write failure")
+        write(path, raw)
+    monkeypatch.setattr(MODEL, "atomic_write", fail_once)
+    with pytest.raises(OSError, match="synthetic interface write failure"):
+        adapter.activate([second], game)
+    assert (data / "interface.ini").read_bytes() == before
+    assert (data / "mods/lexeditor-first/Mod.cs").is_file()
+    assert not (data / "mods/lexeditor-second").exists()
+    assert not (data / RECOVERY).exists()
+
+
 def test_plugin_smoke_is_isolated_from_live_player_data():
     from plugins.kings_field3.plugin import smoke
     assert smoke() == []
@@ -239,7 +293,18 @@ def test_settings_and_shared_mods_render_and_edit_without_player_data(setup, tmp
     from paged_detail import reveal
 
     _, data, _ = setup
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler(MODEL, str(Path(__file__).resolve().parents[2] / "plugins/kings_field3/server.py")))
+    app_root = Path(__file__).resolve().parents[2]
+    class FixtureHandler(handler(MODEL, str(app_root / "plugins/kings_field3/server.py"))):
+        def do_GET(self):
+            from urllib.parse import urlparse
+            path = urlparse(self.path).path
+            if path.startswith("/plugins/blank/"):
+                target = (app_root / path.lstrip("/")).resolve()
+                if target.parent == app_root / "plugins/blank" and target.is_file():
+                    self.send_file(target)
+                    return
+            super().do_GET()
+    server = ThreadingHTTPServer(("127.0.0.1", 0), FixtureHandler)
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
     settings = json.loads((Path(__file__).resolve().parents[2] / "ui/default_settings.json").read_text(encoding="utf-8"))
@@ -283,10 +348,16 @@ def test_settings_and_shared_mods_render_and_edit_without_player_data(setup, tmp
                 assert reach.input_value() == "16"
                 fade = page.get_by_label("Smooth distance fade", exact=True)
                 assert fade.is_checked()
+                output = Path(__import__('tempfile').gettempdir()) / "lexeditor-dev/kf3-plugin-browser"
+                output.mkdir(parents=True, exist_ok=True)
+                page.locator(".lex-plugin-loading-screen").wait_for(state="hidden")
+                page.screenshot(path=str(output / "settings-checked.png"))
                 reach.fill("24")
                 reach.dispatch_event("change")
                 fade.uncheck()
-                page.get_by_role("button", name="Save changes", exact=True).click()
+                with page.expect_response(lambda response: response.url.endswith('/api/preferences') and response.request.method == 'POST') as saved_response:
+                    page.get_by_role("button", name="Save changes", exact=True).click()
+                assert saved_response.value.ok
                 page.wait_for_function("document.querySelector('#global-save').disabled")
                 text = (data / "interface.ini").read_text()
                 assert "kf3.renderdistance=24\n" in text and "kf3.renderdistance.fade=0\n" in text
@@ -294,18 +365,43 @@ def test_settings_and_shared_mods_render_and_edit_without_player_data(setup, tmp
                 output = Path(__import__('tempfile').gettempdir()) / "lexeditor-dev/kf3-plugin-browser"
                 output.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(output / "settings.png"))
+                page.evaluate("settings => dispatchEvent(new CustomEvent('lexeditor-settings-changed', {detail:{...settings, booleanBoxStyle:false}}))", settings)
+                assert fade.evaluate("node=>getComputedStyle(node).width") == "19px"
+                page.screenshot(path=str(output / "settings-arrow.png"))
                 page.set_viewport_size({"width": 640, "height": 480})
                 page.wait_for_timeout(150)  # Let the shared pager refit after resize.
                 reveal(page, reach)
                 reveal(page, fade)
                 assert reach.is_visible() and fade.is_visible()
                 page.screenshot(path=str(output / "settings-small.png"))
+                def header_is_contained():
+                    return page.evaluate("""() => {
+                      const row=document.querySelector('.lex-shell-command-row').getBoundingClientRect();
+                      return [...document.querySelectorAll('.lex-shell-command-row button')].filter(node=>{
+                        const b=node.getBoundingClientRect();
+                        return b.width && b.height && (b.top<row.top-1 || b.bottom>row.bottom+1 || b.left<row.left-1 || b.right>row.right+1);
+                      }).map(node=>node.getAttribute('aria-label'));
+                    }""")
+                assert header_is_contained() == []
                 page.get_by_role("button", name="Open King's Field III Data Map", exact=True).click()
                 page.get_by_text("Disc: SLUS-00255", exact=True).wait_for(state="visible")
                 page.screenshot(path=str(output / "data-map-small.png"))
                 page.locator('[data-tab="mods"]').click()
                 page.get_by_text("Mods", exact=True).first.wait_for(state="visible")
                 page.screenshot(path=str(output / "mods-small.png"))
+                assert not errors
+                # The same header sizing also serves Blank's existing gallery.
+                page.goto(f"http://127.0.0.1:{server.server_port}/plugins/blank/editor.html")
+                page.evaluate("dispatchEvent(new Event('pywebviewready'))")
+                page.locator('.lex-shell-command-row').wait_for(state='visible')
+                page.locator('.lex-plugin-loading-screen').wait_for(state='hidden')
+                page.wait_for_timeout(150)
+                assert header_is_contained() == []
+                page.screenshot(path=str(output / "blank-header-small.png"))
+                page.evaluate("document.documentElement.style.setProperty('--lex-ui-scale','1.5')")
+                page.wait_for_timeout(150)
+                assert header_is_contained() == []
+                page.screenshot(path=str(output / "blank-header-small-150.png"))
                 assert not errors
             finally:
                 browser.close()

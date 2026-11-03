@@ -21,7 +21,7 @@
     "gameIdentity": "Japanese King's Field III / US King's Field II, SLUS-00255",
     "modLoading": {
       "launch": "Play starts the installed Verdite3 launcher. First launch compiles from the player's SLUS-00255 disc.",
-      "removal": "Disable a mod in the shared Mods tab while the game is closed. Only Lexeditor-owned deployment folders and active ids are removed."
+      "removal": "Disable a mod in the shared Mods tab while the game is closed. Lexeditor removes its deployed copy and restores the previous native enable flag and priority."
     }
   }
 }

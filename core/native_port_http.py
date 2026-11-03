@@ -11,14 +11,14 @@ from core.native_port_settings import NativePortSettings
 
 def data_map(model: NativePortSettings) -> dict:
     return {"rows": [
-        {"filename": "interface.ini", "controls": "Port controls, sensitivity, view distance and smooth distance fade.",
+        {"filename": "interface.ini", "controls": "Port controls, sensitivity, view distance, distance fade and native mod flags.",
          "notes": "Other preferences and window layout remain unchanged.",
          "status": "partial", "coverage": "structured", "target": "settings", "openable": True},
         {"filename": "mods/<mod>/mod.json and *.cs", "controls": "Native source mods managed through the shared Mods tab.",
          "notes": "The port compiles source mods and attaches their runtime hooks. Hook compatibility is not inferred.",
          "status": "partial", "coverage": "structured", "target": "mods", "openable": True},
-        {"filename": "settings.json", "controls": "Active native mods and keyboard/controller bindings.",
-         "notes": "Only Lexeditor-owned active mod ids are changed. Edit individual bindings in the native Input menu.",
+        {"filename": "settings.json", "controls": "Keyboard/controller bindings and native runtime configuration.",
+         "notes": "Edit bindings in the native Input menu. Source-mod deployment leaves this file unchanged.",
          "status": "partial", "coverage": "structured", "target": "settings", "openable": True},
         {"filename": "carda.sav / cardb.sav", "controls": "Memory-card saves.",
          "notes": "Lexeditor does not edit saves.", "status": "not-integrated", "coverage": "unavailable", "target": None, "openable": False},

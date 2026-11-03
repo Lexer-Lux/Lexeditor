@@ -69,7 +69,7 @@ def ini_values(text: str) -> dict[str, str]:
     return result
 
 
-def updated_ini(raw: bytes, changes: dict[str, str]) -> bytes:
+def updated_ini(raw: bytes, changes: dict[str, str | None]) -> bytes:
     """Change only requested RecompOne keys; retain unrelated sections and bytes."""
     text = raw.decode("utf-8-sig")
     ini_values(text)
@@ -79,18 +79,23 @@ def updated_ini(raw: bytes, changes: dict[str, str]) -> bytes:
     lines = text.splitlines(keepends=True)
     begin = next((i for i, line in enumerate(lines) if line.strip() == "[RecompOne]"), None)
     if begin is None:
-        prefix = "[RecompOne]" + newline + "".join(f"{k}={v}{newline}" for k, v in changes.items())
+        additions = "".join(f"{k}={v}{newline}" for k, v in changes.items() if v is not None)
+        if not additions:
+            return raw
+        prefix = "[RecompOne]" + newline + additions
         return (b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b"") + (prefix + text).encode("utf-8")
     end = next((i for i in range(begin + 1, len(lines)) if lines[i].strip().startswith("[")), len(lines))
     pending = dict(changes)
     for i in range(begin + 1, end):
         match = re.match(r"^(\s*([^=;#\s]+)\s*=)(.*?)(\r?\n)?$", lines[i])
         if match and match[2].casefold() in pending:
-            lines[i] = match[1] + pending.pop(match[2].casefold()) + (match[4] or "")
-    if pending:
+            value = pending.pop(match[2].casefold())
+            lines[i] = "" if value is None else match[1] + value + (match[4] or "")
+    additions = [f"{k}={v}{newline}" for k, v in pending.items() if v is not None]
+    if additions:
         if end and not lines[end - 1].endswith(("\n", "\r")):
             lines[end - 1] += newline
-        lines[end:end] = [f"{k}={v}{newline}" for k, v in pending.items()]
+        lines[end:end] = additions
     prefix = b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b""
     return prefix + "".join(lines).encode("utf-8")
 
