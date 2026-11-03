@@ -13,6 +13,7 @@ _DATABASE_OVERHEAD = 16 * 1024 * 1024
 _COLUMNS = [('key','BLOB'),('data','BLOB'),('checksum','BLOB'),('touched','INTEGER')]
 _LRU_INDEX = 'CREATE INDEX outputs_lru ON outputs(touched, length(data))'
 CACHE_FILE = 'composed-v2.sqlite3'
+_TOUCH_INTERVAL_NS = 60 * 1_000_000_000
 
 
 class _BadCache(ValueError):
@@ -44,7 +45,8 @@ def _open(root):
     try:
         # Reuse evicted pages instead of moving every remaining large BLOB
         # at each commit. A hard page cap bounds the physical file too.
-        connection.execute('PRAGMA auto_vacuum = INCREMENTAL')
+        if connection.execute('PRAGMA auto_vacuum').fetchone()[0] != 2:
+            connection.execute('PRAGMA auto_vacuum = INCREMENTAL')
         page_size = connection.execute('PRAGMA page_size').fetchone()[0]
         connection.execute(f'PRAGMA max_page_count = {max(1,(LIMIT+_DATABASE_OVERHEAD)//page_size)}')
         objects = connection.execute("SELECT type,name FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 3").fetchall()
@@ -165,14 +167,20 @@ def load(root, key):
             size = database.execute('SELECT length(data) FROM outputs WHERE key = ?', (key,)).fetchone()
             if size is not None and (type(size[0]) is not int or size[0]>LIMIT):
                 raise _BadCache('The cached archive exceeds its size limit')
-            row = database.execute('SELECT data, checksum FROM outputs WHERE key = ?', (key,)).fetchone()
+            row = database.execute('SELECT data, checksum, touched FROM outputs WHERE key = ?', (key,)).fetchone()
             if row is None:
                 return None
-            data, checksum = row
+            data, checksum, touched = row
             if len(data) > LIMIT or sha256(data).digest() != checksum:
                 database.execute('DELETE FROM outputs WHERE key = ?', (key,))
                 return None
-            database.execute('UPDATE outputs SET touched = ? WHERE key = ?', (time.time_ns(), key))
+            # A warm scan reads hundreds of archives. Updating each timestamp
+            # every time turned cache hits into synchronous disk commits.
+            # Minute-resolution recency keeps eviction useful without writing
+            # again when the reader immediately saves another small edit.
+            now = time.time_ns()
+            if type(touched) is not int or not 0 <= now - touched < _TOUCH_INTERVAL_NS:
+                database.execute('UPDATE outputs SET touched = ? WHERE key = ?', (now, key))
             return data
     except (OSError, sqlite3.Error, TypeError, ValueError):
         return None
