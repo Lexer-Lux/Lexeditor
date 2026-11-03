@@ -191,9 +191,19 @@ lost / definition maximum HP * maximum duration, capped at that maximum; default
 .6 seconds, range 0..5. Peak strength is (1 - post-hit HP / maximum HP) times
 configured intensity, default 50%, range 0..100%. Each new damaging hit replaces
 the envelope and linearly fades to zero. Actor HP is u16 +0x14 and definition
-max HP is +0x80. Tint mixes the submitted model's RGB toward red while preserving
-its texture and restores lighting/color after each draw. Nested unrelated models
-suspend the parent's tint. Spawn, restore and overlay changes clear envelopes.
+max HP is +0x80. The finished textured/lit/fogged RGB mixes toward red before
+quantization through RetainedScene.ModelInstance.ColourMixRgb/ColourMix. The old
+pre-texture RGBC path was removed after it failed on a strongly green skin.
+Native lighting/color registers stay untouched. Actor submitter `0x8001E9A4`
+owns only its newly appended retained instances, excluding nested unrelated
+ranges. Spawn, restore and overlay changes clear envelopes.
+
+This requires GPU world mode 2, retained model meshes, a supported backend and
+the Z-buffer. Native/reference mode 0, capture mode 1, disabled retained models,
+renderer verification and individual packet-fallback meshes keep native colors
+without a flash. The gear panel identifies global unsupported settings. The
+generic final-RGB shader API is shared runtime e22da06, imported from cde87b2;
+no sibling game's addresses or gameplay logic were copied.
 
 Red N isolates native compass UV x14..19/y128..132 from the original 33x32
 compass record at `0x80055D04`. Its original FT4 becomes four rectangles, costing
