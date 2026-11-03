@@ -91,9 +91,14 @@ custom controls and unknown settings.
 Native pickup inspection `0x800292F8` copies ten u16 glyphs from
 `0x80058DC0 + 20*itemId` into its frame-local font descriptor. `0x80058E60`
 is entry eight, not the table base. Loose items and container contents share
-this preview. Better UI moves only that native name to y=216 through font
+this preview. Better UI moves only that native name to y=228 through font
 `0x80029DE0`, RA `0x80029420`; declining retains the item and disabling restores
-native y=36 on the next draw.
+native y=36 on the next draw. The preview frame starts at (118,16) and mirrors
+the window template's 71-by-104 half in both directions, yielding 142-by-208.
+The caption uses that full frame width for centering and sits four pixels
+below it. Native font cells advance 14 pixels and are 12 pixels high; their
+translated letter pairs retain those metrics. This leaves the caption within
+the 240-pixel logical screen. The earlier y=216 overlapped the bottom border.
 
 Hit Feedback brackets actual native damage `0x8002D120` and computes
 actual HP lost / definition maximum HP * maximum duration, capped at that
