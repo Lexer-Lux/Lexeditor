@@ -36,7 +36,8 @@ For sprint, holding a controller button or keyboard key across exhaustion must
 behave identically. Stationary frames do not charge movement-based drain. Death,
 load, New Game, menu transitions and disable clear owned transient work without
 turning a still-held input into a fresh run press. Native recovery remains active.
-KF1 uses weapon power and its agreed default physical drain is zero; an
+KF1 uses weapon power and its explicitly chosen default physical drain is 100%
+of the full gauge per second before native recovery; an
 inapplicable magic-energy option must be documented rather than inventing an MP
 cost. KF2's native running charges both 5000-point physical and magic power by
 500 per 15 Hz tick (150% of a full gauge per second); its MP is a separate value.
