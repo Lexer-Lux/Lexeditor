@@ -70,7 +70,8 @@ def build(page):
 def add_barrels(page, count):
     plus = page.locator('.lex-barrel-control:not(.lex-detail-column-control) .lex-barrel-increase')
     for _ in range(count):
-        plus.click(force=True)
+        page.locator('.lex-panel-layout-divider').first.hover()
+        plus.click()
         page.wait_for_timeout(400)
     page.wait_for_function(
         "() => document.querySelectorAll('.lex-barrel-grid > .lex-column-list').length === 2")
