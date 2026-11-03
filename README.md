@@ -1,7 +1,14 @@
 Open-source, plugin-based mod editor with the goal of making it fun and easy for anyone to create and share mods for their favorite games. 
 
 Currently supports:
-* Final Fantasy VII
+* Dark Souls: Remastered
+
+Coming soon:
+* Final Fantasy IV
+* Grand Theft Auto V
+* Palworld
+* Mount And Blade II: Bannerlord
+* * Final Fantasy VII
 * Final Fantasy VII Remaster
 * Final Fantasy VII Remake Intergrade
 * Final Fantasy VIII
@@ -15,10 +22,4 @@ Currently supports:
 * Terraria
 * Dark Souls 3
 
-Coming soon:
-* Final Fantasy IV
-* Grand Theft Auto V
-* Palworld
-* Mount And Blade II: Bannerlord
-
-Don't see your game of choice? Click [Here!](docs/ADDING_A_GAME.md) 
+Don't see your game of choice? Click [here!](docs/ADDING_A_GAME.md) 
