@@ -274,13 +274,15 @@ def main():
         cell.click()
         page.wait_for_timeout(300)
         assert page.locator('.lex-searcher-bar').count()==0
-        assert page.locator('.ff8-encounter-group-preview .lex-title-finder').count()==1, "the group heading has a finder"
+        page.locator('.ff8-encounter-group-preview .lex-title-finder').wait_for()
         # A right-click goes straight to the finder.
         cell.click(button='right')
         page.wait_for_selector('.lex-searcher-bar')
         candidate=page.locator("[aria-label='FF8 encounterGroups'] .lex-search-candidate").nth(2)
-        candidate.dispatch_event('pointerdown',{'button':0,'pointerId':1})
+        candidate.hover()
+        page.mouse.down()
         page.wait_for_timeout(900)
+        page.mouse.up()
         page.wait_for_selector('.ff8-encounter-rule-table')
         assert page.evaluate("state.data.world.rows.find(r=>r.kind==='helper'&&r.id===0).encounterGroup")==2
 
