@@ -47,3 +47,18 @@ def test_status_failure_keeps_work_running_and_preserves_the_real_error(page):
     page.wait_for_function('!document.body.inert')
     assert page.evaluate('operationError') == 'Archive exceeds its size limit'
 
+
+def test_long_operation_label_fits_narrow_window(page, tmp_path):
+    page.set_viewport_size({'width': 360, 'height': 640})
+    framework(page)
+    label = 'Checking/building ' + 'LongModName' * 12 + ' (18/18)'
+    page.evaluate('(label)=>LexeditorUI.setEditorBusy({},label)', label)
+    activity = page.locator('.lex-editor-activity')
+    assert activity.inner_text() == label
+    assert activity.evaluate('''e=>{
+      const r=e.getBoundingClientRect();
+      return r.left>=8 && r.right<=innerWidth-8 &&
+        r.top>=8 && r.bottom<=innerHeight-8 && e.scrollWidth<=e.clientWidth;
+    }''')
+    page.screenshot(path=str(tmp_path / 'long-operation-label.png'))
+
