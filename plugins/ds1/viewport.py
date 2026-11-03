@@ -127,6 +127,7 @@ def _read_flver(kind, location, member):
 
 DIFFUSE_TYPES = frozenset({'g_diffuse', 'gdiffuse'})
 LIGHTMAP_TYPES = frozenset({'g_lightmap'})
+NORMAL_TYPES = frozenset({'g_bumpmap', 'gbumpmap'})
 MAX_TEXTURE_PIXELS = 16 * 1024 * 1024
 TEXTURE_PREVIEW_CAP = 1024
 MAP_TEXTURE_CAP = 256
@@ -139,27 +140,19 @@ MAP_CACHE_SIZE_ENV = 'LEXEDITOR_DS1_MAP_CACHE_MB'
 MAP_CACHE_DEFAULT_MB = 1024
 
 
-def _diffuse_name(material):
-    """The material's diffuse texture stem (LG_M_9240.tga -> LG_M_9240),
-    or None when it names none."""
+def _texture_name(material, types):
+    """A named material texture's stem, independent of its authoring path."""
     for texture in material.get('textures', []):
         path = texture.get('path') or ''
-        if texture.get('type', '').lower() in DIFFUSE_TYPES and path:
+        if texture.get('type', '').lower() in types and path:
             stem = path.replace('\\', '/').rsplit('/', 1)[-1]
             return stem.rsplit('.', 1)[0] if '.' in stem else stem
     return None
 
 
 def _lightmap_name(material):
-    """The material's baked-light texture stem, or None when it names
-    none. Same stem rule as the diffuse; the resolver treats both
-    alike."""
-    for texture in material.get('textures', []):
-        path = texture.get('path') or ''
-        if texture.get('type', '').lower() in LIGHTMAP_TYPES and path:
-            stem = path.replace('\\', '/').rsplit('/', 1)[-1]
-            return stem.rsplit('.', 1)[0] if '.' in stem else stem
-    return None
+    """The material's baked-light texture stem, or None when it names none."""
+    return _texture_name(material, LIGHTMAP_TYPES)
 
 
 def _binder_plain(location):
@@ -814,7 +807,7 @@ def _textured(kind, location, member, stamp, skin, game_root, project, cap, area
         return hit
     encoded = _encode(FlverDocument(_read_flver(kind, location, member)), skin, True)
     needed = sorted({name for mesh in encoded['meshes']
-                     for name in (mesh.get('map'), mesh.get('light')) if name})
+                     for name in (mesh.get('map'), mesh.get('light'), mesh.get('normal')) if name})
     if not needed:
         encoded['textures'] = {}
         _disk_write(entry, encoded)
@@ -933,8 +926,9 @@ def _encode(doc, skin=False, textured=False):
             packed2 = struct.pack('<%df' % len(uvs2), *uvs2) if ok2 else b''
             light = _lightmap_name(doc.meshes[index]['material'])
             entry['uv1'] = base64.b64encode(packed2).decode('ascii')
-            entry['map'] = _diffuse_name(doc.meshes[index]['material'])
+            entry['map'] = _texture_name(doc.meshes[index]['material'], DIFFUSE_TYPES)
             entry['light'] = light
+            entry['normal'] = _texture_name(doc.meshes[index]['material'], NORMAL_TYPES)
         if skin:
             entry.update(_encode_skin(doc, mesh))
         meshes.append(entry)

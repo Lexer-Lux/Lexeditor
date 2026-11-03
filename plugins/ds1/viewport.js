@@ -104,9 +104,9 @@ window.Ds1Viewport = (() => {
     const isCutout = mesh => (mesh.mat_def || "").toLowerCase().includes("_alp");
     const effect = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 1, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false});
-    // Water shaders ([We]) name no diffuse, only a bump map, so the
-    // gray fallback lit by the rig rendered lakes and sewers flat
-    // white. Translucent blue reads as water and stays out of the way.
+    // [We] water has a height map but no diffuse. Its height field is
+    // bound below; color/transparency still use a preview fallback until
+    // the material-definition parameters are decoded.
     const isWater = mesh => (mesh.mat_def || "").toLowerCase().includes("water");
     const water = new THREE.MeshStandardMaterial({color: 0x2f6f9e, roughness: 0.35, metalness: 0,
       side: THREE.DoubleSide, transparent: true, opacity: 0.65, depthWrite: false});
@@ -129,12 +129,16 @@ window.Ds1Viewport = (() => {
     const texKey = (tex, png) => `${tex.length}:${tex}:${texDigest(png)}`;
     const texLoader = new THREE.TextureLoader();
     const disposable = [];
-    const textureFor = async (tex, png) => {
-      const key = texKey(tex, png);
+    const textureKey = (tex, png, channel = null) => `${channel ?? "color"}|${texKey(tex, png)}`;
+    const textureFor = async (tex, png, channel = null) => {
+      const key = textureKey(tex, png, channel);
       if (!texCache.has(key)) {
         try {
           const image = await texLoader.loadAsync(`data:image/png;base64,${png}`);
-          image.colorSpace = THREE.SRGBColorSpace;
+          // Diffuse samples are colors; normal vectors and baked irradiance
+          // are linear data. One PNG can be used in both roles, independently.
+          image.colorSpace = channel === null ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+          image.channel = channel ?? 0;
           // DS1 textures are DirectX bytes: v0 is the first stored row,
           // so the GL flip would stand every texture on its head, and
           // tiling UVs run far past [0,1], so clamp would smear them.
@@ -150,38 +154,16 @@ window.Ds1Viewport = (() => {
       }
       return texCache.get(key);
     };
-    const lightCache = new Map();
-    const lightTextureFor = async (tex, png) => {
-      const key = texKey(tex, png);
-      if (!lightCache.has(key)) {
-        try {
-          const image = await texLoader.loadAsync(`data:image/png;base64,${png}`);
-          // Baked irradiance, not display color: the bytes are linear,
-          // and tagging them sRGB crushed the Depths to near-black
-          // (a median wall texel decoded to under 2% brightness).
-          image.colorSpace = THREE.NoColorSpace;
-          // Some DS1 atlas UVs carry whole-tile offsets (the Depths
-          // wall uses U around -31). Repeat retains their atlas position;
-          // clamping smears one edge texel into colored wall-wide bands.
-          image.flipY = false;
-          image.wrapS = image.wrapT = THREE.RepeatWrapping;
-          image.channel = 1;
-          lightCache.set(key, image);
-          disposable.push(image);
-        } catch (_error) {
-          return null;
-        }
-      }
-      return lightCache.get(key);
-    };
     const materialFor = (mesh, texturesByName, fx, waterMesh, cutout) => {
       const plain = waterMesh ? water : fx ? effect : mesh.cull !== false ? front : double;
       const png = mesh.map && texturesByName && texturesByName[mesh.map];
-      const image = mesh.map && mesh.uv && png ? texCache.get(texKey(mesh.map, png)) : null;
-      if (!image) return plain;
+      const image = mesh.map && mesh.uv && png ? texCache.get(textureKey(mesh.map, png)) : null;
+      const normalPng = mesh.normal && mesh.uv && texturesByName?.[mesh.normal];
+      const normal = normalPng ? texCache.get(textureKey(mesh.normal, normalPng, 0)) : null;
+      if (!image && !normal) return plain;
       const litPng = mesh.light && mesh.uv1 && texturesByName && texturesByName[mesh.light];
-      const lit = !fx && litPng ? lightCache.get(texKey(mesh.light, litPng)) : null;
-      const key = `${texKey(mesh.map, png)}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}|${lit ? texKey(mesh.light, litPng) : "-"}|${cutout ? "c" : "o"}`;
+      const lit = !fx && litPng ? texCache.get(textureKey(mesh.light, litPng, 1)) : null;
+      const key = `${image ? texKey(mesh.map, png) : "-"}|${mesh.cull !== false ? "f" : "d"}|${fx ? "x" : "o"}|${lit ? texKey(mesh.light, litPng) : "-"}|${cutout ? "c" : "o"}|${waterMesh ? "w" : "o"}|${normal ? texKey(mesh.normal, normalPng) : "-"}`;
       if (!matCache.has(key)) {
         // Baked meshes keep the scene rig exactly like the game: map
         // times light, plus the rig's direct light over it. The bake
@@ -196,7 +178,7 @@ window.Ds1Viewport = (() => {
           ? {alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -1,
              polygonOffsetUnits: -1}
           : {};
-        const textured = fx
+        const textured = !image ? plain.clone() : fx
           ? new THREE.MeshStandardMaterial({map: image, roughness: 1, metalness: 0,
               side: THREE.DoubleSide, transparent: true, opacity: 0.25, depthWrite: false})
           : lit
@@ -205,6 +187,25 @@ window.Ds1Viewport = (() => {
                 side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide, ...cut})
             : new THREE.MeshStandardMaterial({map: image, roughness: 0.95, metalness: 0,
                 side: mesh.cull !== false ? THREE.FrontSide : THREE.DoubleSide, ...cut});
+        if (normal) {
+          if (waterMesh && !image) {
+            // [We] water uses a grayscale height field, unlike the packed
+            // two-channel normal vectors used on walls and characters.
+            textured.bumpMap = normal;
+          } else {
+            textured.normalMap = normal;
+            textured.normalScale.set(1, -1);
+            // DS1 stores X/Y in R/G; blue carries other data (c5260 has
+            // zero blue). Treating it as Z points the normals backwards.
+            const chunk = THREE.ShaderChunk.normal_fragment_maps.replace(
+              "mapN.xy *= normalScale;",
+              "mapN.z = sqrt(max(0.0, 1.0 - dot(mapN.xy, mapN.xy)));\n\tmapN.xy *= normalScale;");
+            textured.onBeforeCompile = shader => {
+              shader.fragmentShader = shader.fragmentShader.replace("#include <normal_fragment_maps>", chunk);
+            };
+            textured.customProgramCacheKey = () => "ds1-rg-normal";
+          }
+        }
         matCache.set(key, textured);
         disposable.push(textured);
       }
@@ -730,22 +731,15 @@ window.Ds1Viewport = (() => {
       mountCanvas();
       const fresh = new Map();
       for (const [name, data] of batch)
-        for (const [tex, png] of Object.entries(data.textures || {})) {
-          const key = texKey(tex, png);
-          if (!texCache.has(key) && !fresh.has(key)) fresh.set(key, [tex, png]);
-        }
-      await Promise.all([...fresh.values()].map(([tex, png]) => textureFor(tex, png)));
-      if (mine !== session || !host.isConnected) return false;
-      const freshLit = new Map();
-      for (const [name, data] of batch)
-        for (const mesh of data.meshes || []) {
-          const png = mesh.light && (data.textures || {})[mesh.light];
-          if (mesh.light && mesh.uv1 && png) {
-            const key = texKey(mesh.light, png);
-            if (!lightCache.has(key) && !freshLit.has(key)) freshLit.set(key, [mesh.light, png]);
+        for (const mesh of data.meshes || [])
+          for (const [tex, uv, channel] of [[mesh.map, mesh.uv, null],
+              [mesh.light, mesh.uv1, 1], [mesh.normal, mesh.uv, 0]]) {
+            const png = tex && uv && data.textures?.[tex];
+            if (!png) continue;
+            const key = textureKey(tex, png, channel);
+            if (!texCache.has(key) && !fresh.has(key)) fresh.set(key, [tex, png, channel]);
           }
-        }
-      await Promise.all([...freshLit.values()].map(([tex, png]) => lightTextureFor(tex, png)));
+      await Promise.all([...fresh.values()].map(args => textureFor(...args)));
       if (mine !== session || !host.isConnected) return false;
       const prepared = new Map();
       const allocated = [];
