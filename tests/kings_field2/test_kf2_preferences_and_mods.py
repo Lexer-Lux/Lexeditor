@@ -15,6 +15,23 @@ def test_service_is_registered_for_normal_and_frozen_launches():
     assert "plugins.kings_field2.server" in service_command("plugins.kings_field2.server", owned=True)
 
 
+def test_non_steam_game_validates_without_steam_discovery_or_art_requests(tmp_path):
+    from core.plugin_api import validate_plugin
+    from core.game_installation import GameInstallationManager
+    from core.cover_art import CoverArtCache
+    from plugins.kings_field2.plugin import PLUGIN
+    validate_plugin(PLUGIN)
+    assert GameInstallationManager._steam_candidates("", ("Verdite2",)) == []
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("A non-Steam port must not request a Steam cover")
+
+    covers = CoverArtCache({PLUGIN.plugin_id: PLUGIN}, root=tmp_path,
+                          fetcher=unexpected_fetch, steam_roots=())
+    assert not covers._threads
+    assert covers._states[PLUGIN.plugin_id]["state"] == "unavailable"
+
+
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
     game, data, library = (tmp_path / name for name in ("game", "data", "library"))
