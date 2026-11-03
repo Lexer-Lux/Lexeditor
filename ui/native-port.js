@@ -70,7 +70,8 @@
   function settings() {
     const notices = [];
     if (problem) notices.push(UI.notice({tone: "error", title: "Could not save settings", message: problem}));
-    if (!state.game.supported) notices.push(UI.notice({tone: "warning", title: "Locate " + plugin.portName, message: "Choose the " + plugin.portName + " installation on the main menu."}));
+    if (!state.game.supported) notices.push(UI.notice({tone: "warning", title: "Set up " + (state.game.runtime?.runtime || plugin.portName),
+      message: state.game.runtime?.message || "Choose the " + plugin.portName + " installation on the main menu."}));
     else if (state.game.running) notices.push(UI.notice({tone: "warning", title: plugin.portName + " is running", message: "Close the game, then refresh this page before changing settings."}));
     const body = [...new Set(state.preferences.fields.map(spec => spec.section))].map(section =>
       UI.detailSection({title: section, body: state.preferences.fields.filter(spec => spec.section === section).map(field)}));
@@ -81,10 +82,12 @@
   }
 
   function info() {
-    main.replaceChildren(UI.detailPanel({title: plugin.name, paginate: true, body: [
+    main.replaceChildren(UI.detailPanel({className: "lex-information-panel", title: plugin.name, paginate: true, body: [
       UI.detailSection({title: "Installation", body: [
         UI.detailField({label: "Game", control: UI.readonlyField(plugin.gameIdentity)}),
         UI.detailField({label: "Port", control: UI.readonlyField(state.game.root)}),
+        ...(state.game.runtime ? [UI.detailField({label: "Port version", control: UI.readonlyField(
+          state.game.runtime.installed ? state.game.runtime.pinned || state.game.runtime.version : "Not installed")})] : []),
         UI.detailField({label: "Settings and saves", control: UI.readonlyField(state.game.dataRoot)})
       ]}),
       UI.modLoaderSection(plugin.modLoading)

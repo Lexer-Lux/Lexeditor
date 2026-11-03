@@ -9,14 +9,15 @@ import tempfile
 from core.mod_library import digest, file_tree, package_root
 from core.plugin_files import atomic_write, fetch_file, is_link
 from core.plugin_manifest import install_spec
-from . import model
+from core.native_port_settings import read_json
 
 PIN = json.loads(Path(__file__).with_name("fork.json").read_text(encoding="utf-8"))
 RECEIPT = ".lexeditor-port-files.json"
 BACKUP = ".lexeditor-port-backup.json"
 CRITICAL = ("Verdite2.exe", "bin/Verdite2.dll", *install_spec(__file__).required_paths,
             "content/src/patches/SeparateRun.cs",
-            "content/src/patches/ViewDistanceFade.cs", "content/manifest.txt")
+            "content/src/patches/ViewDistanceFade.cs", "content/src/patches/ControlProfiles.cs",
+            "content/src/patches/NativeNotifications.cs", "content/manifest.txt")
 
 
 def _write(path: Path, value: dict) -> None:
@@ -39,8 +40,8 @@ def _paths(root: Path) -> tuple[Path, Path]:
 
 
 def _verify_owned(root: Path) -> dict:
-    marker = model.read_json(root / "lexeditor-port.json")
-    receipt = model.read_json(root / RECEIPT)
+    marker = read_json(root / "lexeditor-port.json")
+    receipt = read_json(root / RECEIPT)
     if marker.get("repository") != PIN["repository"] or receipt.get("repository") != PIN["repository"]:
         raise ValueError("This folder is not a managed Lexer Verdite2 fork; choose a separate folder")
     hashes = receipt.get("files")
@@ -63,8 +64,8 @@ def status(root: Path | None) -> dict:
         if _paths(root)[0].exists():
             result["message"] = "Repair the interrupted fork installation before opening the editor."
             return result
-        marker = model.read_json(root / "lexeditor-port.json")
-        receipt = model.read_json(root / RECEIPT)
+        marker = read_json(root / "lexeditor-port.json")
+        receipt = read_json(root / RECEIPT)
         result["version"] = marker.get("version", "")
         exact = all(marker.get(key) == PIN[key] for key in ("repository", "sourceRevision", "serial", "version", "tag"))
         hashes = receipt.get("files", {})
@@ -85,7 +86,7 @@ def _discard_backup(path: Path) -> None:
         return
     if is_link(path):
         raise ValueError("The fork backup is linked; it was preserved")
-    record = model.read_json(path / BACKUP)
+    record = read_json(path / BACKUP)
     actual = _tree(path)
     actual.pop(BACKUP, None)
     if record.get("repository") != PIN["repository"] or actual != record.get("files"):
@@ -95,7 +96,7 @@ def _discard_backup(path: Path) -> None:
 
 def _verify_stage(stage: Path) -> None:
     """An incomplete copy can be retried, but never erase edits to that copy."""
-    receipt = model.read_json(stage / RECEIPT)
+    receipt = read_json(stage / RECEIPT)
     expected = receipt.get("stageFiles", {})
     if receipt.get("repository") != PIN["repository"] or not isinstance(expected, dict) or not expected:
         raise ValueError("Unrecognized staged fork; it was preserved")
@@ -107,12 +108,13 @@ def _verify_stage(stage: Path) -> None:
 
 def recover(root: Path) -> None:
     """Recover a folder swap after a process exit; refuse later external edits."""
+    from .model import MODEL
     root = _safe_root(root)
     journal, stage = _paths(root)
     if not journal.exists():
         return
-    model.ensure_closed()
-    state = model.read_json(journal)
+    MODEL.ensure_closed()
+    state = read_json(journal)
     if state.get("repository") != PIN["repository"]:
         raise ValueError("Unrecognized fork installation journal")
     backup = root.with_name(root.name + (".lexeditor-original" if state["original"] else ".lexeditor-previous"))
@@ -147,8 +149,9 @@ def recover(root: Path) -> None:
 
 
 def install(root: Path) -> dict:
-    with model.LOCK:
-        model.ensure_closed()
+    from .model import MODEL
+    with MODEL.lock:
+        MODEL.ensure_closed()
         root = _safe_root(root)
         root.parent.mkdir(parents=True, exist_ok=True)
         recover(root)
@@ -179,7 +182,7 @@ def install(root: Path) -> dict:
                         raise ValueError("The unpacked fork exceeds its size limit")
                     if not all((package / name).is_file() for name in CRITICAL):
                         raise ValueError("The fork package is incomplete")
-                    marker = model.read_json(package / "lexeditor-port.json")
+                    marker = read_json(package / "lexeditor-port.json")
                     if any(marker.get(key) != PIN[key] for key in ("repository", "sourceRevision", "serial", "version", "tag")):
                         raise ValueError("The fork package identifies a different build")
                     hashes = _tree(package)
@@ -205,7 +208,7 @@ def install(root: Path) -> dict:
             if before:
                 _discard_backup(backup)
             _write(journal, {"repository": PIN["repository"], "original": original, "before": before, "after": after})
-            model.ensure_closed()
+            MODEL.ensure_closed()
             if root.exists():
                 if before:
                     root.rename(backup)

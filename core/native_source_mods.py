@@ -30,8 +30,9 @@ def _folder(name: str) -> str:
 
 
 class NativeSourceModAdapter:
-    def __init__(self, model: NativePortSettings):
+    def __init__(self, model: NativePortSettings, *, priority_key: str | None = "mods.{id}.priority"):
         self.model = model
+        self.priority_key = priority_key
 
     verified = False
     message = "The native port's built-in C# source-mod loader. Close the game before changing mods. Installed-game acceptance is still in progress."
@@ -73,7 +74,23 @@ class NativeSourceModAdapter:
             return
         self.model.ensure_closed()
         state = self.model.read_json(recovery / "transaction.json")
+        expected = {"transaction.json", "interface.before", "ledger.before", "mods"}
+        if {path.name for path in recovery.iterdir()} != expected:
+            raise ValueError("Recovery copy was edited; preserve its added or missing files before continuing")
+        for name, before in (("interface.ini", "interface.before"), (LEDGER, "ledger.before")):
+            if self.model.fingerprint(self.model.read_bytes(recovery / before)) != state["before"][name]:
+                raise ValueError(f"Recovery copy {before} was edited; recovery was preserved")
+        backups = recovery / "mods"
+        names = {path.name for path in backups.iterdir()}
+        if names - state["old"].keys():
+            raise ValueError("Recovery copy contains unrecognized mod files; recovery was preserved")
+        for name in names:
+            folder = backups / _folder(name)
+            if not folder.is_dir() or _tree(folder) != state["old"][name]["files"]:
+                raise ValueError(f"Recovery copy {name} was edited; recovery was preserved")
         if state.get("phase") == "committed":
+            if names != state["old"].keys():
+                raise ValueError("Recovery copy is incomplete; recovery was preserved")
             shutil.rmtree(recovery)
             return
         old, new = state["old"], state["new"]
@@ -137,7 +154,9 @@ class NativeSourceModAdapter:
                 name = "lexeditor-" + identity
                 if (native / name).exists() and name not in old:
                     raise ValueError(f"{name} already exists outside Lexeditor")
-                keys = {f"mods.{identity}.enabled".casefold(): "True", f"mods.{identity}.priority".casefold(): str(priority)}
+                keys = {f"mods.{identity}.enabled".casefold(): "True"}
+                if self.priority_key is not None:
+                    keys[self.priority_key.format(id=identity).casefold()] = str(priority)
                 before = old[name]["before"] if name in old else {key: values.get(key) for key in keys}
                 new[name] = {"id": identity, "source": str(folder.resolve()), "files": _tree(folder), "before": before}
                 changes.update(keys)
@@ -163,8 +182,10 @@ class NativeSourceModAdapter:
                 recovery.mkdir()
                 (recovery / "mods").mkdir()
                 self.model.atomic_write(recovery / "interface.before", raw_interface)
-                self.model.atomic_write(recovery / "ledger.before", self.model.read_bytes(data / LEDGER))
+                raw_ledger = self.model.read_bytes(data / LEDGER)
+                self.model.atomic_write(recovery / "ledger.before", raw_ledger)
                 transaction = {"phase": "applying", "old": old, "new": new,
+                               "before": {"interface.ini": self.model.fingerprint(raw_interface), LEDGER: self.model.fingerprint(raw_ledger)},
                                "after": {"interface.ini": self.model.fingerprint(after_interface), LEDGER: self.model.fingerprint(after_ledger)}}
                 self.model.atomic_write(recovery / "transaction.json", _json(transaction))
                 try:
@@ -179,7 +200,7 @@ class NativeSourceModAdapter:
                 except BaseException:
                     self.recover(game_root)
                     raise
-                shutil.rmtree(recovery)
+                self.recover(game_root)
             return {"activated": [folder.name for folder in mods], "mods": self.active_mod_ids(game_root), "dataRoot": str(data)}
 
     def active_mod_ids(self, game_root: Path) -> list[str]:

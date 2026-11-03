@@ -14,7 +14,7 @@ def loader_details(model: NativePortSettings, app_root: Path) -> dict:
     return {"loader": loading["loader"], "output": loading["structure"],
             "order": loading["overriding"],
             "safety": "Lexeditor preserves saves, disc data and external mods. Settings and deployment require the game to be closed.",
-            **model.native["modLoading"]}
+            "removal": model.native["modLoading"]["removal"]}
 
 
 def data_map(model: NativePortSettings) -> dict:
@@ -27,7 +27,7 @@ def data_map(model: NativePortSettings) -> dict:
          "status": "partial", "coverage": "structured", "target": "mods", "openable": True},
         {"filename": "settings.json", "controls": "Keyboard/controller bindings and native runtime configuration.",
          "notes": "Edit bindings in the native Input menu. Source-mod deployment leaves this file unchanged.",
-         "status": "partial", "coverage": "structured", "target": "settings", "openable": True},
+         "status": "not-integrated", "coverage": "unavailable", "target": None, "openable": False},
         {"filename": "carda.sav / cardb.sav", "controls": "Memory-card saves.",
          "notes": "Lexeditor does not edit saves.", "status": "not-integrated", "coverage": "unavailable", "target": None, "openable": False},
         {"filename": "Disc: " + model.native["configIdentity"][0], "controls": "Items, characters, enemies, maps, scripts, models, textures and audio.",

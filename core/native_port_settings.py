@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import tempfile
 import threading
+from collections.abc import Callable
 
 from core.plugin_manifest import manifest
 from core.process_probe import live_processes
@@ -101,11 +102,12 @@ def updated_ini(raw: bytes, changes: dict[str, str | None]) -> bytes:
 
 
 class NativePortSettings:
-    def __init__(self, plugin_file: str, fields: tuple[dict, ...]):
+    def __init__(self, plugin_file: str, fields: tuple[dict, ...], *, readiness: Callable[[Path], dict] | None = None):
         self.descriptor = manifest(plugin_file)
         self.native = self.descriptor["nativePort"]
         self.fields = fields
         self.lock = threading.RLock()
+        self.readiness = readiness
 
     def data_root(self) -> Path:
         return Path(os.environ.get(self.native["dataEnv"]) or
@@ -126,8 +128,12 @@ class NativePortSettings:
         if supported:
             config = read_bytes(root / self.native["configPath"]).decode("utf-8-sig")
             supported = all(json.dumps(value) in config for value in self.native["configIdentity"])
-        return {"root": str(root), "supported": supported, "missing": missing,
-                "dataRoot": str(self.data_root()), "running": bool(live_processes(tuple(self.descriptor["processNames"])))}
+        state = {"root": str(root), "supported": supported, "missing": missing,
+                 "dataRoot": str(self.data_root()), "running": bool(live_processes(tuple(self.descriptor["processNames"])))}
+        if self.readiness is not None:
+            state["runtime"] = self.readiness(root)
+            state["supported"] = supported and state["runtime"]["installed"]
+        return state
 
     def preferences(self, root: Path) -> dict:
         raw = read_bytes(root / "interface.ini")

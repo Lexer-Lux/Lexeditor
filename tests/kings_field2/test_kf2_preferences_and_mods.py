@@ -9,7 +9,8 @@ import zipfile
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from plugins.kings_field2 import model
+from plugins.kings_field2.model import MODEL as model
+from core import native_port_settings as native_settings
 from plugins.kings_field2 import port
 from plugins.kings_field2.mod_support import LEDGER, RECOVERY, VerditeModAdapter
 
@@ -58,8 +59,8 @@ def setup(tmp_path, monkeypatch):
                                                "files": port._tree(game)}))
     (data / "settings.json").write_text(json.dumps({"ActiveMods": ["external.map"], "Unmodeled": {"keep": 42}}))
     (data / "interface.ini").write_text("[RecompOne]\nmods.external.map.enabled=True\nkf2.mouse.turn=1\n[Docking][Data]\nDockNode=0x1\n")
-    monkeypatch.setenv("LEXEDITOR_KF2_DATA", str(data))
-    monkeypatch.setattr(model, "live_processes", lambda _: [])
+    monkeypatch.setenv("VERDITE2_DATA", str(data))
+    monkeypatch.setattr(native_settings, "live_processes", lambda _: [])
     return game, data, library
 
 
@@ -73,8 +74,8 @@ def mod(library, name="example"):
 
 def test_ini_noop_is_byte_exact_and_changes_preserve_other_sections():
     raw = b"\xef\xbb\xbf; head\r\n[RecompOne]\r\n  kf2.mouse.turn =1\r\nMystery = keep\r\n[Window][Output]\r\nPos=12,34\r\n"
-    assert model.updated_ini(raw, {}) == raw
-    output = model.updated_ini(raw, {"kf2.mouse.turn": "2", "kf2.mouse.look": "3"})
+    assert native_settings.updated_ini(raw, {}) == raw
+    output = native_settings.updated_ini(raw, {"kf2.mouse.turn": "2", "kf2.mouse.look": "3"})
     assert output == raw.replace(b"kf2.mouse.turn =1", b"kf2.mouse.turn =2").replace(b"[Window]", b"kf2.mouse.look=3\r\n[Window]")
 
 
@@ -97,7 +98,7 @@ def test_preferences_save_is_bounded_preserves_unknowns_and_refuses_stale(setup)
 def test_duplicate_ini_facts_are_rejected():
     for text in ("[RecompOne]\na=1\na=2\n", "[RecompOne]\na=1\n[RecompOne]\na=2\n"):
         with pytest.raises(ValueError, match="repeat|duplicate"):
-            model.ini_values(text)
+            native_settings.ini_values(text)
 
 
 def test_distance_and_smooth_fade_persist_independently(setup):
@@ -118,13 +119,49 @@ def test_running_game_is_never_modified(setup, monkeypatch):
     game, data, library = setup
     source = mod(library)
     before = (data / "settings.json").read_bytes()
-    monkeypatch.setattr(model, "live_processes", lambda _: [{"pid": 123}])
-    with pytest.raises(ValueError, match="Close Verdite2"):
+    monkeypatch.setattr(native_settings, "live_processes", lambda _: [{"pid": 123}])
+    with pytest.raises(ValueError, match="Close the game"):
         VerditeModAdapter().activate([source], game)
-    with pytest.raises(ValueError, match="Close Verdite2"):
+    with pytest.raises(ValueError, match="Close the game"):
         model.save_preferences(data, {}, model.fingerprint(b""))
     assert (data / "settings.json").read_bytes() == before
     assert not (data / LEDGER).exists()
+
+
+def test_shared_service_refuses_unpinned_port_and_does_not_claim_binding_edits(setup, monkeypatch):
+    from http.server import ThreadingHTTPServer
+    import threading
+    from urllib.error import HTTPError
+    from urllib.request import Request, urlopen
+    from core.native_port_http import data_map, handler
+
+    game, data, _ = setup
+    monkeypatch.setenv(model.descriptor["installation"]["rootEnv"], str(game))
+    assert model.installation(game)["supported"]
+    marker = json.loads((game / "lexeditor-port.json").read_text())
+    marker["tag"] = "a-different-native-build"
+    (game / "lexeditor-port.json").write_text(json.dumps(marker))
+    assert not model.installation(game)["supported"]
+    row = next(row for row in data_map(model)["rows"] if row["filename"] == "settings.json")
+    assert row["status"] == "not-integrated" and not row["openable"]
+    before = (data / "interface.ini").read_bytes()
+    source = Path(__file__).resolve().parents[2] / "plugins/kings_field2/server.py"
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler(model, str(source)))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        payload = json.dumps({"changes": {"kf2.mouse.turn": 2},
+                              "fingerprint": model.preferences(data)["fingerprint"]}).encode()
+        with pytest.raises(HTTPError) as error:
+            urlopen(Request(f"http://127.0.0.1:{server.server_port}/api/preferences", data=payload,
+                            headers={"Content-Type": "application/json"}), timeout=5)
+        assert error.value.code == 400
+        assert (data / "interface.ini").read_bytes() == before
+        assert not (data / "interface.ini.lexeditor-previous").exists()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
 
 def test_activation_and_removal_preserve_native_mods_and_settings(setup):
@@ -143,9 +180,9 @@ def test_activation_and_removal_preserve_native_mods_and_settings(setup):
     assert not (data / "mods/lexeditor-example").exists()
     settings = json.loads((data / "settings.json").read_text())
     assert settings == {"ActiveMods": ["external.map"], "Unmodeled": {"keep": 42}}
-    values = model.ini_values((data / "interface.ini").read_text())
+    values = native_settings.ini_values((data / "interface.ini").read_text())
     assert values["mods.external.map.enabled"] == "True"
-    assert values["mods.example.enabled"] == "False"
+    assert "mods.example.enabled" not in values
     assert values["kf2.mouse.turn"] == "1"
     assert adapter.active_mod_ids(game) == ["external.map"]
     assert (native / "mod.json").read_bytes() == original

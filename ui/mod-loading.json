@@ -92,7 +92,7 @@
       "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
     },
     "kings-field3": {
-      "loader": "Verdite3 / RecompOne's built-in C# source-mod compiler and runtime hook loader.",
+      "loader": "Verdite3 / RecompOne's built-in C# source-mod compiler and runtime hook loader. Play starts the installed Verdite3 launcher. First launch compiles from the player's SLUS-00255 disc.",
       "structure": "One folder per source mod with mod.json and C# source. Lexeditor deploys owned copies into the port's native mods folder.",
       "overriding": "The Lexer fork orders mods by priority then native id, with dependencies loaded first. Lexeditor changes its owned enable flags and priorities in interface.ini and preserves external mod settings. Hook compatibility is not inferred from filenames."
     },

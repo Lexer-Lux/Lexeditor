@@ -15208,14 +15208,18 @@ ${contents.path}`});
     ["SAFETY", "safety", "What Lexeditor never modifies in the installed game."],
     ["REMOVING", "removal", "How to take the changes back out."],
   ];
-  const modLoaderSection = (spec = {}) => detailSection({
-    title: "MOD LOADER",
-    body: MOD_LOADER_FIELDS.map(([label, key, fallback]) => detailField({
-      label,
-      control: readonlyField(String(spec[key] || "").trim() || fallback),
-      help: infoHelp(fallback),
-    })),
-  });
+  const modLoaderSection = (spec = {}) => {
+    const section = detailSection({
+      title: "MOD LOADER",
+      body: MOD_LOADER_FIELDS.map(([label, key, fallback]) => detailField({
+        label,
+        control: readonlyField(String(spec[key] || "").trim() || fallback),
+        help: infoHelp(fallback),
+      })),
+    });
+    section.classList.add("lex-plugin-mod-loading");
+    return section;
+  };
 
   const dataMapState = new Map();
   const dataMap = options => {

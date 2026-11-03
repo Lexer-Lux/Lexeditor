@@ -6,6 +6,7 @@
   <title>Lexeditor</title>
   <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
   <link rel="stylesheet" href="/shared/framework.css">
+  <link rel="stylesheet" href="/shared/native-port.css">
 </head>
 <body>
   <header id="lexeditor-shell"></header>

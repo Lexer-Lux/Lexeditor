@@ -12,7 +12,7 @@ payloads belong in the user's mod library and that distribution repository.
 ## Settings, deployment and loader
 
 Native data defaults to LocalAppData/Verdite2. VERDITE2_DATA selects another
-native data directory; LEXEDITOR_KF2_DATA selects the editor adapter's directory.
+data directory for both the native port and editor adapter.
 Diagnostics must point both at the same private copy when using both processes.
 
 The native loader enables IDs through interface.ini, section RecompOne,

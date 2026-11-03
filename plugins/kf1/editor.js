@@ -1,6 +1,6 @@
 "use strict";
 const {el,detailPanel,actionRow,stack,notice}=LexeditorUI;
-let tab="settings",config=null,saved=null,error="",mapRows=[],query="";
+let tab="settings",config=null,saved=null,error="",mapRows=[],query="",loading={};
 const mapState={page:0,query:"",status:"",sort:["filename",1]};
 async function request(path,body){
   const response=await fetch(path,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -26,6 +26,9 @@ function render(){
     main.replaceChildren(LexeditorUI.settingsColumns([
       detailPanel({title:"King's Field I",body:["Japanese 1994 release, SLPS-00017. English fan translation."]}),
       detailPanel({title:"Verdite1",help:"This setup uses the existing archive/recomp port. F1 opens its native settings. F2 opens Debug Tools only when that optional mod is enabled; this build has no Remaster Editor.",body:[el("a",{href:"https://github.com/Lexer-Lux/verdite1/tree/codex/kf1-settings",target:"_blank",rel:"noreferrer"},"Port source")]}),
+      LexeditorUI.modLoaderSection({loader:loading.loader,output:loading.structure,order:loading.overriding,
+        safety:"Mod setup leaves disc data, game binaries and memory cards unchanged.",
+        removal:"Disable it in Mods with the game closed. The native loader leaves disabled library folders unloaded."}),
       LexeditorUI.creditsPanel("kf1")
     ]));
   }else if(!config){
@@ -45,5 +48,6 @@ const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",pl
   help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",info:()=>navigate("info"),infoActive:()=>tab==="info",
   dirtyCount:dirty,save,discard:reload,readonly:()=>false,
   projectSnapshot:async()=>({canCreate:false,projects:[]})});
-Promise.all([reload(),request("/api/data-map").then(value=>{mapRows=value.rows;})])
+Promise.all([reload(),request("/api/data-map").then(value=>{mapRows=value.rows;}),
+  request("/shared/mod-loading.json").then(value=>{loading=value.plugins.kf1;})])
   .catch(problem=>{error=problem.message;render();}).finally(()=>LexeditorUI.finishPluginLoading());
