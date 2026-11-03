@@ -237,7 +237,7 @@ class ScriptModTests(unittest.TestCase):
             write(path, data)
 
         with mock.patch.object(script_mods, "atomic_write", side_effect=fail_manifest):
-            with self.assertRaisesRegex(OSError, "simulated manifest failure"):
+            with self.assertRaisesRegex(script_mods.ScriptModInfrastructureError, "simulated manifest failure"):
                 self.build()
         self.assertEqual(patch.read_bytes(), old_patch)
         self.assertEqual(manifest.read_bytes(), old_manifest)
@@ -256,7 +256,7 @@ class ScriptModTests(unittest.TestCase):
             write(path, data)
 
         with mock.patch.object(script_mods, "atomic_write", side_effect=fail_manifest):
-            with self.assertRaises(OSError):
+            with self.assertRaises(script_mods.ScriptModInfrastructureError):
                 self.build()
         self.assertEqual(extra.read_bytes(), bytes([60]))
         self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(), "00 = 3C")
@@ -277,6 +277,54 @@ class ScriptModTests(unittest.TestCase):
         with mock.patch.object(script_mods, "atomic_write", side_effect=fail_after_first_write):
             with self.assertRaisesRegex(script_mods.ScriptModError, "Build failed: disk unavailable; .*rollback failed"):
                 self.build()
+
+    def test_batch_write_failure_rolls_back_without_disabling_healthy_mods(self):
+        from core.mod_builds import activate_with_recovery
+        second = make_mod(self.dir / 'library', 'Second')
+        for root in (self.mod, second):
+            (root/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+            self.build(root)
+            script_mods.save_values(root, {'amount': 60})
+        metadata = {root: (root/'mod.json').read_bytes() for root in (self.mod, second)}
+        originals = {root: (root/'hext/ff8/en_nv/patch.txt').read_bytes() for root in metadata}
+        write = script_mods.atomic_write
+        def fail_second_manifest(path, data):
+            if path == second/script_mods.MANIFEST_FILE:
+                raise OSError('disk unavailable')
+            return write(path, data)
+        class Context(list):
+            pass
+        class Adapter:
+            def activate(self, active, game):
+                script_mods.build_batch([script_mods.catalog_row(root) for root in active],
+                                       Context(), allowed_roots=('hext','direct'))
+                return {}
+        with mock.patch.object(script_mods, 'atomic_write', side_effect=fail_second_manifest):
+            try:
+                outcome = activate_with_recovery(Adapter(), list(metadata), self.dir)
+            except script_mods.ScriptModError as failure:
+                self.assertFalse(failure.folders)
+            else:
+                self.fail(f'Activation unexpectedly succeeded: {outcome}')
+        for root in metadata:
+            self.assertEqual((root/'mod.json').read_bytes(), metadata[root])
+            self.assertEqual((root/'hext/ff8/en_nv/patch.txt').read_bytes(), originals[root])
+            self.assertFalse((root/'direct/extra.bin').exists())
+
+    def test_unreadable_rollback_snapshot_does_not_blame_the_mod(self):
+        (self.mod/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+        self.build()
+        target = self.mod/'hext/ff8/en_nv/patch.txt'
+        read = Path.read_bytes
+        def unavailable(path):
+            if path == target:
+                raise PermissionError('snapshot file is busy')
+            return read(path)
+        with mock.patch.object(Path, 'read_bytes', unavailable):
+            with self.assertRaises(script_mods.ScriptModError) as caught:
+                script_mods.build_batch([script_mods.catalog_row(self.mod)], [], allowed_roots=('hext','direct'))
+        self.assertFalse(caught.exception.folders)
+        self.assertEqual(target.read_text(), '00 = 0A')
 
 
 if __name__ == "__main__":
