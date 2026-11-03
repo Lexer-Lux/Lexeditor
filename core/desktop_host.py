@@ -1425,15 +1425,16 @@ class HostApi:
         from core.mod_library import ModLibrary
         if not self.mod_library_status(plugin_id)["canManage"]:
             raise ValueError("Mod management is not supported for this game yet")
-        library = ModLibrary(Path(self.mod_library_location()["root"]))
+        game_library = self._game_mods(plugin_id)
+        library = ModLibrary(game_library.parent)
         source_path = Path(source).resolve()
-        if source_path.parent != (library.root / plugin_id).resolve():
+        if source_path.parent != game_library.resolve():
             raise ValueError("Choose a mod in this game's library")
         adapter = self._mod_adapter(plugin_id)
         if adapter is None:
             raise ValueError("This game does not support editable mod copies yet")
         with self._mod_library_lock:
-            target = library.import_mod(plugin_id, source_path, adapter, name, prepare_editable=True)
+            target = library.import_mod(game_library.name, source_path, adapter, name, prepare_editable=True)
             project = self._projects.select(plugin_id, str(target))
         return self._restart_for_project(plugin_id, project)
 
@@ -1447,7 +1448,7 @@ class HostApi:
         """
         from core import mods_service
         try:
-            library = mods_service.library_rows(self._game_mods(plugin_id))
+            library = self._mod_rows(plugin_id)
         except (OSError, ValueError):
             return
         _plugin, spec = self._projects._spec(plugin_id)
@@ -1625,8 +1626,9 @@ class HostApi:
         if adapter is None or not self.mod_library_status(plugin_id)["canManage"]:
             raise ValueError("Mod management is not supported for this game yet")
         with self._mod_library_lock:
-            target = ModLibrary(Path(self.mod_library_status(plugin_id)["root"])).import_mod(
-                plugin_id, Path(source), adapter, name, data_root, selected, details=details)
+            game_library = self._game_mods(plugin_id)
+            target = ModLibrary(game_library.parent).import_mod(
+                game_library.name, Path(source), adapter, name, data_root, selected, details=details)
         return {"path": str(target), "name": name}
 
     def choose_mod_package(self, plugin_id: str, kind: str = "folder") -> dict:
@@ -1705,7 +1707,7 @@ class HostApi:
                 if not author and game:
                     try:
                         from core import mods_service
-                        rows = mods_service.library_rows(self._game_mods(plugin_id))
+                        rows = self._mod_rows(plugin_id)
                         managed = next((row for row in rows
                                         if Path(row["path"]).name == plugin.managed_mod.folder_name), None)
                         if managed is not None and managed["enabled"]:
@@ -1733,7 +1735,7 @@ class HostApi:
         game = self._installations.snapshot(plugin_id).get("root")
         if not game:
             raise ValueError("Locate the game first")
-        library = (Path(status["root"]) / relative_path(plugin_id)).resolve()
+        library = self._game_mods(plugin_id).resolve()
         roots = [Path(path).resolve() for path in paths]
         if len(set(roots)) != len(roots) or any(path.parent != library for path in roots):
             raise ValueError("Choose each mod once from this game's library")
@@ -1781,7 +1783,23 @@ class HostApi:
     def _game_mods(self, plugin_id: str) -> Path:
         from core import mods_service
         self._library_plugin(plugin_id)
+        adapter = self._mod_adapter(plugin_id)
+        native_root = getattr(adapter, "library_root", None)
+        if native_root:
+            game = self._installations.snapshot(plugin_id).get("root")
+            if game:
+                return Path(native_root(Path(game))).resolve()
         return mods_service.game_library(Path(self.mod_library_location()["root"]), plugin_id)
+
+    def _mod_state(self, plugin_id: str):
+        adapter = self._mod_adapter(plugin_id)
+        read = getattr(adapter, "library_state", None)
+        game = self._installations.snapshot(plugin_id).get("root") if read else None
+        return read(Path(game)) if game else None
+
+    def _mod_rows(self, plugin_id: str) -> list[dict]:
+        from core import mods_service
+        return mods_service.library_rows(self._game_mods(plugin_id), self._mod_state(plugin_id))
 
     def _mods_downloads(self):
         from core import mods_service
@@ -1828,10 +1846,11 @@ class HostApi:
         from core import mods_service
         root = self._game_mods(plugin_id)
         plugin = self._plugins[plugin_id]
-        result = mods_service.overview(root, plugin.lexmod)
+        result = mods_service.overview(root, plugin.lexmod, self._mod_state(plugin_id))
         status = self.mod_library_status(plugin_id)
         result = {**result, "root": str(root), "canManage": bool(status.get("canManage")),
                   "message": status.get("message", ""),
+                  "canReorder": self._mod_state(plugin_id) is None or bool(getattr(self._mod_adapter(plugin_id), "priority_key", None)),
                   "canExport": callable(getattr(self._mod_adapter(plugin_id), "export_release", None))}
         self._attach_mod_marks(plugin_id, result)
         return result
@@ -1945,6 +1964,8 @@ class HostApi:
         from core import mod_metadata, mods_service
         folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
         mod_metadata.write(folder, details)
+        if self._mod_state(plugin_id) is not None:
+            return next(row for row in self._mod_rows(plugin_id) if Path(row["path"]).resolve() == folder)
         return mods_service.mod_row(folder)
 
     def set_mod_enabled(self, plugin_id: str, path: str, enabled: bool) -> dict:
@@ -1953,12 +1974,22 @@ class HostApi:
         with self._mod_library_lock:
             root = self._game_mods(plugin_id)
             folder = mods_service.checked_mod(root, path)
-            mod_requires.check_changes(root, {mod_requires.mod_id(folder): enabled})
+            state = self._mod_state(plugin_id)
+            mod_requires.check_changes(root, {mod_requires.mod_id(folder): enabled}, state=state)
+            if state is not None:
+                if type(enabled) is not bool:
+                    raise ValueError("A mod is on or off")
+                paths = [
+                    row["path"] for row in self._mod_rows(plugin_id)
+                    if (enabled if Path(row["path"]).resolve() == folder else row["enabled"])]
+                activation = self._activate_mods(plugin_id, paths) or {}
+                row = next(row for row in self._mod_rows(plugin_id) if Path(row["path"]).resolve() == folder)
+                return {**row, "disabledMods": activation.get("disabledMods", [])}
             was = bool(mods_service.mod_row(folder).get("enabled"))
             mods_service.set_enabled(folder, enabled)
             activation = {}
             if self._mod_adapter(plugin_id) is not None and self.mod_library_status(plugin_id).get("canManage"):
-                enabled_paths = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
+                enabled_paths = [row["path"] for row in self._mod_rows(plugin_id) if row["enabled"]]
                 try:
                     activation = self._activate_mods(plugin_id, enabled_paths) or {}
                 except Exception:
@@ -1975,6 +2006,17 @@ class HostApi:
         the next activation, as with the selector's own moves.
         """
         from core import mods_service
+        if self._mod_state(plugin_id) is not None:
+            if type(delta) is not int:
+                raise ValueError("A mod moves by whole places")
+            folder = mods_service.checked_mod(self._game_mods(plugin_id), path)
+            reorder = getattr(self._mod_adapter(plugin_id), "reorder_mod", None)
+            if not reorder:
+                raise ValueError("This native loader determines mod order from dependencies and IDs")
+            with self._mod_library_lock:
+                game = self._installations.snapshot(plugin_id)["root"]
+                reorder(folder, delta, Path(game))
+            return next(row for row in self._mod_rows(plugin_id) if Path(row["path"]).resolve() == folder)
         return mods_service.move(self._game_mods(plugin_id), path, delta)
 
     def save_mod_settings(self, plugin_id: str, path: str, values: dict) -> dict:
@@ -1988,7 +2030,7 @@ class HostApi:
             # does. While the bundle is off the saved tick waits for its switch.
             if (mods_service.mod_row(folder).get("enabled") and self._mod_adapter(plugin_id) is not None
                     and self.mod_library_status(plugin_id).get("canManage")):
-                self._activate_mods(plugin_id, [row["path"] for row in mods_service.library_rows(root)
+                self._activate_mods(plugin_id, [row["path"] for row in self._mod_rows(plugin_id)
                                                 if row["enabled"]])
         else:
             script_mods.save_values(folder, values)
@@ -2000,7 +2042,7 @@ class HostApi:
         root = self._game_mods(plugin_id)
         if self._mod_adapter(plugin_id) is None or not self.mod_library_status(plugin_id).get("canManage"):
             return {"activated": False}
-        enabled = [row["path"] for row in mods_service.library_rows(root) if row["enabled"]]
+        enabled = [row["path"] for row in self._mod_rows(plugin_id) if row["enabled"]]
         result = self._activate_mods(plugin_id, enabled) or {}
         return {"activated": True, "mods": len(enabled), 'disabledMods': result.get('disabledMods', [])}
 

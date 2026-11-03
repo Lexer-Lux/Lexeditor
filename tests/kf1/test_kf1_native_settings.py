@@ -17,7 +17,7 @@ def test_standalone_port_is_a_valid_shared_installation(tmp_path):
     assert PLUGIN.installation.steam_app_id == ""
     downloads = []
     cache = CoverArtCache({"kf1": PLUGIN}, root=tmp_path / "covers", steam_roots=(), fetcher=lambda url: downloads.append(url))
-    assert cache.snapshot("kf1")["state"] == "unavailable"
+    assert cache.snapshot("kf1")["state"] == "ready"
     assert not downloads
 
 
@@ -135,7 +135,7 @@ def test_classic_comes_from_pinned_native_asset(port):
 
 
 def test_native_mod_library_activation_and_removal_need_no_copies(port, tmp_path):
-    library = tmp_path / "library"
+    library = port / "mods"
     mods = []
     for name in ("first", "second"):
         folder = library / name
@@ -146,7 +146,7 @@ def test_native_mod_library_activation_and_removal_need_no_copies(port, tmp_path
     adapter = Kf1ModAdapter()
     adapter.activate(mods, port)
     assert sorted(adapter.active_mod_ids(port)) == ["first", "second"]
-    assert not (port / "mods").exists()
+    assert adapter.library_root(port) == library
     adapter.activate([], port)
     assert adapter.active_mod_ids(port) == []
     assert (mods[0] / "Test.cs").is_file()

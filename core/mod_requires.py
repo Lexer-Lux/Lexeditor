@@ -85,7 +85,7 @@ def _stored_mods(library: Path):
         yield folder, stored
 
 
-def _states(library: Path) -> tuple[dict[str, bool], dict[str, str], dict[str, Path]]:
+def _states(library: Path, state: dict | None = None) -> tuple[dict[str, bool], dict[str, str], dict[str, Path]]:
     """The library's mods by id: whether each is on, its name, its folder.
 
     Two mods sharing an id count as on when either is: ids are matched, not
@@ -96,7 +96,8 @@ def _states(library: Path) -> tuple[dict[str, bool], dict[str, str], dict[str, P
     folders: dict[str, Path] = {}
     for folder, stored in _stored_mods(library):
         mod = str(stored.get("id") or folder.name)
-        enabled[mod] = enabled.get(mod, False) or stored.get("enabled") is True
+        on = stored.get("enabled") is True if state is None else state.get(folder.name, {}).get("enabled", False)
+        enabled[mod] = enabled.get(mod, False) or on
         names.setdefault(mod, display_name(folder))
         folders.setdefault(mod, folder)
     return enabled, names, folders
@@ -111,7 +112,7 @@ def _describe(needs: list[str], enabled: dict[str, bool]) -> str:
     return " and ".join(parts)
 
 
-def check_changes(library: Path, changes: dict[str, bool]) -> None:
+def check_changes(library: Path, changes: dict[str, bool], *, state: dict | None = None) -> None:
     """Refuse switches that would leave a changed mod's needs unmet.
 
     Only the switched mods are judged, against the library as it would be
@@ -122,7 +123,7 @@ def check_changes(library: Path, changes: dict[str, bool]) -> None:
     library = Path(library)
     if not isinstance(changes, dict):
         raise ValueError("Switches must map mod ids to on or off")
-    enabled, names, folders = _states(library)
+    enabled, names, folders = _states(library, state)
     planned = dict(enabled)
     for mod, on in changes.items():
         if type(on) is not bool:
@@ -194,7 +195,7 @@ def unmet_lines(library: Path) -> dict[str, list[str]]:
     return lines
 
 
-def table(library: Path) -> dict[str, dict]:
+def table(library: Path, *, state: dict | None = None) -> dict[str, dict]:
     """Each mod folder's needs with their library state, by resolved folder.
 
     One entry per need: its id, the installed mod's name ("" when nothing
@@ -206,7 +207,7 @@ def table(library: Path) -> dict[str, dict]:
     root = Path(library)
     if not root.is_dir():
         return {}
-    enabled, names, _ = _states(root)
+    enabled, names, _ = _states(root, state)
     out: dict[str, dict] = {}
     for folder in sorted(root.iterdir(), key=lambda item: item.name.casefold()):
         if not folder.is_dir() or folder.name.startswith("."):

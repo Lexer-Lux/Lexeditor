@@ -773,7 +773,9 @@
     function updateCard(card,plugin){
       card._plugin=plugin;card.className=`game state-${plugin.status}`;card.dataset.plugin=plugin.id;card.dataset.status=plugin.status;
       card.querySelector(".game-name-text").textContent=plugin.name;fitGameName(card.querySelector(".game-name"));scheduleGameNameFit();
-      card.querySelector(".cover-fallback").textContent=plugin.name.split(/\s+/).map(word=>word[0]).join("").slice(0,3).toUpperCase();
+      const words=plugin.name.trim().split(/\s+/);
+      const edition=words.length>1&&/^(?:[IVXLCDM]+|\d+)$/.test(words[words.length-1])?words.pop():"";
+      card.querySelector(".cover-fallback").textContent=(words.map(word=>word[0]).join("").slice(0,3)+edition).toUpperCase();
       const art=plugin.coverArt||{};let image=card.querySelector(".game-cover");
       if(art.state==="ready"&&art.uri){if(!image||image.dataset.uri!==art.uri){image?.remove();image=document.createElement("img");image.className="game-cover";image.alt=`${plugin.name} cover art`;image.dataset.uri=art.uri;image.src=art.uri;image.onerror=()=>image.remove();card.prepend(image);}}else if(art.state!=="loading") image?.remove();
       const indicator=card.querySelector(".state-indicator"),displayState=plugin.scanInProgress?"Scanning":labels[plugin.status];indicator.classList.toggle("scanning",!!plugin.scanInProgress);card.querySelector(".state-symbol").textContent=plugin.scanInProgress?"":stateSymbols[plugin.status];card.querySelector(".state-label").textContent=displayState;indicator.setAttribute("aria-label",displayState);indicator.title=displayState;

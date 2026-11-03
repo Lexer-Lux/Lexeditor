@@ -154,11 +154,14 @@ def _claims_bundle(folder: Path) -> bool:
     return isinstance(data, dict) and "bundle" in data
 
 
-def library_rows(game_root: Path) -> list[dict]:
+def library_rows(game_root: Path, state: dict | None = None) -> list[dict]:
     root = Path(game_root)
     if not root.is_dir():
         return []
     rows = [mod_row(folder) for folder in root.iterdir() if folder.is_dir() and not folder.name.startswith(".")]
+    if state is not None:
+        for row in rows:
+            row.update(state.get(row["folder"], {"enabled": False}))
     return sorted(rows, key=lambda row: (int(row["order"]) if isinstance(row["order"], int) else 1000,
                                          row["name"].casefold()))
 
@@ -175,10 +178,10 @@ def catalog(repository: str, *, fresh: bool = False) -> dict:
     return result
 
 
-def overview(game_root: Path, repository: str) -> dict:
+def overview(game_root: Path, repository: str, state: dict | None = None) -> dict:
     """Everything the Mods tab lists: local mods first, then downloadable ones."""
-    rows = library_rows(game_root)
-    wanted = mod_requires.table(game_root)
+    rows = library_rows(game_root, state)
+    wanted = mod_requires.table(game_root, state=state)
     for row in rows:
         try:
             entry = wanted.get(str(Path(row["path"]).resolve()), {})

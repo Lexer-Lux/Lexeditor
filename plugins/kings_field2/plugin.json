@@ -5,7 +5,6 @@
   "processNames": [
     "Verdite2.exe"
   ],
-  "lexmod": "Lexer-Lux/Lexers-Mod-For-KF2",
   "installation": {
     "rootEnv": "LEXEDITOR_KF2_ROOT",
     "requiredPaths": [

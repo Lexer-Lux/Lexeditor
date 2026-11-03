@@ -26,6 +26,7 @@ def launch() -> int:
 
 
 PLUGIN = GamePlugin(**plugin_defaults(__file__), check=check, launch=launch,
+                    cover_art=ROOT / "assets" / "covers" / "kf2.jpg",
                     installation=install_spec(__file__), session_factory=KingsField2Session,
                     mod_adapter=VerditeModAdapter(), helper_name="Lexer's Verdite2 fork",
                     helper_pinned=port.PIN["tag"], helper_status_for_root=port.status,

@@ -1123,6 +1123,32 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   height:33%;
   border-width:0 0 round(11cqw, 1px) round(11cqw, 1px);
 }
+.lex-header-switch {
+  display:inline-flex;align-items:center;gap:.4em;white-space:nowrap;cursor:pointer;
+  font-size:.8em;min-width:5em;
+}
+.lex-header-switch input[type="checkbox"] {
+  appearance:none;display:inline-block;position:relative;flex:none;
+  width:2.2em;height:1.2em;min-width:0;min-height:0;margin:0;
+  border:1px solid currentColor;border-radius:1em;background:var(--lex-input-bg,transparent);
+  cursor:inherit;
+}
+.lex-header-switch input[type="checkbox"]::before {
+  content:"";display:block;position:absolute;left:.13em;top:50%;visibility:visible;
+  width:.8em;height:.8em;border:0;border-radius:50%;background:currentColor;
+  transform:translateY(-50%);
+}
+.lex-header-switch input[type="checkbox"]:checked::before {left:calc(100% - .93em);}
+.lex-header-switch input[type="checkbox"]:indeterminate::before {height:.8em;transform:translateY(-50%);}
+.lex-header-switch input[type="checkbox"]:checked {background:var(--lex-accent);}
+.lex-header-switch input[type="checkbox"]:focus-visible {outline:2px solid currentColor;outline-offset:3px;}
+.lex-header-switch-on,.lex-header-switch-pending {display:none;}
+.lex-header-switch:has(input:checked) .lex-header-switch-on {display:inline;}
+.lex-header-switch:has(input:checked) .lex-header-switch-off {display:none;}
+.lex-header-switch:has(input[aria-busy="true"]) {cursor:wait;}
+.lex-header-switch:has(input[aria-busy="true"]) .lex-header-switch-on,
+.lex-header-switch:has(input[aria-busy="true"]) .lex-header-switch-off {display:none;}
+.lex-header-switch:has(input[aria-busy="true"]) .lex-header-switch-pending {display:inline;}
 /* Icon buttons in a detail header: quiet until hovered, like the
    record headers in the game plugins. The mods tab shares them. */
 /* A header icon button is a compact fixed square, like the icon buttons

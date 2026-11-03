@@ -2002,7 +2002,7 @@
         title: "Add section (Developer Mode)", "aria-label": "Add section",
         onclick: () => addDetailHeader(panel)}, sectionIcon());
       const last = actions.lastElementChild;
-      if (last?.matches?.('input[type="checkbox"]')) actions.insertBefore(addHeader, last);
+      if (last?.matches?.('input[type="checkbox"],.lex-header-switch')) actions.insertBefore(addHeader, last);
       else actions.append(addHeader);
     }
     return panel;
@@ -11100,7 +11100,7 @@ ${contents.path}`});
       if (saveBusy || save.disabled) return;
       confirmDiscardChanges(options);
     };
-    let gameRunning = false, gameCanLaunch = true, gameBusy = false;
+    let gameRunning = false, gameCanLaunch = true, gameBusy = false, gameProcessKnown = false;
     let gameWaiting = null, gameLaunchTimer = null, gameLaunchResult = null;
     const clearGameWait = () => {
       clearTimeout(gameLaunchTimer);
@@ -11110,6 +11110,8 @@ ${contents.path}`});
     const renderGameProcess = (running, canLaunch = gameCanLaunch) => {
       const nextRunning = !!running;
       const nextCanLaunch = canLaunch !== false;
+      const processChanged = !gameProcessKnown || nextRunning !== gameRunning;
+      gameProcessKnown = true;
       gameRunning = nextRunning;
       gameCanLaunch = nextCanLaunch;
       const busy = gameBusy || !!gameWaiting;
@@ -11124,6 +11126,7 @@ ${contents.path}`});
       game.classList.toggle("launching", busy);
       // Play is greyed out for a game Lexeditor cannot start; Stop always works.
       game.disabled = busy || (!gameRunning && !gameCanLaunch);
+      if (processChanged) options.gameProcessChanged?.({running: gameRunning, canLaunch: gameCanLaunch});
     };
     const refreshGameProcess = async () => {
       if (gameBusy) return;
@@ -11513,7 +11516,8 @@ ${contents.path}`});
             onclick:()=>callWindow("open_networking_notice_action","support").catch(error=>showToast(String(error)))}),
           element("button", {type:"button",text:"Continue",onclick:()=>close(true)})])]);
       callWindow("lexmod_update", options.plugin.id).catch(() => {});
-      try { await firstRun(options.plugin.id, options.plugin.name); } catch (_error) {}
+      try { await firstRun(options.plugin.id, options.plugin.name,
+        (typeof options.tabs === "function" ? options.tabs() : options.tabs) || []); } catch (_error) {}
       try { await offerUnmanagedMods(); } catch (_error) {}
     };
     if (window.pywebview?.api) startFirstRun();
@@ -16195,7 +16199,6 @@ ${contents.path}`});
       if (document.body.inert) return;
       try {
         if (enabled && !(await confirmFirstModEnable(row.path))) return;
-        control.checked = enabled;
         control.indeterminate = true;
         control.setAttribute("aria-busy", "true");
         setEditorBusy(control, "Building and applying mods");
@@ -16227,7 +16230,7 @@ ${contents.path}`});
       catch (error) { failure("Could not reorder the mods", error); }
     };
     const decorateModRow = (node, row) => {
-      if (row.remote) return;
+      if (row.remote || data?.canReorder === false) return;
       const paths = localPaths();
       // An existing row: handlers become properties, the rest attributes.
       for (const [key, value] of Object.entries(modOrderGestures({
@@ -16309,6 +16312,10 @@ ${contents.path}`});
       }
       const toggle = element("input", {type: "checkbox", checked: row.enabled, "aria-label": `${row.name} enabled`,
         onchange: event => switchMod(row, event)});
+      const enableControl = element("label", {class: "lex-header-switch"}, toggle,
+        element("span", {class: "lex-header-switch-on", "aria-hidden": "true"}, "On"),
+        element("span", {class: "lex-header-switch-off", "aria-hidden": "true"}, "Off"),
+        element("span", {class: "lex-header-switch-pending", "aria-hidden": "true"}, "Applying…"));
       const copyMod = async () => {
         const agreed = await confirmAction({title: "Create an editable copy?",
           message: "Managed mods update automatically. Your named copy will be independent, so updates cannot replace your edits. You have my blessing.", confirmLabel: "Make a copy"});
@@ -16362,7 +16369,7 @@ ${contents.path}`});
         // own red "!" (hover lists them): the tab bar below never moves.
         // The switch still closes the row, always the rightmost control.
         modFlagsMark(row.enabled ? row.conflicts : null, row.alerts),
-        toggle];
+        enableControl];
 
       const sections = [];
       const settingsPanels = [];
@@ -16783,7 +16790,7 @@ ${contents.path}`});
     };
   };
 
-  const firstRun = async (pluginId, pluginName) => {
+  const firstRun = async (pluginId, pluginName, tabs = []) => {
     let status;
     try { status = await callWindow("onboarding_status", pluginId); } catch (_error) { return; }
     if (!status?.show) return;
@@ -16795,12 +16802,17 @@ ${contents.path}`});
     document.body.append(backdrop);
     const link = (text, action) => element("button", {type: "button", class: "lex-dialog-link lex-inline-link", onclick: action}, text);
     const step = (title, body, actions) => dialog.replaceChildren(element("h2", {}, title), ...body,
-      element("div", {class: "lex-dialog-actions"}, ...actions));
+      element("div", {class: "lex-dialog-actions"}, ...actions,
+        element("button", {type: "button", class: "lex-dialog-action", onclick: async () => {
+          await callWindow("lexmod_download_cancel", pluginId).catch(() => {});
+          await finish();
+        }}, "Close setup")));
     const next = (label, action) => element("button", {type: "button", class: "lex-dialog-action primary", onclick: action}, label);
     const finish = async () => { backdrop.remove(); await callWindow("finish_onboarding", pluginId).catch(() => {}); };
     const enjoy = () => step("Please enjoy!", [], [next("Done", finish)]);
     const tweaks = () => step("Tweaks", [element("p", {}, "You can configure all your mod settings at a glance from the Tweaks tab on the right.")], [next("Next", enjoy)]);
-    const mods = () => step("Mods", [element("p", {}, "You can enable or disable mods from the Mods tab, or add your own from there.")], [next("Next", tweaks)]);
+    const mods = () => step("Mods", [element("p", {}, "You can enable or disable mods from the Mods tab, or add your own from there.")],
+      [next("Next", tabs.some(tab => tab.id === "tweaks") ? tweaks : enjoy)]);
     const ready = () => step(`Lexer's Mod for ${game} is ready to play!`, [element("p", {},
       "I hope you enjoy it, and please ", link("contact me", () => callWindow("open_home_link", "twitter")),
       " with any suggestions you have or bugs you may find!")], [next("Next", mods)]);

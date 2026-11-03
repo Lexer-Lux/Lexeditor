@@ -40,6 +40,7 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(**plugin_defaults(__file__), check=check, launch=launch,
+                    cover_art=ROOT / "assets" / "covers" / "kf3.png",
                     smoke=smoke,
                     installation=install_spec(__file__), session_factory=KingsField3Session,
                     mod_adapter=NativeSourceModAdapter(MODEL))

@@ -8,6 +8,7 @@ work, even if your tool does not load skills on its own.
 | --- | --- |
 | file, relabel, test-plan or close a GitHub issue, or write `worklog/` | `.agents/skills/github-issues/SKILL.md` |
 | start, scope or file issues for a game plugin | `.agents/skills/add-game/SKILL.md` |
+| choose or change a game's mod storage or discovery paths | `.agents/skills/add-game/SKILL.md` |
 | add, change or review help bubbles or Data Map descriptions | `.agents/skills/help-text/SKILL.md` |
 | write `codex/`, or import from a `Lexers-Mod-*` repository | `.agents/skills/knowledge/SKILL.md` |
 | ask for a live game session, a debugger or a Cheat Engine step | `.agents/skills/ds1-modding/SKILL.md` |
@@ -91,6 +92,11 @@ work, even if your tool does not load skills on its own.
   vanilla behavior when the mod is disabled.
 
 ## Git and publishing
+
+- Before preparing a release build or publishing a release, check open
+  `release-blocker` issues in Lexer-Lux/Lexeditor and stop while any remain.
+  First-run setup redesign #1011 must be completed before the next release;
+  ordinary local development and diagnostic test runs may continue.
 
 - Before preparing or publishing a Nexus Mods upload, remind Lexer to check
   Nexus support's pending reply about user-triggered updates and the proposed

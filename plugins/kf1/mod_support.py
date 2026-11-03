@@ -13,6 +13,25 @@ class Kf1ModAdapter:
     message = "Verdite1 compiles source mods from the shared library. Native hook compatibility still needs testing per mod."
     package_types = ("folder", "zip")
 
+    def library_root(self, game_root: Path) -> Path:
+        values = parse_ini(read_file(game_root, "interface.ini"))
+        # Honour the loader's configured folder, including installations
+        # already configured by an earlier Lexeditor version.
+        return Path(values.get("mods.root") or game_root / "mods")
+
+    def library_state(self, game_root: Path) -> dict:
+        values = parse_ini(read_file(game_root, "interface.ini"))
+        library = self.library_root(game_root)
+        result = {}
+        for folder in library.iterdir() if library.is_dir() else []:
+            if folder.is_dir() and not folder.name.startswith(".") and (folder / "mod.json").is_file():
+                try:
+                    identity = metadata(folder).get("id", "")
+                    result[folder.name] = {"enabled": values.get(f"mods.{identity}.enabled".casefold(), "False").casefold() == "true"}
+                except (OSError, ValueError):
+                    result[folder.name] = {"enabled": False}
+        return result
+
     def conflicts(self, mods: list[Path], game_root: Path) -> dict:
         owners = {}
         for mod in mods:
@@ -36,8 +55,8 @@ class Kf1ModAdapter:
 
     def active_mod_ids(self, game_root: Path) -> list[str]:
         values = parse_ini(read_file(game_root, "interface.ini"))
-        library = values.get("mods.root")
-        if not library or not Path(library).is_dir():
+        library = self.library_root(game_root)
+        if not library.is_dir():
             return []
         active = []
         for folder in Path(library).iterdir():
@@ -53,7 +72,9 @@ class Kf1ModAdapter:
             parents = {mod.resolve().parent for mod in mods}
             if len(parents) > 1:
                 raise ValueError("Native mods must share one library folder")
-            library = next(iter(parents), Path(values.get("mods.root", game_root / "mods")))
+            library = self.library_root(game_root)
+            if parents and parents != {library.resolve()}:
+                raise ValueError("Choose mods from the native loader's mods folder")
             identities = set()
             for mod in mods:
                 report = self.inspect(mod, file_tree(mod))
