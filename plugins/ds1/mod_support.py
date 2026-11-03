@@ -206,7 +206,7 @@ class Ds1ModAdapter:
                 content = self._content_signature(ordered)
             except Exception:
                 content = None
-            report = self._read_report(game_root, ordered)
+            report = self._read_report(game_root, ordered, content=content)
             raw_menus = mod_loader.has_menu_contributions(ordered)
             if raw_menus:
                 menus_unchanged = bool(report and report.get('menuInputs') == menu_inputs)
@@ -328,8 +328,9 @@ class Ds1ModAdapter:
                       for name, folder in ordered)
 
     @classmethod
-    def _report_key(cls, game_root: Path, ordered) -> str:
-        content = cls._content_signature(ordered)
+    def _report_key(cls, game_root: Path, ordered, *, content=None) -> str:
+        if content is None:
+            content = cls._content_signature(ordered)
         originals = []
         # The main pack can be derived from a layout plus split TPFs without
         # any mod carrying it. It is still part of the installed pair.
@@ -361,13 +362,13 @@ class Ds1ModAdapter:
                              sort_keys=True).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
-    def _read_report(self, game_root, ordered):
+    def _read_report(self, game_root, ordered, *, content=None):
         try:
             path = self._report_path()
             if path.stat().st_size > self.REPORT_LIMIT:
                 return None
             report = json.loads(path.read_text(encoding="utf-8"))
-            if report.get("key") != self._report_key(game_root, ordered):
+            if report.get("key") != self._report_key(game_root, ordered, content=content):
                 return None
             cached = report["conflicts"]
             if not isinstance(cached, list) or any(
@@ -390,10 +391,14 @@ class Ds1ModAdapter:
                      expected_key=None, expected_content=None, timings=None, menu_order=None, menu_inputs=None):
         from core.plugin_files import atomic_write
         try:
-            key = self._report_key(game_root, ordered)
-            if expected_key is not None and key != expected_key:
+            # Capture the post-build inputs once. The comparison and report
+            # must describe that same observation; rescanning here doubles
+            # library traversal without making concurrent edits safe.
+            content = self._content_signature(ordered)
+            if expected_content is not None and content != expected_content:
                 return
-            if expected_content is not None and self._content_signature(ordered) != expected_content:
+            key = self._report_key(game_root, ordered, content=content)
+            if expected_key is not None and key != expected_key:
                 return
             report = {"key": key,
                       "conflicts": [[str(row.file), row.part, list(row.mods)] for row in conflicts]}

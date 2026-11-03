@@ -191,8 +191,17 @@ def test_native_toggle_reuses_installed_data_without_composition(tmp_path, monke
         pytest.fail('A native toggle must not recompose or redeploy unchanged game data')
     monkeypatch.setattr(mod_loader, 'compose_installed', no_composition)
     monkeypatch.setattr(mod_support.deployment, 'apply', no_composition)
+    signatures = []
+    original_signature = adapter._content_signature
+    def signature(ordered):
+        signatures.append(ordered)
+        return original_signature(ordered)
+    monkeypatch.setattr(mod_support.Ds1ModAdapter, '_content_signature', staticmethod(signature))
     assert adapter.activate([native, data], game)['timings']['reusedInstalledData']
+    assert len(signatures) == 3  # Runtime recipe plus pre/post-build observations.
+    signatures.clear()
     assert adapter.activate([data], game)['timings']['reusedInstalledData']
+    assert len(signatures) == 3
     # An external edit still invalidates the installed recipe immediately.
     (data/RELATIVE).write_bytes(b'changed data input')
     assert adapter._read_report(game, ordered) is None
