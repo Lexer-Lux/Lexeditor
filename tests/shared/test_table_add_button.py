@@ -27,34 +27,33 @@ def test_table_add_button(page, kind):
       view.style.height = '600px';
     }''', kind)
     page.wait_for_timeout(300)
-    button = page.locator('.lex-barrelled-master > .lex-table-add')
+    button = page.locator('.lex-barrelled-master > .lex-hover-actions > .lex-table-add')
     assert button.count() == 1
     assert page.locator('.lex-pager .lex-new-button').count() == 0, 'no second add button in the pager'
+    page.mouse.move(page.viewport_size["width"] - 1, page.viewport_size["height"] - 1)
+    page.wait_for_timeout(150)
     shape = button.evaluate('''b => {
-      const r = b.getBoundingClientRect(), m = b.parentElement.getBoundingClientRect(), s = getComputedStyle(b);
+      const r = b.getBoundingClientRect(), m = b.closest(".lex-barrelled-master").getBoundingClientRect(), s = getComputedStyle(b);
       return {round: s.borderRadius, rightGap: m.right - r.right, bottomGap: m.bottom - r.bottom,
-              opacity: parseFloat(s.opacity), square: Math.abs(r.width - r.height) < 1};
+              opacity: parseFloat(getComputedStyle(b.parentElement).opacity), square: Math.abs(r.width - r.height) < 1};
     }''')
     assert shape['round'] == '50%' and shape['square'], shape
     assert 0 <= shape['rightGap'] <= 16 and 0 <= shape['bottomGap'] <= 16, shape
     assert shape['opacity'] == 0, 'out of sight until the table is pointed at'
     page.locator('.lex-barrelled-master').hover(position={'x': 20, 'y': 60})
     page.wait_for_timeout(250)
-    assert .2 < float(button.evaluate('b => getComputedStyle(b).opacity')) < .6, 'faint over the table'
+    assert .2 < float(button.evaluate('b => getComputedStyle(b.parentElement).opacity')) < .6, 'faint over the table'
     button.hover(force=True)
     page.wait_for_timeout(250)
-    assert float(button.evaluate('b => getComputedStyle(b).opacity')) > .8
-    button.click(force=True)
+    assert float(button.evaluate('b => getComputedStyle(b.parentElement).opacity')) > .8
+    page.locator('.lex-barrelled-master').hover()
+    button.click(force=kind != "addable")
     page.wait_for_timeout(200)
     if kind == 'addable':
         assert page.evaluate('window.added') == 1
         assert button.get_attribute('aria-disabled') is None
     else:
-        # Pointing at it says why, before any click.
-        page.locator('.lex-barrelled-master').hover(position={'x': 20, 'y': 60})
-        button.hover(force=True)
-        page.wait_for_selector('.lex-hover-tip')
-        assert ('fixed set of slots' if kind == 'slots' else 'not supported yet') in page.locator('.lex-hover-tip').inner_text()
+        assert ("fixed set of slots" if kind == "slots" else "not supported yet") in button.get_attribute("aria-label")
         assert page.evaluate('window.added') == 0
         assert button.get_attribute('aria-disabled') == 'true'
         why = page.locator('.lex-toast').last.inner_text()
@@ -76,9 +75,10 @@ def test_a_plugins_own_add_button_moves_to_the_corner(page, enabled):
     }''', enabled)
     page.wait_for_timeout(300)
     assert page.locator('.lex-new-button').count() == 1
-    button = page.locator('.lex-barrelled-master > .lex-table-add')
+    button = page.locator('.lex-barrelled-master > .lex-hover-actions > .lex-table-add')
     assert button.count() == 1
-    button.click(force=True)
+    page.locator('.lex-barrelled-master').hover()
+    button.click(force=not enabled)
     page.wait_for_timeout(200)
     assert page.evaluate('window.created') == (1 if enabled else 0)
 
