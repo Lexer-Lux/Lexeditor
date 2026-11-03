@@ -258,6 +258,22 @@ must fit atomically. Frame, area, arena and ordering-table identity guard deferr
 work. Rendered checks observed chest, door, actual barrel type 100/record 81,
 locked red, and solid hidden-wall occlusion across retained/native modes.
 
+Empty contents alone do not mean searched. The dispatcher iterates its selector
+until -1, so admitted containers are retained in a bounded per-dispatch set.
+Hinged containers must pass native facing helper `0x80014F6C`, RA `0x800351F0`.
+Only completed unlocked empty searches emit Opened; full or declined pickups
+remain white. The actual key routine `0x80018054` emits Unlocked on a real
+eligible lock-byte transition to 255, excluding kind 9's first loot byte.
+
+A blocked hinged partner can report its primary before native +0x21 links are
+written. DoorPaired publishes that exact observed branch relationship. Forget
+Me Not stores symmetric same-floor pairs alongside states in a versioned
+1601-byte extension; older 800-byte state-only saves remain readable without
+invented pairs. Actual unlock clears red on the proven mate, preserving already
+opened history. Pending key/search snapshots clear on restore/reset. Native
+locked, unlocked-with-loot and emptied save/load cycles all returned success;
+a blocked pair stayed associated across save/load while its guest links were FF.
+
 The dispatcher is `0x80034DE4`. Selection returns from `0x800315C4` at
 RA `0x80035164`; locked chest notification RA is `0x80035320`, locked door RA
 `0x80035628`. Successful door action calls return at `0x80035400`, `0x800354F0`
@@ -294,6 +310,18 @@ The periodic poison flash calls `0x8001BAB8` with A0=1 at RA `0x8001A130`;
 native preset 5 is green. Ordinary hit flashes return at `0x80019AF8` and must
 remain red. Green selection is owned by the independent Better Poison mod.
 
+Better Poison's intensity defaults to 35% (0..100), blending native base lighting
+toward green preset 5. Frequency defaults to .25 Hz (range 0..0.5). Native opportunities
+span two consecutive world ticks every 20 ticks: .133 seconds every 1.333 seconds
+at the default 15 Hz. Selecting every third opportunity yields one pulse every
+four seconds; intermediate settings alternate opportunity intervals. Zero in
+either setting removes the visual flash. Native poison timing and damage stay
+unchanged: full 600-tick tests at zero, full and disabled each lost 30 HP.
+Death, revival, respawn, load, initialization and full status/vitals reset clear
+owned notification observation without announcing a cure. A living natural
+expiry or real antidote announces one cure; loading poison announces one start.
+Settings persist in Runtime.View and use the native Mods gear controls.
+
 `0x8001FA44` enqueues native notifications, and `0x8001FAFC` animates them. The
 eight-slot queue is at `0x8009506E`, u16 payloads at `0x80095076`, tail/head at
 `0x80095086/87`, phase/hold/angle at `0x80095088/89/8A`. This is the bottom
@@ -315,3 +343,10 @@ The XP bar reads these values without writes. Its HUD render event runs before
 host ImGui submission and supplies full logical display dimensions. Existing
 game-frame snapshots precede ImGui and cannot verify that bar; a temporary
 after-host-render backbuffer capture verified the absolute bottom edge.
+
+Height defaults to 4 native pixels, range 1..16, scaled by viewport height/240.
+At 720 pixels those settings render 3/12/48 display pixels; at 600 the default
+renders 10. The bar spans the full viewport width, including picture margins,
+and its bottom edge is exactly the viewport bottom. Native HUD-hidden state
+suppresses it; disable removes its draw listener. Height persists in Runtime.View
+through the same native Mods gear surface.
