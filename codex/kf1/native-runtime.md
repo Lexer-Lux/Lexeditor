@@ -12,6 +12,10 @@ keyboard bindings, `new GamepadBindings()` and `DefaultAnalog()` in that baselin
 It includes the port's Western face permutation; it is not guessed PSX controls.
 Modern retains Select/Tab menu and Triangle/Q equipped item or spell actions
 (including maps), while adding the requested shoulder actions and held run.
+The corrected Modern controller profile also maps physical Start (button 6)
+to the Western Circle/menu action, matching KF2 Modern. Start does not bind
+Run. Classic and keyboard bindings remain unchanged. Both native setup and
+Lexeditor read that one profile asset; reapply Modern to replace an old profile.
 This archive has no Remaster Editor. F2 belongs to the optional Debug Tools mod.
 
 Retail has no sprint stamina pool or drain. Held run scales collision movement
@@ -109,11 +113,24 @@ Tint is scoped to actor submission and restores all changed lighting after
 submission/unload. Spawn, restore and overlay changes clear timers.
 
 Auto Pick Up All handles semantic operations 64 (loose item) and 65 (gold),
-using native item confirmation/capacity or the original gold queue/addition.
-Only settled drops at the player's feet qualify. Containers 8/9, hidden-height
+using the accepted native stock-byte increment directly, with item-name glyphs
+from the original table sent through NativeNotifications. It does not enter
+inspection or synthesize input. Full stacks and a full notification queue keep
+the item on the ground. Gold retains its original queue/addition.
+Only settled drops within 1000 units (half a map cell) of the player's feet
+qualify. Containers 8/9, hidden-height
 items, moving drops and full inventory are excluded. These are separate mods
 in the user's library, with separate toggles; their payloads do not belong in
 Lexeditor source.
+
+Unlocked Pitch is a separate library mod. Native living-player pitch is
+normally clamped to +/-191; +/-1024 is a vertical view in the 4096-unit circle.
+Its process-only IL hooks widen the mapped stage-A clamp and the Mouse lead
+limit. The upper test's 192 constants must be distinguished from SP+0xC0
+save/restore offsets in the same routine. PGXP immediate copies must match the
+new clamp. Disabling disposes both hooks and returns a living out-of-range view
+to the normal cap. The installed host reached both +/-1024 with position/yaw
+unchanged; disable restored +/-191 and re-enable worked.
 
 ## Interaction records and persistence
 
