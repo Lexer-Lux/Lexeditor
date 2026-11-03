@@ -48,19 +48,20 @@ def test_chance_drafts_header_save_reopen_and_default_restore(service):
             reveal(page, control)
             return control
 
-        # Nested formation rows use the same percentage lane as record panes.
+        # Nested formation rows use the same percentage lane and measured label floor as record panes.
         for width in (1600, 1000, 1600):
             page.set_viewport_size({'width': width, 'height': 1000})
-            control = chance(0)
             page.wait_for_timeout(250)
+            control = chance(0)
             geometry = control.evaluate('''input => {
               const field=input.closest('.lex-detail-field');
               const label=field.querySelector('.lex-detail-field-label');
               const range=document.createRange();range.selectNodeContents(label.firstElementChild);
               return {field:field.getBoundingClientRect().toJSON(),
-                label:label.getBoundingClientRect().toJSON(),ink:range.getBoundingClientRect().toJSON()};
+                label:label.getBoundingClientRect().toJSON(),ink:range.getBoundingClientRect().toJSON(),
+                floor:parseFloat(getComputedStyle(field).getPropertyValue("--lex-detail-label-floor"))||0};
             }''')
-            assert .07 <= geometry['label']['width']/geometry['field']['width'] <= .08, geometry
+            assert abs(geometry['label']['width'] - geometry['floor']) <= 1 or .07 <= geometry['label']['width']/geometry['field']['width'] <= .08, geometry
             assert geometry['ink']['right'] <= geometry['label']['right']+1, geometry
             assert geometry['ink']['bottom'] <= geometry['label']['bottom']+1, geometry
 
@@ -121,7 +122,7 @@ def test_chance_drafts_header_save_reopen_and_default_restore(service):
             save.click()
         assert result.value.status == 200
         page.wait_for_function('() => dirtyCount() === 0')
-        assert posts == ['/api/world-map/save']
+        assert posts == ['/api/world-map/save', '/api/settings/activate']
         assert request()[1]['groups'][0]['initialOutcomes'] == [128,128]+[0]*6
         assert (project/chances.HEXT_RELATIVE).read_bytes()
         page.reload()

@@ -284,12 +284,19 @@
     const input=numberControl((row.initialOutcomes||encounterInitialOutcomes)[index]*100/256,
       0,100,100/256,update,{'aria-label':`Group ${row.id} slot ${index+1} initial chance`});
     input.disabled=state.activeSource!=='mine';
-    const draft=encounterChanceDrafts.get(row)?.get(index);if(draft!==undefined)input.value=draft;
+    const validate = () => {
+      const weight = input.valueAsNumber * 256 / 100;
+      input.setCustomValidity(input.value !== "" && Number.isFinite(weight) && !Number.isInteger(weight)
+        ? "Use steps of 0.390625%." : "");
+    };
+    const draft = encounterChanceDrafts.get(row)?.get(index);
+    if (draft !== undefined) {
+      input.value = draft;
+      validate();
+    }
     input.addEventListener('input',()=>{
       if(input.disabled||input.readOnly)return;
-      input.setCustomValidity('');
-      if(input.value!==''&&Number.isFinite(input.valueAsNumber)&&!Number.isInteger(input.valueAsNumber*256/100))
-        input.setCustomValidity('Use steps of 0.390625%.');
+      validate();
       if(!encounterChanceDrafts.has(row))encounterChanceDrafts.set(row,new Map());
       const drafts=encounterChanceDrafts.get(row);
       const valid=input.checkValidity();
