@@ -38,6 +38,37 @@ native mods, refuses replacement of externally edited deployed source, and
 journals native flags and copies for recovery. The adapter requires a closed
 game. It does not edit settings.json, memory cards, disc data or game binaries.
 
+## Extended scenery range
+
+Fork preview4 accepts10.5..30 tiles in half-tile steps. View distance and smooth
+distance fade use separate keys, `kf2.renderdistance` and `kf2.distancefade.on`.
+Distance scales retained-world fog by distance/10.5; the optional fade only
+adds a one-tile transition at the boundary. Changing fade does not change reach.
+
+The current area's entire80x80 map is already resident. Extended reach selects
+more of that geometry; it does not stream adjacent areas. Retained GPU placement
+uses full coordinates before the old signed16 packet path. Unsupported packet
+fallbacks outside signed16 placement are skipped, preventing coordinate wrap.
+Without retained GPU geometry, effective reach stays at15 while preserving the
+saved larger preference. Extended reach therefore requires GPU geometry.
+
+The GPU depth representation ends at65536. Above15 tiles, a separate mandatory
+depth guard fades out over62976..65024 even when the optional distance fade is off.
+Main, mirror and retained reflection passes receive the physical depth guard;
+the first-person arm and sky keep their existing exclusions.
+
+An installed preview4 matched-camera capture in the native fdat02 corridor
+selected106 map halves at15 and173 at30, including67 beyond15.5. Real geometry
+extended to27 tiles in that corridor, with visible added floor/walls. A pitched
+capture selected real vertices to66688 view depth while retaining the65024 guard.
+These establish this area's renderer behavior, not coverage of every map or
+every optional legacy renderer configuration.
+
+Native setup has one Controls category containing Control layout, Movement and
+Rumble and gyro. Turning and difficulty remains separate. Both initial setup
+and rerun traverse six numbered steps. Classic/Modern/Keep choices share that
+category; saved custom bindings and sensitivity are preserved on ordinary boot.
+
 ## Original notification rendering
 
 Fork v0.5.3-lexer.2 adds NativeNotifications.Post(owner,glyphs), PostText,

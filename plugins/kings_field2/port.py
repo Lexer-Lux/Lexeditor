@@ -18,7 +18,9 @@ CRITICAL = ("Verdite2.exe", "bin/Verdite2.dll", *install_spec(__file__).required
             "content/src/patches/SeparateRun.cs",
             "content/src/patches/ViewDistanceFade.cs", "content/src/patches/ControlProfiles.cs",
             "content/src/patches/Analog.cs", "content/src/patches/EnemyTurn.cs",
-            "content/src/patches/NativeNotifications.cs", "content/manifest.txt")
+            "content/src/patches/NativeNotifications.cs", "content/src/patches/RenderDistance.cs",
+            "content/src/patches/TileWalk.cs", "content/src/patches/ModelWalk.cs",
+            "content/config/onboarding.json", "content/manifest.txt")
 
 
 def _write(path: Path, value: dict) -> None:

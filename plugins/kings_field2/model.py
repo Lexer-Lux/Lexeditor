@@ -11,7 +11,8 @@ FIELDS = (
     {"section": "Controller", "key": "kf2.analog.pitch", "label": "Stick look sensitivity", "kind": "number", "min": .1, "max": 3, "step": .1, "default": 3},
     {"section": "Controller", "key": "kf2.controls.separaterun", "label": "Separate run input", "kind": "boolean", "default": True,
      "help": "Run uses the L3 binding in the port's Input settings: Shift on keyboard or Circle on controller by default. Interact no longer doubles as Run."},
-    {"section": "World", "key": "kf2.renderdistance", "label": "View distance (tiles)", "kind": "number", "min": 10.5, "max": 15, "step": .5, "default": 10.5},
+    {"section": "World", "key": "kf2.renderdistance", "label": "View distance (tiles)", "kind": "number", "min": 10.5, "max": 30, "step": .5, "default": 10.5,
+     "help": "Extends scenery and its fog range. Values above 15 require GPU geometry."},
     {"section": "World", "key": "kf2.distancefade.on", "label": "Smooth distance fade", "kind": "boolean", "default": False,
      "help": "Gradually hides scenery near the view limit. Requires GPU geometry; keeps fog and view distance unchanged."},
 )
