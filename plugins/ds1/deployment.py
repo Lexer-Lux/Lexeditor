@@ -655,7 +655,7 @@ def status(game_root: Path | None, project_root: Path | None) -> dict:
     }
 
 
-def apply(game_root: Path, project_root: Path | None, *, transform=None, composed=None) -> dict:
+def apply(game_root: Path, project_root: Path | None, *, transform=None, composed=None, return_status=True) -> dict | None:
     """Preserve installed originals once, then replace them with the saved project files.
 
     `composed` maps each file to the bytes the mod loader built from every
@@ -763,7 +763,7 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
                 _apply_file(game_root, project_root, relative, *sources[relative])
             else:
                 _restore_file(game_root, relative)
-        return status(game_root, project_root)
+        return status(game_root, project_root) if return_status else None
 
 
 def _apply_file(game_root: Path, project_root: Path, relative: Path, source: Path, new_bytes: bytes,

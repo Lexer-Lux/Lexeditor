@@ -243,7 +243,7 @@ class Ds1ModAdapter:
                 if not reused and composition.files:
                     # The last data mod in load order owns the deployment record.
                     owner = data[-1].folder if data else Path(mods[-1]) if mods else None
-                    deployment.apply(game_root, owner, composed=composition.files)
+                    deployment.apply(game_root, owner, composed=composition.files, return_status=False)
                 elif not reused and any(deployment.status(game_root, None).get(key) for key in ("enabled", "everApplied")):
                     deployment.disable(game_root)
             except Exception:

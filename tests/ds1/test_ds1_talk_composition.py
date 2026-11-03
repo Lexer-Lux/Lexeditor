@@ -264,7 +264,7 @@ def test_mod_activation_deploys_the_current_script_build(monkeypatch, tmp_path):
         mod_loader.Composition(mods[0].files, []))
     deployed = []
     monkeypatch.setattr(mod_support.deployment, 'apply',
-        lambda game, folder, composed: deployed.append(composed))
+        lambda game, folder, composed, *, return_status: deployed.append(composed))
     adapter.activate([tmp_path], tmp_path / 'game')
     assert deployed == [{relative: b'current settings'}]
 
