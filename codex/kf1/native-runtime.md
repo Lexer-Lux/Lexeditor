@@ -4,6 +4,13 @@ These facts apply to Japan's 1994 SLPS-00017 only. The supported installation
 uses the archived C# recompilation based on upstream `529a6b4`, not the newer
 C++ port or either Western game. Generated game code and disc data stay private.
 
+The installed native library is `D:/Programs/Verdite1/mods`. The port's
+`mods.root` setting and KF1's editor adapter select that same folder. Native
+enablement comes from `mods.<native-id>.enabled` in interface.ini, default false;
+an `enabled` property in mod.json does not enable a source mod. The former
+Documents library was moved with file hashes and IDs checked, preserving flags.
+There is one active library, including its existing compilation cache.
+
 ## Controls and weapon power
 
 The native `content/config/controls.json` is the one profile definition used by
@@ -17,6 +24,14 @@ to the Western Circle/menu action, matching KF2 Modern. Start does not bind
 Run. Classic and keyboard bindings remain unchanged. Both native setup and
 Lexeditor read that one profile asset; reapply Modern to replace an old profile.
 This archive has no Remaster Editor. F2 belongs to the optional Debug Tools mod.
+
+Native presets are drawn inside the existing Input settings section through
+the shared `input.profiles` slot. First-run setup selects that section; it does
+not create a second popup. Keep is initially selected and Apply is explicit.
+The input mapper distinguishes the shared Run/back binding from an independent
+menu press. While Run remains held, Tab/Start can enter the native menu; inherited
+R3/back bits do not trap its all-buttons-released wait. Releasing Run restores
+ordinary back input.
 
 Retail has no sprint stamina pool or drain. Held run scales collision movement
 by two before collision resolution. Lexer chose weapon power for Better Sprint
@@ -38,6 +53,12 @@ drain removes 333/334 at 15 Hz, so the latter plateaus at 4666/4667 after native
 recovery refills it every tick. This was reproduced at fixed position and does
 not establish a location-dependent cause. Rendering at 30, 60 and 144 FPS kept
 those amounts unchanged.
+
+Exhaustion latches Better Sprint off until a sampled release and a new press.
+Render frames which skip the player input sample do not count as release.
+Menu, death, restore, new-player initialization and re-enable require fresh input.
+The game has no running Magic-charge or MP cost, so a magic-consumption option
+is inapplicable. The explicitly chosen physical-drain default remains 100%.
 
 The native weapon equip routine is `0x80016A30`: weapon ID is byte
 `0x800A07E4` (Short Sword 0, Knight Sword 2), record pointer `0x800A07E8`.
@@ -66,6 +87,16 @@ and resumes ordinary respawn. Successful reads use the native post-load arm
 at `0x800189A4..0x80018A04`, then state 254 and the original reverse fade.
 Private checks observed cross-floor loading, inventory and equipment restore,
 revival priority, missing/changed-card fallback and saved off after restart.
+
+The separate Better Crystals mod intercepts this same would-revive event before
+consumption. Its actual KF1 item is Dragon King Grass Fruit. The English prompt
+uses native frame `0x8002A510`, text `0x80029DE0`, cursor `0x80029C50`, pad
+`0x8005012C` and native presentation. It displays current inventory and primary
+keyboard/gamepad bindings. Revive returns to the original one-item consumption;
+Reload calls the same native reader independently of the automatic checkbox.
+No-save disables Reload; failed reads return to the choice without consumption.
+The Latin font depends on the English translation; the Japanese-font path safely
+retains original revival. Disabling an open choice also resumes original revival.
 
 ## Color Bars
 
@@ -155,12 +186,19 @@ Native font cells advance 14 pixels and are 12 pixels high; their
 translated letter pairs retain those metrics. This leaves the caption within
 the 240-pixel logical screen. The earlier y=216 overlapped the bottom border.
 
-Hit Feedback brackets actual native damage `0x8002D120` and computes
-actual HP lost / definition maximum HP * maximum duration, capped at that
-maximum. Default .6 seconds, range 0..5, zero disables; overlapping hits retain
-the later expiry. Actor HP is u16 +0x14 and definition max HP is +0x80.
-Tint is scoped to actor submission and restores all changed lighting after
-submission/unload. Spawn, restore and overlay changes clear timers.
+Hit Feedback brackets actual native damage `0x8002D120`. Duration is actual HP
+lost / definition maximum HP * maximum duration, capped at that maximum; default
+.6 seconds, range 0..5. Peak strength is (1 - post-hit HP / maximum HP) times
+configured intensity, default 50%, range 0..100%. Each new damaging hit replaces
+the envelope and linearly fades to zero. Actor HP is u16 +0x14 and definition
+max HP is +0x80. Tint mixes the submitted model's RGB toward red while preserving
+its texture and restores lighting/color after each draw. Nested unrelated models
+suspend the parent's tint. Spawn, restore and overlay changes clear envelopes.
+
+Red N isolates native compass UV x14..19/y128..132 from the original 33x32
+compass record at `0x80055D04`. Its original FT4 becomes four rectangles, costing
+three extra packets (120 bytes). Only the N is red; original coordinates, ring,
+needle, E/S/W and HUD visibility remain native. Disable restores the one packet.
 
 Auto Pick Up All handles semantic operations 64 (loose item) and 65 (gold),
 using the accepted native stock-byte increment directly, with item-name glyphs
@@ -197,6 +235,28 @@ operation 9, with 0xFF empty. Classification uses semantics and remaining loot,
 not an object's appearance. Illusory walls are map attribute 0x45 at
 `0x8009A748 + 100*z + x`; they never receive a glint. The API also denies any
 placed object in such a cell.
+
+The separate `illusory wall` mod identifies a passage by its native three-cell
+shape: center attribute 0x45 and passable collision 1, opposing 0x44/0x46 flanks
+with blocked collision 0, matching height and orientation. There are 51 such
+passages across five floors. Revealing substitutes native open-passage meshes
+0x17/0x18/0x19; it never makes the decorative flanks passable. The independent
+Use/Attack/Walk-through choices default false/false/true, preserving native
+walk-through behavior until changed. All false blocks undiscovered centers.
+Native use is the notification call `0x8001FA44`, RA `0x80034F88`, A0=17. Melee
+uses committed hit position at actor finder `0x8002DA6C`, RA `0x80016CEC`.
+The shell's native Triangle attacks; Square casts, so it cannot verify this hook.
+Discovered passage IDs use the same bounded save extensions as object history.
+
+Interaction glints use a small camera-facing pixel star on the closest rendered
+surface, rather than changing object tint. Retained stars must use main-model
+groups: AddDynamic records triangles which this fork's main view does not draw.
+Native stars are 29 POLY_F4 packets (696 bytes), deferred until Present after
+native geometry/HUD allocation. They keep the object's native depth ordering,
+and the optional packet Z-buffer receives the true sprite depth. A whole star
+must fit atomically. Frame, area, arena and ordering-table identity guard deferred
+work. Rendered checks observed chest, door, actual barrel type 100/record 81,
+locked red, and solid hidden-wall occlusion across retained/native modes.
 
 The dispatcher is `0x80034DE4`. Selection returns from `0x800315C4` at
 RA `0x80035164`; locked chest notification RA is `0x80035320`, locked door RA
