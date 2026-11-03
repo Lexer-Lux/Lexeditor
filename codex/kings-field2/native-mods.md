@@ -55,6 +55,10 @@ Better UI hooks initial pickup placement `0x80046C64` only at return sites `0x80
 and `0x80048610`, after native lock/quest guards. The item record is at caller `SP+0x80`.
 Item names are original-font bytes at `0x80065B24`, stride 24 bytes. Native gold feedback
 remains unchanged. Poison notifications belong to Better Poison, not Better UI.
+The real native confirmation loop was held for 2.5 seconds before choosing an
+action. The name rendered with nonzero native brightness while inventory was
+zero and the ground item was still present. Taking acquired it; putting away
+did not. Disabling only Better UI removed the name and retained those choices.
 
 ## Damage, power and exploration
 
@@ -62,6 +66,9 @@ Creature records start at `0x8016C544`, stride `0x7C`, with 200 slots. Current H
 spawn `0x80039AFC` copies its maximum from definition `0x80172624 + type*0x78 +0x1A`.
 Damage `0x8003A9CC` follows linked body parts to their parent before subtracting HP.
 Hit Feedback measures the resulting loss against that definition maximum.
+Its only setting is maximum flash duration in seconds (0–5, default 0.6).
+Duration is that maximum times min(actual HP lost / definition maximum HP, 1).
+The native check confirms a 1-second maximum and 10% loss give 0.1 seconds.
 
 Native running `0x8002957C` subtracts 500 per 15 Hz world tick from both 5000-point
 physical/magic power gauges `0x8019942E` and `0x80199432`. Better Sprint changes this charge only
