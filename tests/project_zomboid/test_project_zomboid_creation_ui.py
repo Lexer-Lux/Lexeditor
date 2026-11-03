@@ -64,6 +64,7 @@ def test_create_each_supported_family_through_shared_add(tmp_path,monkeypatch,ki
                 template=before[original['start']:original['end']]
                 assert template.startswith(kind)
                 page.evaluate('tab=>navigate(tab)',tab)
+                page.locator(".lex-barrelled-master").hover()
                 page.locator('.lex-table-add').click()
                 # Copy the selected family's fixture rather than assuming list order.
                 templates=page.get_by_label('Copy from record')

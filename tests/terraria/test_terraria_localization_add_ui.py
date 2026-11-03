@@ -41,6 +41,7 @@ def test_localization_add_save_reopen_preserves_source(filename, original, key, 
                     page.wait_for_function('locCurrent !== null')
                     page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
                     page.evaluate('navigate("localization")')
+                    page.locator(".lex-barrelled-master").hover()
                     page.get_by_role('button',name='Add localization key',exact=True).click()
                     key_control=page.get_by_label('New localization key',exact=True)
                     assert key_control.evaluate('e=>e===document.activeElement')
@@ -79,6 +80,7 @@ def test_localization_add_save_reopen_preserves_source(filename, original, key, 
                         page.screenshot(path=str(Path(os.environ['LEXEDITOR_TEST_SHOTS'])/'terraria-reopened-key.png'))
                     # Duplicate Add leaves the original saved entry and bytes intact.
                     before=target.read_bytes()
+                    page.locator(".lex-barrelled-master").hover()
                     page.get_by_role('button',name='Add localization key',exact=True).click()
                     page.get_by_label('New localization key',exact=True).fill(key)
                     page.get_by_label('New localization value',exact=True).fill('Should not replace')

@@ -21,9 +21,10 @@ def test_create_each_family_through_shared_add(tmp_path,kind,template):
         try:
             page=browser.new_page(viewport={'width':1400,'height':900})
             page.goto(url)
-            page.wait_for_function('!state.booting')
+            page.wait_for_function('typeof state !== "undefined" && !state.booting')
             page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
             page.evaluate('kind=>navigate(kind)',kind)
+            page.locator(".lex-barrelled-master").hover()
             page.locator('.lex-table-add').click()
             page.get_by_label('New prototype name').fill(name)
             page.get_by_label('Source prototype').select_option(template)
