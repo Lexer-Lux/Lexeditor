@@ -8,6 +8,7 @@ fixtures only; edits land in the temp mod.
 """
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,10 +25,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix="lexeditor-ds1-pins-") as folder:
         temp = Path(folder)
         game, mod = temp / "game", temp / "mod"
+        spells = list(range(1000, 1213))
         (game / RELATIVE).parent.mkdir(parents=True)
-        (game / RELATIVE).write_bytes(make_archive())
+        (game / RELATIVE).write_bytes(make_archive(table_ids={'Magic': spells},
+            field_values={'Magic': {identity: {'slotLength': identity % 20 + 1} for identity in spells}}))
         (game / texts.RELATIVE).parent.mkdir(parents=True)
-        (game / texts.RELATIVE).write_bytes(make_text_archive())
+        (game / texts.RELATIVE).write_bytes(make_text_archive(names={
+            'Magic': {identity: f'Test Spell {identity}' for identity in spells}}))
         (game / texts.MENU_RELATIVE).write_bytes(make_menu_archive())
         mod.mkdir()
         (mod / MARKER).touch()
@@ -124,6 +128,32 @@ def main():
                     match = heads.filter(has_text="Venom (%)")
                     assert match.count() >= 1, heads.all_inner_texts()
                     assert "Venom (%)" in match.first.inner_text()
+                    # The reported freeze used 213 spells in six tables, with
+                    # attunement slots pinned. A pin must preserve the mounted
+                    # detail field, and revisiting the tab must keep its column.
+                    page.set_viewport_size({'width': 2560, 'height': 1352})
+                    page.evaluate('navigate("items","spells")')
+                    page.locator('.lex-tabbed-panel [role=tab]', has_text='Requirements').first.click()
+                    page.wait_for_selector('[data-field-key="slotLength"]')
+                    assert page.evaluate('state.rows.length') == 213
+                    for index in range(5):
+                        page.get_by_role('button', name='Increase table barrels', exact=True).evaluate('node=>node.click()')
+                        page.wait_for_function('count=>document.querySelectorAll(".lex-barrel-grid .lex-column-list").length===count',
+                                               arg=index + 2)
+                    page.evaluate('window.originalSlotField=document.querySelector("[data-field-key=slotLength]")')
+                    started = time.perf_counter()
+                    page.locator('[data-lex-auto-pin][data-lex-pin-column="slotLength"]').click(force=True)
+                    page.wait_for_selector('.lex-column-list-cell[data-column-key="pin:slotLength"]')
+                    page.evaluate('async()=>{await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame)}')
+                    assert time.perf_counter() - started < 8, 'Pinning reproduced the reported multi-second freeze'
+                    assert page.evaluate('originalSlotField===document.querySelector("[data-field-key=slotLength]")')
+                    for _ in range(3):
+                        page.evaluate('navigate("items","armor")')
+                        started = time.perf_counter()
+                        page.evaluate('navigate("items","spells")')
+                        page.wait_for_selector('.lex-column-list-cell[data-column-key="pin:slotLength"]')
+                        assert time.perf_counter() - started < 8, 'Returning to pinned spells froze the editor'
+                        assert page.locator('.lex-barrel-grid .lex-column-list').count() == 6
                     assert not errors, errors
                 finally:
                     browser.close()
