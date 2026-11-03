@@ -248,10 +248,9 @@ def main() -> int:
     if files["pytest"]:
         rels = [p.relative_to(ROOT).as_posix() for p in files["pytest"]]
         print(f":: pytest ({len(rels)} files)", flush=True)
-        # Shared checks can hang in a native/browser child before pytest prints
-        # its failure summary. Identify each test, dump a stuck thread's stack,
-        # and report the first failure before starting unrelated later cases.
-        pytest_options = ["-v", "-x", "-o", "faulthandler_timeout=120"] if args.shared else ["-q"]
+        # Identify each shared test and dump a stuck thread's stack, but collect
+        # all failures in this CI run instead of revealing one per remote run.
+        pytest_options = ["-v", "-o", "faulthandler_timeout=120"] if args.shared else ["-q"]
         if subprocess.run([sys.executable, "-m", "pytest", *pytest_options, *rels], cwd=ROOT, env=env).returncode:
             failures.append("pytest")
     node = shutil.which("node")
