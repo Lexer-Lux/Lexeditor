@@ -47,9 +47,7 @@ class BannerlordUiContractTests(unittest.TestCase):
         for token in ("LexeditorUI.pagedListDetail", "LexeditorUI.columnList", "LexeditorUI.detailPanel",
                       "LexeditorUI.tabbedPanel", "LexeditorUI.infoHelp"):
             self.assertIn(token, shared)
-        self.assertIn("BLUI.settingsColumns(", settings)
-        self.assertIn('typeof LexeditorUI.paginateSettings==="function"', settings)
-        self.assertIn("BLUI.pager(", settings)  # branch-framework fallback only
+        self.assertIn("LexeditorUI.tweaksPage(", settings)
 
     def test_data_map_layers_mount_shared_view_content(self) -> None:
         renderers, offenders = [], []
