@@ -9,7 +9,7 @@
     "executable": "KingsField1.exe",
     "launchPath": "KingsField1.exe",
     "installDirNames": ["Verdite1"],
-    "defaultRoots": ["D:/Programs/Verdite1"],
+    "defaultRoots": ["D:\\Programs\\Verdite1"],
     "reshadeRenderer": "opengl32"
   }
 }
