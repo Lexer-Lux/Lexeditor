@@ -1845,12 +1845,54 @@ class HostApi:
             projects.remap_prefix(Path(path), folder)
         return {'path': str(folder)}
 
-    def mods_overview(self, plugin_id: str) -> dict:
+    def _mod_repository_preferences(self):
+        from core.runtime_bootstrap import user_data_dir
+        path = user_data_dir() / "mod-repositories.json"
+        try:
+            preferences = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            preferences = {}
+        return path, preferences
+
+    def _mod_repositories(self, plugin_id: str) -> tuple[str, ...]:
+        plugin = self._plugins[plugin_id]
+        defaults = getattr(plugin, "mod_repositories", ())
+        _, preferences = self._mod_repository_preferences()
+        return (*defaults, *preferences.get(plugin_id, ()))
+
+    def set_mod_repository(self, plugin_id: str, source: str, add: bool) -> None:
+        import re
+        from core.plugin_files import atomic_write
+        plugin = self._plugins[plugin_id]
+        source = source.strip().rstrip("/")
+        match = re.fullmatch(r"(?:https://github\.com/)?([A-Za-z0-9-]+/[A-Za-z0-9_.-]+)", source, re.I)
+        if not match or match[1].split("/")[1] in (".", ".."):
+            raise ValueError("Enter a GitHub repository as owner/name or its GitHub URL")
+        repository = match[1]
+        defaults = (plugin.lexmod, *getattr(plugin, "mod_repositories", ()))
+        if repository.casefold() in {item.casefold() for item in defaults}:
+            raise ValueError("This repository is included with the game plugin")
+        with self._mod_library_lock:
+            path, preferences = self._mod_repository_preferences()
+            custom = [item for item in preferences.get(plugin_id, []) if item.casefold() != repository.casefold()]
+            if add:
+                if len(custom) >= 12:
+                    raise ValueError("Remove a repository before adding another")
+                custom.append(repository)
+            preferences[plugin_id] = custom
+            path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write(path, (json.dumps(preferences, indent=2) + "\n").encode("utf-8"))
+
+    def mods_overview(self, plugin_id: str, refresh: bool = False) -> dict:
         """Every mod in this game's library, then Lexer's Mod modules not yet here."""
         from core import mods_service
         root = self._game_mods(plugin_id)
         plugin = self._plugins[plugin_id]
-        result = mods_service.overview(root, plugin.lexmod, self._mod_state(plugin_id))
+        repositories = self._mod_repositories(plugin_id)
+        result = mods_service.overview(root, plugin.lexmod, self._mod_state(plugin_id), repositories=repositories, refresh=refresh)
+        defaults = (plugin.lexmod, *getattr(plugin, "mod_repositories", ()))
+        for entry in result["repositories"]:
+            entry["builtIn"] = entry["repository"] in defaults
         status = self.mod_library_status(plugin_id)
         result = {**result, "root": str(root), "canManage": bool(status.get("canManage")),
                   "message": status.get("message", ""), "archiveExtensions": status.get("archiveExtensions", []),
@@ -2076,8 +2118,12 @@ class HostApi:
                 "version": catalog["version"], "features": catalog["features"],
                 "readmeProblems": catalog["readmeProblems"], "modules": catalog["modules"]}
 
-    def lexmod_download(self, plugin_id: str, modules: list[str] | None = None) -> dict:
-        repository = self._plugins[plugin_id].lexmod
+    def lexmod_download(self, plugin_id: str, modules: list[str] | None = None, repository: str = "") -> dict:
+        plugin = self._plugins[plugin_id]
+        default = plugin.lexmod
+        if repository and repository != default and repository not in self._mod_repositories(plugin_id):
+            raise ValueError("This repository is not configured for this game")
+        repository = repository or default
         if not repository:
             raise ValueError("This game has no Lexer's mod")
         if modules is not None and (not isinstance(modules, list) or not all(isinstance(m, str) for m in modules)):

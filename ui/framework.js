@@ -16227,7 +16227,9 @@ ${contents.path}`});
     const contentsQuery = {records: "", files: ""}, contentsPage = {records: 0, files: 0};
     const contentsFitted = {records: 10, files: 10};
     const failure = (title, error) => showAlert({title, message: error?.message || String(error)});
-    const load = async () => { data = await callWindow("mods_overview", pluginId); };
+    let showRepositories = false;
+    let repositoriesBusy = false;
+    const load = async (refresh = false) => { data = await callWindow("mods_overview", pluginId, ...(refresh ? [true] : [])); };
     const switchMod = async (row, event) => {
       const control = event.target, enabled = control.checked;
       let confirmed = !!(row.enabled ?? row.on);
@@ -16262,7 +16264,7 @@ ${contents.path}`});
         clearPending();
       }
     };
-    const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.folder}`}))];
+    const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.repository || ""}:${row.folder}`}))];
     const keyOf = row => row.path;
     const replaceRow = fresh => { data.rows = data.rows.map(row => row.path === fresh.path ? fresh : row); };
     // The Mods tab and the mod selector show one order: the library's load
@@ -16331,7 +16333,7 @@ ${contents.path}`});
     const download = async (row, button, note) => {
       button.disabled = true;
       try {
-        await callWindow("lexmod_download", pluginId, [row.folder]);
+        await callWindow("lexmod_download", pluginId, [row.folder], ...(row.repository ? [row.repository] : []));
         const result = await watchDownload(pluginId, progress => { note.textContent = progressText(progress); });
         if (result.state === "failed") throw new Error(result.error);
         await load(); selected = data.rows.find(item => item.folder === row.folder)?.path || null; draw();
@@ -16343,14 +16345,52 @@ ${contents.path}`});
       // add/import dialog, in every detail state.
       const addButton = element("button", {type: "button", class: "lex-header-icon",
         title: "Add a mod", "aria-label": "Add a mod", onclick: add}, addIcon());
-      if (!row) return detailPanel({title: "Mods", actions: [addButton], body: [detailNote(rows().length
+      const repositoryButton = element("button", {type: "button", onclick: () => {
+        showRepositories = !showRepositories; draw();
+      }}, showRepositories ? "Back to mod" : "Repositories");
+      const refreshRepositories = async (source, add) => {
+        if (repositoriesBusy) return;
+        repositoriesBusy = true;
+        draw();
+        try {
+          if (source) await callWindow("set_mod_repository", pluginId, source, add);
+          await load(!source);
+        } catch (error) {
+          failure("Could not update repositories", error);
+        } finally {
+          repositoriesBusy = false;
+          draw();
+        }
+      };
+      if (showRepositories) {
+        const actions = actionRow(
+          element("button", {type: "button", disabled: repositoriesBusy, onclick: async () => {
+            const source = await promptText({title: "Add a GitHub repository", label: "GitHub URL or owner/name", confirmLabel: "Add"});
+            if (source) await refreshRepositories(source, true);
+          }}, "Add repository"),
+          element("button", {type: "button", disabled: repositoriesBusy, onclick: () => refreshRepositories()}, "Refresh"));
+        const sources = (data.repositories || []).map(source => detailSection({
+          title: source.repository,
+          body: [
+            detailNote(source.error || (source.version ? `Version ${source.version}` : "Catalog unavailable")),
+            source.builtIn ? detailNote("Included with the game plugin")
+              : actionRow(element("button", {type: "button", disabled: repositoriesBusy,
+                "aria-label": `Remove ${source.repository}`,
+                onclick: () => refreshRepositories(source.repository, false)}, "Remove")),
+          ],
+        }));
+        return detailPanel({title: "Mod repositories", actions: [repositoryButton], paginate: false,
+          body: [actions, repositoriesBusy ? loadingStatus("Loading repositories") : null, ...sources]});
+      }
+      if (!row) return detailPanel({title: "Mods", actions: [addButton, repositoryButton], body: [detailNote(rows().length
         ? "Select a mod." : "This game has no mods yet. Press + in the header to create one or add one you already have.")]});
       if (row.remote) {
         const note = detailNote("");
         const button = element("button", {type: "button", class: "lex-mods-detail-download", onclick: () => download(row, button, note)}, "Download");
-        return detailPanel({title: row.name, actions: [addButton],
-          help: "A module of Lexer's Mod that is not in your library yet. Once downloaded it stays up to date.",
+        return detailPanel({title: row.name, actions: [addButton, repositoryButton],
+          help: "Download this mod to add it to your library.",
           body: [detailSection({title: "DETAILS", body: [
+            detailField({label: "SOURCE", control: readonlyField(row.repository || data.lexmod?.repository || "GitHub")}),
             detailField({label: "AUTHOR", control: readonlyField(row.author || "—")}),
             detailField({label: "DESCRIPTION", control: readonlyField(row.description || "—")})]}),
             actionRow(button), note]});
@@ -16399,7 +16439,7 @@ ${contents.path}`});
         }
       };
       // The switch closes the header row, always the rightmost record control.
-      const actions = [addButton,
+      const actions = [addButton, repositoryButton,
         element("button", {type: "button", class: "lex-header-icon", title: duplicateTitle,
           "aria-label": duplicateTitle, onclick: copyMod}, copyIcon()),
         element("button", {type: "button", class: "lex-header-icon", title: removeTitle,

@@ -205,6 +205,7 @@ class GamePlugin:
     # Lexer's Mod for this game: "Owner/Repository" on GitHub, or "" when the
     # game has none. A Lexmod is a collection of modules, each one a mod.
     lexmod: str = ""
+    mod_repositories: tuple[str, ...] = ()
     # Multi-helper plugins opt into independent setup/update rows. Legacy
     # singular fields above remain valid and are synthesized into one helper.
     helpers: tuple[PluginHelper, ...] = ()

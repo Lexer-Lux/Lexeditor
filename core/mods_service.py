@@ -178,7 +178,8 @@ def catalog(repository: str, *, fresh: bool = False) -> dict:
     return result
 
 
-def overview(game_root: Path, repository: str, state: dict | None = None) -> dict:
+def overview(game_root: Path, repository: str, state: dict | None = None, *,
+             repositories: tuple[str, ...] = (), refresh: bool = False) -> dict:
     """Everything the Mods tab lists: local mods first, then downloadable ones."""
     rows = library_rows(game_root, state)
     wanted = mod_requires.table(game_root, state=state)
@@ -190,20 +191,27 @@ def overview(game_root: Path, repository: str, state: dict | None = None) -> dic
         row["requirements"] = entry.get("needs", [])
         if entry.get("error"):
             row["requirementsError"] = entry["error"]
-    result = {"rows": rows, "remote": [], "lexmod": None}
-    if not repository:
-        return result
-    result["lexmod"] = {"repository": repository, "url": f"https://github.com/{repository}", "error": ""}
-    try:
-        remote = catalog(repository)
-    except lexmods.LexmodError as error:
-        result["lexmod"]["error"] = str(error)
-        return result
-    present = set(lexmods.installed(game_root, repository))
+    result = {"rows": rows, "remote": [], "lexmod": None, "repositories": []}
     local = {row["folder"].casefold() for row in rows}
-    result["lexmod"]["version"] = remote["version"]
-    result["remote"] = [{**module, "remote": True} for module in remote["modules"]
-                        if module["folder"] not in present and module["folder"].casefold() not in local]
+    seen = set()
+    for source in (repository, *repositories):
+        if not source or source.casefold() in seen:
+            continue
+        seen.add(source.casefold())
+        entry = {"repository": source, "url": f"https://github.com/{source}", "error": ""}
+        result["repositories"].append(entry)
+        if source == repository:
+            result["lexmod"] = entry
+        try:
+            remote = catalog(source, fresh=True) if refresh else catalog(source)
+        except lexmods.LexmodError as error:
+            entry["error"] = str(error)
+            continue
+        entry["version"] = remote["version"]
+        result["remote"].extend(
+            {**module, "repository": source, "version": remote["version"], "remote": True}
+            for module in remote["modules"] if module["folder"].casefold() not in local
+        )
     return result
 
 

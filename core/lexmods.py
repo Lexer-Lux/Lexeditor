@@ -142,13 +142,14 @@ def catalog(repository: str) -> dict:
     version = latest(repository)
     readme = _raw(repository, version["ref"], "README.md").decode("utf-8", "replace")
     tree = _json(f"https://api.github.com/repos/{repository}/git/trees/{version['ref']}?recursive=1")
-    folders = sorted({PurePosixPath(item["path"]).parts[0] for item in tree.get("tree", [])
-                      if item.get("type") == "blob" and len(PurePosixPath(item["path"]).parts) == 2
-                      and PurePosixPath(item["path"]).name == mod_metadata.FILE})
+    manifests = sorted({item["path"] for item in tree.get("tree", [])
+                        if item.get("type") == "blob" and _module_path(PurePosixPath(item["path"]).parts)})
     modules = []
-    for folder in folders:
+    for manifest in manifests:
+        folder = PurePosixPath(manifest).parent.name
         try:
-            info = json.loads(_raw(repository, version["ref"], f"{folder}/{mod_metadata.FILE}"))
+            relative_path(manifest)
+            info = json.loads(_raw(repository, version["ref"], manifest))
         except (LexmodError, ValueError):
             continue
         if not isinstance(info, dict):
@@ -210,22 +211,39 @@ def _download(url: str, progress, cancel: threading.Event | None) -> bytes:
         raise LexmodError("GitHub could not be reached") from error
 
 
+def _module_path(parts: tuple[str, ...]) -> bool:
+    return (len(parts) == 2 or (len(parts) == 3 and parts[0] == "mods")) and parts[-1] == mod_metadata.FILE
+
+
 def _modules_in(archive: zipfile.ZipFile) -> dict[str, dict[str, bytes]]:
-    """Every module folder in a GitHub archive, as {folder: {path: bytes}}."""
+    """Read module folders from the repository root or its mods directory."""
     names = [info for info in archive.infolist() if not info.is_dir()]
     if not names:
         raise LexmodError("The download is empty")
     top = PurePosixPath(names[0].filename).parts[0]
-    files: dict[str, dict[str, bytes]] = {}
+    roots = {}
     for info in names:
         parts = PurePosixPath(info.filename).parts
-        if parts[0] != top or len(parts) < 3:
-            continue
-        folder = parts[1]
-        relative = "/".join(parts[2:])
-        relative_path(f"{folder}/{relative}")  # Refuses traversal and odd names.
-        files.setdefault(folder, {})[relative] = archive.read(info)
-    return {folder: content for folder, content in files.items() if mod_metadata.FILE in content}
+        if parts[0] == top and _module_path(parts[1:]):
+            relative_path("/".join(parts[1:]))
+            key = parts[-2]
+            if key.casefold() in roots:
+                raise LexmodError(f"Duplicate module folder {key}")
+            roots[key.casefold()] = (key, parts[:-1])
+    files = {folder: {} for folder, _ in roots.values()}
+    for info in names:
+        parts = PurePosixPath(info.filename).parts
+        for depth in (2, 3):
+            if len(parts) <= depth:
+                continue
+            entry = roots.get(parts[depth - 1].casefold())
+            if entry is None or parts[:depth] != entry[1]:
+                continue
+            relative = "/".join(parts[depth:])
+            relative_path(relative)
+            files[entry[0]][relative] = archive.read(info)
+            break
+    return files
 
 
 def install(repository: str, library: Path, *, modules: list[str] | None = None,
