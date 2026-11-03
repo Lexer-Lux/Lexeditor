@@ -33,7 +33,7 @@
     ],
     "gameIdentity": "Japanese King's Field II / US King's Field, SLUS-00158",
     "modLoading": {
-      "removal": "Disable a mod in Mods with the game closed. Lexeditor removes its deployed copy and restores its previous native enable flag."
+      "removal": "Disable a mod in Mods with the game closed. Its folder and saved settings remain available."
     }
   }
 }
