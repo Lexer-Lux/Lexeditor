@@ -55,7 +55,8 @@ class ScriptModTests(unittest.TestCase):
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.dir = Path(self.temp.name)
+        # Catalog rows and recovery identify mods by their resolved paths.
+        self.dir = Path(self.temp.name).resolve()
         self.addCleanup(self.temp.cleanup)
         self.mod = make_mod(self.dir / "library")
 
