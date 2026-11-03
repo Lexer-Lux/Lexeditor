@@ -53,6 +53,7 @@ def setup(tmp_path, monkeypatch):
     (game / port.RECEIPT).write_text(json.dumps({"repository": port.PIN["repository"],
                                                "files": port._tree(game)}))
     (data / "settings.json").write_text(json.dumps({"ActiveMods": ["external.map"], "Unmodeled": {"keep": 42}}))
+    (data / "interface.ini").write_text("[RecompOne]\nmods.external.map.enabled=True\nkf2.mouse.turn=1\n[Docking][Data]\nDockNode=0x1\n")
     monkeypatch.setenv("LEXEDITOR_KF2_DATA", str(data))
     monkeypatch.setattr(model, "live_processes", lambda _: [])
     return game, data, library
@@ -138,6 +139,11 @@ def test_activation_and_removal_preserve_native_mods_and_settings(setup):
     assert not (data / "mods/lexeditor-example").exists()
     settings = json.loads((data / "settings.json").read_text())
     assert settings == {"ActiveMods": ["external.map"], "Unmodeled": {"keep": 42}}
+    values = model.ini_values((data / "interface.ini").read_text())
+    assert values["mods.external.map.enabled"] == "True"
+    assert values["mods.example.enabled"] == "False"
+    assert values["kf2.mouse.turn"] == "1"
+    assert adapter.active_mod_ids(game) == ["external.map"]
     assert (native / "mod.json").read_bytes() == original
 
 
@@ -171,7 +177,7 @@ def test_failed_configuration_write_rolls_back_mod_files_and_active_ids(setup, m
     first, second = mod(library, "first"), mod(library, "second")
     adapter = VerditeModAdapter()
     adapter.activate([first], game)
-    old_settings = (data / "settings.json").read_bytes()
+    old_settings = (data / "interface.ini").read_bytes()
     original_write = model.atomic_write
     failed = False
 
@@ -187,7 +193,7 @@ def test_failed_configuration_write_rolls_back_mod_files_and_active_ids(setup, m
         adapter.activate([second], game)
     assert (data / "mods/lexeditor-first/Mod.cs").is_file()
     assert not (data / "mods/lexeditor-second").exists()
-    assert (data / "settings.json").read_bytes() == old_settings
+    assert (data / "interface.ini").read_bytes() == old_settings
     assert not (data / RECOVERY).exists()
 
 

@@ -14,15 +14,15 @@ PLUGIN_ROOT = Path(__file__).resolve().parent
 
 def data_map() -> dict:
     rows = [
-        {"filename": "interface.ini", "controls": "Mouse and stick sensitivity, mouse look inversion.",
-         "notes": "Other Verdite2 preferences and ImGui layout remain unchanged.",
+        {"filename": "interface.ini", "controls": "Native mod switches, sensitivity, separate running, view distance and distance fading.",
+         "notes": "The Mods tab manages native enable flags. Settings use the port's saved preferences. Other keys and window layout stay intact.",
          "status": "partial", "coverage": "structured", "target": "settings", "openable": True},
         {"filename": "mods/<mod>/mod.json and *.cs", "controls": "Verdite2 source mods managed through the shared Mods tab.",
          "notes": "The existing native loader compiles and runs source mods. Installed-game acceptance is in progress.",
          "status": "partial", "coverage": "structured", "target": "mods", "openable": True},
-        {"filename": "settings.json", "controls": "Native active-mod ids and controller/keyboard bindings.",
-         "notes": "The adapter updates its own active ids and preserves the other fields. Separate run/interact controls are under investigation.",
-         "status": "partial", "coverage": "structured", "target": "settings", "openable": True},
+        {"filename": "settings.json", "controls": "Controller and keyboard bindings, disc path and memory-card paths.",
+         "notes": "Use the port's Input menu for bindings. Lexeditor does not edit this file. Its legacy ActiveMods field does not enable native mods.",
+         "status": "not-integrated", "coverage": "unavailable", "target": None, "openable": False},
         {"filename": "carda.sav / cardb.sav", "controls": "The game's memory-card saves.",
          "notes": "The editor does not modify memory-card saves.", "status": "not-integrated", "coverage": "unavailable", "target": None, "openable": False},
         {"filename": "Disc: SLUS-00158", "controls": "Items, characters, enemies, maps, scripts, models, textures and audio.",

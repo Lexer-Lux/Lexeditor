@@ -30,8 +30,8 @@ def _folder(name: str) -> str:
 
 
 class VerditeModAdapter:
-    verified = False
-    message = "Verdite2's built-in C# source-mod loader. Close the game before changing mods. Installed-game acceptance is still in progress."
+    verified = True
+    message = "Verdite2's built-in C# source-mod loader. Close the game before changing mods."
     package_types = ("folder", "zip")
 
     def inspect(self, root: Path, files: list[Path]) -> dict:
@@ -84,7 +84,7 @@ class VerditeModAdapter:
                 expected = new[name]["files"] if backup.exists() or name not in old else old[name]["files"]
                 if _tree(target) != expected:
                     raise ValueError(f"Interrupted deployment {name} was edited; recovery was preserved without overwriting it")
-        for name, before in (("settings.json", "settings.before"), (LEDGER, "ledger.before")):
+        for name, before in (("interface.ini", "interface.before"), (LEDGER, "ledger.before")):
             current = model.read_bytes(data / name)
             original = model.read_bytes(recovery / before)
             if model.fingerprint(current) not in (model.fingerprint(original), state["after"][name]):
@@ -97,7 +97,7 @@ class VerditeModAdapter:
                 backup.rename(target)
             elif name not in old and target.exists():
                 shutil.rmtree(target)
-        for name, before in (("settings.json", "settings.before"), (LEDGER, "ledger.before")):
+        for name, before in (("interface.ini", "interface.before"), (LEDGER, "ledger.before")):
             raw = model.read_bytes(recovery / before)
             if raw:
                 model.atomic_write(data / name, raw)
@@ -137,14 +137,12 @@ class VerditeModAdapter:
                     identity = model.read_json(folder / "mod.json").get("id", "")
                     if str(identity).casefold() in identities:
                         raise ValueError(f"Native mod {identity} already exists outside Lexeditor")
-            raw_settings = model.read_bytes(data / "settings.json")
-            settings = model.read_json(data / "settings.json")
-            active = settings.get("ActiveMods", [])
-            if not isinstance(active, list) or any(not isinstance(value, str) for value in active):
-                raise ValueError("Verdite2 ActiveMods must be a list of native mod ids")
+            raw_settings = model.read_bytes(data / "interface.ini")
             owned_ids = {entry["id"] for entry in old.values()}
-            settings["ActiveMods"] = [value for value in active if value not in owned_ids] + [entry["id"] for entry in new.values()]
-            after_settings, after_ledger = _json(settings), _json({"folders": new})
+            enabled = {f"mods.{identity}.enabled": "False" for identity in owned_ids}
+            enabled.update({f"mods.{entry['id']}.enabled": "True" for entry in new.values()})
+            after_settings = model.updated_ini(raw_settings, enabled)
+            after_ledger = _json({"folders": new})
             required = sum((folder / path).stat().st_size for folder in mods for path in file_tree(folder))
             if shutil.disk_usage(data).free < required + 4 * model.MAX_CONFIG:
                 raise OSError("There is not enough free space to stage the enabled source mods")
@@ -157,17 +155,17 @@ class VerditeModAdapter:
                         raise ValueError(f"{name} changed while being prepared; nothing was deployed")
                 recovery.mkdir()
                 (recovery / "mods").mkdir()
-                model.atomic_write(recovery / "settings.before", raw_settings)
+                model.atomic_write(recovery / "interface.before", raw_settings)
                 model.atomic_write(recovery / "ledger.before", model.read_bytes(data / LEDGER))
                 transaction = {"phase": "applying", "old": old, "new": new,
-                               "after": {"settings.json": model.fingerprint(after_settings), LEDGER: model.fingerprint(after_ledger)}}
+                               "after": {"interface.ini": model.fingerprint(after_settings), LEDGER: model.fingerprint(after_ledger)}}
                 model.atomic_write(recovery / "transaction.json", _json(transaction))
                 try:
                     for name in old:
                         (native / name).rename(recovery / "mods" / name)
                     for name in new:
                         (staged / name).rename(native / name)
-                    model.atomic_write(data / "settings.json", after_settings)
+                    model.atomic_write(data / "interface.ini", after_settings)
                     model.atomic_write(data / LEDGER, after_ledger)
                     transaction["phase"] = "committed"
                     model.atomic_write(recovery / "transaction.json", _json(transaction))
@@ -175,10 +173,12 @@ class VerditeModAdapter:
                     self.recover(game_root)
                     raise
                 shutil.rmtree(recovery)
-            return {"activated": [folder.name for folder in mods], "mods": settings["ActiveMods"], "dataRoot": str(data)}
+            return {"activated": [folder.name for folder in mods], "mods": self.active_mod_ids(game_root), "dataRoot": str(data)}
 
     def active_mod_ids(self, game_root: Path) -> list[str]:
-        return list(model.read_json(model.data_root() / "settings.json").get("ActiveMods", []))
+        values = model.ini_values(model.read_bytes(model.data_root() / "interface.ini").decode("utf-8-sig"))
+        return [key[5:-8] for key, value in values.items()
+                if key.startswith("mods.") and key.endswith(".enabled") and value.casefold() == "true"]
 
     def standalone_mods(self, game_root: Path) -> list[dict]:
         native = model.data_root() / "mods"
