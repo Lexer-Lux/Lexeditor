@@ -1,5 +1,5 @@
 """Each mod's conflict lines, said from its own side (core/mod_conflicts.py)."""
-from core.mod_conflicts import MAX_LISTED, lines_by_mod
+from core.mod_conflicts import MAX_LISTED, lines_by_mod, merge_marks
 
 
 def test_the_last_mod_overrides_and_the_others_are_told():
@@ -18,3 +18,13 @@ def test_a_part_one_mod_changes_is_no_conflict_and_long_lists_are_counted():
 def test_a_mod_outside_the_library_counts_but_gets_no_row():
     lines = lines_by_mod([("Name 100", ["A", "Project"])], {"A": "a"})
     assert lines == {"a": ["Name 100: Project changes this too and loads later, so this mod's change is not used"]}
+
+
+def test_combining_reports_preserves_cached_inputs_and_bounds_the_result():
+    first = {'a': [str(index) for index in range(MAX_LISTED)]}
+    second = {'a': ['overlap'], 'b': ['new conflict']}
+    result = merge_marks(first, second)
+    assert result['a'] == first['a'] + ['…and 1 more']
+    result['b'].append('another conflict')
+    assert len(first['a']) == MAX_LISTED
+    assert second == {'a': ['overlap'], 'b': ['new conflict']}
