@@ -31,6 +31,9 @@ def main():
                   state.filters.effectSection=tab==='effects'?active:'effects';
                   state.tab=tab;await render();
                 }''',[tab,active])
+                # Measure the selected surface before exercising hover below.
+                # The pointer can remain over the replacement active tab.
+                page.mouse.move(1595,895)
                 bar=page.locator('#toolbar > .lex-subtab-bar')
                 bar.wait_for()
                 page.wait_for_function("getComputedStyle(document.querySelector('nav button.active')).backgroundColor===getComputedStyle(document.querySelector('#toolbar>.lex-subtab-bar')).backgroundColor")

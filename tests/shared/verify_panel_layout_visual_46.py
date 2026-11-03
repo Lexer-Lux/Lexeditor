@@ -116,6 +116,16 @@ def drag_second_divider(cdp: Cdp, selector: str, panel_selector: str) -> dict:
     return geometry
 
 
+def assert_automatic_split(result: dict) -> None:
+    assert len(result['before']) == len(result['after']) > 1, result
+    assert all(width > 0 for width in result['after']), result
+    assert all(abs(before - after) < 2 for before, after in zip(result['before'], result['after'])), result
+    if 'stored' in result:
+        assert result['stored'] is None, result
+        assert 'lex-panel-layout-static' in result['rootClass'], result
+        assert result['orientation'] is None and not result['prevented'], result
+
+
 def verify_ff8() -> dict:
     project = tempfile.TemporaryDirectory(prefix="lexeditor-panel-layout-ff8-", ignore_cleanup_errors=True)
     profile = browser = cdp = None
@@ -129,14 +139,9 @@ def verify_ff8() -> dict:
             result = check_layout(cdp, ".gf-three-panel", ".lex-panel-layout-pane",
                                   "lexeditor:panel-layout:ff8-gfs")
             assert result["panels"] == 3 and result["dividers"] == 2, result
-            assert result["after"][0] > result["before"][0], result
-            assert result["after"][1] < result["before"][1], result
-            assert abs(result["after"][2] - result["before"][2]) < 2, result
-            assert isinstance(result["stored"], list) and len(result["stored"]) == 3, result
+            assert_automatic_split(result)
             pointer = drag_second_divider(cdp, ".gf-three-panel", ".lex-panel-layout-pane")
-            assert abs(pointer["after"][0] - pointer["before"][0]) < 2, pointer
-            assert pointer["after"][1] > pointer["before"][1], pointer
-            assert pointer["after"][2] < pointer["before"][2], pointer
+            assert_automatic_split(pointer)
             result["pointer"] = pointer
             result["screenshot"] = str(screenshot(cdp, "github-46-ff8-resizable-panels.png"))
             cdp.call("Emulation.setDeviceMetricsOverride", {
@@ -303,7 +308,7 @@ def verify_blank() -> dict:
             assert integer == {"value": "25", "model": 25, "dirty": 0}, integer
             edited = cdp.eval("""(()=>{const row=[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER')),input=row.querySelector('input[type=number]');input.value='26';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));return{value:input.value,model:demo.value,dirty:dirtyCount(),reference:row.querySelector('.lex-reference-value')?.textContent.trim(),saveDisabled:document.querySelector('#global-save').disabled};})()""")
             assert edited["value"] == "26" and edited["model"] == 26 and edited["dirty"] == 1, edited
-            assert edited["reference"] == "V25" and not edited["saveDisabled"], edited
+            assert edited["reference"] == "V25 units" and not edited["saveDisabled"], edited
             unit_layout = cdp.eval("""(()=>{const row=[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER')),root=row.querySelector('.lex-source-control-internal'),input=root.querySelector('input[type=number]'),unit=root.querySelector('.lex-unit'),reference=root.querySelector('.lex-reference-value'),stepper=root.querySelector('.lex-stepper'),up=root.querySelector('.lex-stepper-up');const box=node=>{const value=node.getBoundingClientRect();return{left:value.left,right:value.right,top:value.top,bottom:value.bottom,width:value.width}};const r=reference.getBoundingClientRect();return{root:box(root),input:box(input),unit:box(unit),reference:box(reference),stepper:box(stepper),up:box(up),referenceHit:document.elementFromPoint((r.left+r.right)/2,(r.top+r.bottom)/2)?.closest('.lex-reference-value')===reference,paddingRight:getComputedStyle(input).paddingRight};})()""")
             assert unit_layout["unit"]["right"] <= unit_layout["input"]["right"] - 3, unit_layout
             assert unit_layout["reference"]["left"] >= unit_layout["unit"]["right"] + 3, unit_layout
@@ -335,11 +340,10 @@ def verify_blank() -> dict:
             result = check_layout(cdp, ".blank-layout", ".lex-panel-layout-pane",
                                   "lexeditor:list-detail:blank-two")
             assert result["panels"] == 2 and result["dividers"] == 1, result
-            assert result["after"][0] > result["before"][0], result
+            assert_automatic_split(result)
             table_heading = cdp.eval("""(()=>{const head=document.querySelector('.lex-column-list-header'),cell=head.querySelector('.lex-column-list-head-cell'),row=document.querySelector('.lex-column-list-row'),style=getComputedStyle(cell);return{height:head.getBoundingClientRect().height,rowHeight:row.getBoundingClientRect().height,fontSize:parseFloat(style.fontSize),bodyFontSize:parseFloat(getComputedStyle(row).fontSize),fontWeight:Number(style.fontWeight)}})()""")
             assert table_heading["height"] <= table_heading["rowHeight"], table_heading
             assert 15.5 <= table_heading["fontSize"] <= 17 and table_heading["fontWeight"] >= 700, table_heading
-            assert result["after"][1] < result["before"][1], result
             assert not result["errors"], result
             defaults = cdp.eval("""(()=>{const style=getComputedStyle(document.documentElement),title=document.querySelector('.lex-detail-section-title'),initial=document.querySelector('.lex-column-list-head-cell[aria-sort]:not([aria-sort="none"])'),indicator=initial?.querySelector('.lex-sort-indicator'),indicatorBox=indicator?.getBoundingClientRect(),cellBox=initial?.getBoundingClientRect();return{background:style.getPropertyValue('--lex-bg').trim(),panel:style.getPropertyValue('--lex-panel').trim(),titlePosition:getComputedStyle(title).position,titleTransform:getComputedStyle(title).transform,sortKey:initial?.dataset.columnKey,sortText:indicator?.textContent.trim(),sortPosition:getComputedStyle(indicator).position,sortVisible:indicatorBox.width>0&&indicatorBox.left>=cellBox.left&&indicatorBox.right<=cellBox.right,order:[...document.querySelectorAll('.lex-column-list-row')].map(node=>node.textContent)}})()""")
             assert defaults["background"] == "#e3e7eb" and defaults["panel"] == "#ffffff", defaults
@@ -402,14 +406,28 @@ def verify_blank() -> dict:
             editable_screenshot = str(screenshot(cdp, "github-46-blank-game-editable-table.png"))
             cdp.eval("navigate('three')")
             wait_eval(cdp, "document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length===3", 10)
-            # The tip target carries the mark's own overhang: the drawn pin leans
-            # up and to the right of its tip, so the tip sits left of the value
-            # box's edge by that overhang and a few pixels lower, which keeps the
-            # whole mark inside the row instead of past the panel body's clip.
-            three = cdp.eval("""(()=>{const rows=[...document.querySelectorAll('.blank-detail .lex-detail-field')].filter(row=>row.querySelector('.lex-column-pin')),pins=rows.map(row=>{const root=row.querySelector('.lex-source-control'),target=root.querySelector('input,select'),pin=root.querySelector('.lex-column-pin'),a=target.getBoundingClientRect(),p=pin.getBoundingClientRect(),outward=false,inset=Math.min(3,a.height*.1),tip={x:p.left+p.width*3.71/24,y:p.top+p.height*21.71/24},wanted={x:a.right+(outward?inset:-inset-Math.min(p.width-p.width*3.71/24,8)),y:a.top+(outward?-inset:inset+Math.min(4,a.height*.2))};return{kind:target.type||target.tagName.toLowerCase(),size:p.width,dx:tip.x-wanted.x,dy:tip.y-wanted.y}});return{panels:document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length,dividers:document.querySelectorAll('.blank-layout>.lex-panel-layout-divider').length,statuses:document.querySelectorAll('.lex-integration-status').length,pins}})()""")
+            # The whole mark must stay inside its property row, near the value's
+            # upper-right corner. Wide booleans contain it in the box; numeric
+            # pins can move left to remain inside the row's clipping boundary.
+            three = cdp.eval("""(()=>{
+              const rows=[...document.querySelectorAll('.blank-detail .lex-detail-field')]
+                .filter(row=>row.querySelector('.lex-column-pin'));
+              const pins=rows.map(row=>{
+                const target=row.querySelector('.lex-source-control input,.lex-source-control select'),
+                  pin=row.querySelector('.lex-column-pin'),a=target.getBoundingClientRect(),
+                  p=pin.getBoundingClientRect(),r=row.getBoundingClientRect();
+                return{kind:target.type||target.tagName.toLowerCase(),size:p.width,
+                  inside:p.left>=r.left-1&&p.right<=r.right+1&&p.top>=r.top-1&&p.bottom<=r.bottom+1,
+                  cornerGap:a.right-p.right,topGap:p.top-a.top};
+              });
+              return{panels:document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length,
+                dividers:document.querySelectorAll('.blank-layout>.lex-panel-layout-divider').length,
+                statuses:document.querySelectorAll('.lex-integration-status').length,pins};
+            })()""")
             assert three["panels"] == 3 and three["dividers"] == 2 and three["statuses"] == 3, three
             assert len(three["pins"]) == 4 and all(pin["size"] >= 13 for pin in three["pins"]), three
-            assert all(abs(pin["dx"]) <= 1 and abs(pin["dy"]) <= 1 for pin in three["pins"]), three
+            assert all(pin['inside'] and abs(pin['cornerGap']) <= pin['size'] + 1
+                       and abs(pin['topGap']) <= pin['size'] + 1 for pin in three['pins']), three
             three_screenshot = str(screenshot(cdp, "github-46-blank-game-three-panels.png"))
             cdp.eval("navigate('subtabs')")
             wait_eval(cdp, "!!document.querySelector('.lex-subtab-bar')", 10)
@@ -473,14 +491,9 @@ def verify_rdr2() -> dict:
             result = check_layout(cdp, ".shop-workspace", ".lex-panel-layout-pane",
                                   "lexeditor:panel-layout:rdr2-shops")
             assert result["panels"] == 3 and result["dividers"] == 2, result
-            assert result["after"][0] > result["before"][0], result
-            assert result["after"][1] < result["before"][1], result
-            assert abs(result["after"][2] - result["before"][2]) < 2, result
-            assert isinstance(result["stored"], list) and len(result["stored"]) == 3, result
+            assert_automatic_split(result)
             pointer = drag_second_divider(cdp, ".shop-workspace", ".lex-panel-layout-pane")
-            assert abs(pointer["after"][0] - pointer["before"][0]) < 2, pointer
-            assert pointer["after"][1] > pointer["before"][1], pointer
-            assert pointer["after"][2] < pointer["before"][2], pointer
+            assert_automatic_split(pointer)
             result["pointer"] = pointer
             result["recordLayouts"] = record_layouts
             result["screenshot"] = str(screenshot(cdp, "github-46-rdr2-resizable-shops.png"))

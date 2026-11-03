@@ -203,12 +203,14 @@ def main():
                     # so a lone "V" holds the same column an "R1" would.
                     assert 0<=data['indent']<=30,data
                     assert data['height']<=data['row']+1,data
-                # A value box is square, and a panel ends where the pagination
-                # bar begins - no band of dead ground between them, and the
-                # same on every page that has a bar.
+                # Every value box uses the shared theme's corner token. A
+                # plugin or field must not invent its own control shape.
                 for box in page.locator('.lex-detail-field[data-lex-type] input:not([type=checkbox])').all():
                     if not box.is_visible():continue
-                    assert box.evaluate("e=>getComputedStyle(e).borderRadius")=='0px',                        box.evaluate("e=>[e.className,getComputedStyle(e).borderRadius]")
+                    corners = box.evaluate('''node=>{const css=getComputedStyle(node);
+                      return {actual:css.borderRadius,expected:(css.getPropertyValue('--lex-input-radius')
+                        ||css.getPropertyValue('--lex-radius')).trim()};}''')
+                    assert corners['actual'] == corners['expected'], corners
                 # Measured from the last row a reader can SEE, not from the
                 # box around it: the pane reached the bar while its content
                 # stopped a pager's height short, which is the band that was
