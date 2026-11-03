@@ -162,6 +162,7 @@ def _database(root):
 
 
 def load(root, key):
+    verified = None
     try:
         with _database(root) as database:
             size = database.execute('SELECT length(data) FROM outputs WHERE key = ?', (key,)).fetchone()
@@ -174,6 +175,7 @@ def load(root, key):
             if len(data) > LIMIT or sha256(data).digest() != checksum:
                 database.execute('DELETE FROM outputs WHERE key = ?', (key,))
                 return None
+            verified = data
             # A warm scan reads hundreds of archives. Updating each timestamp
             # every time turned cache hits into synchronous disk commits.
             # Minute-resolution recency keeps eviction useful without writing
@@ -183,7 +185,9 @@ def load(root, key):
                 database.execute('UPDATE outputs SET touched = ? WHERE key = ?', (now, key))
             return data
     except (OSError, sqlite3.Error, TypeError, ValueError):
-        return None
+        # Recency is disposable metadata. A failed UPDATE or commit must not
+        # discard archive bytes whose size and checksum already verified.
+        return verified
 
 
 def store(root, key, data):
