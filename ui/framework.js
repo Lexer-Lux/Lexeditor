@@ -3509,7 +3509,8 @@
       const icon = pin.getBoundingClientRect();
       if (!owner.width || !target.height || !icon.width) return;
       const checkbox = input.matches('input[type="checkbox"]');
-      const wideBoolean = checkbox && document.documentElement.dataset.lexBooleanStyle !== "arrow";
+      const wideBoolean = checkbox && target.width >= 2 * icon.width
+        && document.documentElement.dataset.lexBooleanStyle !== "arrow";
       if (checkbox && !wideBoolean) {
         // Keep the whole icon inside the row, above the leader near the box.
         // Rectangles include UI zoom; positioned offsets use unscaled pixels.
