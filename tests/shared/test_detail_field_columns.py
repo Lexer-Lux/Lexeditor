@@ -100,6 +100,8 @@ def test_developer_can_drop_a_property_into_an_empty_column(page):
             f'[data-lex-layout-field="{columns[1][0]}"] .lex-detail-field-label-text').text_content()
         first = page.locator('main .lex-tweak-column').first.locator('.lex-detail-field').first
         drag(page, name, first)
+        updated = page.evaluate(COLUMNS)
+        assert len(updated[1]) < len(columns[1]), (columns, updated)
     assert page.evaluate(COLUMNS)[1] == []
     empty = page.locator('main .lex-tweaks-paged .lex-tweak-column').nth(1)
     box = empty.bounding_box()
@@ -136,6 +138,8 @@ def test_tally_counts_empty_fitted_columns(page):
             f'[data-lex-layout-field="{columns[donor][0]}"] .lex-detail-field-label-text').text_content()
         first = page.locator('main .lex-tweak-column').first.locator('.lex-detail-field').first
         drag(page, name, first)
+        updated = page.evaluate(COLUMNS)
+        assert sum(map(len, updated[1:])) < sum(map(len, columns[1:])), (columns, updated)
     assert page.evaluate(COLUMNS)[1:] == [[], []]
     # Right-click fits to width again: the deal keeps three columns (the
     # stored three-group layout applies as stored), and the tally says so.
