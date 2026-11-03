@@ -1,9 +1,9 @@
-"""Boolean rows stand as tall as number rows until references show.
+"""Boolean provenance remains readable without moving neighboring rows.
 
 Lexer's Navigation section (all booleans) ran visibly taller than its
 number siblings: every boolean row reserved a 12px provenance gutter
-whether or not it had references to show. The gutter now appears only
-with actual reference values; the box itself matches input height.
+whether or not it had references to show. References now share the value
+box, and appearing or disappearing must not change the row height.
 """
 from test_shared_ui_feedback import ROOT, framework, page  # noqa: F401
 
@@ -42,17 +42,23 @@ def test_boolean_row_matches_number_row_without_references(page):
     assert abs(boolean - number) <= 1, (number, boolean)
 
 
-def test_boolean_row_grows_when_references_show(page):
+def test_boolean_row_stays_stable_when_references_show_and_hide(page, tmp_path):
     framework(page)
     mount_rows(page, 1)
-    short = heights(page)
-    page.evaluate('''() => {
-      const flag = document.querySelector('.lex-boolean-field input[type=checkbox]');
-      flag.checked = false;
-      flag.dispatchEvent(new Event('input', {bubbles: true}));
-      LexeditorUI.refreshReferences();
-    }''')
-    page.wait_for_timeout(250)
-    assert page.locator('.lex-boolean-field .lex-reference-values').is_visible()
-    grown = heights(page)
-    assert grown[1] - short[1] >= 10, (short, grown)
+    baseline = heights(page)
+    flag = page.locator('.lex-boolean-field input[type=checkbox]')
+    reference = page.locator('.lex-boolean-field .lex-reference-values')
+    for checked in (False, True, False):
+        flag.set_checked(checked)
+        page.wait_for_timeout(100)
+        assert reference.is_visible() is (not checked)
+        current = heights(page)
+        assert all(abs(left-right) <= 1 for left, right in zip(baseline, current)), (baseline, current)
+        if not checked:
+            assert reference.evaluate('''node=>{
+              const row=node.closest('.lex-detail-field').getBoundingClientRect();
+              const box=node.getBoundingClientRect();
+              return box.width>0 && box.height>0 && box.left>=row.left && box.right<=row.right+1
+                && box.top>=row.top && box.bottom<=row.bottom+1;
+            }''')
+    page.screenshot(path=str(tmp_path / 'stable-boolean-reference.png'))
