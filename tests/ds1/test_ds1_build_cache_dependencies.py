@@ -145,6 +145,30 @@ def test_installer_and_archive_engine_changes_do_not_change_the_script_engine_id
     tweak_mods._installation_revision.cache_clear()
 
 
+def test_script_cache_survives_checkout_line_ending_changes(game, monkeypatch):
+    root, library, _built = game
+    folder = mod(library, 'stable', 'def build(settings,context):\n    return {"native/value.txt":"safe"}\n')
+    source_files = {Path(module.__file__) for module in (script_mods, script_worker, build_dependencies)}
+    original = Path.read_bytes
+
+    def with_endings(path, ending):
+        data = original(path)
+        if path in source_files:
+            return data.replace(b'\r\n', b'\n').replace(b'\n', ending)
+        return data
+
+    try:
+        with monkeypatch.context() as changes:
+            changes.setattr(Path, 'read_bytes', lambda path: with_endings(path, b'\r\n'))
+            tweak_mods._script_compiler_revision.cache_clear()
+            assert not build(folder, root, library).get('cached')
+            changes.setattr(Path, 'read_bytes', lambda path: with_endings(path, b'\n'))
+            tweak_mods._script_compiler_revision.cache_clear()
+            assert build(folder, root, library)['cached']
+    finally:
+        tweak_mods._script_compiler_revision.cache_clear()
+
+
 def test_incomplete_dependency_record_builds_but_never_reuses_stale_outputs(game):
     root,library,_built = game
     folder = mod(library,'simple','def build(settings,context):\n    return {"native/value.txt":"safe"}\n')
