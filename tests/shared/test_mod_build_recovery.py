@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core.mod_builds import ModBuildError, activate_with_recovery
+from core.mod_builds import ModBuildError, ModRecoveryError, activate_with_recovery
 
 
 def write_mod(parent: Path, folder: str, name: str | None = None, **extra) -> Path:
@@ -149,7 +149,12 @@ class ActivateForLaunchTest(unittest.TestCase):
             script_mods.build_batch(rows, SimpleNamespace(current=''), allowed_roots=('native',))
             self.fail('A failed rollback must not reach deployment')
         adapter = ScriptedAdapter(behavior)
-        with patch.object(script_mods, 'build', side_effect=[{'files': []}, ValueError('broken')]), \
+        def build(folder, context, *, allowed_roots, rollback):
+            if folder == good:
+                rollback[folder] = {script_mods.MANIFEST_FILE: None}
+                return {'files': []}
+            raise ValueError('broken')
+        with patch.object(script_mods, 'build', side_effect=build), \
                 patch.object(script_mods, 'restore_generated', side_effect=OSError('cannot restore')):
             with self.assertRaisesRegex(ModBuildError, 'rollback failed'):
                 activate_with_recovery(adapter, [good, bad], self.game_root)
@@ -243,6 +248,71 @@ class ActivateForLaunchTest(unittest.TestCase):
 
         self.assertTrue(enabled_of(first))
         self.assertTrue(enabled_of(second))
+        self.assertEqual(len(adapter.calls), 1)
+
+    def test_failed_retry_reports_mods_already_excluded_without_blame_for_healthy_mods(self):
+        for index, failure in enumerate((OSError('disk unavailable'),
+                                         RuntimeError('deployment failed'),
+                                         ModBuildError([], 'shared input damaged'))):
+            with self.subTest(error=type(failure).__name__):
+                library = self.root/str(index)
+                bad = write_mod(library, 'bad', 'Bad Mod')
+                dependent = write_mod(library, 'dependent', 'Dependent Mod', requires=['bad'])
+                good = write_mod(library, 'good', 'Good Mod')
+                def behavior(active, game_root):
+                    if bad.resolve() in active:
+                        raise ModBuildError([bad], 'broken archive')
+                    raise failure
+                adapter = ScriptedAdapter(behavior)
+                with self.assertRaises(ModRecoveryError) as caught:
+                    activate_with_recovery(adapter, [bad, dependent, good], self.game_root)
+                self.assertEqual(caught.exception.folders, ())
+                self.assertIs(caught.exception.__cause__, failure)
+                self.assertIn(str(failure), str(caught.exception))
+                self.assertIn('Bad Mod: broken archive', str(caught.exception))
+                self.assertIn('Dependent Mod: A required mod could not be built.', str(caught.exception))
+                self.assertEqual([row['folder'] for row in caught.exception.disabledMods], ['bad','dependent'])
+                self.assertEqual(len(adapter.calls), 2)
+                self.assertFalse(enabled_of(bad))
+                self.assertFalse(enabled_of(dependent))
+                self.assertTrue(enabled_of(good))
+
+    def test_failed_native_retry_does_not_claim_ini_switches_were_committed(self):
+        bad = write_mod(self.root, 'bad', 'Bad Mod')
+        good = write_mod(self.root, 'good', 'Good Mod')
+        def behavior(active, game_root):
+            if bad.resolve() in active:
+                raise ModBuildError([bad], 'broken native mod')
+            raise OSError('INI unavailable')
+        adapter = ScriptedAdapter(behavior)
+        adapter.library_state = lambda: {}
+        with self.assertRaises(ModRecoveryError) as caught:
+            activate_with_recovery(adapter, [bad, good], self.game_root)
+        self.assertIn('Mods excluded during recovery:', str(caught.exception))
+        self.assertNotIn('switched off', str(caught.exception))
+        self.assertTrue(enabled_of(bad))
+        self.assertTrue(enabled_of(good))
+
+    def test_selection_write_failure_reports_only_completed_exclusions(self):
+        from core import mods_service
+        bad = write_mod(self.root, 'bad', 'Bad Mod')
+        dependent = write_mod(self.root, 'dependent', 'Dependent Mod', requires=['bad'])
+        good = write_mod(self.root, 'good', 'Good Mod')
+        def behavior(active, game_root):
+            raise ModBuildError([bad], 'broken archive')
+        adapter = ScriptedAdapter(behavior)
+        write = mods_service.set_enabled
+        def fail_dependent(folder, enabled):
+            if folder == dependent:
+                raise OSError('metadata is busy')
+            return write(folder, enabled)
+        with patch.object(mods_service, 'set_enabled', side_effect=fail_dependent):
+            with self.assertRaisesRegex(ModRecoveryError, 'metadata is busy') as caught:
+                activate_with_recovery(adapter, [bad, dependent, good], self.game_root)
+        self.assertEqual([row['folder'] for row in caught.exception.disabledMods], ['bad'])
+        self.assertFalse(enabled_of(bad))
+        self.assertTrue(enabled_of(dependent))
+        self.assertTrue(enabled_of(good))
         self.assertEqual(len(adapter.calls), 1)
 
     def test_failure_outside_active_set_propagates_without_disabling(self):
