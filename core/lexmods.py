@@ -272,11 +272,32 @@ def install(repository: str, library: Path, *, modules: list[str] | None = None,
     if unknown:
         raise LexmodError("Lexer's mod has no module " + ", ".join(sorted(unknown)))
     library.mkdir(parents=True, exist_ok=True)
+    installed_ids = set()
+    if install_only:
+        for path in library.iterdir():
+            if not path.is_dir() or path.name.startswith("."):
+                continue
+            try:
+                existing = mod_metadata._stored(path)
+            except (ValueError, OSError):
+                existing = {}
+            installed_ids.add(str(existing.get("id") or path.name).casefold())
     plans = []
     for folder in sorted(wanted & set(upstream)):
         target = library / folder
         if target.exists() and (install_only or folder not in present):
             raise LexmodError(f"A mod named {folder} is already in the library and did not come from Lexer's mod")
+        if install_only:
+            try:
+                metadata = json.loads(upstream[folder][mod_metadata.FILE].decode("utf-8-sig"))
+            except (UnicodeError, ValueError) as error:
+                raise LexmodError(f"{folder} has invalid mod metadata") from error
+            if not isinstance(metadata, dict):
+                raise LexmodError(f"{folder} has invalid mod metadata")
+            identity = str(metadata.get("id") or folder).casefold()
+            if identity in installed_ids:
+                raise LexmodError(f"A mod with ID {identity} is already in the library")
+            installed_ids.add(identity)
         plans.append((folder, target, upstream[folder]))
     if cancel is not None and cancel.is_set():
         raise Cancelled("The download was cancelled")

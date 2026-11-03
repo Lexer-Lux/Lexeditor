@@ -35,6 +35,17 @@ class ModsServiceTests(unittest.TestCase):
             (root / "mod.json").write_text(json.dumps(mod), encoding="utf-8")
         return root
 
+    def test_selected_install_rejects_an_id_already_installed_under_another_folder(self):
+        existing = self.make("Renamed", id="combat", name="My copy", enabled=False)
+        before = (existing / "mod.json").read_bytes()
+        incoming = archive({"Combat": {"mod.json": b'{"id":"Combat","name":"Combat"}'}})
+        with self.assertRaisesRegex(lexmods.LexmodError, "ID combat is already"):
+            lexmods.install(REPO, self.game, modules=["Combat"], install_only=True,
+                            fetch={"version": {"version": "v1", "ref": "v1"}, "zip": incoming})
+        self.assertEqual(list(self.game.iterdir()), [existing])
+        self.assertEqual((existing / "mod.json").read_bytes(), before)
+
+
     def test_local_mods_come_first_then_lexer_modules_not_downloaded(self):
         self.make("Mine", name="Mine", author="Me", enabled=True)
         self.make("Unnamed")
