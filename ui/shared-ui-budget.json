@@ -1,4 +1,13 @@
 {
   "note": "Counts may fall, never rise. See tests/shared/verify_shared_ui_budget.py.",
-  "files": {}
+  "files": {
+    "plugins/ds1/editor.js": {
+      "sharedSelectors": 14,
+      "handBuiltRows": 0
+    },
+    "plugins/ff8/editor.css": {
+      "sharedSelectors": 2,
+      "handBuiltRows": 0
+    }
+  }
 }

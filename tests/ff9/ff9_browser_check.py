@@ -16,6 +16,8 @@ from playwright.sync_api import expect, sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 
 from plugins.ff9 import memoria_baseline
 from plugins.ff9.plugin import FF9Session
@@ -82,8 +84,7 @@ def csv_bytes(relative: str) -> bytes:
 
 def field(page, label: str):
     row = page.locator(".lex-detail-field").filter(has=page.get_by_text(label, exact=True)).first
-    expect(row).to_be_visible()
-    return row
+    return reveal(page, row)
 
 
 def numeric_field(page, label: str):
@@ -211,7 +212,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             # Right-clicking a property puts back the value its record shipped
             # with. The shared Detail owns the reset and the reference entry;
             # the plugin supplies the vanilla value and the way to write one.
-            price.fill("333")
+            numeric_field(page, "BUY PRICE").fill("333")
             expect(save).to_be_enabled()
             expect(page.locator(".lex-source-control.lex-value-modified")).to_have_count(1)
             page.screenshot(path=str(OUT / "ff9-items-modified.png"), full_page=True)
@@ -221,14 +222,14 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             expect(page.locator(".lex-source-control.lex-value-modified")).to_have_count(0)
             page.screenshot(path=str(OUT / "ff9-items-restored.png"), full_page=True)
 
-            price.fill("333")
+            numeric_field(page, "BUY PRICE").fill("333")
             expect(save).to_be_enabled()
             save.click(button="right")
             page.get_by_role("button", name="Discard Changes", exact=True).click()
             expect(price).to_have_value("250")
             expect(save).to_be_disabled()
 
-            price.fill("333")
+            numeric_field(page, "BUY PRICE").fill("333")
             save.click()
             page.wait_for_function("dirtyCount()===0")
             overlay = project / "StreamingAssets/Data/Items/Items.csv"
@@ -266,7 +267,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.screenshot(path=str(OUT / "ff9-enemy-save-reopen.png"), full_page=True)
 
             page.evaluate("navigate('info')")
-            expect(page.get_by_text("EXTERNAL MOD COMPATIBILITY", exact=True)).to_be_visible()
+            reveal(page, page.get_by_text("EXTERNAL MOD COMPATIBILITY", exact=True))
             expect(page.get_by_label("ENABLED", exact=True)).to_have_value("None detected")
             expect(page.get_by_label("RUNTIME ORDER", exact=True)).to_have_value("No active mod folders")
             expect(page.get_by_label("METADATA WARNINGS", exact=True)).to_have_value("None detected")
@@ -365,7 +366,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             # many items the shop holds, and the panel must name them.
             page.evaluate("navigate('shops')")
             page.wait_for_function("state.datasets.shops?.rows?.length===2")
-            shop_rows = page.locator(".ff9-table .lex-column-list-row")
+            shop_rows = page.locator(".ff9-table .lex-column-list-row:not(.lex-filler-row)")
             expect(shop_rows).to_have_count(2)
             expect(shop_rows.filter(has_text="Test Shop")).to_contain_text("3 items")
             expect(shop_rows.filter(has_text="Closed Shop")).to_contain_text("Nothing")
@@ -404,7 +405,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             expect(field(page, "ICON").locator("select")).to_have_count(1)
             page.screenshot(path=str(OUT / "ff9-tetra-master.png"), full_page=True)
             raised = "A" if selected_card["ATK(UP)"] % 10 + 1 == 10 else str(selected_card["ATK(UP)"] % 10 + 1)
-            ranks.first.click()
+            reveal(page, ranks.first).click()
             expect(ranks.first).to_have_text(raised)
             ranks.first.click(button="right")
             expect(ranks.first).to_have_text(shown("ATK(UP)"))
@@ -415,7 +416,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.evaluate("state.datasetChoice.abilities='ability-beatrix-1'")
             page.evaluate("navigate('abilities')")
             page.wait_for_function("state.datasets['ability-beatrix-1']?.rows?.length===4")
-            ability_rows = page.locator(".ff9-table .lex-column-list-row")
+            ability_rows = page.locator(".ff9-table .lex-column-list-row:not(.lex-filler-row)")
             expect(ability_rows).to_have_count(4)
             expect(ability_rows.filter(has_text="Empty slot 1")).to_have_count(1)
             expect(ability_rows.filter(has_text="Empty slot 2")).to_have_count(1)
@@ -565,6 +566,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             # An edit attempt is refused and offers the one action that ends
             # the read-only state, instead of leaving a dead control.
             price.click()
+            # Focusing a text-formatted number only reads it. Typing is the
+            # edit attempt that must offer mod creation without changing data.
+            price.press('3')
             dialog = page.locator(".lex-dialog")
             dialog.wait_for(state="visible", timeout=5000)
             assert "Create a mod" in dialog.inner_text(), dialog.inner_text()

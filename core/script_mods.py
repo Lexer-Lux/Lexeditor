@@ -13,10 +13,10 @@ the script runs with the reader's values and returns the files it wants in
 the mod (a Hext patch, an INI section, a data file). Those files then deploy
 exactly like a hand-made mod's files, through the game's own loader.
 
-Running a script runs code, so only trusted mods build. Trust is the reader's
-explicit choice, kept in Lexeditor's own data folder rather than in the
-library, and it is bound to a hash of the script: a changed script, such as an
-update to a downloaded mod, stops building until it is trusted again.
+Running a script runs code, so enabling a mod is the reader's explicit
+choice: the first time any mod is enabled, Lexeditor warns that only mods
+from sources the reader trusts should ever be enabled. That warning can be
+switched off in the global settings under "Trust Warning".
 """
 from __future__ import annotations
 
@@ -25,12 +25,16 @@ import importlib.util
 import json
 import math
 import os
+import shutil
 from pathlib import Path, PurePosixPath
 import sys
 import threading
-from typing import Any, Callable
+import tempfile
+from time import perf_counter
+from typing import Any, BinaryIO, Callable
 
-from core.plugin_files import atomic_write
+from core.plugin_files import atomic_write, is_link, read_bounded
+from core.mod_builds import ModBuildError
 
 SCRIPT_VERSION = 1
 SCRIPT_FOLDER = "script"
@@ -38,26 +42,48 @@ ENTRY_MODULE = "tweak"
 SCHEMA_FILE = "settings.schema.json"
 VALUES_FILE = "settings.json"
 MANIFEST_FILE = ".lexeditor-generated.json"
-TRUST_ENV = "LEXEDITOR_SCRIPT_TRUST_FILE"
 # The files a tweak mod owns besides its game files. A loader that validates
 # mod contents accepts these for a tweak mod, and only for one.
 OWN_FILES = frozenset({SCHEMA_FILE, VALUES_FILE, MANIFEST_FILE})
+# script/ is also a game folder (Dark Souls keeps its talk and AI scripts
+# there as .dcx archives). A tweak's own code is never one, so those stay
+# game files a tweak mod can ship.
+GAME_ARCHIVE_SUFFIXES = frozenset({".dcx"})
 FIELD_TYPES = frozenset({"bool", "int", "number", "enum", "sound", "intList"})
+MAX_METADATA_BYTES = 8 * 1024 * 1024
+MAX_SOURCE_BYTES = 32 * 1024 * 1024
+MAX_SOURCE_TOTAL = 128 * 1024 * 1024
+MAX_SOURCE_NODES = 32000
 _IMPORT_LOCK = threading.Lock()
 
 
-class ScriptModError(ValueError):
+class ScriptModError(ModBuildError):
     """A tweak mod's metadata, settings or build result is not acceptable."""
+
+    def __init__(self, message: str, *, folders=()):
+        super().__init__(folders, message)
+
+
+class ScriptModRollbackError(ScriptModError):
+    """Generated files could not be restored; recovery must stop."""
+
+
+class ScriptModInfrastructureError(ScriptModError):
+    """Execution, transport or output storage failed, rather than the mod."""
 
 
 # --- discovery -------------------------------------------------------------
 
 def _read_json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        with path.open('rb') as stream:
+            data = read_bounded(stream, MAX_METADATA_BYTES + 1)
+        if len(data) > MAX_METADATA_BYTES:
+            raise ValueError('exceeds the 8 MiB metadata limit')
+        return json.loads(data.decode('utf-8-sig'))
     except FileNotFoundError:
         return None
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, RecursionError) as error:
         raise ScriptModError(f"{path.name} is not readable JSON: {error}") from error
 
 
@@ -69,8 +95,11 @@ def is_script_mod(root: Path) -> bool:
 
 def owns(relative: str | Path) -> bool:
     """True for a file that belongs to the tweak-mod format, not to the game."""
-    parts = PurePosixPath(str(relative).replace("\\", "/")).parts
-    return bool(parts) and (parts[0] == SCRIPT_FOLDER or (len(parts) == 1 and parts[0] in OWN_FILES))
+    path = PurePosixPath(str(relative).replace("\\", "/"))
+    parts = path.parts
+    if parts and parts[0] == SCRIPT_FOLDER:
+        return path.suffix.casefold() not in GAME_ARCHIVE_SUFFIXES
+    return len(parts) == 1 and parts[0] in OWN_FILES
 
 
 def spec(root: Path) -> dict:
@@ -130,6 +159,8 @@ def _coerce(field: dict, value: Any) -> Any:
         length = field.get("length")
         if not isinstance(value, list) or (length is not None and len(value) != length):
             raise ScriptModError(f"{key} must list {length} whole numbers")
+        if len(value) < field.get("minLength", 0) or len(value) > field.get("maxLength", len(value)):
+            raise ScriptModError(f"{key} has an invalid number of entries")
         return [_bounded(field, item, integer=True) for item in value]
     return _bounded(field, value, integer=kind in ("int", "sound"))
 
@@ -180,60 +211,11 @@ def save_values(root: Path, changes: dict) -> dict:
     return current
 
 
-# --- trust -----------------------------------------------------------------
-
-def _trust_path() -> Path:
-    override = os.environ.get(TRUST_ENV)
-    if override:
-        return Path(override)
-    from core.runtime_bootstrap import user_data_dir
-    return user_data_dir() / "trusted-script-mods.json"
-
+# --- running ---------------------------------------------------------------
 
 def _key(root: Path) -> str:
     return os.path.normcase(str(Path(root).resolve()))
 
-
-def script_hash(root: Path) -> str:
-    """Hash every file the script package holds, names included."""
-    digest = hashlib.sha256()
-    package = Path(root) / SCRIPT_FOLDER
-    for path in sorted((item for item in package.rglob("*")
-                        if item.is_file() and "__pycache__" not in item.parts),
-                       key=lambda item: item.relative_to(package).as_posix()):
-        digest.update(path.relative_to(package).as_posix().encode("utf-8") + b"\0")
-        digest.update(hashlib.sha256(path.read_bytes()).digest())
-    return digest.hexdigest()
-
-
-def _trusted() -> dict:
-    data = _read_json(_trust_path()) or {}
-    mods = data.get("mods") if isinstance(data, dict) else None
-    return mods if isinstance(mods, dict) else {}
-
-
-def trust_state(root: Path) -> str:
-    """'trusted', 'changed' (trusted once, script edited since) or 'untrusted'."""
-    entry = _trusted().get(_key(root))
-    if not isinstance(entry, dict):
-        return "untrusted"
-    return "trusted" if entry.get("sha256") == script_hash(root) else "changed"
-
-
-def set_trusted(root: Path, trusted: bool) -> str:
-    mods = _trusted()
-    if trusted:
-        spec(root)
-        mods[_key(root)] = {"sha256": script_hash(root)}
-    else:
-        mods.pop(_key(root), None)
-    target = _trust_path()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write(target, (json.dumps({"version": 1, "mods": mods}, indent=2) + "\n").encode("utf-8"))
-    return trust_state(root)
-
-
-# --- running ---------------------------------------------------------------
 
 def _package_name(root: Path) -> str:
     return "lexeditor_tweak_" + hashlib.sha1(_key(root).encode("utf-8")).hexdigest()[:16]
@@ -244,6 +226,17 @@ def _load(root: Path):
     package_dir = Path(root) / SCRIPT_FOLDER
     name = _package_name(root)
     with _IMPORT_LOCK:
+        # Source-content checks can notice edits with unchanged size/mtime.
+        # Python's timestamp-based bytecode cache must not hide those edits.
+        for relative in consumed_files(root):
+            if relative.parts[0] != SCRIPT_FOLDER or relative.suffix != '.py':
+                continue
+            bytecode = Path(importlib.util.cache_from_source(str(root/relative)))
+            if is_link(bytecode.parent):
+                raise ScriptModError('Build bytecode cache must not be a link')
+            if not bytecode.resolve().is_relative_to(package_dir.resolve()):
+                raise ScriptModError('Build bytecode cache is outside the script folder')
+            bytecode.unlink(missing_ok=True)
         for loaded in [key for key in sys.modules if key == name or key.startswith(name + ".")]:
             del sys.modules[loaded]
         init = package_dir / "__init__.py"
@@ -265,8 +258,8 @@ def _load(root: Path):
 def import_module(root: Path, name: str):
     """One module from a mod's script package, for that mod's own tests.
 
-    Running a mod's tests is the developer's explicit act, so this does not
-    ask for trust; Lexeditor itself only ever runs a script through build().
+    Running a mod's tests is the developer's explicit act; Lexeditor itself
+    only ever runs a script through build(), for a mod the reader enabled.
     """
     package = _package_name(Path(root))
     # One test may import several modules from the same mod; they must share
@@ -276,19 +269,15 @@ def import_module(root: Path, name: str):
     return importlib.import_module(f"{package}.{name}")
 
 
-def load_trusted(root: Path):
+def load_script(root: Path):
     """The mod's entry module, or an error naming why it may not run."""
     spec(root)
-    state = trust_state(root)
-    if state != "trusted":
-        raise ScriptModError("Its script changed since it was trusted; trust it again to build it"
-                             if state == "changed" else "It is not trusted to run its script")
     return _load(root)
 
 
 def describe(root: Path, context: Any) -> dict:
-    """Optional extra data a trusted mod offers the editor, such as a table."""
-    module = load_trusted(root)
+    """Optional extra data a mod offers the editor, such as a table."""
+    module = load_script(root)
     function: Callable | None = getattr(module, "describe", None)
     result = function(values(root), context) if function else {}
     if not isinstance(result, dict):
@@ -321,7 +310,11 @@ def _contained_target(root: Path, path: PurePosixPath) -> Path:
 
 
 def _generated_files(root: Path, allowed_roots: tuple[str, ...] | None) -> dict[str, str]:
-    """Validate all recorded ownership before any generated file is changed."""
+    """Recorded ownership, validated, before any generated file is changed.
+
+    A rebuild always comes from the mod's script: a hand edit to a generated
+    file is overwritten, never refused.
+    """
     manifest = _contained_target(root, PurePosixPath(MANIFEST_FILE))
     data = _read_json(manifest)
     if data is None and not manifest.exists():
@@ -339,40 +332,66 @@ def _generated_files(root: Path, allowed_roots: tuple[str, ...] | None) -> dict[
         if (not isinstance(digest, str) or len(digest) != 64
                 or any(char not in "0123456789abcdef" for char in digest)):
             raise ScriptModError(f"{relative} has an invalid generated-file hash")
-        target = _contained_target(root, path)
-        if target.is_file() and hashlib.sha256(target.read_bytes()).hexdigest() != digest:
-            raise ScriptModError(f"{relative} changed since it was generated; preserve or restore your edits before rebuilding")
+        _contained_target(root, path)
         previous[key] = digest
     return previous
 
 
-def _snapshot(root: Path, keys) -> dict[str, bytes | None]:
+def _close_snapshot(snapshot):
+    for stream in snapshot.values():
+        if stream is not None:
+            try:
+                stream.close()
+            except OSError:
+                pass  # Discarding a temporary copy cannot mask the build failure.
+
+
+def _snapshot(root: Path, keys) -> dict[str, BinaryIO | None]:
     result = {}
-    for key in keys:
-        target = _contained_target(root, PurePosixPath(key))
-        result[key] = target.read_bytes() if target.is_file() else None
+    try:
+        for key in keys:
+            target = _contained_target(root, PurePosixPath(key))
+            result[key] = None
+            if target.is_file():
+                saved = result[key] = tempfile.TemporaryFile()
+                with target.open('rb') as source:
+                    shutil.copyfileobj(source, saved, 64 * 1024)
+                saved.seek(0)
+    except BaseException as error:
+        _close_snapshot(result)
+        if isinstance(error, OSError):
+            raise ScriptModInfrastructureError(f'Could not preserve generated mod files: {error}') from error
+        raise
     return result
 
 
-def snapshot_generated(root: Path, *, allowed_roots: tuple[str, ...]) -> dict[str, bytes | None]:
-    """Keep an operation-local copy of validated generated files and ownership."""
-    previous = _generated_files(Path(root), allowed_roots)
-    return _snapshot(Path(root), [*previous, MANIFEST_FILE])
+def _matches_snapshot(target: Path, saved: BinaryIO) -> bool:
+    saved.seek(0)
+    try:
+        if not target.is_file():
+            return False
+        with target.open('rb') as current:
+            while True:
+                before = saved.read(64 * 1024)
+                if current.read(len(before) or 1) != before:
+                    return False
+                if not before:
+                    return True
+    finally:
+        saved.seek(0)
 
 
-def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
-                      new_files=(), allowed_roots: tuple[str, ...]) -> None:
-    """Undo one build using its in-memory snapshot, reporting every failure."""
-    restored = {key: None for key in new_files if key not in snapshot}
-    restored.update(snapshot)
+def restore_generated(root: Path, snapshot: dict[str, BinaryIO | None], *,
+                      allowed_roots: tuple[str, ...]) -> None:
+    """Undo one build from temporary files, reporting every failure."""
     errors = []
-    for key, contents in restored.items():
+    for key, contents in snapshot.items():
         try:
             path = PurePosixPath(key) if key == MANIFEST_FILE else _safe_output(key, allowed_roots)
             target = _contained_target(Path(root), path)
             if contents is None:
                 target.unlink(missing_ok=True)
-            elif not target.is_file() or target.read_bytes() != contents:
+            elif not _matches_snapshot(target, contents):
                 atomic_write(target, contents)
         except Exception as error:
             errors.append(f"{key}: {error}")
@@ -380,23 +399,102 @@ def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
         raise ScriptModError("Generated-file rollback failed: " + "; ".join(errors))
 
 
-def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
-    """Run a trusted tweak mod's script and write what it returns into the mod.
+_INPUT_NAMES = ('mod.json', SCHEMA_FILE, VALUES_FILE)
+
+
+def consumed_files(root: Path) -> list[Path]:
+    root = Path(root)
+    found = [Path(name) for name in _INPUT_NAMES if (root / name).is_file()]
+    pending, visited = [root / SCRIPT_FOLDER], 0
+    while pending:
+        directory = pending.pop()
+        try:
+            if is_link(directory):
+                raise ScriptModError('Build source directories must not be links')
+            if not directory.exists():
+                continue
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    visited += 1
+                    if visited > MAX_SOURCE_NODES:
+                        raise ScriptModError('Build source contains too many entries')
+                    if entry.name in ('.git', '__pycache__'):
+                        continue
+                    path = Path(entry.path)
+                    if is_link(path):
+                        raise ScriptModError('Build sources must not be links')
+                    if entry.is_dir(follow_symlinks=False):
+                        pending.append(path)
+                    elif entry.is_file(follow_symlinks=False):
+                        relative = path.relative_to(root)
+                        if owns(relative):
+                            found.append(relative)
+        except OSError as error:
+            raise ScriptModError(f'Build source is not readable: {error}') from error
+    return sorted(found)
+
+
+def source_fingerprint(root: Path) -> str:
+    """Content identity of a script's source and settings, excluding its outputs."""
+    root = Path(root)
+    paths = [root / name for name in _INPUT_NAMES]
+    paths += [root / relative for relative in consumed_files(root)
+              if relative.parts and relative.parts[0] == SCRIPT_FOLDER]
+    digest = hashlib.sha256()
+    total = 0
+    for path in sorted(paths):
+        name = path.relative_to(root).as_posix().encode('utf-8')
+        limit = MAX_METADATA_BYTES if path.name in _INPUT_NAMES and path.parent == root else MAX_SOURCE_BYTES
+        if path.is_symlink():
+            raise ScriptModError(f'{path.name}: build source must not be a link')
+        if path.is_file():
+            with path.open('rb') as stream:
+                data = read_bounded(stream, min(limit, MAX_SOURCE_TOTAL-total) + 1)
+        else:
+            data = b''
+        total += len(data)
+        if len(data) > limit or total > MAX_SOURCE_TOTAL:
+            raise ScriptModError(f'{path.name}: build source exceeds its size limit')
+        if path == root / 'mod.json':
+            try:
+                metadata = json.loads(data)
+                if not isinstance(metadata,dict):
+                    raise ValueError('must be an object')
+            except (ValueError,RecursionError) as error:
+                raise ScriptModError(f'mod.json is not readable JSON: {error}') from error
+            # Enablement and priority select/combine outputs; they are not
+            # authoring inputs. Context reads track actual mod dependencies.
+            data = json.dumps({key: metadata.get(key) for key in
+                               ('id', 'name', 'script')}, sort_keys=True).encode('utf-8')
+        digest.update(len(name).to_bytes(8, 'little') + name)
+        digest.update(len(data).to_bytes(8, 'little') + data)
+    return digest.hexdigest()
+
+
+def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...],
+          rollback: dict | None = None) -> dict:
+    """Run a tweak mod's script and write what it returns into the mod.
 
     Only files this build or an earlier one generated are replaced or
     removed: a file the reader put in the mod by hand is never overwritten.
+    A batch retains this build's snapshot in rollback after a successful
+    commit. Cache hits need no snapshot because they change no files.
     """
     root = Path(root)
-    module = load_trusted(root)
-    function: Callable | None = getattr(module, "build", None)
-    if function is None:
-        raise ScriptModError("The script has no build() function")
+    previous = _generated_files(root, allowed_roots)
+    if hasattr(context, 'cached_build'):
+        try:
+            if context.cached_build(root, previous):
+                return {'files': sorted(previous), 'written': [], 'removed': [], 'cached': True}
+        except Exception:
+            pass  # Reuse is optional; ownership validation above is not.
+    if hasattr(context, 'begin_build'):
+        context.begin_build(root)
     current = values(root)
-    outputs = function(current, context)
+    outputs = context.run_script(root, current) if hasattr(context, 'run_script') else execute_script(root, current, context)
     if not isinstance(outputs, dict):
         raise ScriptModError("build() must return {path: contents}")
     manifest_path = root / MANIFEST_FILE
-    previous = _generated_files(root, allowed_roots)
     planned: dict[str, bytes] = {}
     for relative, contents in outputs.items():
         path = _safe_output(relative, allowed_roots)
@@ -417,7 +515,11 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
         for key, contents in planned.items():
             target = root / Path(*PurePosixPath(key).parts)
             target.parent.mkdir(parents=True, exist_ok=True)
-            if not target.is_file() or target.read_bytes() != contents:
+            matches = False
+            if target.is_file():
+                with target.open('rb') as stream:
+                    matches = read_bounded(stream, len(contents) + 1) == contents
+            if not matches:
                 atomic_write(target, contents)
                 written.append(key)
         for key in sorted(set(previous) - set(planned)):
@@ -426,21 +528,46 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...]) -> dict:
                 target.unlink()
                 removed.append(key)
         manifest = {"version": 1, "files": {key: hashlib.sha256(data).hexdigest() for key, data in planned.items()}}
+        if hasattr(context, 'build_record'):
+            try:
+                record = context.build_record(root, planned)
+                # Keep optional reuse metadata bounded; a large observation set
+                # can always rebuild through the ordinary path instead.
+                if len(json.dumps(record).encode('utf-8')) <= 65536:
+                    manifest['build'] = record
+            except Exception:
+                pass  # Cache metadata must not roll back a valid mod build.
         atomic_write(manifest_path, (json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
+        if rollback is not None:
+            rollback[root] = snapshot
     except Exception as error:
         try:
             restore_generated(root, snapshot, allowed_roots=allowed_roots)
         except ScriptModError as rollback_error:
-            raise ScriptModError(f"Build failed: {error}; {rollback_error}") from error
+            raise ScriptModRollbackError(f"Build failed: {error}; {rollback_error}") from error
+        if isinstance(error, OSError):
+            raise ScriptModInfrastructureError(f'Could not save generated mod files: {error}') from error
         raise
+    finally:
+        if rollback is None or rollback.get(root) is not snapshot:
+            _close_snapshot(snapshot)
     return {"files": sorted(planned), "written": written, "removed": removed}
 
 
+def execute_script(root: Path, current: dict, context: Any) -> dict:
+    """Evaluate only; the caller validates and commits the returned files."""
+    module = load_script(root)
+    function: Callable | None = getattr(module, "build", None)
+    if not callable(function):
+        raise ScriptModError("The script has no build() function")
+    return function(current, context)
+
+
 def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...],
-                error: type[Exception] = ScriptModError) -> list[dict]:
+                error: type[Exception] = ScriptModError, timings: list | None = None) -> list[dict]:
     """Build every row (enabled tweak mods, in load order), or none of them.
 
-    Each row carries id, name, path, schema, trust and error, as catalog_row
+    Each row carries id, name, path, schema and error, as catalog_row
     gives them. Everything that can be refused is refused before any mod
     writes; a failure during the builds puts back every mod already built.
     The context's `current` names the mod being built.
@@ -449,37 +576,44 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
     snapshots = {}
     for row in rows:
         if row["error"]:
-            raise error(f"{row['name']}: {row['error']}")
+            raise error(f"{row['name']}: {row['error']}", folders=[row['path']])
         missing = [need for need in row["schema"]["requires"] if need not in enabled]
         if missing:
-            raise error(f"{row['name']} requires {', '.join(missing)}, which is not enabled")
+            raise error(f"{row['name']} requires {', '.join(missing)}, which is not enabled", folders=[row['path']])
         if row["schema"]["blocker"]:
-            raise error(f"{row['name']}: {row['schema']['blocker']}")
+            raise error(f"{row['name']}: {row['schema']['blocker']}", folders=[row['path']])
         conflicts = [mod_id for mod_id in row["schema"]["conflicts"] if mod_id in enabled]
         if conflicts:
-            raise error(f"{row['name']} conflicts with {', '.join(conflicts)}")
-        if row["trust"] != "trusted":
-            raise error(f"{row['name']}: its script is {row['trust']}; trust it before building")
-        try:
-            snapshots[row["id"]] = snapshot_generated(Path(row["path"]), allowed_roots=allowed_roots)
-        except Exception as failure:
-            raise error(f"{row['name']}: {failure}") from failure
+            raise error(f"{row['name']} conflicts with {', '.join(conflicts)}", folders=[row['path']])
     built = []
     try:
-        for row in rows:
+        for index, row in enumerate(rows):
+            if row.get('prebuilt'):
+                continue
+            from core.operation_progress import report
+            report(f"Checking/building {row['name']} ({index + 1}/{len(rows)})")
             context.current = row["name"]
-            result = build(Path(row["path"]), context, allowed_roots=allowed_roots)
+            started = perf_counter()
+            result = build(Path(row["path"]), context, allowed_roots=allowed_roots,
+                           rollback=snapshots)
+            if timings is not None:
+                timings.append({'mod': row['name'], 'seconds': perf_counter() - started,
+                                'cached': result.get('cached', False)})
             built.append({"id": row["id"], "files": result["files"]})
     except Exception as failure:
         failures = []
-        for result in reversed(built):
+        for root, snapshot in reversed(snapshots.items()):
             try:
-                restore_generated(enabled[result["id"]], snapshots[result["id"]],
-                                  new_files=result["files"], allowed_roots=allowed_roots)
+                restore_generated(root, snapshot, allowed_roots=allowed_roots)
             except Exception as rollback_error:
-                failures.append(f"{result['id']}: {rollback_error}")
+                failures.append(f"{root.name}: {rollback_error}")
         suffix = "; rollback failed: " + "; ".join(failures) if failures else ""
-        raise error(f"{context.current}: {failure}{suffix}") from failure
+        folders = [] if failures or isinstance(failure, (ScriptModRollbackError, ScriptModInfrastructureError)) else (
+            failure.folders if isinstance(failure, ModBuildError) and failure.folders else [row['path']])
+        raise error(f"{context.current}: {failure}{suffix}", folders=folders) from failure
+    finally:
+        for snapshot in snapshots.values():
+            _close_snapshot(snapshot)
     return built
 
 
@@ -501,12 +635,12 @@ def clear(root: Path) -> list[str]:
 
 def catalog_row(root: Path) -> dict:
     """What the Tweaks page needs about one tweak mod, without running it."""
-    row = {"path": str(Path(root).resolve()), "trust": "untrusted", "error": ""}
+    row = {"path": str(Path(root).resolve()), "id": Path(root).name,
+           "name": Path(root).name, "error": ""}
     try:
         row.update(spec(root))
         row["schema"] = schema(root)
         row["values"] = values(root)
-        row["trust"] = trust_state(root)
-    except ScriptModError as error:
+    except Exception as error:
         row["error"] = str(error)
     return row

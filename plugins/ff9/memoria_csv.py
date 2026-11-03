@@ -64,6 +64,9 @@ _INTEGER_RANGES = {
 }
 _BOOLEAN_TYPES = {"bit", "bool", "boolean"}
 _FLOAT_TYPES = {"single", "float", "double"}
+# Property-leading icons by CSV column. Names must exist in the shared
+# TYPE_GLYPHS registry (ui/framework.js); unknown names draw nothing.
+_FIELD_ICONS = {"Gems": "gems"}
 
 
 def _sha256(path: Path) -> str:
@@ -182,6 +185,7 @@ class MemoriaCsvDocument:
                 # not gameplay data. Neither should masquerade as a writable
                 # property merely because it occupies a CSV cell.
                 "editable": column.casefold() not in {"id", "comment"},
+                "icon": _FIELD_ICONS.get(column),
             }
             if normalized in _BOOLEAN_TYPES:
                 descriptor["kind"] = "boolean"

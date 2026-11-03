@@ -32,7 +32,7 @@ from plugins.blank.plugin import PLUGIN  # noqa: E402
 LIST = ".blank-components"
 TABLE = f"{LIST} .lex-barrelled-master"
 HEAD = f'{TABLE} .lex-column-list-head-cell[data-column-key="id"]'
-ROWS = f"{TABLE} .lex-column-list-row"
+ROWS = f"{TABLE} .lex-column-list-row:not(.lex-filler-row)"
 
 
 def main() -> int:
@@ -49,12 +49,20 @@ def main() -> int:
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.goto(session.url, wait_until="domcontentloaded")
-            page.wait_for_timeout(1600)
+            page.locator(LIST).wait_for()
+            # Utilities has enough entries to require several pages. Templates
+            # now fits on one page, so cannot expose a page-only sorting bug.
+            page.evaluate("navigate('utility')")
+            page.locator(HEAD).wait_for()
 
             def pager(label: str) -> bool:
                 """Press one pager button, ignoring a disabled end-of-list one."""
                 control = page.locator(f'{LIST} [aria-label="{label}"]')
                 if not control.count() or control.is_disabled():
+                    return False
+                # Next wraps from the last page to the first. Last is still
+                # disabled at the end and supplies the traversal boundary.
+                if label == "Next page" and page.locator(f'{LIST} [aria-label="Last page"]').is_disabled():
                     return False
                 control.click()
                 page.wait_for_timeout(300)
@@ -70,14 +78,14 @@ def main() -> int:
             def all_ids() -> list[str]:
                 """Every component, in the order the list really shows them."""
                 ids: list[str] = []
-                while pager("First page"):
-                    pass
-                while True:
+                pager("First page")
+                for _ in range(100):
                     ids += page_ids()
                     if not pager("Next page"):
                         break
-                while pager("First page"):
-                    pass
+                else:
+                    raise AssertionError('Catalogue paging never reached its final page')
+                pager("First page")
                 return ids
 
             def mark() -> dict:

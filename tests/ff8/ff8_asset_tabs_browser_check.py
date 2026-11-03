@@ -90,6 +90,10 @@ def main():
             page.wait_for_function(
                 "() => { try { return !state.booting; } catch (e) { return false; } }",
                 timeout=180000)
+            # Models and Textures decode in the background after first paint.
+            page.wait_for_function(
+                "() => { try { return state.heavyReady.current; } catch (e) { return false; } }",
+                timeout=180000)
             assert page.evaluate("state.bootFailed") in (None, False), "plugin boot failed"
             assert page.evaluate("state.activeSource") == "mine"
             assert page.evaluate("state.data.sfx.rows.length") == 2791

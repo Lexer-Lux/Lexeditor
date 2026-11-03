@@ -81,3 +81,26 @@ def merge(vanilla: bytes, mods: list[tuple[str, bytes]], spec: dict,
                                   "winner": claims[-1][0],
                                   "claimants": [mod_id for mod_id, _ in claims]})
     return bytes(output), conflicts
+
+
+def diff(vanilla: bytes, mod: bytes, spec: dict, path: str) -> list[dict]:
+    """One mod file against vanilla: changed fields per record."""
+    record_size = int(spec["record"])
+    if len(vanilla) % record_size:
+        raise ValueError(f"Vanilla {path} has a partial record")
+    if len(mod) != len(vanilla):
+        raise ValueError(f"The mod changes the fixed size of {path}")
+    bit_offsets = set(spec.get("bits", set()))
+    out = []
+    for record_id in range(len(vanilla) // record_size):
+        base = record_id * record_size
+        changed = []
+        for name, relative, size in spec["fields"]:
+            mine = mod[base + relative:base + relative + size]
+            base_slice = vanilla[base + relative:base + relative + size]
+            if mine != base_slice:
+                changed.append(name)
+        if changed:
+            out.append({"table": path, "id": record_id,
+                          "label": f"Record {record_id}", "fields": changed})
+    return out

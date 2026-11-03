@@ -27,7 +27,7 @@ def main():
               state.tab='loot';state.lootFile='__sounds';await renderLoot();
             }''')
             listing=page.locator('#main .lex-column-list')
-            rows=listing.locator('.lex-list-row')
+            rows=listing.locator('.lex-list-row:not(.lex-filler-row)')
             expect(rows.first).to_be_visible()
             assert 0 < rows.count() < 522
             page.get_by_role('button',name='Last page',exact=True).click()

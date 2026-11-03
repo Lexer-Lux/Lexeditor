@@ -68,7 +68,7 @@ class GameInstallSpec:
 
     root_env: str
     required_paths: tuple[str, ...]
-    steam_app_id: str
+    steam_app_id: str  # Empty for games distributed outside Steam.
     install_dir_names: tuple[str, ...]
     default_roots: tuple[Path, ...]
     data_env: str | None = None
@@ -202,9 +202,10 @@ class GamePlugin:
     # reads it since the developer page moved to the Mod Loader issue's status.
     mods_load: bool = False
     managed_mod: object | None = None
-    # Trusted, persistent boolean tweak callbacks for shared bundled components.
-    # Keys are stable IDs referenced by mod.json; packages never supply code.
-    bundled_tweaks: dict | None = None
+    # Lexer's Mod for this game: "Owner/Repository" on GitHub, or "" when the
+    # game has none. A Lexmod is a collection of modules, each one a mod.
+    lexmod: str = ""
+    mod_repositories: tuple[str, ...] = ()
     # Multi-helper plugins opt into independent setup/update rows. Legacy
     # singular fields above remain valid and are synthesized into one helper.
     helpers: tuple[PluginHelper, ...] = ()
@@ -271,7 +272,7 @@ def validate_plugin(plugin: GamePlugin) -> None:
         spec = plugin.installation
         if not spec.root_env or not spec.required_paths or not spec.install_dir_names:
             raise ValueError(f"{plugin.plugin_id} has an incomplete installation descriptor")
-        if not spec.steam_app_id.isdigit():
+        if not isinstance(spec.steam_app_id, str) or (spec.steam_app_id and not spec.steam_app_id.isdigit()):
             raise ValueError(f"{plugin.plugin_id} has an invalid Steam application ID")
         if spec.art_app_id is not None and not spec.art_app_id.isdigit():
             raise ValueError(f"{plugin.plugin_id} has an invalid Steam artwork ID")

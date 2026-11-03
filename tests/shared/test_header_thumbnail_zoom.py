@@ -4,6 +4,8 @@ A details-panel header thumbnail that does not open the model viewer grows in
 place on hover so the art can be seen at a readable size: "it should expand",
 not put a second thumbnail beside it.
 A thumbnail that opens the model viewer keeps its magnifier instead.
+An empty preview never expands: neither a no-thumbnail placeholder nor an
+icon whose preview state says unavailable, even beside a real picture.
 """
 from pathlib import Path
 
@@ -88,6 +90,47 @@ def test_model_preview_trigger_does_not_expand_on_hover():
             trigger = page.get_by_role("button", name="Open model preview", exact=True)
             assert trigger.count() == 1
             trigger.hover()
+            page.wait_for_timeout(300)
+            assert page.locator(".lex-header-thumb-zoom").count() == 0
+        finally:
+            browser.close()
+
+
+def test_no_thumbnail_placeholder_does_not_expand_on_hover():
+    with sync_playwright() as play:
+        browser, page = _page(play)
+        try:
+            page.evaluate("""() => {
+              const panel = LexeditorUI.detailPanel({title: 'Example',
+                icon: LexeditorUI.noThumbnail(''), body: 'Fields'});
+              document.querySelector('main').append(panel);
+            }""")
+            icon = page.locator(".lex-detail-panel-icon")
+            assert icon.count() == 1
+            assert icon.locator(".lex-no-thumbnail").count() == 1
+            icon.hover()
+            page.wait_for_timeout(300)
+            assert page.locator(".lex-header-thumb-zoom").count() == 0
+        finally:
+            browser.close()
+
+
+def test_unavailable_preview_does_not_expand_on_hover():
+    with sync_playwright() as play:
+        browser, page = _page(play)
+        try:
+            page.evaluate("""(iconURL) => {
+              const icon = document.createElement('img');
+              icon.src = iconURL;
+              icon.alt = '';
+              const panel = LexeditorUI.detailPanel({title: 'Example', icon, body: 'Fields'});
+              panel.querySelector('.lex-detail-panel-icon').setAttribute(
+                'data-lex-preview-state', 'unavailable');
+              document.querySelector('main').append(panel);
+            }""", ICON)
+            icon = page.locator(".lex-detail-panel-icon")
+            assert icon.count() == 1
+            icon.hover()
             page.wait_for_timeout(300)
             assert page.locator(".lex-header-thumb-zoom").count() == 0
         finally:

@@ -1,6 +1,7 @@
 """Actual plugin Data Map adapters + shared layout, with in-memory data only.
 
-Boot fetches stay unresolved so no installed game or mod filesystem is touched.
+Boot fetches stay unresolved or receive synthetic API data; no installed game
+or mod filesystem is touched.
 The real HTML, plugin CSS, scripts, shell and map callbacks are exercised.
 """
 # Dev caches and outputs live in the temp folder, never in the checkout.
@@ -44,8 +45,25 @@ def html_for(game):
     history.replaceState=(s,u)=>replace(s,u);history.pushState=(s,u)=>push(s,u);
     window.fetch=()=>new Promise(()=>{});
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
+    if '/shared/native-port.js' in html:
+        # The shared native-port view boots through its real API contract and
+        # keeps state inside its module. Do not require production test globals.
+        fixture = {'plugin': {'pluginId': game, 'name': 'Fixture edition', 'accent': '#a3aebe',
+                              'portName': 'Fixture port', 'modLoading': {}},
+                   'state': {'game': {'supported': True, 'running': False, 'root': 'fixture', 'dataRoot': 'fixture'},
+                             'preferences': {'fields': [], 'fingerprint': 'fixture'}},
+                   'datamap': {'rows': [{**row, 'target': 'settings'} for row in ROWS]}}
+        stub += '''const nativeFixture='''+json.dumps(fixture)+''';
+        window.fetch=input=>{const key=String(input).replace(/^.*\\/api\\//,'');
+          return Object.hasOwn(nativeFixture,key)
+            ? Promise.resolve({ok:true,status:200,json:async()=>nativeFixture[key]})
+            : new Promise(()=>{});};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
+    # Shared feature modules are part of the real page too. Leaving Unreal
+    # Config unresolved stops Remake before its shell can be constructed.
+    html=re.sub(r'<script src="/shared/([A-Za-z0-9_./-]+\.js)"></script>',
+                lambda m:'<script>'+(ROOT/'ui'/m[1]).read_text(encoding='utf-8').replace('</script','<\\/script')+'</script>',html)
     # A plugin page loads its code and styles from modules beside it. There is
     # no server here, so every one the page names is inlined where it stands,
     # or nothing of the plugin runs and it looks like a plugin that failed to boot.
@@ -63,10 +81,12 @@ with sync_playwright() as p:
     try:
         for game in GAMES:
             for width,height in [(900,620),(1200,800),(1600,1000)]:
+                print(f"checking Data Map {game} at {width}x{height}", flush=True)
                 errors=[]
                 page=browser.new_page(viewport={'width':width,'height':height})
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 html=html_for(game)
+                native_port='/shared/native-port.js' in (ROOT/'plugins'/game/'editor.html').read_text(encoding='utf-8') if game!='ff7_2013' else False
                 if game=='warband':
                     # Warband's shared shell reads sessionStorage during boot.
                     # set_content() uses an opaque/storage-refused document in
@@ -86,14 +106,18 @@ with sync_playwright() as p:
                 # into. Palworld keeps its own named globals instead, so it is
                 # seeded through those rather than being called broken for not
                 # having a variable of that name.
-                booted = page.evaluate(
+                if native_port:
+                    page.wait_for_selector('.lex-shell-command-row')
+                booted = native_port or page.evaluate(
                     'typeof state !== "undefined" || typeof mapRows !== "undefined" '
 + '|| typeof datamap !== "undefined"')
                 if not booted and game != 'blank':
                     raise AssertionError((game,width,height,'plugin state missing',errors,page.locator('body').inner_text()[:1200]))
                 target=OPEN_TARGETS.get(game,'items')
                 fixture_rows=[{**row,'target':target} for row in ROWS]
-                if game=='blank':
+                if native_port:
+                    page.locator('#plugin-data-map').click()
+                elif game=='blank':
                     page.evaluate('navigate("datamap")')
                 elif game=='terraria':
                     # Terraria maps server rows by file extension; seed one of
@@ -121,7 +145,7 @@ with sync_playwright() as p:
                 else:
                     open_target=OPEN_TARGETS.get(game,'items')
                     fixture_rows=[{**row,'target':open_target} for row in ROWS]
-                    page.evaluate('''rows=>{
+                    page.evaluate(r'''rows=>{
                       const mapPayload={rows};
                       window.fetch=input=>/\/api\/data-?map/.test(String(input))
                         ? Promise.resolve({ok:true,status:200,json:async()=>mapPayload})
@@ -196,7 +220,11 @@ with sync_playwright() as p:
                     # adapter to verify, so only the filter is checked there.
                     opens=page.locator('.lex-data-map-open').count()
                     if opens:
-                        if game=='warband':
+                        if native_port:
+                            page.locator('.lex-data-map-open').first.click()
+                            page.get_by_text('Settings',exact=True).first.wait_for(state='visible')
+                            page.locator('#plugin-data-map').click()
+                        elif game=='warband':
                             # Warband's completed Data Map opens structured
                             # Module System datasets in Misc., preserving the
                             # dataset identity instead of pretending every row

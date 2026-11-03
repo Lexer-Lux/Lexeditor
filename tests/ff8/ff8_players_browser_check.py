@@ -33,7 +33,7 @@ def main():
   source=(ROOT/'plugins/ff8/cards_ui.js').read_text(encoding='utf-8').replace('    render,\n    edits:', '    render, renderPlayers:()=>{mode="players";return render()},\n    edits:',1)
   page.add_script_tag(content=source)
   page.evaluate('''()=>{
-   const U=LexeditorUI;window.model={tab:'cards',activeSource:'mine',data:{fields:{rows:[{key:'test',name:'Test area',_loaded:true,players:[]},{key:'garden',name:'Garden',_loaded:true,players:[
+   const U=LexeditorUI;window.model={tab:'cards',activeSource:'mine',data:{cards:{rows:[]},fields:{rows:[{key:'test',name:'Test area',_loaded:true,players:[]},{key:'garden',name:'Garden',_loaded:true,players:[
      {id:0,entity:'Student',params:[{id:0,name:'Deck ID',mode:'literal',editable:true,value:201}]},
      {id:1,entity:'Teacher',params:[{id:0,name:'Deck ID',mode:'literal',editable:true,value:201}]},
      {id:2,entity:'Ghost',params:[{id:0,name:'Deck ID',mode:'variable',editable:true,value:7}]}]}]}},vanilla:{fields:{rows:[]}}};

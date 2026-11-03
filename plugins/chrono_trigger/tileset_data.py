@@ -9,11 +9,12 @@ Lexeditor never resizes these files. Unknown bits in the third assembly byte and
 any trailing bytes are preserved.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 BGSET_RE = re.compile(r"^Game/field/BGSetTable/bgsettable_(\d+)\.dat$", re.IGNORECASE)
@@ -71,12 +72,14 @@ def save_graphics_set(
     if digest(payload) != expected_sha256:
         raise RuntimeError(f"{path} changed since it was opened; reload before saving")
     allowed = {f"graphicsSet{index}" for index in range(BGSET_BYTES)}
+    if not isinstance(values, dict):
+        raise ValueError("Graphics-set values must be an object")
     unknown = set(values) - allowed
     if unknown:
         raise ValueError(f"Unsupported graphics-set fields: {', '.join(sorted(unknown))}")
     output = bytearray(payload)
     for key, value in values.items():
-        number = int(value)
+        number = integer_value(value, key)
         if not 0 <= number <= 0xFF:
             raise ValueError(f"{key} must be between 0 and 255")
         output[int(key.removeprefix("graphicsSet"))] = number
@@ -155,6 +158,7 @@ def load_tile_assemblies(store: OverlayStore, source: str = "mine") -> dict:
 def save_tile_assembly(
     store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]
 ) -> dict:
+    validate_edits(edits)
     current = _parse_assembly(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -164,28 +168,37 @@ def save_tile_assembly(
     seen = set()
     allowed = {"chipIndex", "flipHorizontal", "flipVertical", "paletteIndex", "priority"}
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("Tile-assembly edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Tile-assembly token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate tile-assembly edit")
         seen.add(token)
         row = by_token[token]
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("Tile-assembly values must be an object")
         unknown = set(values) - allowed
         if unknown:
             raise ValueError(f"Unsupported tile-assembly fields: {', '.join(sorted(unknown))}")
-        chip = int(values.get("chipIndex", row["chipIndex"]))
-        palette = int(values.get("paletteIndex", row["paletteIndex"]))
+        for field in ("flipHorizontal", "flipVertical", "priority"):
+            if field in values and type(values[field]) is not bool:
+                raise ValueError(f"Tile-assembly {field} must be a boolean")
+        chip = integer_value(values.get("chipIndex", row["chipIndex"]), "Chip index")
+        palette = integer_value(values.get("paletteIndex", row["paletteIndex"]), "Palette index")
         if not 0 <= chip <= 0x03FF:
             raise ValueError("Chip index must be between 0 and 1023")
         if not 0 <= palette <= 0x0F:
             raise ValueError("Palette index must be between 0 and 15")
         data1 = chip | (palette << 12)
-        if bool(values.get("flipHorizontal", row["flipHorizontal"])):
+        if values.get("flipHorizontal", row["flipHorizontal"]):
             data1 |= 0x0400
-        if bool(values.get("flipVertical", row["flipVertical"])):
+        if values.get("flipVertical", row["flipVertical"]):
             data1 |= 0x0800
         data2 = row["unknownPriorityBits"] | (
-            0x01 if bool(values.get("priority", row["priority"])) else 0
+            0x01 if values.get("priority", row["priority"]) else 0
         )
         struct.pack_into("<HB", output, row["byteOffset"], data1, data2)
     store.write(path, expected_sha256, bytes(output))

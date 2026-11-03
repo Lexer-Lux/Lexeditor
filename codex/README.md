@@ -20,6 +20,7 @@ A game with nothing settled yet has no folder; do not create placeholder pages.
 - [Final Fantasy VIII](ff8/README.md)
 - [Final Fantasy IX](ff9/README.md)
 - [Final Fantasy X/X-2](ffx-x2/README.md)
+- [King's Field II](kings-field2/native-mods.md)
 - [Palworld](palworld/README.md)
 - [Project Zomboid](project-zomboid/README.md)
 - [Red Dead Redemption 2](rdr2/README.md)

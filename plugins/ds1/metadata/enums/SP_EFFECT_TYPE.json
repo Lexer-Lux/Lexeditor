@@ -30,7 +30,7 @@
       "Names": [
         {
           "Language": "English",
-          "Text": "Flame"
+          "Text": "Poison"
         }
       ]
     },
@@ -57,7 +57,7 @@
       "Names": [
         {
           "Language": "English",
-          "Text": "Stun"
+          "Text": "Toxic"
         }
       ]
     },
@@ -841,6 +841,15 @@
         {
           "Language": "English",
           "Text": "Precision Enhancement"
+        }
+      ]
+    },
+    {
+      "Key": "171",
+      "Names": [
+        {
+          "Language": "English",
+          "Text": "Karmic Justice"
         }
       ]
     },

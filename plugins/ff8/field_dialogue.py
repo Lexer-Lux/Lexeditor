@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import struct
 
+from core.numeric_values import integer_value
+
 from . import kernel_text, japanese_text
 
 
@@ -70,13 +72,16 @@ def apply_edits(raw: bytes, edits: list[dict], *, map_name: str = "") -> tuple[b
     seen: set[int] = set()
     replacements: dict[int, str] = {}
     for edit in edits:
-        line_id = int(edit.get("id", -1))
+        line_id = integer_value(edit.get("id", -1), "Field dialogue line")
         if line_id in seen or not 0 <= line_id < len(lines):
             raise ValueError("Invalid or duplicate field dialogue line edit")
         if set(edit) - {"id", "text"}:
             raise ValueError("Field dialogue edit contains an unsupported field")
         seen.add(line_id)
-        replacements[line_id] = str(edit.get("text", ""))
+        text = edit.get("text", "")
+        if not isinstance(text, str):
+            raise ValueError("Field dialogue text must be a string")
+        replacements[line_id] = text
 
     payloads: list[bytes] = []
     changed = 0

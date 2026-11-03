@@ -13,6 +13,22 @@ from plugins.rdr import server
 from tools.rdr_test_support import workspace, loot_document
 
 
+def reveal_information(page, target):
+    pager = page.locator('.lex-information-panel .lex-tweaks-pages')
+    if not target.count() or not target.is_visible():
+        first = pager.get_by_role('button', name='First page', exact=True)
+        if first.count() and not first.is_disabled():
+            first.click()
+    for _ in range(20):
+        if target.count() and target.is_visible():
+            return
+        next_page = pager.get_by_role('button', name='Next page', exact=True)
+        assert next_page.count() and not next_page.is_disabled(), 'Information control is unreachable'
+        next_page.click()
+        page.wait_for_timeout(80)
+    assert target.is_visible()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--screenshots', type=Path)
@@ -130,7 +146,7 @@ def main():
                     paths['LOOT_FILE'].write_text('{broken')
                     page.reload()
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')
-                    assert page.locator('.lex-column-list-row:not(.lex-filler-row)').count()
+                    page.locator('.lex-column-list-row:not(.lex-filler-row)').first.wait_for()
                     page.evaluate('navigate("loot")')
                     assert page.get_by_text('Loot ASI override is unavailable', exact=True).count()
                     page.evaluate('navigate("settings")')
@@ -147,32 +163,44 @@ def main():
                     assert information_button.count() == 1
                     assert 'active' in (information_button.get_attribute('class') or '').split()
                     delivery = page.locator('.lex-detail-section[aria-label="SAVED FILES AND GAME DELIVERY"]')
+                    reveal_information(page, delivery)
                     assert delivery.count() == 1 and delivery.is_visible()
                     assert page.get_by_role('button', name='Deploy Project').count()
                     assert page.get_by_role('button', name='Revert Deployment').count()
                     shop_test = page.locator('.lex-detail-section[aria-label="SHOP EDIT TEST"]')
+                    reveal_information(page, shop_test)
                     assert shop_test.count() == 1 and shop_test.is_visible()
                     assert page.get_by_role('button', name='Stage Shop Test').count()
                     plan = server.shop_test_plan()
                     assert plan['available'] and plan['status'] == 'baseline'
-                    page.get_by_role('button', name='Stage Shop Test').click()
+                    stage_shop = page.get_by_role('button', name='Stage Shop Test', exact=True)
+                    reveal_information(page, stage_shop)
+                    stage_shop.click()
                     page.wait_for_function('state.dashboard.shopTest.status === "staged"')
                     assert server.shop_test_plan()['id'] == plan['id']
                     assert server.shop_test_plan()['currentPriceModifier'] == plan['testPriceModifier']
-                    page.get_by_role('button', name='Restore Shop Test').click()
+                    restore_shop = page.get_by_role('button', name='Restore Shop Test', exact=True)
+                    reveal_information(page, restore_shop)
+                    restore_shop.click()
                     page.wait_for_function('state.dashboard.shopTest.status === "baseline"')
                     assert server.shop_test_plan()['currentPriceModifier'] == plan['baselinePriceModifier']
                     mission_test = page.locator('.lex-detail-section[aria-label="MISSION REWARD TEST"]')
+                    reveal_information(page, mission_test)
                     assert mission_test.count() == 1 and mission_test.is_visible()
                     mission_plan = server.mission_test_plan()
                     assert mission_plan['missionId'] == 2 and mission_plan['status'] == 'baseline'
-                    page.get_by_role('button', name='Stage Mission Test').click()
+                    stage_mission = page.get_by_role('button', name='Stage Mission Test', exact=True)
+                    reveal_information(page, stage_mission)
+                    stage_mission.click()
                     page.wait_for_function('state.dashboard.missionTest.status === "staged"')
                     staged_mission = server.mission_test_plan()
                     assert staged_mission['testRewards'] == {'cash': 123, 'fame': 321, 'honor': 222}
-                    page.get_by_role('button', name='Restore Mission Test').click()
+                    restore_mission = page.get_by_role('button', name='Restore Mission Test', exact=True)
+                    reveal_information(page, restore_mission)
+                    restore_mission.click()
                     page.wait_for_function('state.dashboard.missionTest.status === "baseline"')
                     assert server._mission_row(server._mission_override_document(), 2) is None
+                    reveal_information(page, delivery)
                     delivery_text = page.locator('#main').inner_text()
                     assert 'Deploy Project rebuilds verified copies' in delivery_text
                     assert 'original' in delivery_text and 'never overwritten' in delivery_text

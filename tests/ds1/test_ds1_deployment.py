@@ -12,8 +12,44 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from ds1_fixture import make_archive
+from msb_fixture import build_msb
+from tae_fixture import build_anibnd, build_tae
 from plugins.ds1 import deployment
+from plugins.ds1.formats import FormatError
+from plugins.ds1.msb import MAP_DIR, MsbDocument
 from plugins.ds1.store import ItemStore, MARKER, RELATIVE
+from plugins.ds1.tae import TaeDocument
+from plugins.ds1.tae_store import CHR_DIR
+
+MAP = MAP_DIR / "m10_00_00_00.msb"
+CHAR = CHR_DIR / "c1200.anibnd.dcx"
+VANILLA_CHAR = build_anibnd({"a87.tae": build_tae()})
+
+
+def edited_map(*edits):
+    document = MsbDocument(build_msb())
+    for key, field, value in edits:
+        document.edit(key, field, value)
+    return document.export()
+
+
+def with_map(game, payload=None):
+    (game / MAP_DIR).mkdir(parents=True, exist_ok=True)
+    (game / MAP).write_bytes(build_msb() if payload is None else payload)
+
+
+def edited_char(member, *edits):
+    members = {"a87.tae": build_tae()}
+    document = TaeDocument(members[member])
+    for anim, event, field, value in edits:
+        document.edit(anim, event, field, value)
+    members[member] = document.export()
+    return build_anibnd(members)
+
+
+def with_char(game, payload=None):
+    (game / CHR_DIR).mkdir(parents=True, exist_ok=True)
+    (game / CHAR).write_bytes(VANILLA_CHAR if payload is None else payload)
 
 
 def project(tmp_path, name="mod"):
@@ -39,6 +75,10 @@ def read_marker(game):
     return json.loads(marker_path(game).read_text())
 
 
+class SimulatedCrash(BaseException):
+    """A terminated process cannot run the caught-error rollback."""
+
+
 class CrashAfter:
     """Monkeypatches deployment.atomic_write to perform the real write, then raise
     immediately after the call targeting `trigger`, simulating a process crash that
@@ -53,7 +93,7 @@ class CrashAfter:
             self.original(path, data)
             if Path(path) == self.trigger and not self.fired:
                 self.fired = True
-                raise RuntimeError("simulated crash")
+                raise SimulatedCrash("simulated crash")
         monkeypatch.setattr(deployment, "atomic_write", fake)
 
 
@@ -84,6 +124,51 @@ def test_invalid_saved_archive_is_rejected_before_any_installed_write(tmp_path):
     assert not marker_path(game).exists()
 
 
+@pytest.mark.parametrize('operation', ['apply', 'reapply', 'disable'])
+def test_later_write_failure_restores_the_entire_batch(tmp_path, monkeypatch, operation):
+    game,mod = project(tmp_path)
+    with_map(game)
+    store = ItemStore(game,mod,False)
+    store.edit('EquipParamGoods',100,'sellValue',42)
+    store.save()
+    (mod/MAP).parent.mkdir(parents=True,exist_ok=True)
+    # A structurally valid map is enough to exercise the second write.
+    (mod/MAP).write_bytes(build_msb())
+    if operation != 'apply':
+        deployment.apply(game,mod)
+        store.edit('EquipParamGoods',100,'sellValue',43)
+        store.save()
+        # Reapply now skips identical files. Change the map too so this still
+        # exercises a failure after a real second write and its batch rollback.
+        if operation == 'reapply':
+            (mod/MAP).write_bytes(build_msb(parts=(("enemy",2,0,0,120000,(4.0,5.0,6.0)),)))
+    before = {relative:(game/relative).read_bytes() for relative in (RELATIVE,MAP)}
+    markers = {relative:deployment._read_marker(deployment._marker_path(game,relative))
+               for relative in before}
+    write = deployment.atomic_write
+    fired = False
+    def fail_after_map(path,data):
+        nonlocal fired
+        write(path,data)
+        if Path(path) == game/MAP and not fired:
+            fired = True
+            raise OSError('second file failed')
+    monkeypatch.setattr(deployment,'atomic_write',fail_after_map)
+    with pytest.raises(OSError,match='second file failed'):
+        deployment.disable(game) if operation == 'disable' else deployment.apply(game,mod)
+    assert fired
+    for relative,payload in before.items():
+        assert (game/relative).read_bytes() == payload
+        marker = deployment._read_marker(deployment._marker_path(game,relative))
+        if markers[relative] is not None:
+            assert marker == markers[relative]
+        else:
+            assert not marker['enabled'] and marker['pendingHash'] is None
+    # The preserved originals and ownership state allow a normal retry.
+    monkeypatch.setattr(deployment,'atomic_write',write)
+    deployment.disable(game) if operation == 'disable' else deployment.apply(game,mod)
+
+
 def test_apply_checks_live_bytes_before_marking_success(tmp_path, monkeypatch):
     game, mod = project(tmp_path)
     original = (game / RELATIVE).read_bytes()
@@ -98,9 +183,32 @@ def test_apply_checks_live_bytes_before_marking_success(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match='failed verification'):
         deployment.apply(game, mod)
     assert not deployment.status(game, mod)['enabled']
-    assert read_marker(game)['pendingHash'] is not None
+    assert read_marker(game)['pendingHash'] is None
     assert (game / RELATIVE).read_bytes() == original
     assert backup_path(game).read_bytes() == original
+
+
+def test_external_edit_during_batch_is_preserved_and_earlier_write_rolled_back(tmp_path, monkeypatch):
+    game,mod = project(tmp_path)
+    with_map(game)
+    store = ItemStore(game,mod,False)
+    store.edit('EquipParamGoods',100,'sellValue',42)
+    store.save()
+    (mod/MAP).parent.mkdir(parents=True,exist_ok=True)
+    (mod/MAP).write_bytes(build_msb())
+    before = (game/RELATIVE).read_bytes()
+    external = b'external map editor bytes'
+    apply_file = deployment._apply_file
+    def edit_next_file(*args):
+        apply_file(*args)
+        if args[2] == RELATIVE:
+            (game/MAP).write_bytes(external)
+    monkeypatch.setattr(deployment,'_apply_file',edit_next_file)
+    with pytest.raises(RuntimeError,match='external bytes were kept'):
+        deployment.apply(game,mod)
+    assert (game/RELATIVE).read_bytes() == before
+    assert (game/MAP).read_bytes() == external
+    assert not deployment._backup_path(game,MAP).exists()
 
 def test_apply_preserves_original_once_and_installs_the_saved_archive(tmp_path):
     game, mod = project(tmp_path)
@@ -242,7 +350,10 @@ def test_service_exposes_apply_and_disable_routes(tmp_path):
     from urllib.request import Request, urlopen
     from plugins.ds1.plugin import DS1Session
     game, mod = project(tmp_path)
-    ItemStore(game, mod, False).save()
+    store = ItemStore(game, mod, False)
+    # A mod that changes nothing installs nothing, so this one changes a price.
+    store.edit("EquipParamGoods", 100, "sellValue", 42)
+    store.save()
     original = (game / RELATIVE).read_bytes()
     session = DS1Session({"LEXEDITOR_DS1_ROOT": str(game), "LEXEDITOR_DS1_PROJECT": str(mod),
                           "LEXEDITOR_MOD_READ_ONLY": "0", "LEXEDITOR_NO_MOD": "0"})
@@ -300,7 +411,7 @@ def test_crash_between_live_write_and_marker_commit_on_initial_apply(tmp_path, m
     live = game / RELATIVE
 
     crash = CrashAfter(monkeypatch, live)
-    with pytest.raises(RuntimeError, match="simulated crash"):
+    with pytest.raises(SimulatedCrash, match="simulated crash"):
         deployment.apply(game, mod)
     assert crash.fired
 
@@ -335,7 +446,7 @@ def test_crash_between_live_write_and_marker_commit_on_reapply(tmp_path, monkeyp
     old_active = read_marker(game)["activeHash"]
 
     crash = CrashAfter(monkeypatch, live)
-    with pytest.raises(RuntimeError, match="simulated crash"):
+    with pytest.raises(SimulatedCrash, match="simulated crash"):
         deployment.apply(game, mod)
     assert crash.fired
     assert deployment._hash_file(live) == new_hash
@@ -357,7 +468,7 @@ def test_crash_between_live_write_and_marker_commit_on_disable(tmp_path, monkeyp
     live = game / RELATIVE
 
     crash = CrashAfter(monkeypatch, live)
-    with pytest.raises(RuntimeError, match="simulated crash"):
+    with pytest.raises(SimulatedCrash, match="simulated crash"):
         deployment.disable(game)
     assert crash.fired
     assert live.read_bytes() == original
@@ -383,7 +494,7 @@ def test_a_pending_apply_is_finalized_even_if_disable_is_called_next(tmp_path, m
     live = game / RELATIVE
 
     crash = CrashAfter(monkeypatch, live)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(SimulatedCrash):
         deployment.apply(game, mod)
     monkeypatch.undo()
 
@@ -625,6 +736,98 @@ def test_ordinary_absolute_paths_with_dot_segments_still_work(tmp_path):
     applied = deployment.apply(noisy_game, noisy_mod)
     assert applied["enabled"]
     assert (game / RELATIVE).read_bytes() == (mod / RELATIVE).read_bytes()
+
+
+def test_apply_installs_maps_only_project_with_backup_and_marker(tmp_path):
+    game, mod = project(tmp_path)
+    with_map(game)
+    wanted = edited_map(((2, 0), "posX", 5.5))
+    (mod / MAP_DIR).mkdir(parents=True)
+    (mod / MAP).write_bytes(wanted)
+    applied = deployment.apply(game, mod)
+    assert (game / MAP).read_bytes() == wanted
+    assert deployment._backup_path(game, MAP).read_bytes() == build_msb()
+    marker = deployment._marker_path(game, MAP)
+    assert marker.name == ".lexeditor-ds1-deployment.m10_00_00_00.msb.json" and marker.is_file()
+    assert applied["maps"]["applied"] == ["m10_00_00_00.msb"]
+    assert applied["enabled"] and applied["thisProjectActive"] and applied["everApplied"]
+    assert applied["backupOk"] and not applied["matchesOriginal"] and not applied["stale"]
+    disabled = deployment.disable(game)
+    assert (game / MAP).read_bytes() == build_msb()
+    assert deployment._backup_path(game, MAP).is_file()
+    assert disabled["maps"]["applied"] == [] and not disabled["enabled"]
+
+
+def test_apply_restores_map_missing_from_the_new_project(tmp_path):
+    game, first = project(tmp_path, "first")
+    with_map(game)
+    wanted = edited_map(((2, 0), "posX", 5.5))
+    (first / RELATIVE).parent.mkdir(parents=True, exist_ok=True)
+    (first / RELATIVE).write_bytes(make_archive())
+    (first / MAP_DIR).mkdir(parents=True)
+    (first / MAP).write_bytes(wanted)
+    deployment.apply(game, first)
+    assert (game / MAP).read_bytes() == wanted
+    _game, second = project(tmp_path, "second")
+    (second / RELATIVE).parent.mkdir(parents=True, exist_ok=True)
+    (second / RELATIVE).write_bytes(make_archive())
+    applied = deployment.apply(game, second)
+    assert (game / MAP).read_bytes() == build_msb()
+    assert applied["maps"]["applied"] == []
+
+
+def test_map_staleness_after_the_project_changes(tmp_path):
+    game, mod = project(tmp_path)
+    with_map(game)
+    (mod / MAP_DIR).mkdir(parents=True)
+    (mod / MAP).write_bytes(edited_map(((2, 0), "posX", 5.5)))
+    deployment.apply(game, mod)
+    assert not deployment.status(game, mod)["stale"]
+    (mod / MAP).write_bytes(edited_map(((2, 0), "posX", 6.5)))
+    status = deployment.status(game, mod)
+    assert status["stale"] and status["maps"]["stale"]
+
+
+def test_apply_installs_chars_only_project_with_backup_and_marker(tmp_path):
+    game, mod = project(tmp_path)
+    with_char(game)
+    wanted = edited_char("a87.tae", (0, 0, "start", 0.25))
+    (mod / CHR_DIR).mkdir(parents=True)
+    (mod / CHAR).write_bytes(wanted)
+    applied = deployment.apply(game, mod)
+    assert (game / CHAR).read_bytes() == wanted
+    assert deployment._backup_path(game, CHAR).read_bytes() == VANILLA_CHAR
+    marker = deployment._marker_path(game, CHAR)
+    assert marker.name == ".lexeditor-ds1-deployment.c1200.anibnd.dcx.json" and marker.is_file()
+    assert applied["chars"]["applied"] == ["c1200.anibnd.dcx"]
+    assert applied["enabled"] and applied["thisProjectActive"] and applied["everApplied"]
+    assert applied["backupOk"] and not applied["matchesOriginal"] and not applied["stale"]
+    disabled = deployment.disable(game)
+    assert (game / CHAR).read_bytes() == VANILLA_CHAR
+    assert deployment._backup_path(game, CHAR).is_file()
+    assert disabled["chars"]["applied"] == [] and not disabled["enabled"]
+
+
+def test_char_staleness_after_the_project_changes(tmp_path):
+    game, mod = project(tmp_path)
+    with_char(game)
+    (mod / CHR_DIR).mkdir(parents=True)
+    (mod / CHAR).write_bytes(edited_char("a87.tae", (0, 0, "start", 0.25)))
+    deployment.apply(game, mod)
+    assert not deployment.status(game, mod)["stale"]
+    (mod / CHAR).write_bytes(edited_char("a87.tae", (0, 0, "start", 0.75)))
+    status = deployment.status(game, mod)
+    assert status["stale"] and status["chars"]["stale"]
+
+
+def test_apply_refuses_a_corrupt_character_file(tmp_path):
+    game, mod = project(tmp_path)
+    with_char(game)
+    (mod / CHR_DIR).mkdir(parents=True)
+    (mod / CHAR).write_bytes(b"not a binder")
+    with pytest.raises(FormatError):
+        deployment.apply(game, mod)
+    assert (game / CHAR).read_bytes() == VANILLA_CHAR
 
 
 if __name__ == "__main__":

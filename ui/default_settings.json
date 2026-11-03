@@ -3,7 +3,6 @@
   "booleanBoxStyle": true,
   "globalMessageRarity": 3.0,
   "hoverableAltClick": false,
-  "showHoverTooltips": false,
   "loadingTransitionMinimumSeconds": 2.5,
   "mainMenuHeightPercent": 5.0,
   "pageWrapAround": true,
@@ -14,9 +13,12 @@
   "residentCoverDarkenPercent": 33.0,
   "residentHandleWidthPercent": 5.0,
   "selectionHoldMs": 500,
+  "showHiddenProperties": false,
+  "showHoverTooltips": false,
   "soundEnabled": false,
   "soundVolumePercent": 25.0,
   "tableRowsPerPage": 40,
+  "trustWarning": true,
   "tweakColumnsPerPage": 6,
   "updateCheckFrequency": "monthly"
 }

@@ -61,7 +61,7 @@ def test_dense_table_text_fits_real_rows(page, height, theme, zoom):
       const rows=Array.from({length:200},(_,id)=>({id,name:id%2?'0x05468962':'ADVERT_WHR_QUARTER_SHOES',kind:'ADVERT'}));
       const main=document.querySelector('main');main.style.cssText='position:absolute;inset:150px 0 0;height:auto';
       const render=()=>{
-        const table=U.pagedListDetail({rows,key:r=>r.id,slots:false,pageSize:40,
+        const table=U.pagedListDetail({rows,key:r=>r.id,slots:false,pageSize:40,order:'given',
           splitKey:'clip-fixture',maxBarrels:1,change:render,
           master:v=>U.columnList({rows:v.rows,key:r=>r.id,select:v.select,
             columns:[{key:'name',label:'Name'},{key:'kind',label:'Kind'}]}),
@@ -77,7 +77,30 @@ def test_dense_table_text_fits_real_rows(page, height, theme, zoom):
     output.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(output/f'lex-dense-{theme}-{height}-{zoom}.png'))
     assert not table_hits, table_hits
-    assert page.locator('.lex-column-list-row').first.evaluate('n=>n.getBoundingClientRect().height') >= 31
-    assert page.locator('.lex-column-list-row').first.evaluate('n=>parseFloat(getComputedStyle(n).fontSize)') >= 11
+    # The reader's requested density is authoritative. A former 32px row
+    # minimum silently capped the row count, contradicting the pager's choice.
+    assert page.locator('.lex-column-list-row').count() == 40
+    samples = page.evaluate('''async()=>{
+      const values=[];
+      for(let frame=0;frame<12;frame++) {
+        await new Promise(requestAnimationFrame);
+        values.push([...document.querySelectorAll('.lex-column-cell-text')]
+          .map(n=>getComputedStyle(n).fontSize).join('|'));
+      }return values;
+    }''')
+    assert len(set(samples)) == 1, samples
+    assert len(set(samples[-1].split('|'))) == 1, samples[-1]
     if theme == 'rdr2' and (ROOT/'plugins/rdr2/assets/fonts/RDRLino-Regular.woff2').exists():
         assert page.evaluate('document.fonts.check(\'14px "Lex RDR Lino"\')')
+
+
+def test_dense_text_grows_back_when_rows_gain_height(page):
+    test_dense_table_text_fits_real_rows(page, 720, 'blank', 1)
+    label = page.locator('.lex-column-cell-text').first
+    before = label.evaluate('n=>parseFloat(getComputedStyle(n).fontSize)')
+    page.set_viewport_size({'width':1280, 'height':1080})
+    page.wait_for_function('''before=>parseFloat(getComputedStyle(
+      document.querySelector('.lex-column-cell-text')).fontSize)>before''', arg=before)
+    page.wait_for_timeout(200)
+    assert page.locator('.lex-column-list-row').count() == 40
+    assert not json.loads(page.evaluate(PROBE))

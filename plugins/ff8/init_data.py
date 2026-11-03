@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from core.numeric_values import integer_value
+
 
 GF_COUNT = 16
 GF_SIZE = 68
@@ -77,8 +79,8 @@ CONFIG_LABELS = [
     "Unknown action 2", "Start action",
 ]
 CONFIG_FLAG_ENTRIES = [
-    {"name": "Battle vibration trigger", "mask": 0x01}, {"name": "Unknown bit 1", "mask": 0x02},
-    {"name": "Unknown bit 2", "mask": 0x04}, {"name": "Unknown bit 3", "mask": 0x08},
+    {"name": "Battle vibration trigger", "mask": 0x01}, {"name": "Unknown bit 1", "mask": 0x02, "readonly": True},
+    {"name": "Unknown bit 2", "mask": 0x04, "readonly": True}, {"name": "Unknown bit 3", "mask": 0x08, "readonly": True},
     {"name": "Vibration hardware present", "mask": 0x10}, {"name": "Use custom controls", "mask": 0x20},
     {"name": "No controller detected", "mask": 0x40}, {"name": "Controls modified", "mask": 0x80},
 ]
@@ -158,14 +160,19 @@ def _read_fields(data: bytes, definitions: list[dict]) -> list[dict]:
             for definition in definitions]
 
 
-def read(data: bytes, *, items: list[dict], weapons: list[dict], magic: list[dict],
-         gfs: list[dict], abilities: list[dict]) -> dict:
+def _general_fields(weapons: list[dict]) -> list[dict]:
     party_entries = [{"id": index, "name": name} for index, name in enumerate(PARTY_NAMES)] + [{"id": 255, "name": "Empty"}]
     general_defs = deepcopy(GENERAL_FIELDS)
     for definition in general_defs[:3]:
         definition["lookup"]["entries"] = party_entries
     for definition in general_defs[4:7]:
         definition["lookup"]["entries"] = weapons
+    return general_defs
+
+
+def read(data: bytes, *, items: list[dict], weapons: list[dict], magic: list[dict],
+         gfs: list[dict], abilities: list[dict]) -> dict:
+    general_defs = _general_fields(weapons)
     character_rows = []
     for character_id, name in enumerate(CHARACTER_NAMES):
         base = CHARACTER_OFFSET + character_id * CHARACTER_SIZE
@@ -190,7 +197,7 @@ def read(data: bytes, *, items: list[dict], weapons: list[dict], magic: list[dic
 
 def _definition_map(*, weapons: list[dict], magic: list[dict], gfs: list[dict], abilities: list[dict]) -> dict[tuple[str, int, str], dict]:
     definitions: dict[tuple[str, int, str], dict] = {}
-    for definition in GENERAL_FIELDS:
+    for definition in _general_fields(weapons):
         definitions[("general", 0, definition["field"])] = definition
     for definition in CONFIG_FIELDS:
         definitions[("config", 0, definition["field"])] = definition
@@ -280,14 +287,15 @@ def apply(data: bytes, edits: list[dict], *, item_ids: set[int], weapon_ids: set
     changed = 0
     for edit in edits:
         kind = str(edit.get("kind", ""))
-        row_id = int(edit.get("id", 0))
+        row_id = integer_value(edit.get("id", 0), "Starting-data record ID")
         if kind == "inventory":
-            slot = int(edit["slot"])
+            slot = integer_value(edit["slot"], "Starting inventory slot")
             key = (kind, slot)
             if key in seen or not 0 <= slot < ITEM_COUNT:
                 raise ValueError(f"Invalid or duplicate starting inventory slot: {slot}")
             seen.add(key)
-            item_id, quantity = int(edit["itemId"]), int(edit["quantity"])
+            item_id = integer_value(edit["itemId"], "Starting inventory item ID")
+            quantity = integer_value(edit["quantity"], "Starting inventory quantity")
             if item_id not in item_ids or not 0 <= quantity <= 100:
                 raise ValueError("Starting inventory needs a valid item and a quantity from 0 to 100")
             if item_id == 0:
@@ -297,12 +305,13 @@ def apply(data: bytes, edits: list[dict], *, item_ids: set[int], weapon_ids: set
             changed += 1
             continue
         if kind == "magic":
-            slot = int(edit["slot"])
+            slot = integer_value(edit["slot"], "Starting Magic slot")
             key = (kind, row_id, slot)
             if key in seen or not 0 <= row_id < CHARACTER_COUNT or not 0 <= slot < 32:
                 raise ValueError("Invalid or duplicate starting Magic slot")
             seen.add(key)
-            magic_id, quantity = int(edit["magicId"]), int(edit["quantity"])
+            magic_id = integer_value(edit["magicId"], "Starting Magic ID")
+            quantity = integer_value(edit["quantity"], "Starting Magic quantity")
             if magic_id not in magic_ids | {0} or not 0 <= quantity <= 100:
                 raise ValueError("Starting Magic needs a valid spell and a quantity from 0 to 100")
             if magic_id == 0:
@@ -317,12 +326,27 @@ def apply(data: bytes, edits: list[dict], *, item_ids: set[int], weapon_ids: set
         if definition is None or key in seen:
             raise ValueError(f"Invalid or duplicate init.out field: {kind} {row_id} {field_name}")
         seen.add(key)
-        value = 1 if definition.get("control") == "boolean" and bool(edit.get("value")) else int(edit.get("value", 0))
+        if definition.get("control") == "boolean":
+            if not isinstance(edit.get("value"), bool):
+                raise ValueError(f"{definition['label']} must be a boolean")
+            value = int(edit["value"])
+        else:
+            value = integer_value(edit.get("value", 0), definition["label"])
         if not int(definition["minimum"]) <= value <= int(definition["maximum"]):
             raise ValueError(f"{definition['label']} must be {definition['minimum']} to {definition['maximum']}")
         if field_name in {"weapon_id", "weapon_laguna", "weapon_kiros", "weapon_ward"} and value not in weapon_ids:
             raise ValueError(f"Invalid weapon id: {value}")
         offset, size = int(definition["offset"]), int(definition["size"])
+        lookup = definition.get("lookup", {})
+        if lookup.get("type") == "enum" and value not in {entry["id"] for entry in lookup["entries"]}:
+            raise ValueError(f"Invalid {definition['label']} choice: {value}")
+        if lookup.get("type") == "flags":
+            writable = 0
+            for entry in lookup["entries"]:
+                if not entry.get("readonly"):
+                    writable |= entry["mask"]
+            if (value ^ _read_int(result, offset, size)) & ~writable:
+                raise ValueError(f"{definition['label']}: unknown flags are read-only")
         result[offset:offset + size] = value.to_bytes(size, "little")
         changed += 1
     return bytes(result), changed

@@ -1,6 +1,7 @@
 """The shared Create Mod dialog: naming a mod is the only required step,
-and choosing a different location is a separate, explicit action next to
-it - not a folder picker forced open on every mod.
+author and description are asked for but may stay blank, and choosing a
+different location is a separate, explicit action next to it - not a folder
+picker forced open on every mod.
 """
 from test_shared_ui_feedback import framework, page
 
@@ -35,7 +36,7 @@ def test_creating_a_mod_needs_only_a_name_by_default(page):
     page.get_by_role("button", name="Create", exact=True).click()
     page.wait_for_timeout(200)
     calls = page.evaluate("window.calls")
-    assert calls == [["create_mod_project", ["fixture", "My Mod", ""]]], calls
+    assert calls == [["create_mod_project", ["fixture", "My Mod", "", {"author": "", "description": ""}]]], calls
 
 
 def test_choosing_a_different_location_is_a_separate_explicit_step(page):
@@ -49,8 +50,29 @@ def test_choosing_a_different_location_is_a_separate_explicit_step(page):
     calls = page.evaluate("window.calls")
     assert calls == [
         ["choose_mod_project_location", ["fixture"]],
-        ["create_mod_project", ["fixture", "My Mod", "D:/Elsewhere"]],
+        ["create_mod_project", ["fixture", "My Mod", "D:/Elsewhere", {"author": "", "description": ""}]],
     ], calls
+
+
+def test_author_and_description_go_with_the_name(page):
+    framework(page)
+    mount_shell(page)
+    page.get_by_label("New mod name").fill("My Mod")
+    page.get_by_label("Author").fill("  Lexer ")
+    page.get_by_label("Description").fill("Makes the game better.")
+    page.get_by_role("button", name="Create", exact=True).click()
+    page.wait_for_timeout(200)
+    assert page.evaluate("window.calls") == [["create_mod_project", ["fixture", "My Mod", "",
+        {"author": "Lexer", "description": "Makes the game better."}]]]
+
+
+def test_a_blank_name_is_refused(page):
+    framework(page)
+    mount_shell(page)
+    page.get_by_label("New mod name").fill("   ")
+    page.get_by_role("button", name="Create", exact=True).click()
+    page.get_by_text("Enter a mod name.", exact=True).wait_for()
+    assert page.evaluate("window.calls") == []
 
 
 def test_cancelling_the_dialog_creates_nothing(page):

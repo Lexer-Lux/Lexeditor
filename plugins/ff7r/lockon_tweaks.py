@@ -18,6 +18,8 @@ from pathlib import Path
 import shutil
 from typing import Any
 
+from core.numeric_values import integer_value
+
 from .archive import extract_pair, installed_paks
 from .cooked_serial_edit import rewrite_unique_linear_color
 from .dataobject import Entry
@@ -224,9 +226,13 @@ def save_virtual_edits(game_root: Path, data_root: Path, project_root: Path, ind
     for edit in edits:
         if not isinstance(edit, dict):
             raise TypeError("each Better Lock-on edit must be an object")
-        if int(edit.get("entry", -1)) != 0 or "index" in edit:
+        if set(edit) - {"entry", "property", "value", "index"}:
+            raise ValueError("Better Lock-on edit contains unsupported fields")
+        if integer_value(edit.get("entry", -1), "Better Lock-on entry index") != 0 or "index" in edit:
             raise ValueError("Better Lock-on accepts scalar edits on its single record only")
-        prop = str(edit.get("property", ""))
+        prop = edit.get("property", "")
+        if not isinstance(prop, str):
+            raise TypeError("Better Lock-on property must be text")
         if prop not in {"RemovePrompt", "RedReticle"}:
             raise ValueError("Better Lock-on property is read-only or unknown")
         if prop in seen:

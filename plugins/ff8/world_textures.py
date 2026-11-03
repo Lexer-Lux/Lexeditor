@@ -15,6 +15,7 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+from core.numeric_values import integer_value
 
 from PIL import Image
 
@@ -159,10 +160,7 @@ def rows(dataset: str = "current") -> dict:
 
 
 def _texture_id(value) -> int:
-    try:
-        texture_id = int(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError("World texture ID must be an integer") from error
+    texture_id = integer_value(value, "World texture ID")
     if not 0 <= texture_id < TEXTURE_COUNT:
         raise ValueError(f"World texture ID must be 0 to {TEXTURE_COUNT - 1}")
     return texture_id
@@ -186,10 +184,7 @@ def png_bytes(texture_id: int, palette: int = 0,
               dataset: str = "current") -> bytes:
     payload = tim_bytes(texture_id, dataset)
     layout = _tim_layout(payload + bytes(SLOT_SIZE - len(payload)))
-    try:
-        palette = int(palette)
-    except (TypeError, ValueError) as error:
-        raise ValueError("Palette ID must be an integer") from error
+    palette = integer_value(palette, "Palette ID")
     if not 0 <= palette < layout["paletteCount"]:
         raise ValueError(f"Palette ID must be 0 to {layout['paletteCount'] - 1}")
     palette_start = 20 + palette * 256 * 2

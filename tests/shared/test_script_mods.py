@@ -1,9 +1,8 @@
-"""Tweak mods build only when trusted, and only into their own game files."""
+"""Tweak mods build when enabled, and only into their own game files."""
 from __future__ import annotations
 
 import json
 import hashlib
-import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -45,12 +44,19 @@ def make_mod(parent: Path, name: str = "Example", helper_text: str = "line = lam
 
 
 class ScriptModTests(unittest.TestCase):
+    def test_integer_tables_bound_entry_count_and_each_cost(self):
+        field = {"key": "costs", "type": "intList", "min": 1, "max": 7,
+                 "minLength": 0, "maxLength": 99}
+        self.assertEqual(script_mods._coerce(field, []), [])
+        self.assertEqual(script_mods._coerce(field, [1, 3, 7]), [1, 3, 7])
+        for invalid in ([1]*100, [0], [8], [1.5]):
+            with self.assertRaises(script_mods.ScriptModError):
+                script_mods._coerce(field, invalid)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.dir = Path(self.temp.name)
-        patcher = mock.patch.dict(os.environ, {script_mods.TRUST_ENV: str(self.dir / "trust.json")})
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        # Catalog rows and recovery identify mods by their resolved paths.
+        self.dir = Path(self.temp.name).resolve()
         self.addCleanup(self.temp.cleanup)
         self.mod = make_mod(self.dir / "library")
 
@@ -65,6 +71,10 @@ class ScriptModTests(unittest.TestCase):
         self.assertTrue(script_mods.owns("settings.json"))
         self.assertFalse(script_mods.owns("hext/ff8/en_nv/patch.txt"))
         self.assertFalse(script_mods.owns("direct/settings.json"))
+        # Game archives under script/ (DS1 talk and AI scripts) stay game files.
+        self.assertTrue(script_mods.owns("script/humanity_x64.S"))
+        self.assertFalse(script_mods.owns("script/talk/m10_02_00_00.talkesdbnd.dcx"))
+        self.assertFalse(script_mods.owns("script/m10_00_00_00.luabnd.DCX"))
 
     def test_values_start_at_defaults_and_bad_stored_values_fall_back(self):
         self.assertEqual(script_mods.values(self.mod), {"enabled": True, "amount": 10, "mode": "a"})
@@ -79,22 +89,19 @@ class ScriptModTests(unittest.TestCase):
                 script_mods.save_values(self.mod, bad)
         self.assertEqual(script_mods.values(self.mod)["amount"], 60)
 
-    def test_an_untrusted_mod_never_runs(self):
-        with self.assertRaisesRegex(script_mods.ScriptModError, "not trusted"):
-            self.build()
-        self.assertFalse((self.mod / "hext").exists())
+    def test_a_mod_builds_with_no_trust_step(self):
+        result, seen = self.build()
+        self.assertEqual(seen, [10])
+        self.assertEqual(result["files"], ["hext/ff8/en_nv/patch.txt"])
 
-    def test_editing_the_script_revokes_trust_until_trusted_again(self):
-        self.assertEqual(script_mods.set_trusted(self.mod, True), "trusted")
-        (self.mod / "script" / "helper.py").write_text("line = lambda n: 'changed'\n", encoding="utf-8")
-        self.assertEqual(script_mods.trust_state(self.mod), "changed")
-        with self.assertRaisesRegex(script_mods.ScriptModError, "changed since"):
-            self.build()
-        self.assertEqual(script_mods.set_trusted(self.mod, True), "trusted")
+    def test_editing_the_script_changes_the_next_build(self):
         self.build()
+        self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(encoding="utf-8"), "00 = 0A")
+        (self.mod / "script" / "helper.py").write_text("line = lambda n: 'changed'\n", encoding="utf-8")
+        self.build()
+        self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(encoding="utf-8"), "changed")
 
     def test_build_writes_outputs_and_removes_ones_no_longer_produced(self):
-        script_mods.set_trusted(self.mod, True)
         script_mods.save_values(self.mod, {"amount": 60})
         result, seen = self.build()
         self.assertEqual(seen, [60])
@@ -109,7 +116,6 @@ class ScriptModTests(unittest.TestCase):
         self.assertFalse((self.mod / "hext/ff8/en_nv/patch.txt").exists())
 
     def test_a_hand_made_file_is_never_overwritten(self):
-        script_mods.set_trusted(self.mod, True)
         target = self.mod / "hext/ff8/en_nv/patch.txt"
         target.parent.mkdir(parents=True)
         target.write_text("mine", encoding="utf-8")
@@ -118,11 +124,9 @@ class ScriptModTests(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"), "mine")
 
     def test_outputs_stay_inside_the_allowed_game_roots(self):
-        script_mods.set_trusted(self.mod, True)
         for bad in ("../escape.txt", "C:/x.txt", "mod.json", "settings.json", "script/tweak.py", "textures/x.png"):
             (self.mod / "script" / "tweak.py").write_text(
                 f"def build(settings, context):\n    return {{{bad!r}: 'x'}}\n", encoding="utf-8")
-            script_mods.set_trusted(self.mod, True)
             with self.assertRaises(script_mods.ScriptModError, msg=bad):
                 self.build()
         self.assertFalse((self.dir / "library" / "escape.txt").exists())
@@ -130,7 +134,6 @@ class ScriptModTests(unittest.TestCase):
     def test_two_mods_with_the_same_module_names_do_not_share_code(self):
         other = make_mod(self.dir / "library", "Other", "line = lambda n: 'other'\n")
         for root in (self.mod, other):
-            script_mods.set_trusted(root, True)
             self.build(root)
         self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(encoding="utf-8"), "00 = 0A")
         self.assertEqual((other / "hext/ff8/en_nv/patch.txt").read_text(encoding="utf-8"), "other")
@@ -138,19 +141,17 @@ class ScriptModTests(unittest.TestCase):
     def test_catalog_row_reads_without_running_the_script(self):
         (self.mod / "script" / "tweak.py").write_text("raise SystemExit('ran')\n", encoding="utf-8")
         row = script_mods.catalog_row(self.mod)
-        self.assertEqual(row["trust"], "untrusted")
+        self.assertNotIn("trust", row)
         self.assertEqual(row["schema"]["requires"], ["other"])
         self.assertEqual(row["values"]["amount"], 10)
 
     def test_describe_and_clear(self):
-        script_mods.set_trusted(self.mod, True)
         self.assertEqual(script_mods.describe(self.mod, None), {"amount": 10})
         self.build()
         self.assertEqual(script_mods.clear(self.mod), ["hext/ff8/en_nv/patch.txt"])
         self.assertFalse((self.mod / script_mods.MANIFEST_FILE).exists())
 
     def test_manifest_paths_are_validated_before_any_files_change(self):
-        script_mods.set_trusted(self.mod, True)
         self.build()
         patch = self.mod / "hext/ff8/en_nv/patch.txt"
         original = patch.read_bytes()
@@ -171,7 +172,6 @@ class ScriptModTests(unittest.TestCase):
                 self.assertFalse((self.mod / "direct/extra.bin").exists())
 
     def test_malformed_manifest_is_refused_before_writing(self):
-        script_mods.set_trusted(self.mod, True)
         manifest = self.mod / script_mods.MANIFEST_FILE
         for malformed in (None, [], {}, {"version": 2, "files": {}},
                           {"version": 1, "files": []},
@@ -183,27 +183,29 @@ class ScriptModTests(unittest.TestCase):
             self.assertFalse((self.mod / "hext").exists())
             self.assertEqual(json.loads(manifest.read_text()), malformed)
 
-    def test_changed_generated_files_are_preserved_on_rebuild_removal_and_clear(self):
-        script_mods.set_trusted(self.mod, True)
+    def test_hand_edits_to_generated_files_are_overwritten_on_rebuild_removal_and_clear(self):
+        # A rebuild always comes from the mod's script (generated-file guard
+        # dropped in cdb352a0): edits to its output are replaced, not refused.
         script_mods.save_values(self.mod, {"amount": 60})
         self.build()
         extra = self.mod / "direct/extra.bin"
-        extra.write_bytes(b"my changes")
         patch = self.mod / "hext/ff8/en_nv/patch.txt"
-        original = patch.read_bytes()
         manifest = self.mod / script_mods.MANIFEST_FILE
-        original_manifest = manifest.read_bytes()
-        for amount in (70, 5):
-            script_mods.save_values(self.mod, {"amount": amount})
-            with self.assertRaisesRegex(script_mods.ScriptModError, "changed since"):
-                self.build()
-            self.assertEqual(extra.read_bytes(), b"my changes")
-            self.assertEqual(patch.read_bytes(), original)
-        with self.assertRaisesRegex(script_mods.ScriptModError, "changed since"):
-            script_mods.clear(self.mod)
-        self.assertEqual(extra.read_bytes(), b"my changes")
-        self.assertEqual(patch.read_bytes(), original)
-        self.assertEqual(manifest.read_bytes(), original_manifest)
+        extra.write_bytes(b"my changes")
+        patch.write_bytes(b"my changes")
+        script_mods.save_values(self.mod, {"amount": 70})
+        self.build()
+        self.assertEqual(extra.read_bytes(), bytes([70]))
+        self.assertEqual(patch.read_text(encoding="utf-8"), "00 = 46")
+        extra.write_bytes(b"my changes")
+        script_mods.save_values(self.mod, {"amount": 5})
+        self.build()
+        self.assertFalse(extra.exists())
+        self.assertEqual(patch.read_text(encoding="utf-8"), "00 = 05")
+        patch.write_bytes(b"my changes")
+        self.assertEqual(script_mods.clear(self.mod), ["hext/ff8/en_nv/patch.txt"])
+        self.assertFalse(patch.exists())
+        self.assertFalse(manifest.exists())
 
     def test_generated_paths_cannot_follow_a_directory_link_outside_the_mod(self):
         outside = self.dir / "outside"
@@ -212,7 +214,6 @@ class ScriptModTests(unittest.TestCase):
             (self.mod / "hext").symlink_to(outside, target_is_directory=True)
         except OSError:
             self.skipTest("Directory symlinks are unavailable for this account")
-        script_mods.set_trusted(self.mod, True)
         with self.assertRaisesRegex(script_mods.ScriptModError, "outside"):
             self.build()
         target = outside / "keep.txt"
@@ -224,7 +225,6 @@ class ScriptModTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), b"keep")
 
     def test_partial_write_failure_restores_files_and_manifest(self):
-        script_mods.set_trusted(self.mod, True)
         self.build()
         patch = self.mod / "hext/ff8/en_nv/patch.txt"
         manifest = self.mod / script_mods.MANIFEST_FILE
@@ -238,14 +238,13 @@ class ScriptModTests(unittest.TestCase):
             write(path, data)
 
         with mock.patch.object(script_mods, "atomic_write", side_effect=fail_manifest):
-            with self.assertRaisesRegex(OSError, "simulated manifest failure"):
+            with self.assertRaisesRegex(script_mods.ScriptModInfrastructureError, "simulated manifest failure"):
                 self.build()
         self.assertEqual(patch.read_bytes(), old_patch)
         self.assertEqual(manifest.read_bytes(), old_manifest)
         self.assertFalse((self.mod / "direct/extra.bin").exists())
 
     def test_partial_removal_failure_restores_removed_files(self):
-        script_mods.set_trusted(self.mod, True)
         script_mods.save_values(self.mod, {"amount": 60})
         self.build()
         extra = self.mod / "direct/extra.bin"
@@ -258,13 +257,12 @@ class ScriptModTests(unittest.TestCase):
             write(path, data)
 
         with mock.patch.object(script_mods, "atomic_write", side_effect=fail_manifest):
-            with self.assertRaises(OSError):
+            with self.assertRaises(script_mods.ScriptModInfrastructureError):
                 self.build()
         self.assertEqual(extra.read_bytes(), bytes([60]))
         self.assertEqual((self.mod / "hext/ff8/en_nv/patch.txt").read_text(), "00 = 3C")
 
     def test_failed_rollback_is_reported_with_original_failure(self):
-        script_mods.set_trusted(self.mod, True)
         self.build()
         script_mods.save_values(self.mod, {"amount": 60})
         write = script_mods.atomic_write
@@ -280,6 +278,194 @@ class ScriptModTests(unittest.TestCase):
         with mock.patch.object(script_mods, "atomic_write", side_effect=fail_after_first_write):
             with self.assertRaisesRegex(script_mods.ScriptModError, "Build failed: disk unavailable; .*rollback failed"):
                 self.build()
+
+    def test_batch_write_failure_rolls_back_without_disabling_healthy_mods(self):
+        from core.mod_builds import activate_with_recovery
+        second = make_mod(self.dir / 'library', 'Second')
+        for root in (self.mod, second):
+            (root/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+            self.build(root)
+            script_mods.save_values(root, {'amount': 60})
+        metadata = {root: (root/'mod.json').read_bytes() for root in (self.mod, second)}
+        originals = {root: (root/'hext/ff8/en_nv/patch.txt').read_bytes() for root in metadata}
+        write = script_mods.atomic_write
+        def fail_second_manifest(path, data):
+            if path == second/script_mods.MANIFEST_FILE:
+                raise OSError('disk unavailable')
+            return write(path, data)
+        class Context(list):
+            pass
+        class Adapter:
+            def activate(self, active, game):
+                script_mods.build_batch([script_mods.catalog_row(root) for root in active],
+                                       Context(), allowed_roots=('hext','direct'))
+                return {}
+        with mock.patch.object(script_mods, 'atomic_write', side_effect=fail_second_manifest):
+            try:
+                outcome = activate_with_recovery(Adapter(), list(metadata), self.dir)
+            except script_mods.ScriptModError as failure:
+                self.assertFalse(failure.folders)
+            else:
+                self.fail(f'Activation unexpectedly succeeded: {outcome}')
+        for root in metadata:
+            self.assertEqual((root/'mod.json').read_bytes(), metadata[root])
+            self.assertEqual((root/'hext/ff8/en_nv/patch.txt').read_bytes(), originals[root])
+            self.assertFalse((root/'direct/extra.bin').exists())
+
+    def test_unreadable_rollback_snapshot_does_not_blame_the_mod(self):
+        (self.mod/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+        self.build()
+        target = self.mod/'hext/ff8/en_nv/patch.txt'
+        open_file = Path.open
+        def unavailable(path, *args, **kwargs):
+            if path == target:
+                raise PermissionError('snapshot file is busy')
+            return open_file(path, *args, **kwargs)
+        class Context(list):
+            pass
+        with mock.patch.object(Path, 'open', unavailable):
+            with self.assertRaises(script_mods.ScriptModError) as caught:
+                script_mods.build_batch([script_mods.catalog_row(self.mod)], Context(), allowed_roots=('hext','direct'))
+        self.assertFalse(caught.exception.folders)
+        self.assertEqual(target.read_text(), '00 = 0A')
+
+    def test_batch_reuses_each_build_snapshot(self):
+        second = make_mod(self.dir / 'library', 'Second')
+        for root in (self.mod, second):
+            (root/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+            self.build(root)
+            script_mods.save_values(root, {'amount': 60})
+        class Context(list):
+            pass
+        with mock.patch.object(script_mods, '_snapshot', wraps=script_mods._snapshot) as snapshot:
+            result = script_mods.build_batch(
+                [script_mods.catalog_row(root) for root in (self.mod, second)],
+                Context(), allowed_roots=('hext','direct'))
+        self.assertEqual(snapshot.call_count, 2)
+        self.assertEqual(len(result), 2)
+        for root in (self.mod, second):
+            self.assertEqual((root/'direct/extra.bin').read_bytes(), bytes([60]))
+
+    def test_batch_failure_never_snapshots_or_restores_a_cache_hit(self):
+        second = make_mod(self.dir / 'library', 'Second')
+        for root in (self.mod, second):
+            (root/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+            self.build(root)
+        target = self.mod/'hext/ff8/en_nv/patch.txt'
+        class Context:
+            def cached_build(inner, root, previous):
+                return root == self.mod
+            def run_script(inner, root, current):
+                # An external edit during the later build must survive its failure.
+                target.write_text('external edit')
+                raise ValueError('broken second mod')
+        with mock.patch.object(script_mods, '_snapshot', wraps=script_mods._snapshot) as snapshot, \
+                mock.patch.object(script_mods, 'restore_generated') as restore:
+            with self.assertRaisesRegex(script_mods.ScriptModError, 'broken second mod') as caught:
+                script_mods.build_batch(
+                    [script_mods.catalog_row(root) for root in (self.mod, second)],
+                    Context(), allowed_roots=('hext','direct'))
+        self.assertEqual(caught.exception.folders, (second,))
+        snapshot.assert_not_called()
+        restore.assert_not_called()
+        self.assertEqual(target.read_text(), 'external edit')
+
+    def test_large_generated_rollback_streams_and_closes_temporary_files(self):
+        self.build()
+        target = self.mod/'hext/ff8/en_nv/patch.txt'
+        block = b'original bytes ' * 4096
+        with target.open('wb') as stream:
+            for _ in range(128):
+                stream.write(block)
+        original_hash = hashlib.sha256(block * 128).hexdigest()
+        script_mods.save_values(self.mod, {'amount': 60})
+        open_file, temporary, write = Path.open, tempfile.TemporaryFile, script_mods.atomic_write
+        snapshots, reads = [], []
+        class BoundedReader:
+            def __init__(inner, source):
+                inner.source = source
+            def __enter__(inner):
+                return inner
+            def __exit__(inner, *args):
+                return inner.source.__exit__(*args)
+            def read(inner, count=-1):
+                self.assertGreaterEqual(count, 0)
+                self.assertLessEqual(count, 64 * 1024)
+                reads.append(count)
+                return inner.source.read(count)
+        def bounded(path, *args, **kwargs):
+            source = open_file(path, *args, **kwargs)
+            return BoundedReader(source) if path == target and args == ('rb',) else source
+        def snapshot(*args, **kwargs):
+            result = temporary(*args, **kwargs)
+            snapshots.append(result)
+            return result
+        def fail_manifest(path, data):
+            if path == self.mod/script_mods.MANIFEST_FILE:
+                raise OSError('manifest storage failed')
+            return write(path, data)
+        with mock.patch.object(Path, 'open', bounded), \
+                mock.patch.object(script_mods.tempfile, 'TemporaryFile', snapshot), \
+                mock.patch.object(script_mods, 'atomic_write', side_effect=fail_manifest):
+            with self.assertRaisesRegex(script_mods.ScriptModInfrastructureError, 'manifest storage failed'):
+                self.build()
+        self.assertTrue(reads)
+        self.assertTrue(snapshots)
+        self.assertTrue(all(stream.closed for stream in snapshots))
+        self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), original_hash)
+        self.assertFalse((self.mod/'direct/extra.bin').exists())
+
+    def test_successful_batch_closes_its_rollback_files(self):
+        (self.mod/'settings.schema.json').write_text(json.dumps({**SCHEMA, 'requires': []}))
+        self.build()
+        temporary, snapshots = tempfile.TemporaryFile, []
+        def snapshot(*args, **kwargs):
+            result = temporary(*args, **kwargs)
+            snapshots.append(result)
+            return result
+        class Context(list):
+            pass
+        with mock.patch.object(script_mods.tempfile, 'TemporaryFile', snapshot):
+            script_mods.build_batch([script_mods.catalog_row(self.mod)], Context(),
+                                   allowed_roots=('hext','direct'))
+        self.assertTrue(snapshots)
+        self.assertTrue(all(stream.closed for stream in snapshots))
+
+    def test_failed_streamed_write_preserves_target_and_cleans_partial_file(self):
+        target = self.dir/'output.bin'
+        target.write_bytes(b'previous')
+        class BrokenStream:
+            first = True
+            def read(inner, count):
+                self.assertEqual(count, 64 * 1024)
+                if inner.first:
+                    inner.first = False
+                    return b'partial replacement'
+                raise OSError('rollback input unreadable')
+        with self.assertRaisesRegex(OSError, 'rollback input unreadable'):
+            script_mods.atomic_write(target, BrokenStream())
+        self.assertEqual(target.read_bytes(), b'previous')
+        self.assertFalse(list(self.dir.glob('output.bin.*.tmp')))
+
+    def test_partial_snapshot_failure_closes_files_before_any_generated_write(self):
+        self.build()
+        target = self.mod/'hext/ff8/en_nv/patch.txt'
+        previous = target.read_bytes()
+        temporary, snapshots = tempfile.TemporaryFile, []
+        def snapshot(*args, **kwargs):
+            result = temporary(*args, **kwargs)
+            snapshots.append(result)
+            return result
+        def interrupted(source, destination, length):
+            destination.write(b'partial snapshot')
+            raise OSError('snapshot storage unavailable')
+        with mock.patch.object(script_mods.tempfile, 'TemporaryFile', snapshot), \
+                mock.patch.object(script_mods.shutil, 'copyfileobj', side_effect=interrupted):
+            with self.assertRaisesRegex(script_mods.ScriptModInfrastructureError, 'snapshot storage unavailable'):
+                self.build()
+        self.assertTrue(snapshots)
+        self.assertTrue(all(stream.closed for stream in snapshots))
+        self.assertEqual(target.read_bytes(), previous)
 
 
 if __name__ == "__main__":

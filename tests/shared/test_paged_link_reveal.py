@@ -31,3 +31,11 @@ def test_a_page_the_reader_chose_still_wins(page):
     framework(page)
     render(page, 300, 165, 16)
     assert not render(page, 30, 24, 0).startswith('Row 24')
+
+
+def test_programmatic_selection_moves_the_single_highlight(page):
+    framework(page)
+    render(page, 3, 0, 0)
+    render(page, 3, 1, 0)
+    assert page.locator('.lex-list-row[aria-selected="true"]').get_attribute('data-key')=='1'
+    assert page.locator('.lex-detail-panel-title').inner_text().startswith('Row 1')

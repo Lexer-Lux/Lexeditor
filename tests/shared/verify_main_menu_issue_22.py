@@ -74,6 +74,10 @@ def main() -> int:
         assert cache.wait(10), "cover-art workers did not finish"
         for plugin_id, plugin in plugins.items():
             state = cache.snapshot(plugin_id)
+            spec = plugin.installation
+            if plugin.cover_art is None and not (spec and (spec.art_app_id or spec.steam_app_id)):
+                assert state["state"] == "unavailable" and not state["uri"], (plugin_id, state)
+                continue
             assert state["state"] == "ready", state
             path = Path(state["uri"].removeprefix("file:///"))
             assert path.is_file(), (plugin_id, state)
@@ -99,7 +103,9 @@ def main() -> int:
         )
         assert cache.wait(10), "offline cover-art workers did not finish"
         for plugin_id, plugin in plugins.items():
-            expected = "ready" if plugin.cover_art is not None else "missing"
+            spec = plugin.installation
+            expected = ("ready" if plugin.cover_art is not None else
+                        "missing" if spec and (spec.art_app_id or spec.steam_app_id) else "unavailable")
             assert cache.snapshot(plugin_id)["state"] == expected, (plugin_id, cache.snapshot(plugin_id))
 
     with tempfile.TemporaryDirectory(prefix="lexeditor-local-steam-art-", ignore_cleanup_errors=True) as temp:

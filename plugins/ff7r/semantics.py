@@ -13,6 +13,8 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 from typing import Any
 
+from core.numeric_values import integer_value
+
 from .storage import load_package, save_edits
 from .text_storage import resident_text_map
 
@@ -411,7 +413,11 @@ def save_economy_edits(game_root, data_root, project_root, index: dict, asset: s
     for edit in edits:
         if not isinstance(edit, dict):
             raise TypeError("Each economy edit must be an object")
-        field = str(edit.get("field", ""))
+        if set(edit) - {"entry", "field", "value", "index"}:
+            raise ValueError("Economy edit contains unsupported fields")
+        field = edit.get("field", "")
+        if not isinstance(field, str):
+            raise TypeError("Economy field must be text")
         prop_name = ECONOMY_EDIT_FIELDS.get(field)
         if prop_name is None:
             raise ValueError(f"Unknown economy field: {field}")
@@ -422,7 +428,7 @@ def save_economy_edits(game_root, data_root, project_root, index: dict, asset: s
         if "index" in edit:
             raise ValueError("Economy fields are scalar and do not accept an array index")
         generic_edits.append({
-            "entry": int(edit.get("entry", -1)),
+            "entry": integer_value(edit.get("entry", -1), "Entry index"),
             "property": prop_name,
             "value": edit.get("value"),
         })
@@ -455,8 +461,12 @@ def save_loot_edits(game_root, data_root, project_root, index: dict, asset: str,
     for edit in edits:
         if not isinstance(edit, dict):
             raise TypeError("Each enemy-loot edit must be an object")
-        kind = str(edit.get("kind", ""))
-        field = str(edit.get("field", ""))
+        if set(edit) - {"entry", "kind", "field", "index", "value"}:
+            raise ValueError("Enemy-loot edit contains unsupported fields")
+        kind = edit.get("kind", "")
+        field = edit.get("field", "")
+        if not isinstance(kind, str) or not isinstance(field, str):
+            raise TypeError("Enemy-loot kind and field must be text")
         if kind not in specs:
             raise ValueError(f"Unknown or unavailable enemy-loot group: {kind}")
         if field not in {"item", "chance", "quantity"}:
@@ -464,7 +474,7 @@ def save_loot_edits(game_root, data_root, project_root, index: dict, asset: str,
         prop_name = specs[kind].get(field)
         if prop_name is None:
             raise ValueError(f"{kind} loot does not expose a {field} field in this installed FF7R DataObject")
-        slot = int(edit.get("index", -1))
+        slot = integer_value(edit.get("index", -1), "Enemy-loot slot index")
         if slot < 0:
             raise ValueError("Enemy-loot slot index must be zero or greater")
         value = edit.get("value")
@@ -472,7 +482,7 @@ def save_loot_edits(game_root, data_root, project_root, index: dict, asset: str,
             if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 100:
                 raise ValueError("Enemy-loot chance must be an integer from 0 to 100")
         generic_edits.append({
-            "entry": int(edit.get("entry", -1)),
+            "entry": integer_value(edit.get("entry", -1), "Entry index"),
             "property": prop_name,
             "index": slot,
             "value": value,

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <physicsDefRate />
+    <magicDefRate />
+    <fireDefRate />
+    <thunderDefRate />
+    <slashDefRate />
+    <blowDefRate />
+    <thrustDefRate />
+    <resistPoisonRate />
+    <resistDiseaseRate />
+    <resistBloodRate />
+    <resistCurseRate />
+    <residentSpEffectId1 />
+    <residentSpEffectId2 />
+    <residentSpEffectId3 />
+    <materialSetId />
+  </Field>
+</PARAMMETA>

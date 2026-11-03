@@ -1,0 +1,108 @@
+{
+  "Param": "CACL_CORRECT_GRAPH_ST",
+  "Type": "CACL_CORRECT_GRAPH_ST",
+  "Name": "CACL_CORRECT_GRAPH_ST",
+  "Description": "Handles value curve functions for various mechanics.",
+  "Fields": [
+    {
+      "Field": "stageMaxVal0",
+      "Name": "Threshold Point [0]",
+      "Description": "Stat value where this stage of the curve starts. For weapons this is a stat point such as 40 Strength. List the five stages from low to high."
+    },
+    {
+      "Field": "stageMaxVal1",
+      "Name": "Threshold Point [1]",
+      "Description": "Stat value where this stage of the curve starts. For weapons this is a stat point such as 40 Strength. List the five stages from low to high."
+    },
+    {
+      "Field": "stageMaxVal2",
+      "Name": "Threshold Point [2]",
+      "Description": "Stat value where this stage of the curve starts. For weapons this is a stat point such as 40 Strength. List the five stages from low to high."
+    },
+    {
+      "Field": "stageMaxVal3",
+      "Name": "Threshold Point [3]",
+      "Description": "Stat value where this stage of the curve starts. For weapons this is a stat point such as 40 Strength. List the five stages from low to high."
+    },
+    {
+      "Field": "stageMaxVal4",
+      "Name": "Threshold Point [4]",
+      "Description": "Stat value where this stage of the curve starts. For weapons this is a stat point such as 40 Strength. List the five stages from low to high."
+    },
+    {
+      "Field": "stageMaxGrowVal0",
+      "Name": "Threshold Coefficient [0] (%)",
+      "Description": "Share of total scaling reached at this growth stage. 100 completes the curve here, but values can exceed 100. The matching Threshold Point sets the stage's stat value."
+    },
+    {
+      "Field": "stageMaxGrowVal1",
+      "Name": "Threshold Coefficient [1] (%)",
+      "Description": "Share of total scaling reached at this growth stage. 100 completes the curve here, but values can exceed 100. The matching Threshold Point sets the stage's stat value."
+    },
+    {
+      "Field": "stageMaxGrowVal2",
+      "Name": "Threshold Coefficient [2] (%)",
+      "Description": "Share of total scaling reached at this growth stage. 100 completes the curve here, but values can exceed 100. The matching Threshold Point sets the stage's stat value."
+    },
+    {
+      "Field": "stageMaxGrowVal3",
+      "Name": "Threshold Coefficient [3] (%)",
+      "Description": "Share of total scaling reached at this growth stage. 100 completes the curve here, but values can exceed 100. The matching Threshold Point sets the stage's stat value."
+    },
+    {
+      "Field": "stageMaxGrowVal4",
+      "Name": "Threshold Coefficient [4] (%)",
+      "Description": "Share of total scaling reached at this growth stage. 100 completes the curve here, but values can exceed 100. The matching Threshold Point sets the stage's stat value."
+    },
+    {
+      "Field": "adjPt_maxGrowVal0",
+      "Name": "Adjustment Factor [0]",
+      "Description": "Curve shape between this stage's bounds. 1 draws a straight line. Higher values start flat and steepen, lower values start steep, and negative values mirror the curve."
+    },
+    {
+      "Field": "adjPt_maxGrowVal1",
+      "Name": "Adjustment Factor [1]",
+      "Description": "Curve shape between this stage's bounds. 1 draws a straight line. Higher values start flat and steepen, lower values start steep, and negative values mirror the curve."
+    },
+    {
+      "Field": "adjPt_maxGrowVal2",
+      "Name": "Adjustment Factor [2]",
+      "Description": "Curve shape between this stage's bounds. 1 draws a straight line. Higher values start flat and steepen, lower values start steep, and negative values mirror the curve."
+    },
+    {
+      "Field": "adjPt_maxGrowVal3",
+      "Name": "Adjustment Factor [3]",
+      "Description": "Curve shape between this stage's bounds. 1 draws a straight line. Higher values start flat and steepen, lower values start steep, and negative values mirror the curve."
+    },
+    {
+      "Field": "adjPt_maxGrowVal4",
+      "Name": "Adjustment Factor [4]",
+      "Description": "This value is not used."
+    },
+    {
+      "Field": "init_inclination_soul",
+      "Name": "Leveling Cost - Initial Cost",
+      "Description": "Initial slope of the level-up cost curve. Only the level-up cost row uses it. The exact formula is not established."
+    },
+    {
+      "Field": "adjustment_value",
+      "Name": "Leveling Cost - Initial Offset",
+      "Description": "Flat adjustment to early level-up costs. Only the level-up cost row uses it. The exact formula is not established."
+    },
+    {
+      "Field": "boundry_inclination_soul",
+      "Name": "Leveling Cost - Cost Increase",
+      "Description": "Extra slope added to level-up costs past the threshold. Only the level-up cost row uses it. The exact formula is not established."
+    },
+    {
+      "Field": "boundry_value",
+      "Name": "Leveling Cost - Increase Interval",
+      "Description": "Level where the cost curve switches to its steeper shape. Only the level-up cost row uses it. The exact formula is not established."
+    },
+    {
+      "Field": "pad",
+      "Name": "",
+      "Description": ""
+    }
+  ]
+}

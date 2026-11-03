@@ -39,7 +39,7 @@ class ATBVirtualProperty:
 
 class ATBVirtualPackage:
     def __init__(self, *, asset: str, properties: list[ATBVirtualProperty],
-                 entries: list[Entry], source_sha: str, active_sha: str):
+                 entries: list[Entry], source_sha: str, active_sha: str, record_properties: dict | None = None):
         self.asset = asset
         self.export_name = "LexeditorATBTweaks"
         self.properties = properties
@@ -47,6 +47,7 @@ class ATBVirtualPackage:
         self.names: list[str] = []
         self.source_sha = source_sha
         self.active_sha = active_sha
+        self.record_properties = record_properties or {}
 
     def api_payload(self, *, source_sha256: str | None = None, using_project: bool = False) -> dict:
         return {
@@ -58,7 +59,8 @@ class ATBVirtualPackage:
             "names": [],
             "properties": [prop.api() for prop in self.properties],
             "records": [
-                {"id": entry.index, "tag": entry.tag, "values": entry.values}
+                {"id": entry.index, "tag": entry.tag, "values": entry.values,
+                 "propertyOverrides": self.record_properties.get(entry.index, {})}
                 for entry in self.entries
             ],
         }
@@ -88,6 +90,8 @@ def load_atb_virtual_package(game_root: Path, data_root: Path, project_root: Pat
         entries=entries,
         source_sha=spec["sourceSha256"],
         active_sha=spec["activeSha256"],
+        record_properties={i: row["propertyOverrides"] for i, row in enumerate(spec["entries"])
+                           if "propertyOverrides" in row},
     )
     return package, spec["sourceSha256"], config_path(project_root).is_file()
 

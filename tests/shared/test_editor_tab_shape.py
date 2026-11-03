@@ -32,7 +32,8 @@ def test_tabs_tab_shaped_at_rest(page):
     page.wait_for_timeout(300)
     radii = page.locator('.lex-shell-header nav button').evaluate_all(
         'ns => ns.map(n => getComputedStyle(n).borderTopLeftRadius)')
-    assert len(radii) == 3, radii
+    # The plugin's three tabs, after the shell's own Mods tab.
+    assert len(radii) == 4, radii
     assert all(r == '8px' for r in radii), radii
 
 

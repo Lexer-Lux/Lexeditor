@@ -1,0 +1,23 @@
+{
+  "id": "kf1",
+  "name": "King's Field I",
+  "accent": "#887455",
+  "processNames": ["KingsField1.exe"],
+  "nativePort": {
+    "dataDirectory": "Verdite1",
+    "gameIdentity": "Japanese King's Field I (1994), SLPS-00017",
+    "modLoading": {
+      "launch": "Play starts the installed archive/recomp Verdite1 port.",
+      "removal": "Disable a mod through the shared Mods tab while the game is closed. Its native enable flag is cleared; the library folder and saved knowledge remain."
+    }
+  },
+  "installation": {
+    "rootEnv": "LEXEDITOR_KF1_ROOT",
+    "requiredPaths": ["KingsField1.exe", "KingsField1.dll", "lexeditor-port.json"],
+    "executable": "KingsField1.exe",
+    "launchPath": "KingsField1.exe",
+    "installDirNames": ["Verdite1"],
+    "defaultRoots": ["D:\\Programs\\Verdite1"],
+    "reshadeRenderer": "opengl32"
+  }
+}

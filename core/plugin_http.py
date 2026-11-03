@@ -46,6 +46,16 @@ READ_ONLY_MANAGED_MESSAGE = ("This mod updates automatically, so direct edits wo
 class PluginRequestHandler(BaseHTTPRequestHandler):
     """A plugin service's replies: JSON, a file, and a quiet log."""
 
+    def send_operation_progress(self) -> bool:
+        """Read activity outside the plugin's data lock, while a write runs."""
+        from urllib.parse import parse_qs, urlparse
+        query = urlparse(self.path)
+        if query.path != '/api/operation-progress':
+            return False
+        from core.operation_progress import snapshot
+        self.send_json(snapshot(parse_qs(query.query).get('id', [''])[0]))
+        return True
+
     def refuse_write_when_read_only(self, path: str) -> bool:
         """Refuse a write in a read-only session; True when it was refused.
 
@@ -76,6 +86,7 @@ class PluginRequestHandler(BaseHTTPRequestHandler):
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", NO_STORE)
             self.end_headers()
             self.wfile.write(data)
         except ConnectionError:
@@ -86,11 +97,15 @@ class PluginRequestHandler(BaseHTTPRequestHandler):
         self.send_bytes(data, mimetypes.guess_type(Path(target).name)[0]
                         or "application/octet-stream", status)
 
-    def send_bytes(self, data: bytes, content_type: str, status: int = 200) -> None:
+    def send_bytes(self, data: bytes, content_type: str, status: int = 200,
+                   cache: str | None = None) -> None:
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
-            self.send_header("Cache-Control", NO_STORE)
+            from core.network_policy import disabled
+            if disabled() and content_type.startswith('text/html'):
+                self.send_header('Content-Security-Policy', "default-src 'self' data: blob: http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:*; frame-src 'self' http://127.0.0.1:* http://localhost:*")
+            self.send_header("Cache-Control", cache or NO_STORE)
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)

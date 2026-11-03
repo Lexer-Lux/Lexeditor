@@ -497,7 +497,8 @@ def main() -> int:
                     page.locator("#plugin-info").click()
                     page.locator(".lex-information-panel").wait_for()
                     assert page.get_by_text("MOD LOADER", exact=True).count() == 1
-                    assert page.get_by_role("button", name="Deploy Local Mod").count() == 1
+                    # The Info panel's sections flow into pages; the button may be on any.
+                    assert page.locator("button", has_text="Deploy Local Mod").count() == 1
                     assert page.locator('input.lex-readonly-field[value="Project Zomboid native Build 42 mod system."]').count() == 1
                     assert_layout(page, "info-desktop")
                     screenshot(page, args.screenshots, "15-info-desktop")

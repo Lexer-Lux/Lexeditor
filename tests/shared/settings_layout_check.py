@@ -37,8 +37,8 @@ def main():
             assert not page.locator('#modal').is_visible()
             page.evaluate('LexeditorUI.openSettings()')
             page.wait_for_selector('.lex-global-setting input')
-            font=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'
-            page.route('**/assets/ff8-menu.ttf*',lambda r:r.fulfill(path=str(font)))
+            font=Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'
+            page.route('**/assets/ff8-menu.ttf*',lambda r:r.fulfill(path=str(font)) if font.is_file() else r.abort())
             page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
             page.evaluate('document.fonts.ready')
             assert page.get_by_role('checkbox',name='Wrap around at the ends',exact=True).count()==2
@@ -46,8 +46,16 @@ def main():
                 page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(250)
                 metrics=page.locator('.lex-global-settings').evaluate("""dialog=>({width:dialog.getBoundingClientRect().width,scroll:dialog.scrollWidth,client:dialog.clientWidth,cards:[...dialog.querySelectorAll('.lex-global-setting:not([hidden])')].map(e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}})})""")
                 assert metrics['scroll']<=metrics['client']+2,metrics
-                if width == 2048:
-                    assert page.locator('.lex-global-settings').evaluate('n=>n.scrollHeight<=n.clientHeight+1')
+                fit=page.locator('.lex-global-settings').evaluate('n=>({h:n.clientHeight,sh:n.scrollHeight,scrolls:n.classList.contains("lex-settings-must-scroll"),top:n.getBoundingClientRect().top,bottom:n.getBoundingClientRect().bottom})')
+                assert fit['top']>=0 and fit['bottom']<=height+1,fit
+                if fit['sh']>fit['h']+1:
+                    assert fit['scrolls'],fit
+                    save=page.locator('.lex-settings-save-control').bounding_box()
+                    assert save['y']>=0 and save['y']+save['height']<=height,save
+                    last=page.locator('.lex-global-setting:visible').last
+                    last.scroll_into_view_if_needed()
+                    assert last.evaluate('e=>{const r=e.getBoundingClientRect(),dialog=e.closest(".lex-global-settings"),d=dialog.getBoundingClientRect(),actions=dialog.querySelector(".lex-dialog-actions").getBoundingClientRect();return r.top>=d.top&&r.bottom<=Math.min(d.bottom,actions.top)}'),last.bounding_box()
+                    page.locator('.lex-global-settings').evaluate('e=>e.scrollTop=0')
                 checks=page.locator('.lex-global-setting input[type="checkbox"]').evaluate_all('ns=>ns.map(n=>({w:n.getBoundingClientRect().width,h:n.getBoundingClientRect().height,p:getComputedStyle(n).padding}))')
                 assert all(abs(n['w']-n['h'])<1 for n in checks),checks
                 assert page.locator('.lex-global-setting input:not([type="checkbox"]),.lex-global-setting select').evaluate_all('ns=>new Set(ns.filter(n=>n.getBoundingClientRect().height).map(n=>Math.round(n.getBoundingClientRect().height))).size===1')

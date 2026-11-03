@@ -23,6 +23,7 @@ FORBIDDEN_PARTS={'__pycache__','.git','worklog','codex','baseline','game-data','
 # helper payload is named here explicitly. Anything not listed stays out of
 # the installer.
 VENDORED_HELPERS=(
+    'assets/helpers/libarchive/libarchive.dll',
     'tools/reshade/6.8.0/ReShade_Setup_6.8.0_Addon.exe',
     'tools/reshade/6.8.0/ReShade_Setup_6.8.0.exe',
     'tools/reshade/6.8.0/LICENSE.md',

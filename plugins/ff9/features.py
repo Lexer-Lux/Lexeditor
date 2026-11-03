@@ -171,18 +171,19 @@ def _edit_mod_order(raw: bytes, *, add: bool) -> bytes:
 
 
 def _iter_project_files(project_root: Path) -> list[tuple[Path, Path]]:
-    source = project_root / "StreamingAssets"
-    if not source.is_dir():
-        return []
     result: list[tuple[Path, Path]] = []
-    for path in source.rglob("*"):
-        if path.is_symlink():
-            raise RuntimeError(f"FF9 project deployment refuses linked files: {path}")
-        if path.is_file():
-            relative = path.relative_to(project_root)
-            if ".." in relative.parts:
-                raise RuntimeError("Unsafe FF9 project path")
-            result.append((path, relative))
+    for top in ("StreamingAssets", "FF9_Data"):
+        source = project_root / top
+        if not source.is_dir():
+            continue
+        for path in source.rglob("*"):
+            if path.is_symlink():
+                raise RuntimeError(f"FF9 project deployment refuses linked files: {path}")
+            if path.is_file():
+                relative = path.relative_to(project_root)
+                if ".." in relative.parts:
+                    raise RuntimeError("Unsafe FF9 project path")
+                result.append((path, relative))
     return result
 
 

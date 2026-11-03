@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 import re
 import shutil
+from core.numeric_values import integer_value, finite_number
 
 from .paths import contained_project_path
 from .source_revision import (
@@ -76,7 +77,7 @@ def _float_value(token: str) -> float:
 
 
 def _float_literal(value) -> str:
-    number = float(value)
+    number = finite_number(value, "Effect value")
     if not math.isfinite(number):
         raise ValueError("Effect values must be finite numbers")
     if abs(number) > 1_000_000_000:
@@ -150,7 +151,7 @@ def _apply_string_edits(
     replacements: list[tuple[int, int, str]] = []
     changed_records: set[int] = set()
     for edit in edits:
-        index = int(edit.get("index", -1))
+        index = integer_value(edit.get("index", -1), "Definition index")
         row = by_index.get(index)
         if row is None:
             raise ValueError(f"Definition {index} no longer exists")
@@ -303,7 +304,7 @@ def save_effect_definitions(
     changed_records: set[int] = set()
 
     for edit in edits:
-        index = int(edit.get("index", -1))
+        index = integer_value(edit.get("index", -1), "Effect index")
         row = by_index.get(index)
         if row is None:
             raise ValueError(f"Effect {index} no longer exists")
@@ -317,7 +318,7 @@ def save_effect_definitions(
         if unknown:
             raise ValueError(f"Unsupported effect fields: {', '.join(sorted(unknown))}")
         for field, incoming in fields.items():
-            value = float(incoming)
+            value = finite_number(incoming, "Effect value")
             if not math.isfinite(value):
                 raise ValueError("Effect values must be finite")
             if value == row[field]:

@@ -1,6 +1,5 @@
 """Enabled tweak builds preflight dependencies and restore failed batches."""
 import json
-import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -19,9 +18,6 @@ class TweakBuildTests(unittest.TestCase):
         self.project.mkdir()
         self.library = self.root / "library"
         self.library.mkdir()
-        patcher = mock.patch.dict(os.environ, {script_mods.TRUST_ENV: str(self.root / "trust.json")})
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def mod(self, name, code, **schema):
         root = self.library / name
@@ -31,7 +27,6 @@ class TweakBuildTests(unittest.TestCase):
         (root / "script/__init__.py").write_text("", encoding="utf-8")
         (root / "script/tweak.py").write_text(code, encoding="utf-8")
         (root / "settings.schema.json").write_text(json.dumps(schema), encoding="utf-8")
-        script_mods.set_trusted(root, True)
         return root
 
     def build(self):
@@ -73,15 +68,6 @@ class TweakBuildTests(unittest.TestCase):
                 with self.assertRaisesRegex(tweak_mods.BuildError, message):
                     self.build()
                 build.assert_not_called()
-
-    def test_later_untrusted_mod_fails_before_any_build(self):
-        self.mod("a", "def build(settings, context):\n    return {}\n")
-        second = self.mod("b", "def build(settings, context):\n    return {}\n")
-        script_mods.set_trusted(second, False)
-        with mock.patch.object(script_mods, "build") as build:
-            with self.assertRaisesRegex(tweak_mods.BuildError, "untrusted"):
-                self.build()
-            build.assert_not_called()
 
     def test_batch_rollback_failure_names_mod_and_original_error(self):
         self.mod("a", "def build(settings, context):\n    return {'hext/a.txt': 'new'}\n")

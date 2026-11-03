@@ -16,7 +16,7 @@ from .field_data import load_exits, load_treasure, save_exits, save_treasure
 from .gameplay_data import (load_weapons, save_weapons, load_armor, save_armor,
                             load_helmets, save_helmets)
 from .palette_data import load_palette, palette_files, save_palette
-from .project import OverlayStore
+from .project import OverlayStore, validate_edits
 from .scene_data import load_scenes, save_scene
 from .scene_map_data import (scene_map_files, load_scene_map, save_scene_map,
                              load_scene_properties, save_scene_properties,
@@ -156,52 +156,54 @@ class Handler(PluginRequestHandler):
             return
         try:
             body = self.read_json()
+            if route.endswith("/save") and "edits" in body:
+                validate_edits(body["edits"])
             if route == "/api/messages/save":
-                result = save_messages(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_messages(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/scenes/save":
-                result = save_scene(STORE, int(body["id"]), str(body["sha256"]), dict(body.get("values") or {}), str(body.get("language", "en")))
+                result = save_scene(STORE, body["id"], str(body["sha256"]), body.get("values", {}), str(body.get("language", "en")))
             elif route == "/api/scene-map/save":
-                result = save_scene_map(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_scene_map(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/scene-properties/save":
-                result = save_scene_properties(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_scene_properties(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/scene-render-settings/save":
-                result = save_scene_render_settings(STORE, str(body["path"]), str(body["sha256"]), dict(body.get("values") or {}))
+                result = save_scene_render_settings(STORE, str(body["path"]), str(body["sha256"]), body.get("values", {}))
             elif route == "/api/palette/save":
-                result = save_palette(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_palette(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/exits/save":
-                result = save_exits(STORE, str(body["dataSha256"]), str(body["offsetSha256"]), list(body.get("edits") or []))
+                result = save_exits(STORE, str(body["dataSha256"]), str(body["offsetSha256"]), body.get("edits", []))
             elif route == "/api/treasure/save":
-                result = save_treasure(STORE, str(body["dataSha256"]), str(body["offsetSha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
+                result = save_treasure(STORE, str(body["dataSha256"]), str(body["offsetSha256"]), body.get("edits", []), str(body.get("language", "en")))
             elif route == "/api/worlds/save":
-                result = save_worlds(STORE, str(body["sha256"]), list(body.get("edits") or []))
+                result = save_worlds(STORE, str(body["sha256"]), body.get("edits", []))
             elif route == "/api/world-navigation/save":
-                result = save_world_navigation(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
+                result = save_world_navigation(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []), str(body.get("language", "en")))
             elif route == "/api/chip-animations/save":
-                result = save_chip_animations(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_chip_animations(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/world-map/save":
-                result = save_world_tiles(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_world_tiles(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/world-properties/save":
-                result = save_world_properties(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_world_properties(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/world-music/save":
-                result = save_world_music(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_world_music(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/world-colors/save":
-                result = save_world_colors(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_world_colors(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/graphics-sets/save":
-                result = save_graphics_set(STORE, str(body["path"]), str(body["sha256"]), dict(body.get("values") or {}))
+                result = save_graphics_set(STORE, str(body["path"]), str(body["sha256"]), body.get("values", {}))
             elif route == "/api/tile-assemblies/save":
-                result = save_tile_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_tile_assembly(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/sprite-headers/save":
-                result = save_sprite_header(STORE, str(body["path"]), str(body["sha256"]), dict(body.get("values") or {}))
+                result = save_sprite_header(STORE, str(body["path"]), str(body["sha256"]), body.get("values", {}))
             elif route == "/api/sprite-assemblies/save":
-                result = save_sprite_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+                result = save_sprite_assembly(STORE, str(body["path"]), str(body["sha256"]), body.get("edits", []))
             elif route == "/api/sprite-image/save":
-                result = save_sprite_image(STORE, int(body["index"]), int(body.get("bitmap", 0)), str(body["sha256"]), str(body["imageBase64"]))
+                result = save_sprite_image(STORE, body["index"], body.get("bitmap", 0), str(body["sha256"]), body["imageBase64"])
             elif route == "/api/weapons/save":
-                result = save_weapons(STORE, str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
+                result = save_weapons(STORE, str(body["sha256"]), body.get("edits", []), str(body.get("language", "en")))
             elif route == "/api/armor/save":
-                result = save_armor(STORE, str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
+                result = save_armor(STORE, str(body["sha256"]), body.get("edits", []), str(body.get("language", "en")))
             elif route == "/api/helmets/save":
-                result = save_helmets(STORE, str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
+                result = save_helmets(STORE, str(body["sha256"]), body.get("edits", []), str(body.get("language", "en")))
             elif route == "/api/export":
                 result = STORE.export_ctp()
             elif route == "/api/revert":

@@ -36,7 +36,10 @@ CONFIG = json.loads((TESTS / "plugin_checks.json").read_text(encoding="utf-8"))
 PLUGINS = sorted(p.name for p in (ROOT / "plugins").iterdir()
                  if p.is_dir() and (p / "plugin.py").is_file())
 SHARED = "shared"
-SCRIPT_SKIP = {"verify_all.py"}
+# These launch other checks rather than owning a check themselves. Individual
+# shared checks are discovered below; cross-plugin UI callers run once through
+# the explicit global extra command.
+SCRIPT_SKIP = {"verify_all.py", "verify_regressions.py", "verify_browser_regressions.py"}
 
 
 def utf8_console() -> None:
@@ -127,7 +130,7 @@ WORKFLOW = """\
 name: {title}
 on:
   push:
-    branches: [master]
+    branches: {branches}
     {filter}:
 {paths}
   pull_request:
@@ -150,27 +153,50 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install -r requirements-test.txt
-      - run: python -m playwright install chromium
+{toolchain}      - run: python -m playwright install chromium
       - run: python tools/check_plugin.py {argument}
+{check_env}"""
+
+
+EVIDENCE_STEP = """\
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: {plugin}-evidence-${{{{ github.sha }}}}
+          path: ${{{{ runner.temp }}}}/lexeditor-dev/{plugin}-evidence
+          if-no-files-found: warn
+          retention-days: 7
 """
 
 
-def workflow_files() -> dict[str, str]:
+def workflow_files(target: str | None = None) -> dict[str, str]:
     """The complete, expected contents of .github/workflows/."""
     from runpy import run_path
-    native_ff8_workflow = run_path(str(ROOT / "tools/ff8_native_workflow.py"))["WORKFLOW"]
     shared = ["tests/plugin_checks.json", "tools/check_plugin.py", "tests/shared/verify_all.py",
               "requirements-test.txt"]
-    files = {"ff8-stock-build.yml": native_ff8_workflow}
-    for plugin in PLUGINS:
+    if target is not None and target not in PLUGINS:
+        raise ValueError(f"Unknown plugin: {target}")
+    files = {} if target else {
+        "archive-runtime.yml": run_path(str(ROOT / "tools/archive_runtime_workflow.py"))["WORKFLOW"],
+        "ff8-stock-build.yml": run_path(str(ROOT / "tools/ff8_native_workflow.py"))["WORKFLOW"]}
+    for plugin in ([target] if target else PLUGINS):
         paths = [f"plugins/{plugin}/**", f"tests/{plugin}/**"] + shared
         paths.append(f".github/workflows/{plugin}-checks.yml")
+        capture = plugin in CONFIG.get("capture_evidence", [])
+        check_env = ("        env:\n          LEXEDITOR_CHECK_ARTIFACTS: ${{ runner.temp }}/lexeditor-dev/"
+                     + plugin + "-evidence\n") if capture else ""
         files[f"{plugin}-checks.yml"] = WORKFLOW.format(
-            title=f"{plugin} checks", filter="paths", argument=plugin, env="",
+            title=f"{plugin} checks", filter="paths", argument=plugin, env="", check_env=check_env, branches="[master]",
+            toolchain=''.join(f"      - run: python -m pip install {requirement}\n"
+                              for requirement in CONFIG.get('ci_requirements', {}).get(plugin, [])),
             paths="\n".join(f"      - '{path}'" for path in paths))
+        if capture:
+            files[f"{plugin}-checks.yml"] += EVIDENCE_STEP.format(plugin=plugin)
+    if target:
+        return files
     ignored = ["plugins/**", "worklog/**", "codex/**", "**.md"]
     files["global-checks.yml"] = WORKFLOW.format(
-        title="global checks", filter="paths-ignore", argument="--global",
+        title="global checks", filter="paths-ignore", argument="--global", check_env="", toolchain="", branches="[master]",
         # tests/shared/test_plugin_issues.py reads the public issue tracker.
         env="    env:\n      GH_TOKEN: ${{ github.token }}\n",
         paths="\n".join(f"      - '{path}'" for path in ignored))
@@ -183,15 +209,19 @@ def main() -> int:
     parser.add_argument("plugin", nargs="?", choices=PLUGINS)
     parser.add_argument("--global", dest="shared", action="store_true")
     parser.add_argument("--list", action="store_true")
-    parser.add_argument("--jobs", type=int, default=4)
+    # Four browsers wedge hosted runners (screenshot/goto timeouts, a
+    # different set every run); two is quick enough and stays green.
+    parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--write-workflows", action="store_true",
-                        help="regenerate .github/workflows: one <plugin>-checks.yml per plugin plus global-checks.yml")
+                        help="regenerate all workflows, or only the named plugin workflow")
     args = parser.parse_args()
     if args.write_workflows:
-        expected = workflow_files()
-        for stale in WORKFLOWS.glob("*.yml"):
-            if stale.name not in expected:
-                stale.unlink()
+        expected = workflow_files(args.plugin)
+        WORKFLOWS.mkdir(parents=True, exist_ok=True)
+        if args.plugin is None:
+            for stale in WORKFLOWS.glob("*.yml"):
+                if stale.name not in expected:
+                    stale.unlink()
         for name, text in expected.items():
             (WORKFLOWS / name).write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {len(expected)} workflows")
@@ -218,7 +248,10 @@ def main() -> int:
     if files["pytest"]:
         rels = [p.relative_to(ROOT).as_posix() for p in files["pytest"]]
         print(f":: pytest ({len(rels)} files)", flush=True)
-        if subprocess.run([sys.executable, "-m", "pytest", "-q", *rels], cwd=ROOT, env=env).returncode:
+        # Identify each shared test and dump a stuck thread's stack, but collect
+        # all failures in this CI run instead of revealing one per remote run.
+        pytest_options = ["-v", "-o", "faulthandler_timeout=120"] if args.shared else ["-q"]
+        if subprocess.run([sys.executable, "-m", "pytest", *pytest_options, *rels], cwd=ROOT, env=env).returncode:
             failures.append("pytest")
     node = shutil.which("node")
     for test in files["node"]:

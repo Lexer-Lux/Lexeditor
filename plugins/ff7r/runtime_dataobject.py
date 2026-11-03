@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from core.numeric_values import integer_value
+
 from .dataobject import Entry
 from .native_probe import probe_installed_exe
 from .runtime_config import (
@@ -349,9 +351,13 @@ def save_runtime_edits(project_root: Path, *, source_sha256: str, active_sha256:
     for edit in edits:
         if not isinstance(edit, dict):
             raise TypeError("each runtime edit must be an object")
-        if int(edit.get("entry", -1)) != 0 or "index" in edit:
+        if set(edit) - {"entry", "property", "value", "index"}:
+            raise ValueError("Runtime edit contains unsupported fields")
+        if integer_value(edit.get("entry", -1), "Runtime entry index") != 0 or "index" in edit:
             raise ValueError("runtime settings support only scalar edits on the Runtime Tweaks record")
-        prop = str(edit.get("property", ""))
+        prop = edit.get("property", "")
+        if not isinstance(prop, str):
+            raise TypeError("Runtime property must be text")
         if prop not in _EDIT_PATHS:
             raise ValueError(f"runtime property is read-only or unknown: {prop}")
         if prop in seen:

@@ -50,7 +50,11 @@ def _synthetic_wmset(rules=RULES, groups=GROUPS):
     pointers[5] = pointers[6] = pointers[7] = pointers[8] = cursor
     field_returns = struct.pack("<I", 0)
     cursor += len(field_returns)
+    from test_ff8_vehicle_warp import _fixture_warps, _section_11
+    warps = _section_11(*_fixture_warps())
     for index in range(9, 32):
+        if index == world_map.VEHICLE_WARP_SECTION + 1:
+            cursor += len(warps)
         pointers[index] = cursor
     pointers[32] = cursor
     sky = struct.pack("<II", 8, 0) + bytes(52)
@@ -63,7 +67,7 @@ def _synthetic_wmset(rules=RULES, groups=GROUPS):
     for index in range(35, world_map.SECTION_COUNT):
         pointers[index] = cursor
     return (struct.pack(f"<{world_map.SECTION_COUNT}I", *pointers)
-            + section1 + section2 + section4 + field_returns + sky + bytes(draw)
+            + section1 + section2 + section4 + field_returns + warps + sky + bytes(draw)
             + b"\0\0\0\0")
 
 

@@ -12,6 +12,10 @@ window is dead space.
 
 Usage:
     python tests/shared/verify_no_dead_space.py [plugin ...] [--size WxH] [--live]
+
+FFX/X-2 uses the existing authored browser datasets in non-live mode so CI
+measures every populated dataset without proprietary VBF archives. --live
+continues to measure the installed game.
 """
 
 from __future__ import annotations
@@ -30,7 +34,6 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
 
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 import browser_guard  # noqa: E402
@@ -85,6 +88,9 @@ PROBE = r"""
     for (const child of node.children) {
       const style = getComputedStyle(child);
       if (style.visibility === 'hidden' || style.display === 'none') continue;
+      // A shared tab wrapper may delegate its layout to its children. It has
+      // no box to paint, but its visible descendants still occupy the view.
+      if (style.display === 'contents') { walk(child); continue; }
       const box = child.getBoundingClientRect();
       if (box.width < 1 || box.height < 1) continue;
       // A container that only holds its children tells us nothing; a
@@ -107,19 +113,85 @@ PROBE = r"""
 def tabs_of(cdp) -> list[str]:
     raw = cdp.eval(
         "JSON.stringify([...document.querySelectorAll("
-        "'.lex-shell-header nav button[data-tab]')].map(b=>b.dataset.tab))")
+        "'.lex-shell-header nav button[data-tab]')].filter(b=>!b.disabled&&"
+        "b.getBoundingClientRect().width>0&&b.getBoundingClientRect().height>0)"
+        ".map(b=>b.dataset.tab))")
     try:
         return [tab for tab in json.loads(raw) if tab]
     except Exception:
         return []
 
 
+def findings(plugin: str, tab: str, box: dict, stacked: list) -> list[str]:
+    result = []
+    for entry in stacked or []:
+        if entry.get("stacked"):
+            result.append(f"{plugin}/{tab or 'default'}: {entry['stacked']} rows painted on "
+                          f"top of each other in {entry['cls']}")
+        else:
+            result.append(f"{plugin}/{tab or 'default'}: {entry['rows']} rows in a table that "
+                          f"declares {entry['declared']} grid tracks ({entry['cls']})")
+    gap = box["bottom"] - box["lowest"]
+    if gap > box["height"] * ALLOWED_GAP and f"{plugin}/{tab}" not in ACCEPTED:
+        result.append(f"{plugin}/{tab or 'default'}: {gap}px of dead space under the "
+                      f"content ({box['height']}px window)")
+    return result
+
+
+def check_ffx_fixture(width: int, height: int) -> list[str]:
+    """Measure actual populated editors, not missing proprietary VBF errors."""
+    from playwright.sync_api import expect, sync_playwright
+    from tests.ffx_x2.test_ffx_x2_browser_check import (
+        BASE, DATASETS, fixture_store, _serve, _open_dataset)
+
+    failures = []
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": width, "height": height})
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.add_init_script(STUB)
+            _serve(page, fixture_store())
+            page.goto(BASE + "/", wait_until="networkidle")
+
+            def measure(tab):
+                print(f"measuring ffx_x2/{tab} (authored data) at {width}x{height}", flush=True)
+                expect(page.locator('#main .lex-panel-loading')).to_have_count(0)
+                expect(page.locator('#main [role="alert"]')).to_have_count(0)
+                failures.extend(findings('ffx_x2', tab, page.evaluate(PROBE),
+                                         page.evaluate(OVERLAP_PROBE)))
+
+            for group, datasets in DATASETS.items():
+                for dataset in datasets:
+                    _open_dataset(page, group, dataset)
+                    # _open_dataset requires the real list and detail, so an
+                    # error or empty placeholder cannot substitute for a view.
+                    measure(dataset)
+            page.locator('#plugin-data-map').click()
+            expect(page.locator('.lex-data-map')).to_be_visible()
+            measure('datamap')
+            page.locator('#plugin-info').click()
+            expect(page.locator('#main > .lex-panel-layout')).to_be_visible()
+            measure('info')
+            page.locator('[data-tab="mods"]').click()
+            expect(page.locator('#main .lex-mods-page')).to_be_visible()
+            measure('mods')
+            assert not errors, errors
+        finally:
+            browser.close()
+    return failures
+
+
 def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
+    if plugin == 'ffx_x2' and not live:
+        return check_ffx_fixture(width, height)
     failures: list[str] = []
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-gap-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-gap-project-")
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     browser = None
+    cdp = None
     try:
         with session_for(plugin, None if live else project.name) as session:
             port = free_port()
@@ -142,39 +214,43 @@ def check(plugin: str, width: int, height: int, live: bool) -> list[str]:
             cdp.call("Page.addScriptToEvaluateOnNewDocument", {"source": STUB})
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state==='undefined'||!state.booting", 120)
+            wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')", 120)
             time.sleep(1.5)
             found = tabs_of(cdp)
             for tab in found or [""]:
+                print(f"measuring {plugin}/{tab or 'default'} at {width}x{height}", flush=True)
                 if tab:
-                    cdp.eval(f"navigate({tab!r})")
+                    # Shared shell tabs (notably Mods) own their handler and
+                    # are not entries in each plugin's private navigate map.
+                    # Use the same control the reader uses for every page.
+                    reached = cdp.eval(f"""(()=>{{const button=[...document.querySelectorAll(
+                      '.lex-shell-header nav button[data-tab]')].find(node=>node.dataset.tab==={tab!r});
+                      if(!button||button.disabled)return false;button.click();return true;}})()""")
+                    if not reached:
+                        raise AssertionError(f"The reachable tab disappeared: {plugin}/{tab}")
                     time.sleep(1.8)
+                    # A loading spinner's centre is not the page's bottom.
+                    # This applies to every shared or plugin-owned page.
+                    wait_eval(cdp, "![...document.querySelectorAll('#main .lex-panel-loading')].some(node=>"
+                              "node.getBoundingClientRect().width>0&&node.getBoundingClientRect().height>0)", 120)
                 raw = cdp.eval(f"JSON.stringify({PROBE})")
                 try:
                     box = json.loads(raw)
                 except Exception:
                     box = None
                 if not box:
-                    continue
+                    raise AssertionError(f"No usable main-panel measurement: {plugin}/{tab or 'default'}")
                 try:
                     stacked = json.loads(cdp.eval(f"JSON.stringify({OVERLAP_PROBE})"))
                 except Exception:
                     stacked = []
-                for entry in stacked or []:
-                    if entry.get("stacked"):
-                        failures.append(
-                            f"{plugin}/{tab or 'default'}: {entry['stacked']} rows painted on "
-                            f"top of each other in {entry['cls']}")
-                    else:
-                        failures.append(
-                            f"{plugin}/{tab or 'default'}: {entry['rows']} rows in a table that "
-                            f"declares {entry['declared']} grid tracks ({entry['cls']})")
-                gap = box["bottom"] - box["lowest"]
-                if gap > box["height"] * ALLOWED_GAP and f"{plugin}/{tab}" not in ACCEPTED:
-                    failures.append(
-                        f"{plugin}/{tab or 'default'}: {gap}px of dead space under the "
-                        f"content ({box['height']}px window)")
+                failures.extend(findings(plugin, tab, box, stacked))
     finally:
+        if cdp:
+            cdp.close()
         browser_guard.kill_tree(browser)
+        profile.cleanup()
+        project.cleanup()
     return failures
 
 

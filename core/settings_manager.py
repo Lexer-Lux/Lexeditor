@@ -23,7 +23,9 @@ DEFAULTS = {
     "updateCheckFrequency": "daily",
     "hoverableAltClick": False,
     "showHoverTooltips": False,
+    "showHiddenProperties": False,
     "pageWrapAround": True,
+    "trustWarning": True,
     "booleanBoxStyle": True,
     "selectionHoldMs": 650,
     "tableRowsPerPage": 15,
@@ -165,8 +167,10 @@ class SettingsStore:
             "modLibraryPath": payload.get("modLibraryPath", "") if isinstance(payload.get("modLibraryPath", ""), str) else "",
             "hoverableAltClick": payload.get("hoverableAltClick", defaults["hoverableAltClick"]) is True,
             "showHoverTooltips": payload.get("showHoverTooltips", defaults["showHoverTooltips"]) is True,
+            "showHiddenProperties": payload.get("showHiddenProperties", defaults["showHiddenProperties"]) is True,
             "panelTabTarget": "focus" if payload.get("panelTabTarget", defaults["panelTabTarget"]) == "focus" else "hover",
             "pageWrapAround": payload.get("pageWrapAround", defaults["pageWrapAround"]) is not False,
+            "trustWarning": payload.get("trustWarning", defaults["trustWarning"]) is not False,
             "booleanBoxStyle": payload.get("booleanBoxStyle", defaults.get("booleanBoxStyle", True)) is not False,
             "selectionHoldMs": max(150, min(2000, selection_hold_ms)),
             "tableRowsPerPage": max(5, min(40, table_rows_per_page)),
@@ -186,6 +190,11 @@ class SettingsStore:
             "loadingTransitionMinimumSeconds": max(
                 0.0, min(10.0, loading_transition_minimum_seconds)
             ),
+            # The mods whose first-enable warning was accepted. An older file
+            # stored one yes/no for all mods; it counts as none.
+            "trustWarningSeen": sorted({str(item) for item in payload.get("trustWarningSeen", [])
+                                        if isinstance(item, str) and item})
+            if isinstance(payload.get("trustWarningSeen"), list) else [],
             "viewPreferences": view_preferences,
         }
 
@@ -219,13 +228,19 @@ class SettingsStore:
              panel_tab_target: str | None = None,
              pager_bar_height_percent: float | None = None,
              boolean_box_style: bool | None = None,
-             show_hover_tooltips: bool | None = None) -> dict:
+             show_hover_tooltips: bool | None = None,
+             show_hidden_properties: bool | None = None,
+             trust_warning: bool | None = None) -> dict:
         """Save per-user preferences. Authenticated authoring state is never persisted."""
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
         current = self.snapshot()
         if show_hover_tooltips is None:
             show_hover_tooltips = current["showHoverTooltips"]
+        if show_hidden_properties is None:
+            show_hidden_properties = current["showHiddenProperties"]
+        if trust_warning is None:
+            trust_warning = current["trustWarning"]
         if panel_tab_target is None:
             panel_tab_target = current["panelTabTarget"]
         if panel_tab_target not in ("hover", "focus"):
@@ -260,8 +275,10 @@ class SettingsStore:
                 "updateCheckFrequency": update_check_frequency,
                 "hoverableAltClick": bool(hoverable_alt_click),
                 "showHoverTooltips": bool(show_hover_tooltips),
+                "showHiddenProperties": bool(show_hidden_properties),
                 "pageWrapAround": bool(page_wrap_around),
                 "booleanBoxStyle": bool(boolean_box_style),
+                "trustWarning": bool(trust_warning),
                 "panelTabTarget": panel_tab_target,
                 "selectionHoldMs": selection_hold_ms,
                 "tableRowsPerPage": table_rows_per_page,
@@ -269,12 +286,25 @@ class SettingsStore:
                 "mainMenuHeightPercent": main_menu_height_percent,
                 "pagerBarHeightPercent": pager_bar_height_percent,
                 "soundEnabled": bool(sound_enabled),
+                "trustWarningSeen": stored["trustWarningSeen"],
                 "viewPreferences": stored["viewPreferences"],
                 "modLibraryPath": stored["modLibraryPath"],
             }
             if sound_volume_percent is not None:
                 payload["soundVolumePercent"] = max(0.0, min(100.0, float(sound_volume_percent)))
             self._write(payload)
+        return self.snapshot()
+
+    def acknowledge_trust_warning(self, mod: str) -> dict:
+        """Remember that the first-enable warning was accepted for this mod."""
+        if not isinstance(mod, str) or not mod.strip():
+            raise ValueError("Which mod was enabled is missing")
+        with self._lock:
+            value = self._read()
+            seen = set(value.get("trustWarningSeen") or [])
+            seen.add(mod.strip().casefold())
+            value["trustWarningSeen"] = sorted(seen)
+            self._write({"version": 8, **value})
         return self.snapshot()
 
     def set_mod_library_path(self, path: Path) -> dict:
@@ -304,7 +334,9 @@ class SettingsStore:
             "updateCheckFrequency": frequency,
             "hoverableAltClick": bool(current["hoverableAltClick"]),
             "showHoverTooltips": bool(current["showHoverTooltips"]),
+            "showHiddenProperties": bool(current.get("showHiddenProperties", False)),
             "pageWrapAround": bool(current["pageWrapAround"]),
+            "trustWarning": bool(current["trustWarning"]),
             "booleanBoxStyle": bool(current.get("booleanBoxStyle", True)),
             "panelTabTarget": "focus" if current["panelTabTarget"] == "focus" else "hover",
             "selectionHoldMs": max(150, min(2000, int(current["selectionHoldMs"]))),

@@ -9,9 +9,9 @@
     <mp />
     <stamina />
     <iconId />
-    <behaviorId />
+    <behaviorId Refs="BehaviorParam_PC" />
     <mtrlItemId Refs="EquipMtrlSetParam" />
-    <replaceMagicId />
+    <replaceMagicId Refs="Magic" />
     <maxQuantity />
     <heroPoint />
     <overDexterity />

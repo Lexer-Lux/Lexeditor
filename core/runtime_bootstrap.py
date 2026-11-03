@@ -7,7 +7,11 @@ import subprocess
 import sys
 
 SERVICE_MODULES = frozenset({
+    'plugins.kf1.server',
     'plugins.ds1.server',
+    'plugins.kings_field3.server',
+    'plugins.ds1.script_worker',
+    'plugins.kings_field2.server',
 
     'plugins.bannerlord.server', 'plugins.blank.server', 'plugins.ff7.server', 'plugins.ff7r.server', 'plugins.ff7r.themed_server',
     'plugins.ds3.server', 'plugins.ff8.server', 'plugins.ff9.server', 'plugins.ffx_x2.server', 'plugins.palworld.full_server', 'plugins.project_zomboid.server',
@@ -82,6 +86,34 @@ def open_path(path: Path) -> None:
         # Never pass a file path through a shell.
         subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(target)],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def open_text_file(path: Path) -> None:
+    """Use a text-editor association, never the executable .py association."""
+    target = Path(path).resolve(strict=True)
+    if not target.is_file():
+        raise ValueError('Choose a text file')
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+        query = ctypes.WinDLL('shlwapi').AssocQueryStringW
+        query.argtypes = [wintypes.DWORD, ctypes.c_int, wintypes.LPCWSTR,
+                          wintypes.LPCWSTR, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+        query.restype = ctypes.c_long
+        buffer = ctypes.create_unicode_buffer(32768)
+        size = wintypes.DWORD(len(buffer))
+        # ASSOCSTR_EXECUTABLE (2), using the user's plain-text association.
+        result = query(0, 2, '.txt', 'open', buffer, ctypes.byref(size))
+        editor = buffer.value if result == 0 and buffer.value else 'notepad.exe'
+        subprocess.Popen([editor, str(target)])
+    elif sys.platform == 'darwin':
+        subprocess.Popen(['open', '-t', str(target)])
+    else:
+        import shutil
+        launcher = shutil.which('sensible-editor')
+        if not launcher:
+            raise OSError('No default text editor was found. Open disable_networking.py in your text editor.')
+        subprocess.Popen([launcher, str(target)])
 
 
 if __name__ == '__main__':
