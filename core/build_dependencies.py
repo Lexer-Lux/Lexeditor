@@ -14,6 +14,7 @@ from pathlib import Path
 import sys
 import threading
 import types
+from core.plugin_files import read_bounded
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_INPUTS = 512
@@ -33,7 +34,7 @@ def fingerprint(relative, root=ROOT):
     if path.stat().st_size > MAX_INPUT_BYTES:
         raise ValueError('Build dependency exceeds its size limit')
     with path.open('rb') as stream:
-        data = stream.read(MAX_INPUT_BYTES+1)
+        data = read_bounded(stream, MAX_INPUT_BYTES+1)
     if len(data) > MAX_INPUT_BYTES:
         raise ValueError('Build dependency grew beyond its size limit')
     return hashlib.sha256(data).hexdigest()
