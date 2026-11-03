@@ -392,7 +392,6 @@ def main():
         assert page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True).count() == 1
         assert 'Level byte' not in page.locator('.ff8-encounter-group-detail').inner_text()
         reveal(page,page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True))
-        page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True).scroll_into_view_if_needed()
         shot('special-level')
         rows=page.locator('.ff8-encounter-group-detail .ff8-encounter-formation-row')
         assert rows.count()==8
