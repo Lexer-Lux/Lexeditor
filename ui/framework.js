@@ -1978,7 +1978,8 @@
       options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null,
       sound ? sound.scrub : null);
     if (sound && heading) heading.classList.add("lex-audio-heading");
-    const bodyBox = detailBody(bodyClass, options.body, options.paginate);
+    const bodyBox = detailBody(bodyClass, options.body,
+      options.paginate ?? (DETAIL_BODY_LAYOUTS[options.bodyLayout] ? false : undefined));
     if (heading) heading.addEventListener("contextmenu", event => {
       if (!sharedSettingsSnapshot?.developerMode) return;
       event.preventDefault();
