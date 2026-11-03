@@ -34,3 +34,42 @@ def test_unchanged_output_still_rejects_damaged_installation(tmp_path, damage):
     with pytest.raises(RuntimeError):
         deployment.apply(game, mod, composed={RELATIVE: payload})
     assert target.read_bytes() == b'foreign bytes'
+
+
+def test_only_changed_outputs_are_parsed_again(tmp_path, monkeypatch):
+    game, mod = project(tmp_path)
+    payload = make_archive(field_values={'EquipParamGoods': {100: {'basicPrice': 17}}})
+    deployment.apply(game, mod, composed={RELATIVE: payload})
+    parsed = []
+    original = dict(deployment.FILES)[RELATIVE]
+    def parse(data):
+        parsed.append(data)
+        return original(data)
+    monkeypatch.setattr(deployment, 'FILES', tuple(
+        (relative, parse if relative == RELATIVE else reader) for relative, reader in deployment.FILES))
+    deployment.apply(game, mod, composed={RELATIVE: payload})
+    assert not parsed
+    changed = make_archive(field_values={'EquipParamGoods': {100: {'basicPrice': 18}}})
+    deployment.apply(game, mod, composed={RELATIVE: changed})
+    assert parsed == [changed]
+    with pytest.raises(ValueError):
+        deployment.apply(game, mod, composed={RELATIVE: b'broken output'})
+    assert parsed[-1] == b'broken output'
+    assert (game/RELATIVE).read_bytes() == changed
+
+
+def test_external_change_after_comparison_is_still_preserved(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    game, mod = project(tmp_path)
+    payload = make_archive(field_values={'EquipParamGoods': {100: {'basicPrice': 17}}})
+    deployment.apply(game, mod, composed={RELATIVE: payload})
+    transaction = deployment._data_transaction
+    @contextmanager
+    def changed_during_save(root, desired):
+        (game/RELATIVE).write_bytes(b'external edit')
+        with transaction(root, desired) as state:
+            yield state
+    monkeypatch.setattr(deployment, '_data_transaction', changed_during_save)
+    with pytest.raises(RuntimeError):
+        deployment.apply(game, mod, composed={RELATIVE: payload})
+    assert (game/RELATIVE).read_bytes() == b'external edit'
