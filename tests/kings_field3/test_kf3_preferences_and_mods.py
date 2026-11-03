@@ -279,6 +279,26 @@ def test_interface_write_failure_restores_files_and_native_flags(setup, monkeypa
     assert not (data / RECOVERY).exists()
 
 
+def test_private_native_fixture_helper_uses_adapter_and_refuses_player_paths(setup):
+    import tempfile
+    from prepare_native_fixture import prepare
+    game, data, library = setup
+    source = mod(library)
+    with pytest.raises(ValueError, match="below %TEMP%"):
+        prepare(game, data, [source])
+    scratch = Path(tempfile.gettempdir()) / "lexeditor-dev"
+    scratch.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="kf3-loader-fixture-", dir=scratch) as name:
+        private = Path(name)
+        (private / "settings.json").write_bytes(b'{"customBindings":"keep"}')
+        result = prepare(game, private, [source])
+        values = model.ini_values((private / "interface.ini").read_text())
+        assert values["mods.example.enabled"] == "True"
+        assert values["mods.example.priority"] == "1"
+        assert (private / "mods/lexeditor-example/Mod.cs").is_file()
+        assert result["settingsJsonTouched"] is False
+
+
 def test_plugin_smoke_is_isolated_from_live_player_data():
     from plugins.kings_field3.plugin import smoke
     assert smoke() == []
@@ -383,6 +403,10 @@ def test_settings_and_shared_mods_render_and_edit_without_player_data(setup, tmp
                       }).map(node=>node.getAttribute('aria-label'));
                     }""")
                 assert header_is_contained() == []
+                name = page.locator('.lex-project-name')
+                assert name.inner_text() == 'Select a mod'
+                assert name.evaluate('node=>node.scrollWidth<=node.clientWidth+1'), page.locator('.lex-project-select').evaluate("node=>({width:node.clientWidth,padding:getComputedStyle(node).padding,name:node.querySelector('.lex-project-name').getBoundingClientRect().toJSON(),path:getComputedStyle(node.querySelector('.lex-project-path')).display,container:node.closest('.lex-shell-left-actions').getBoundingClientRect().toJSON()})")
+                assert not page.locator('.lex-project-path').is_visible()
                 page.get_by_role("button", name="Open King's Field III Data Map", exact=True).click()
                 page.get_by_text("Disc: SLUS-00255", exact=True).wait_for(state="visible")
                 page.screenshot(path=str(output / "data-map-small.png"))
@@ -397,6 +421,7 @@ def test_settings_and_shared_mods_render_and_edit_without_player_data(setup, tmp
                 page.locator('.lex-plugin-loading-screen').wait_for(state='hidden')
                 page.wait_for_timeout(150)
                 assert header_is_contained() == []
+                assert page.locator('.lex-project-name').evaluate('node=>node.scrollWidth<=node.clientWidth+1')
                 page.screenshot(path=str(output / "blank-header-small.png"))
                 page.evaluate("document.documentElement.style.setProperty('--lex-ui-scale','1.5')")
                 page.wait_for_timeout(150)

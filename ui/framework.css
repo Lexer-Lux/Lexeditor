@@ -675,9 +675,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    before anything overlaps. It keeps a slot for the picker's menu button,
    and when its own width runs short the picker drops its label. */
 .lex-shell-start > .lex-shell-left-actions { flex: 1 1 auto; container-type: inline-size; min-width: 40px; }
-@container (max-width: 130px) {
-  .lex-project-select { padding: 4px 26px 4px 4px; }
-  .lex-project-select > :is(.lex-project-name, .lex-project-path) { display: none; }
+@container (max-width: 240px) {
+  .lex-shell-left-actions .lex-project-select { padding: 4px 26px 4px 4px; }
+  /* The source name already identifies the selection. Give it the compact
+     face instead of squeezing it beside the redundant path or helper hint. */
+  .lex-project-select > .lex-project-path { display: none; }
 }
 /* The end cell's controls sit against the window's right edge. */
 .lex-shell-end > .lex-shell-right-actions { margin-left: auto; }
