@@ -124,6 +124,55 @@ def test_editor_and_packaged_engine_share_semantic_cache_revision(tmp_path,monke
         mod_loader._composition_revision.cache_clear()
 
 
+def test_menu_codec_changes_preserve_non_menu_archive_cache_identity(monkeypatch):
+    original = Path.read_bytes
+    changed = {'name': None}
+    def read(path):
+        raw = original(path)
+        return raw+b'\n# changed codec\n' if path.name == changed['name'] else raw
+    monkeypatch.setattr(Path, 'read_bytes', read)
+    def revisions():
+        mod_loader._composition_revision.cache_clear()
+        return (mod_loader._composition_revision(), mod_loader._composition_revision(include_menu=False))
+    try:
+        baseline = revisions()
+        for name in ('menu_layout.py','menu_scripts.py','menu_dim.py','texture_packs.py'):
+            changed['name'] = name
+            current = revisions()
+            assert current[0] != baseline[0], name
+            assert current[1] == baseline[1], name
+        changed['name'] = 'formats.py'
+        current = revisions()
+        assert current[0] != baseline[0] and current[1] != baseline[1]
+    finally:
+        mod_loader._composition_revision.cache_clear()
+
+
+def test_non_menu_outputs_survive_menu_code_changes_but_not_their_own_codec(inputs, monkeypatch):
+    root, mod, _paths, calls, _emevd, _base, _variant = inputs
+    cache = root/'cache'
+    first = mod_loader.compose_installed(root, [mod], cache_root=cache)
+    count = len(calls)
+    original = Path.read_bytes
+    changed = {'name': 'menu_layout.py'}
+    def read(path):
+        raw = original(path)
+        return raw+b'\n# changed codec\n' if path.name == changed['name'] else raw
+    monkeypatch.setattr(Path, 'read_bytes', read)
+    try:
+        mod_loader._composition_revision.cache_clear()
+        monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
+        second = mod_loader.compose_installed(root, [mod], cache_root=cache)
+        assert second.files == first.files and len(calls) == count
+        changed['name'] = 'emevd.py'
+        mod_loader._composition_revision.cache_clear()
+        monkeypatch.setattr(mod_loader, '_compose_cache', OrderedDict())
+        third = mod_loader.compose_installed(root, [mod], cache_root=cache)
+        assert third.files == first.files and len(calls) == count*2
+    finally:
+        mod_loader._composition_revision.cache_clear()
+
+
 @pytest.mark.parametrize('damage',['not-a-database','wrong-columns','extra-trigger'])
 def test_damaged_disposable_cache_is_rebuilt_without_disabling_mods(tmp_path,damage):
     path = tmp_path/'composed.sqlite3'

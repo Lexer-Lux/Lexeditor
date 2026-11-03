@@ -271,12 +271,12 @@ def test_script_engine_changes_do_not_recompose_unchanged_managed_menu(tmp_path,
         calls.append(True)
         return b'compiled fixture'
     monkeypatch.setattr(tweak_mods.menu_layout, 'compose', compose)
-    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'composer-one')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda **_kwargs: b'composer-one')
     first = tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path)
     monkeypatch.setattr(tweak_mods, '_script_compiler_revision', lambda: 'unrelated script change')
     assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
     assert len(calls) == 1
-    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'composer-two')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda **_kwargs: b'composer-two')
     assert tweak_mods._compose_menu(b'original', [], tweak_mods.LAYOUT, tmp_path) == first
     assert len(calls) == 1
     codec.write_bytes(b'codec-two')
@@ -669,6 +669,7 @@ def test_host_activation_uses_the_same_recovery_as_save(tmp_path):
                 raise mod_builds.ModBuildError([broken], 'broken fixture')
             return {}
     host = SimpleNamespace(mod_library_status=lambda _: {'canManage': True, 'root': str(tmp_path)},
+        _game_mods=lambda _: library,
         _installations=SimpleNamespace(snapshot=lambda _: {'root': str(tmp_path / 'game')}),
         game_process_status=lambda _: {'running': False}, _mod_adapter=lambda _: Adapter(),
         _mod_library_lock=threading.Lock())

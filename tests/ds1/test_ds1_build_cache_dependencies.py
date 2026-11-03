@@ -135,7 +135,7 @@ def test_installer_and_archive_engine_changes_do_not_change_the_script_engine_id
     original = Path.read_bytes
     with monkeypatch.context() as changes:
         changes.setattr(Path,'read_bytes',lambda path:original(path)+b'\n# unrelated installer change' if path==Path(tweak_mods.__file__) else original(path))
-        changes.setattr(mod_loader,'_composition_revision',lambda:b'unrelated archive engine change')
+        changes.setattr(mod_loader,'_composition_revision',lambda **_kwargs:b'unrelated archive engine change')
         tweak_mods._script_compiler_revision.cache_clear()
         tweak_mods._installation_revision.cache_clear()
         assert tweak_mods._script_compiler_revision() == before

@@ -469,8 +469,8 @@ def materialize_mod(mod: Mod, originals: dict) -> Mod:
     return Mod(mod.name,mod.folder,files,retained)
 
 
-@lru_cache(maxsize=1)
-def _composition_revision():
+@lru_cache(maxsize=2)
+def _composition_revision(include_menu=True):
     # Source edits in another chat must invalidate outputs too, including
     # uncommitted edits. Schema data also determines PARAM merge units/labels.
     from .formats import METADATA
@@ -480,6 +480,11 @@ def _composition_revision():
     unrelated = {'server.py', 'script_worker.py', 'plugin.py', 'mod_support.py', 'deployment.py',
                  'tweak_mods.py', 'composition_cache.py', 'project_refresh.py', 'mod_usage.py',
                  'map_store.py', 'collision_store.py', 'runtime_package.py'}
+    if not include_menu:
+        # These consume menu declarations or texture packs, never a map,
+        # character/talk binder, event archive or parameter contribution.
+        # Their prepared output bytes are already part of each menu's key.
+        unrelated |= {'menu_layout.py', 'menu_scripts.py', 'menu_dim.py', 'texture_packs.py'}
     sources = [*(path for path in Path(__file__).parent.glob('*.py') if path.name not in unrelated),
                Path(__file__).parents[1] / 'ds3/formats.py',
                *(path for path in METADATA.rglob('*') if path.suffix in ('.xml', '.json'))]
@@ -537,7 +542,8 @@ def _compose_files(originals, mods, conflicts_only, cache_root=None):
     disk_key = None
     if cached is None and cache_root is not None and not conflicts_only:
         try:
-            disk_key = sha256(_composition_revision() + digest.digest()).digest()
+            has_menu = any(path.parts[0].casefold() == 'menu' for path in relatives)
+            disk_key = sha256(_composition_revision(include_menu=has_menu) + digest.digest()).digest()
             payload = composition_cache.load(cache_root, disk_key)
             if payload is not None:
                 header, data = payload.split(b'\n', 1)

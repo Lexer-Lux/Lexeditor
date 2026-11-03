@@ -714,7 +714,7 @@ def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkey
         return b'compiled:' + original + json.dumps(specs).encode()
     monkeypatch.setattr(tweak_mods.menu_layout, 'compose', compose)
     monkeypatch.setattr(tweak_mods.menu_scripts, 'compose', compose)
-    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-one')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda **_kwargs: b'compiler-one')
     specs = [{'owner': 'example', 'changes': []}]
     expected = tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
     # No in-memory result cache is involved: reopen the persisted store.
@@ -722,7 +722,7 @@ def test_unchanged_menu_archives_do_not_recompose_after_restart(tmp_path, monkey
     assert len(calls) == 1
     tweak_mods._compose_menu(b'changed original', specs, managed, tmp_path)
     tweak_mods._compose_menu(b'vanilla', [{'owner': 'different', 'changes': []}], managed, tmp_path)
-    monkeypatch.setattr(mod_loader, '_composition_revision', lambda: b'compiler-two')
+    monkeypatch.setattr(mod_loader, '_composition_revision', lambda **_kwargs: b'compiler-two')
     tweak_mods._compose_menu(b'vanilla', specs, managed, tmp_path)
     assert len(calls) == 3
     codec.write_bytes(b'codec-two')
