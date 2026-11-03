@@ -97,6 +97,28 @@ def test_cache_retains_a_full_real_library_sized_scan(tmp_path):
         assert {key:composition_cache.load(tmp_path,key) for key in expected} == expected
 
 
+def test_recent_cache_hits_do_not_rewrite_the_database_but_older_hits_refresh_recency(tmp_path, monkeypatch):
+    clock = [100 * composition_cache._TOUCH_INTERVAL_NS]
+    monkeypatch.setattr(composition_cache.time, 'time_ns', lambda: clock[0])
+    composition_cache.store(tmp_path, b'key', b'archive')
+    path = tmp_path / composition_cache.CACHE_FILE
+    def touched():
+        with sqlite3.connect(path) as database:
+            return database.execute('SELECT touched FROM outputs WHERE key=?', (b'key',)).fetchone()[0]
+    before = path.read_bytes()
+    clock[0] += 1
+    assert composition_cache.load(tmp_path, b'key') == b'archive'
+    assert path.read_bytes() == before
+    clock[0] += composition_cache._TOUCH_INTERVAL_NS
+    assert composition_cache.load(tmp_path, b'key') == b'archive'
+    assert touched() == clock[0]
+    # A backwards wall-clock adjustment must not leave a future timestamp
+    # protecting one archive from eviction indefinitely.
+    clock[0] -= 2 * composition_cache._TOUCH_INTERVAL_NS
+    assert composition_cache.load(tmp_path, b'key') == b'archive'
+    assert touched() == clock[0]
+
+
 def test_editor_and_packaged_engine_share_semantic_cache_revision(tmp_path,monkeypatch):
     from plugins.ds1 import formats
     first,second = tmp_path/'editor',tmp_path/'game engine'
