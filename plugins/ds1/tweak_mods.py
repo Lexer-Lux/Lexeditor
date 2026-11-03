@@ -667,8 +667,10 @@ class BuildContext:
 def _script_compiler_revision():
     from core import build_dependencies
     from . import script_worker
+    # Match existing Windows receipts across Git checkout and packaging line endings.
     sources = [inspect.getsource(BuildContext).encode(),sys.version.encode(),
-               *(Path(module.__file__).read_bytes() for module in (script_mods,script_worker,build_dependencies))]
+               *(Path(module.__file__).read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
+                 for module in (script_mods,script_worker,build_dependencies))]
     return _sha(b'\0'.join(sources))
 
 
