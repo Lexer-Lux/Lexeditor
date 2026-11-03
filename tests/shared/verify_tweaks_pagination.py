@@ -49,7 +49,7 @@ with sync_playwright() as p:
   if first.is_enabled():first.click()
   page.get_by_label('Setting 0-0-0',exact=True).fill('changed')
   seen=set();labels=set()
-  while True:
+  for _ in range(200):
    seen.update(page.locator('[data-card]:visible').evaluate_all('(nodes)=>nodes.map(n=>+n.dataset.card)'))
    for label in page.locator('[data-card]:visible input').evaluate_all('(nodes)=>nodes.map(n=>n.getAttribute("aria-label"))'):
     field=page.locator('[data-card]:visible').locator(f'input[aria-label="{label}"]')
@@ -57,8 +57,11 @@ with sync_playwright() as p:
     box=field.bounding_box();assert box['y']>=0 and box['y']+box['height']<=height,(width,height,zoom,label,box)
     labels.add(label)
    pager=page.locator('.lex-tweaks-pages').bounding_box();assert pager['y']+pager['height']<=height+1,(zoom,pager)
-   if not page.get_by_role('button',name='Next page',exact=True).is_enabled():break
+   # Next wraps; Last remains disabled at the final page.
+   if not page.get_by_role('button',name='Last page',exact=True).is_enabled():break
    page.get_by_role('button',name='Next page',exact=True).click()
+  else:
+   raise AssertionError('Tweaks paging never reached its final page')
   assert seen==set(range(19)),seen
   assert labels==EXPECTED,(width,height,zoom,'missing',sorted(EXPECTED-labels),'unexpected',sorted(labels-EXPECTED))
   assert page.get_by_label('Setting 0-0-0',exact=True).input_value()=='changed'

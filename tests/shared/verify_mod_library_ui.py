@@ -83,7 +83,12 @@ def main():
                     document.querySelector('#main').dispatchEvent(event);
                 }""", base64.b64encode(pak.read_bytes()).decode())
                 page.get_by_role("button", name="Import mod", exact=True).wait_for()
-                page.get_by_label("Package data folder").select_option("Wrapped")
+                package = page.get_by_label("Package data folder")
+                # The dropped folder itself is now the package root. It must
+                # not acquire a second, synthetic Wrapped/ directory inside.
+                assert package.locator('option').evaluate_all(
+                    'options=>options.map(option=>option.value)') == ['']
+                assert package.input_value() == ''
                 page.get_by_label("Mod name", exact=True).fill("Imported test")
                 page.get_by_role("button", name="Import mod", exact=True).click()
                 page.get_by_text("Imported test", exact=True).wait_for()

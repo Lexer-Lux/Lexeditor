@@ -8,7 +8,7 @@ the whole strip shrinks together into the window instead of clipping one label
 or scrolling. This measures the rendered strip of a real plugin page.
 
 FF8 is the hard case - nineteen tabs with New Game enabled, wider than the
-window at the theme's own size - and Blank is the easy one, six short names
+window at the theme's own size - and Blank is the easy one, seven short names
 that must still spread across the row. FF7 is left out on purpose: its editor
 page is written into the served HTML and this harness never gives its frame an
 animation frame, so its strip cannot be measured from here.
@@ -100,8 +100,8 @@ def test_blank_tabs_share_the_row():
                        "!!document.querySelector('.lex-shell-header nav')")
     row = rows[1600]
     assert row["found"], row
-    assert set(row["tabs"]) == {"mods","template","organism","molecule","atom","utility"}
-    assert len(row["tabs"]) == 6, row
+    assert set(row["tabs"]) == {"mods","template","organism","molecule","atom","utility","animations"}
+    assert len(row["tabs"]) == 7, row
     assert not row["clipped"], row
     assert not row["swallowed"], row
     assert row["strip"] >= row["lane"], row
