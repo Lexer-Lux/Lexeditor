@@ -176,6 +176,35 @@ def test_native_ini_keys_are_case_insensitive():
         settings.parse_ini(b"[RecompOne]\nKF1.RenderDistance=16\nkf1.renderdistance=24\n")
 
 
+def test_shared_native_screen_reads_each_ports_loader_details():
+    import threading
+    from http.server import ThreadingHTTPServer
+    from urllib.request import urlopen
+    from core.native_port_http import handler
+    from plugins.kf1.server import Handler
+    from plugins.kings_field3.model import MODEL
+    for service, identity in ((Handler, "SLPS-00017"), (handler(MODEL, str(Path(__file__).resolve().parents[2] / "plugins/kings_field3/server.py")), "SLUS-00255")):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), service)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            with urlopen(f"http://127.0.0.1:{server.server_port}/api/plugin") as response:
+                value = json.load(response)
+            assert identity in value["gameIdentity"]
+            assert all(value["modLoading"][key] for key in ("loader", "output", "order", "safety", "removal"))
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=5)
+
+
+def test_screenshot_tool_uses_the_registered_service_factory():
+    from tools.shot import session_for
+    service = session_for("kf1", None)
+    assert service.plugin_id == "kf1" and service.module == "plugins.kf1.server"
+    assert service.process is None
+
+
 def test_rendered_settings_save_and_reload(port):
     import threading
     from http.server import ThreadingHTTPServer
@@ -197,7 +226,7 @@ def test_rendered_settings_save_and_reload(port):
                 field = page.get_by_role("spinbutton", name="View distance (cells)", exact=True)
                 field.fill("24")
                 page.get_by_role("checkbox", name="Smooth distance fade", exact=True).uncheck()
-                with page.expect_response(lambda response: response.url.endswith("/api/settings") and response.request.method == "POST") as response:
+                with page.expect_response(lambda response: response.url.endswith("/api/preferences") and response.request.method == "POST") as response:
                     page.get_by_role("button", name="Save changes", exact=True).click()
                 assert response.value.status == 200
                 page.reload()
@@ -212,6 +241,53 @@ def test_rendered_settings_save_and_reload(port):
                 page.get_by_role("button", name="Replace bindings", exact=True).click()
                 page.get_by_role("button", name="Run control setup again", exact=True).wait_for()
                 assert json.loads((port / "settings.json").read_text())["Keys"]["Circle"] == "E"
+                assert not errors
+            finally:
+                browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=5)
+
+
+def test_shared_screen_keeps_ports_without_profiles_working(tmp_path, monkeypatch):
+    import threading
+    from http.server import ThreadingHTTPServer
+    from core import native_port_settings
+    from core.native_port_http import handler
+    from plugins.kings_field3.model import MODEL
+    playwright_api = pytest.importorskip("playwright.sync_api")
+    root, data = tmp_path / "kf3", tmp_path / "player-data"
+    for name in MODEL.descriptor["installation"]["requiredPaths"]:
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"synthetic")
+    (root / MODEL.native["configPath"]).write_text(json.dumps(MODEL.native["configIdentity"]))
+    monkeypatch.setenv(MODEL.descriptor["installation"]["rootEnv"], str(root))
+    monkeypatch.setenv(MODEL.native["dataEnv"], str(data))
+    monkeypatch.setattr(native_port_settings, "live_processes", lambda names: [])
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler(MODEL, str(Path(__file__).resolve().parents[2] / "plugins/kings_field3/server.py")))
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        with playwright_api.sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(viewport={"width": 800, "height": 600})
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                page.goto(f"http://127.0.0.1:{server.server_port}")
+                field = page.get_by_role("spinbutton", name="Stick turn sensitivity", exact=True)
+                page.wait_for_function("!document.documentElement.classList.contains('lex-loading-live')")
+                field.fill("2")
+                field.press("Tab")
+                assert page.get_by_role("button", name="Run control setup again", exact=True).count() == 0
+                with page.expect_response(lambda response: response.url.endswith("/api/preferences") and response.request.method == "POST") as response:
+                    page.get_by_role("button", name="Save changes", exact=True).click()
+                assert response.value.status == 200
+                assert native_port_settings.ini_values((data / "interface.ini").read_text())["kf3.analog.turn"] == "2"
+                page.locator(".lex-plugin-loading-screen").wait_for(state="hidden")
+                page.screenshot(path=str(tmp_path / "kf3-shared-settings.png"))
                 assert not errors
             finally:
                 browser.close()

@@ -6,10 +6,14 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from core.plugin_http import PluginRequestHandler
+from core.native_port_http import loader_details
+from core.plugin_manifest import manifest_in
 from . import settings
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
+DESCRIPTOR = manifest_in(PLUGIN_ROOT)
+CONTROL_HELP = "Classic Controls restores the baseline upstream port bindings. Modern Controls adds RT/RB attack, LT/LB cast, Cross/E interact and Circle/Left Shift held run. Original Select/Tab menu and Triangle/Q item or spell actions, including maps, remain. Cross confirms and Circle backs out in menus. F2 remains optional Debug Tools; this archive has no Remaster Editor."
 
 DATA_MAP = [
     {"filename": "interface.ini", "controls": "Native display and control settings", "status": "partial", "coverage": "view", "target": "settings",
@@ -27,18 +31,42 @@ DATA_MAP = [
 ]
 
 
+def preferences(value=None):
+    value = settings.payload() if value is None else value
+    fields = []
+    for section in value["sections"]:
+        for field in section["fields"]:
+            fields.append({"key": field["id"], "section": section["label"], "kind": field["kind"],
+                           "label": field["label"], "value": field["value"], "help": field.get("description", ""),
+                           **{new: field[old] for old, new in (("minimum", "min"), ("nonzeroMinimum", "nonzeroMin"), ("maximum", "max"), ("step", "step")) if old in field}})
+    result = {"fields": fields, "fingerprint": value["sha256"]}
+    if "controls" in value:
+        result["controls"] = {**value["controls"], "help": CONTROL_HELP}
+    return result
+
+
 class Handler(PluginRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "kf1", "name": "King's Field I", "hosted": True,
+                            "accent": DESCRIPTOR["accent"], "portName": DESCRIPTOR["nativePort"]["dataDirectory"],
+                            "gameIdentity": DESCRIPTOR["nativePort"]["gameIdentity"], "modLoading": loader_details(DESCRIPTOR, ROOT),
                             "windowHost": "webview2", "capabilities": ["native-port-settings", "data-map"]})
-        elif path == "/api/settings":
+        elif path == "/api/state":
+            root = settings.game_root()
+            game = {"root": str(root), "dataRoot": str(root), "supported": True,
+                    "running": bool(settings.live_processes(tuple(DESCRIPTOR["processNames"])))}
             try:
-                self.send_json(settings.payload())
+                value = preferences()
             except (OSError, ValueError) as error:
-                self.send_json({"error": str(error)}, 400)
-        elif path == "/api/data-map":
+                # A missing/unsupported port still has a read-only schema and
+                # Data Map. Binding values require a verified native asset.
+                game.update(supported=False, error=str(error))
+                value = preferences({"sha256": "", "sections": [{"label": "Display and controls",
+                    "fields": [{**field, "value": field["default"]} for field in settings.FIELDS]}]})
+            self.send_json({"game": game, "preferences": value})
+        elif path == "/api/datamap":
             self.send_json({"rows": DATA_MAP})
         elif path == "/":
             self.send_file(PLUGIN_ROOT / "editor.html")
@@ -56,7 +84,7 @@ class Handler(PluginRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
-        if path not in {"/api/settings", "/api/settings/controls"}:
+        if path not in {"/api/preferences", "/api/control-setup"}:
             self.send_json({"error": "Not found"}, 404)
             return
         origin = self.headers.get("Origin")
@@ -70,10 +98,14 @@ class Handler(PluginRequestHandler):
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
                 raise ValueError("Settings request must be an object")
-            if path == "/api/settings/controls":
-                self.send_json(settings.setup_controls(body))
+            if path == "/api/control-setup":
+                self.send_json(preferences(settings.setup_controls({**body, "sha256": body.get("fingerprint")})))
             else:
-                self.send_json(settings.save(body))
+                changes = body.get("changes")
+                if not isinstance(changes, dict) or changes.keys() - {field["id"] for field in settings.FIELDS}:
+                    raise ValueError("Unrecognized native setting")
+                values = {field["id"]: field["value"] for section in settings.payload()["sections"] for field in section["fields"]}
+                self.send_json(preferences(settings.save({"sha256": body.get("fingerprint"), "values": {**values, **changes}})))
         except (OSError, ValueError, TypeError) as error:
             self.send_json({"error": str(error)}, 400)
 

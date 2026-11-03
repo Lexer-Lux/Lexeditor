@@ -15,7 +15,7 @@ from core.plugin_manifest import manifest_in
 LOCK = threading.RLock()
 MAX_BYTES = 1024 * 1024
 FIELDS = (
-    {"id": "kf1.renderdistance", "label": "View distance (cells)", "kind": "number", "minimum": 0, "maximum": 30, "step": 1, "default": 16,
+    {"id": "kf1.renderdistance", "label": "View distance (cells)", "kind": "number", "minimum": 0, "nonzeroMinimum": 8, "maximum": 30, "step": 1, "default": 16,
      "description": "Use 8–30 with Renderer set to Retained, or 0 for the original reach. Original visible cells remain. Fog becomes black beyond about 9.17."},
     {"id": "kf1.renderdistance.fade", "label": "Smooth distance fade", "kind": "boolean", "default": True,
      "description": "Fades geometry near the view edge. This does not change view distance or the game's fog shading."},
@@ -210,7 +210,7 @@ def save(body: dict) -> dict:
                 raise ValueError(f"{field['label']} needs an on/off choice")
             changes[field["id"]] = "3" if value and field["id"].endswith(".fade") else "1" if value else "0"
         else:
-            if type(value) not in (int, float) or not math.isfinite(value) or (value != 0 and not 8 <= value <= 30):
+            if type(value) not in (int, float) or not math.isfinite(value) or (value != 0 and not field["nonzeroMinimum"] <= value <= field["maximum"]):
                 raise ValueError(f"{field['label']} must be 0 or between 8 and 30")
             changes[field["id"]] = str(value)
     if not isinstance(body.get("sha256"), str):

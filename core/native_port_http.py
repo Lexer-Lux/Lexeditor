@@ -9,12 +9,12 @@ from core.plugin_http import PluginRequestHandler
 from core.native_port_settings import NativePortSettings
 
 
-def loader_details(model: NativePortSettings, app_root: Path) -> dict:
-    loading = json.loads((app_root / "ui/mod-loading.json").read_text(encoding="utf-8"))["plugins"][model.descriptor["id"]]
+def loader_details(descriptor: dict, app_root: Path) -> dict:
+    loading = json.loads((app_root / "ui/mod-loading.json").read_text(encoding="utf-8"))["plugins"][descriptor["id"]]
     return {"loader": loading["loader"], "output": loading["structure"],
             "order": loading["overriding"],
             "safety": "Lexeditor preserves saves, disc data and external mods. Settings and deployment require the game to be closed.",
-            **model.native["modLoading"]}
+            **descriptor["nativePort"]["modLoading"]}
 
 
 def data_map(model: NativePortSettings) -> dict:
@@ -51,7 +51,7 @@ def handler(model: NativePortSettings, plugin_file: str):
                     self.send_json({"apiVersion": 1, "pluginId": model.descriptor["id"],
                                     "name": model.descriptor["name"], "accent": model.descriptor["accent"],
                                     "portName": model.native["dataDirectory"], "gameIdentity": model.native["gameIdentity"],
-                                    "modLoading": loader_details(model, app_root),
+                                    "modLoading": loader_details(model.descriptor, app_root),
                                     "hosted": True, "windowHost": "webview2",
                                     "capabilities": ["native-source-mods", "player-settings"]})
                 elif path == "/api/state":
