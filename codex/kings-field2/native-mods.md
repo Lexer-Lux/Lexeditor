@@ -38,6 +38,37 @@ native mods, refuses replacement of externally edited deployed source, and
 journals native flags and copies for recovery. The adapter requires a closed
 game. It does not edit settings.json, memory cards, disc data or game binaries.
 
+## Extended scenery range
+
+Fork preview4 accepts10.5..30 tiles in half-tile steps. View distance and smooth
+distance fade use separate keys, `kf2.renderdistance` and `kf2.distancefade.on`.
+Distance scales retained-world fog by distance/10.5; the optional fade only
+adds a one-tile transition at the boundary. Changing fade does not change reach.
+
+The current area's entire80x80 map is already resident. Extended reach selects
+more of that geometry; it does not stream adjacent areas. Retained GPU placement
+uses full coordinates before the old signed16 packet path. Unsupported packet
+fallbacks outside signed16 placement are skipped, preventing coordinate wrap.
+Without retained GPU geometry, effective reach stays at15 while preserving the
+saved larger preference. Extended reach therefore requires GPU geometry.
+
+The GPU depth representation ends at65536. Above15 tiles, a separate mandatory
+depth guard fades out over62976..65024 even when the optional distance fade is off.
+Main, mirror and retained reflection passes receive the physical depth guard;
+the first-person arm and sky keep their existing exclusions.
+
+An installed preview4 matched-camera capture in the native fdat02 corridor
+selected106 map halves at15 and173 at30, including67 beyond15.5. Real geometry
+extended to27 tiles in that corridor, with visible added floor/walls. A pitched
+capture selected real vertices to66688 view depth while retaining the65024 guard.
+These establish this area's renderer behavior, not coverage of every map or
+every optional legacy renderer configuration.
+
+Native setup has one Controls category containing Control layout, Movement and
+Rumble and gyro. Turning and difficulty remains separate. Both initial setup
+and rerun traverse six numbered steps. Classic/Modern/Keep choices share that
+category; saved custom bindings and sensitivity are preserved on ordinary boot.
+
 ## Original notification rendering
 
 Fork v0.5.3-lexer.2 adds NativeNotifications.Post(owner,glyphs), PostText,
@@ -55,6 +86,10 @@ Better UI hooks initial pickup placement `0x80046C64` only at return sites `0x80
 and `0x80048610`, after native lock/quest guards. The item record is at caller `SP+0x80`.
 Item names are original-font bytes at `0x80065B24`, stride 24 bytes. Native gold feedback
 remains unchanged. Poison notifications belong to Better Poison, not Better UI.
+The real native confirmation loop was held for 2.5 seconds before choosing an
+action. The name rendered with nonzero native brightness while inventory was
+zero and the ground item was still present. Taking acquired it; putting away
+did not. Disabling only Better UI removed the name and retained those choices.
 
 ## Damage, power and exploration
 
@@ -62,6 +97,9 @@ Creature records start at `0x8016C544`, stride `0x7C`, with 200 slots. Current H
 spawn `0x80039AFC` copies its maximum from definition `0x80172624 + type*0x78 +0x1A`.
 Damage `0x8003A9CC` follows linked body parts to their parent before subtracting HP.
 Hit Feedback measures the resulting loss against that definition maximum.
+Its only setting is maximum flash duration in seconds (0–5, default 0.6).
+Duration is that maximum times min(actual HP lost / definition maximum HP, 1).
+The native check confirms a 1-second maximum and 10% loss give 0.1 seconds.
 
 Native running `0x8002957C` subtracts 500 per 15 Hz world tick from both 5000-point
 physical/magic power gauges `0x8019942E` and `0x80199432`. Better Sprint changes this charge only

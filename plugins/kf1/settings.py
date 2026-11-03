@@ -16,7 +16,7 @@ LOCK = threading.RLock()
 MAX_BYTES = 1024 * 1024
 FIELDS = (
     {"id": "kf1.renderdistance", "label": "View distance (cells)", "kind": "number", "minimum": 0, "nonzeroMinimum": 8, "maximum": 30, "step": 1, "default": 16,
-     "description": "Use 8–30 with Renderer set to Retained, or 0 for the original reach. Original visible cells remain. Fog becomes black beyond about 9.17."},
+     "description": "Use 8–30 with Renderer set to Retained, or 0 for the original reach and fog. Greater distances also extend the fog range."},
     {"id": "kf1.renderdistance.fade", "label": "Smooth distance fade", "kind": "boolean", "default": True,
      "description": "Fades geometry near the view edge. This does not change view distance or the game's fog shading."},
     {"id": "kf1.controls.holdrun", "label": "Hold to run", "kind": "boolean", "default": False,
