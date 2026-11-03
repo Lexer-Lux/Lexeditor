@@ -220,7 +220,7 @@ def test_theme_bounds_oversized_and_unproven_sources(tmp_path, monkeypatch):
 
 
 def test_theme_asset_route_serves_browser_files_only(tmp_path):
-    root = tmp_path / "cache"
+    root = tmp_path / "browser" / "cache"
     raw = root / "token" / "raw" / "fonts" / "DSFont24.ccm.dcx"
     raw.parent.mkdir(parents=True)
     raw.write_bytes(b"private")

@@ -141,8 +141,8 @@ def test_editor_and_packaged_engine_share_semantic_cache_revision(tmp_path,monke
         assert revision(second) == expected
         (second/'plugins/ds1/runtime_package.py').write_text('changed release packaging')
         assert revision(second) == expected
-        for source in ('viewport.py','flver.py','mtd.py'):
-            (second/'plugins/ds1'/source).write_text('changed read-only model preview')
+        for source in ('viewport.py','flver.py','mtd.py','theme.py'):
+            (second/'plugins/ds1'/source).write_text('changed read-only presentation')
             assert revision(second) == expected
         (second/'plugins/ds1/mod_loader.py').write_text('changed composer')
         assert revision(second) != expected
@@ -174,7 +174,7 @@ def test_menu_codec_changes_preserve_non_menu_archive_cache_identity(monkeypatch
         mod_loader._composition_revision.cache_clear()
 
 
-@pytest.mark.parametrize('unrelated_source', ['menu_layout.py', 'viewport.py', 'flver.py', 'mtd.py'])
+@pytest.mark.parametrize('unrelated_source', ['menu_layout.py', 'viewport.py', 'flver.py', 'mtd.py', 'theme.py'])
 def test_non_menu_outputs_survive_unrelated_code_changes_but_not_their_own_codec(inputs, monkeypatch, unrelated_source):
     root, mod, _paths, calls, _emevd, _base, _variant = inputs
     cache = root/'cache'

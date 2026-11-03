@@ -41,7 +41,8 @@ def test_theme_cache_uses_installed_assets_without_touching_archives(tmp_path: P
 
 
 def test_theme_asset_route_cannot_serve_raw_cache(tmp_path: Path):
-    root = tmp_path / "cache"
+    # An ancestor named browser must not authorize raw files in this cache.
+    root = tmp_path / "browser" / "cache"
     raw = root / "token" / "raw" / "fonts" / "font.dds.phyre"
     raw.parent.mkdir(parents=True)
     raw.write_bytes(b"private")

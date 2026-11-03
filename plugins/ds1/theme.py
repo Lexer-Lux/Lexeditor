@@ -29,6 +29,8 @@ import re
 import shutil
 import struct
 
+from core.plugin_files import atomic_write as _atomic_bytes
+from core.theme_assets import asset_path, atomic_json as _atomic_json
 from .assets import dds_info, parse_tpf, render_png
 from .formats import FormatError, inflate
 
@@ -109,29 +111,6 @@ def _signature(game_root: Path | None) -> tuple[str, list[str]]:
         inputs.append(f"{path.relative_to(game_root).as_posix()}:{stat.st_size}:{stat.st_mtime_ns}")
     material = "|".join(sorted(inputs))
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16], sorted(inputs)
-
-
-def _atomic_bytes(target: Path, data: bytes) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(target.name + ".lexeditor.tmp")
-    try:
-        with temporary.open("wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, target)
-    finally:
-        temporary.unlink(missing_ok=True)
-
-
-def _atomic_json(target: Path, payload: dict) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(target.name + ".lexeditor.tmp")
-    try:
-        temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        os.replace(temporary, target)
-    finally:
-        temporary.unlink(missing_ok=True)
 
 
 def _cache_raw(source: Path, target: Path, maximum: int) -> bool:
@@ -379,18 +358,6 @@ def sfx_extract(cache_root: Path, game_root: Path | None, bank: str, stream: str
         raise ValueError("The theme sound cache is full")
     _atomic_bytes(target, _fsb.extract_mp3(_sfx_bank(Path(game_root), bank), entry))
     return f"/theme/{state['token']}/browser/sfx/{Path(bank).stem}/{target.name}"
-
-
-def asset_path(cache_root: Path, route: str) -> Path:
-    """Resolve a browser theme URL beneath the private cache root."""
-    root = Path(cache_root).resolve()
-    relative = str(route).replace("\\", "/").strip("/")
-    target = (root / relative).resolve()
-    if target == root or root not in target.parents or not target.is_file():
-        raise FileNotFoundError("Theme asset not found")
-    if "browser" not in target.parts:
-        raise FileNotFoundError("Raw theme sources are not web-served")
-    return target
 
 
 # Menu UI events, proved against the installed frpg_main bank and its FEV
