@@ -11,6 +11,7 @@ import tempfile
 import threading
 
 from core.process_probe import live_processes
+from core.plugin_manifest import install_spec
 
 LOCK = threading.RLock()
 MAX_CONFIG = 2 * 1024 * 1024
@@ -36,7 +37,8 @@ def data_root() -> Path:
 
 
 def game_root() -> Path:
-    return Path(os.environ.get("LEXEDITOR_KF2_ROOT") or "D:/Programs/Verdite2").expanduser().resolve()
+    spec = install_spec(__file__)
+    return Path(os.environ.get(spec.root_env) or spec.default_roots[0]).expanduser().resolve()
 
 
 def ensure_closed() -> None:
@@ -175,11 +177,15 @@ def save_preferences(root: Path, changes: dict, expected: str) -> dict:
 
 
 def installation(root: Path) -> dict:
-    required = ("bin/Verdite2.exe", "bin/RecompOne.Runtime.dll", "content/config/kf2.json")
+    from .port import status
+    required = install_spec(__file__).required_paths
     missing = [relative for relative in required if not (root / relative).is_file()]
     supported = not missing
     if supported:
         config = (root / "content/config/kf2.json").read_text(encoding="utf-8-sig")
         supported = '"SLUS-00158"' in config and '"KingsField2"' in config
+    fork = status(root)
+    supported = supported and fork["installed"]
     return {"root": str(root), "supported": supported, "missing": missing,
+            "fork": fork,
             "dataRoot": str(data_root()), "running": bool(live_processes(("Verdite2.exe",)))}

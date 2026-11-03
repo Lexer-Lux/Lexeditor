@@ -2,11 +2,15 @@
 import json
 from pathlib import Path
 import sys
+import hashlib
+import shutil
+import zipfile
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from plugins.kings_field2 import model
+from plugins.kings_field2 import port
 from plugins.kings_field2.mod_support import LEDGER, RECOVERY, VerditeModAdapter
 
 
@@ -40,6 +44,14 @@ def setup(tmp_path, monkeypatch):
     for name in ("Verdite2.exe", "RecompOne.Runtime.dll"):
         (game / "bin" / name).write_bytes(b"synthetic only")
     (game / "content/config/kf2.json").write_text('{"game":{"id":"SLUS-00158","name":"KingsField2"}}')
+    for name in port.CRITICAL:
+        target = game / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            target.write_bytes(b"synthetic only")
+    (game / "lexeditor-port.json").write_text(json.dumps(port.PIN))
+    (game / port.RECEIPT).write_text(json.dumps({"repository": port.PIN["repository"],
+                                               "files": port._tree(game)}))
     (data / "settings.json").write_text(json.dumps({"ActiveMods": ["external.map"], "Unmodeled": {"keep": 42}}))
     monkeypatch.setenv("LEXEDITOR_KF2_DATA", str(data))
     monkeypatch.setattr(model, "live_processes", lambda _: [])
@@ -199,3 +211,96 @@ def test_recovery_preserves_edited_backup_without_replacing_deployed_mod(setup, 
     assert (data / RECOVERY / "mods/lexeditor-first/Mod.cs").read_text() == "// recovered player edits\n"
     assert (data / "mods/lexeditor-second/Mod.cs").is_file()
     assert not (data / "mods/lexeditor-first").exists()
+
+
+def pinned_archive(game, temporary, monkeypatch):
+    archive = temporary / "fork.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        for path in game.rglob("*"):
+            if path.is_file() and path.name != port.RECEIPT:
+                output.write(path, path.relative_to(game).as_posix())
+    pin = {**port.PIN, "bytes": archive.stat().st_size,
+           "sha256": hashlib.sha256(archive.read_bytes()).hexdigest()}
+    monkeypatch.setattr(port, "PIN", pin)
+    monkeypatch.setattr(port, "fetch_file", lambda url, target, **kwargs: shutil.copy2(archive, target))
+    return archive
+
+
+def test_fork_download_install_is_separate_and_hash_verified(setup, tmp_path, monkeypatch):
+    game, _, _ = setup
+    original = port._tree(game)
+    archive = pinned_archive(game, tmp_path, monkeypatch)
+    target = tmp_path / "new-fork"
+    assert port.install(target)["installed"]
+    assert port._tree(game) == original
+    assert model.installation(target)["supported"]
+    # A changed download cannot create a second installation.
+    archive.write_bytes(b"truncated or tampered download")
+    with pytest.raises(ValueError, match="pinned size and SHA-256"):
+        port.install(tmp_path / "rejected-fork")
+    assert not (tmp_path / "rejected-fork").exists()
+
+
+def test_fork_updates_preserve_user_files_and_keep_bounded_backups(setup, tmp_path, monkeypatch):
+    game, _, _ = setup
+    target = tmp_path / "fork"
+    pinned_archive(game, tmp_path, monkeypatch)
+    port.install(target)
+    (target / "bin/ReShade.ini").write_text("player preference")
+    for version in ("old-one", "old-two", "old-three"):
+        marker = json.loads((target / "lexeditor-port.json").read_text())
+        marker["sourceRevision"] = version
+        (target / "lexeditor-port.json").write_text(json.dumps(marker))
+        # Simulate a legitimately installed earlier release's receipt.
+        receipt = json.loads((target / port.RECEIPT).read_text())
+        receipt["files"]["lexeditor-port.json"] = port.digest(target / "lexeditor-port.json")
+        (target / port.RECEIPT).write_text(json.dumps(receipt))
+        assert port.install(target)["installed"]
+        assert (target / "bin/ReShade.ini").read_text() == "player preference"
+    assert target.with_name("fork.lexeditor-original").is_dir()
+    assert target.with_name("fork.lexeditor-previous").is_dir()
+    assert not port._paths(target)[0].exists()
+
+
+def test_fork_never_overwrites_unmanaged_or_modified_port_files(setup, tmp_path, monkeypatch):
+    game, _, _ = setup
+    pinned_archive(game, tmp_path, monkeypatch)
+    target = tmp_path / "unmanaged"
+    target.mkdir()
+    (target / "player.txt").write_text("keep me")
+    with pytest.raises(ValueError, match="not a managed"):
+        port.install(target)
+    assert (target / "player.txt").read_text() == "keep me"
+    target = tmp_path / "fork"
+    port.install(target)
+    (target / "bin/Verdite2.dll").write_bytes(b"player build")
+    with pytest.raises(ValueError, match="changed outside"):
+        port.install(target)
+    assert (target / "bin/Verdite2.dll").read_bytes() == b"player build"
+
+
+def test_fork_swap_failure_restores_previous_installation(setup, tmp_path, monkeypatch):
+    game, _, _ = setup
+    pinned_archive(game, tmp_path, monkeypatch)
+    target = tmp_path / "fork"
+    port.install(target)
+    marker = json.loads((target / "lexeditor-port.json").read_text())
+    marker["sourceRevision"] = "older-installed-build"
+    (target / "lexeditor-port.json").write_text(json.dumps(marker))
+    receipt = json.loads((target / port.RECEIPT).read_text())
+    receipt["files"]["lexeditor-port.json"] = port.digest(target / "lexeditor-port.json")
+    (target / port.RECEIPT).write_text(json.dumps(receipt))
+    before = port._tree(target)
+    rename = Path.rename
+
+    def fail_stage_move(path, destination):
+        if path == port._paths(target)[1] and Path(destination) == target:
+            raise OSError("synthetic failed folder swap")
+        return rename(path, destination)
+
+    monkeypatch.setattr(Path, "rename", fail_stage_move)
+    with pytest.raises(OSError, match="failed folder swap"):
+        port.install(target)
+    assert port._tree(target) == before
+    assert not port._paths(target)[0].exists()
+    assert not port._paths(target)[1].exists()

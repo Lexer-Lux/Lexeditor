@@ -66,7 +66,8 @@
   function settings() {
     const notices = [];
     if (problem) notices.push(UI.notice({tone: "error", title: "Could not save settings", message: problem}));
-    if (!state.game.supported) notices.push(UI.notice({tone: "warning", title: "Locate Verdite2", message: "Choose the Verdite2 installation for King's Field II on the main menu."}));
+    if (!state.game.supported) notices.push(UI.notice({tone: "warning", title: "Set up Lexer's Verdite2 fork",
+      message: state.game.fork.message || "Choose the fork installation for King's Field II on the main menu."}));
     else if (state.game.running) notices.push(UI.notice({tone: "warning", title: "Verdite2 is running", message: "Close the game, then refresh this page before changing settings."}));
     const body = [...new Set(state.preferences.fields.map(spec => spec.section))].map(section =>
       UI.detailSection({title: section, body: state.preferences.fields.filter(spec => spec.section === section).map(field)}));
@@ -81,6 +82,7 @@
       UI.detailSection({title: "Installation", body: [
         UI.detailField({label: "Game", control: UI.readonlyField("Japanese King's Field II / US King's Field, SLUS-00158")}),
         UI.detailField({label: "Port", control: UI.readonlyField(state.game.root)}),
+        UI.detailField({label: "Port version", control: UI.readonlyField(state.game.fork.version || "Not installed")}),
         UI.detailField({label: "Settings and saves", control: UI.readonlyField(state.game.dataRoot)})
       ]}),
       UI.modLoaderSection({loader: "Verdite2 / RecompOne's built-in C# source-mod compiler and hook loader.",
