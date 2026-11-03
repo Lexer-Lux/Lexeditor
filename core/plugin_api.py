@@ -271,7 +271,7 @@ def validate_plugin(plugin: GamePlugin) -> None:
         spec = plugin.installation
         if not spec.root_env or not spec.required_paths or not spec.install_dir_names:
             raise ValueError(f"{plugin.plugin_id} has an incomplete installation descriptor")
-        if not spec.steam_app_id.isdigit():
+        if not isinstance(spec.steam_app_id, str) or (spec.steam_app_id and not spec.steam_app_id.isdigit()):
             raise ValueError(f"{plugin.plugin_id} has an invalid Steam application ID")
         if spec.art_app_id is not None and not spec.art_app_id.isdigit():
             raise ValueError(f"{plugin.plugin_id} has an invalid Steam artwork ID")
