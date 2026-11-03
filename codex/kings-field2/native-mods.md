@@ -145,6 +145,19 @@ Classic and Modern paths; this is separate from human controller feel.
 Forget Me Not uses actual interaction, lock, empty-search and pickup results.
 Its sidecar binds exploration to card path, slot and native save-block hash.
 It keeps original/newest snapshots per card/slot, capped at 12 snapshots and 8 MiB.
+Successful native save `0x80023764` writes the actual selected slot to
+`0x8006E5D4`. A new-save request can be zero or another absent slot, and the game
+chooses the first free slot instead. Persist against that confirmed byte after
+success, never the requested A0 value. Native load `0x80023638(slot)` uses the
+exact requested slot; `0x8004A040` receives the packed block at buffer+0x400.
+Actual copied-card writes/loads preserve locked-red knowledge, confirmed empty
+searches and taken contents. Other slots and a replacement save in the same slot
+do not inherit unrelated history.
+
+The native key matcher `0x800375EC(record, key)` preserves A0 and returns1 only
+on a matching unlock, writing record+0x38 to255. A post-hook removes only prior
+locked knowledge2 for that supported record, returning unfinished loot to white
+before opening. Merely waiting for EndUse misses this separate key-use path.
 It renders small surface-following billboard glints through native packets with
 registered per-corner depth. Retained GPU geometry and Z-buffer support are
 required; unsupported or unlocated surfaces are omitted. Actual chest and barrel
