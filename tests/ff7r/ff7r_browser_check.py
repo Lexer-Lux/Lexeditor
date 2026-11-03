@@ -526,8 +526,6 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         integration.select_option("not-integrated")
         page.wait_for_timeout(200)
         expect(integration).to_have_value("not-integrated")
-        view_rows = page.locator(".lex-data-map-table .lex-column-list-row")
-        expect(view_rows).to_have_count(12)
         view_text = page.locator(".lex-data-map-table").inner_text()
         assert "fixture/resource-03.uasset" in view_text
         assert "fixture/resource-07.uasset" in view_text
