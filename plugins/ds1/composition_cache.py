@@ -123,12 +123,22 @@ def store(root, key, data):
             # Serialize eviction and insertion across host/plugin processes.
             database.execute('BEGIN IMMEDIATE')
             database.execute('DELETE FROM outputs WHERE key = ?', (key,))
-            while True:
-                count, size = database.execute('SELECT count(*), coalesce(sum(length(data)), 0) FROM outputs').fetchone()
+            entries = database.execute('SELECT rowid, length(data) FROM outputs ORDER BY touched LIMIT ?',
+                                       (ENTRIES+1,)).fetchall()
+            if (len(entries) > ENTRIES or any(type(size) is not int or not 0 <= size <= LIMIT
+                                             for _row, size in entries)):
+                raise _BadCache('The disposable cache exceeds its entry bounds')
+            count, size = len(entries), sum(size for _row, size in entries)
+            victims = []
+            for row, length in entries:
                 if count < ENTRIES and size + len(data) <= LIMIT:
                     break
-                database.execute('DELETE FROM outputs WHERE key = '
-                                 '(SELECT key FROM outputs ORDER BY touched LIMIT 1)')
+                victims.append((row,))
+                count -= 1
+                size -= length
+            # Sort the bounded LRU index once. Sorting the table again for
+            # every victim made one large archive spend seconds in eviction.
+            database.executemany('DELETE FROM outputs WHERE rowid = ?', victims)
             database.execute('INSERT INTO outputs VALUES (?, ?, ?, ?)',
                              (key, data, sha256(data).digest(), time.time_ns()))
     except (OSError, sqlite3.Error, TypeError, ValueError):

@@ -210,6 +210,33 @@ def test_busy_cache_is_not_mistaken_for_corruption(tmp_path):
     assert composition_cache.load(tmp_path,b'old') == b'old output'
 
 
+def test_large_cache_entry_evicts_only_the_oldest_outputs(tmp_path, monkeypatch):
+    monkeypatch.setattr(composition_cache, 'LIMIT', 4096)
+    monkeypatch.setattr(composition_cache, '_DATABASE_OVERHEAD', 32768)
+    for number in range(64):
+        composition_cache.store(tmp_path, str(number).encode(), bytes([number])*48)
+    composition_cache.store(tmp_path, b'large', b'new'*800)
+    assert composition_cache.load(tmp_path, b'large') == b'new'*800
+    assert composition_cache.load(tmp_path, b'0') is None
+    assert composition_cache.load(tmp_path, b'63') == bytes([63])*48
+    with sqlite3.connect(tmp_path/'composed.sqlite3') as connection:
+        count, size = connection.execute('SELECT count(*),sum(length(data)) FROM outputs').fetchone()
+    connection.close()
+    assert count == 36 and size <= 4096
+
+
+def test_excess_cache_entry_count_is_discarded_without_an_unbounded_eviction_loop(tmp_path, monkeypatch):
+    composition_cache.store(tmp_path, b'initial', b'output')
+    monkeypatch.setattr(composition_cache, 'ENTRIES', 3)
+    with sqlite3.connect(tmp_path/'composed.sqlite3') as connection:
+        connection.executemany('INSERT INTO outputs VALUES (?,?,?,?)',
+                              [(str(n).encode(), b'output', b'checksum', n) for n in range(5)])
+    connection.close()
+    composition_cache.store(tmp_path, b'first', b'valid output')
+    composition_cache.store(tmp_path, b'next', b'valid output')
+    assert composition_cache.load(tmp_path, b'next') == b'valid output'
+
+
 def test_eviction_reuses_pages_with_a_physical_disk_cap(tmp_path,monkeypatch):
     monkeypatch.setattr(composition_cache,'LIMIT',32*1024)
     monkeypatch.setattr(composition_cache,'_DATABASE_OVERHEAD',16*1024)
