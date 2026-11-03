@@ -10,6 +10,7 @@ models are viewed, never rewritten, so there is no pack path to keep
 byte-exact.
 """
 import logging
+import math
 import struct
 
 from .formats import FormatError, inflate
@@ -383,7 +384,7 @@ class FlverDocument:
                 'material': self.materials[header['material']],
                 'default_bone': header['default_bone'], 'triangles': [],
                 'cull': all(face_sets[face]['cull'] for face in faces) if faces else True,
-                'positions': [], 'normals': [], 'uvs': [], 'uvs2': [],
+                'positions': [], 'normals': [], 'normal_w': [], 'uvs': [], 'uvs2': [],
                 'weights': [], 'bone_ids': []}
         for face in faces:
             mesh['triangles'].extend(face_sets[face]['triangles'])
@@ -430,7 +431,7 @@ class FlverDocument:
         for prefix, piece in CORRUPTED_PREFIXES:
             if blob[:32] == prefix:
                 self.notes.append(f'Known corrupted DSR vertex data ({piece}); values may be wrong')
-        positions, normals, uvs, uvs2, weights, bone_ids = [], [], [], [], [], []
+        positions, normals, normal_w, uvs, uvs2, weights, bone_ids = [], [], [], [], [], [], []
         for v in range(header['vcount']):
             cursor = v * stride
             uv_seen = 0
@@ -439,7 +440,8 @@ class FlverDocument:
                     cursor += fmt
                     continue
                 size = FORMAT_SIZES[fmt]
-                value = _decode_member(semantic, fmt, blob[cursor:cursor + size])
+                chunk = blob[cursor:cursor + size]
+                value = _decode_member(semantic, fmt, chunk)
                 cursor += size
                 if value is None:
                     continue
@@ -447,6 +449,16 @@ class FlverDocument:
                     positions.extend(value)
                 elif semantic == NORMAL:
                     normals.extend(value)
+                    if fmt == 0x03:
+                        normal_w.append(struct.unpack_from('<i', chunk, 12)[0])
+                    elif fmt in (0x10, 0x11, 0x13, 0x2F):
+                        normal_w.append(chunk[3])
+                    elif fmt == 0x12:
+                        normal_w.append(chunk[0])
+                    elif fmt in (0x1A, 0x2E):
+                        normal_w.append(struct.unpack_from('<h' if fmt == 0x1A else '<H', chunk, 6)[0])
+                    else:
+                        normal_w.append(None)
                 elif semantic == UV:
                     # Map pieces carry a lightmap pair after the diffuse
                     # pair, either as a second member or packed into one
@@ -468,6 +480,7 @@ class FlverDocument:
             raise FlverError('Vertex array did not yield one position per vertex')
         mesh['positions'].extend(positions)
         mesh['normals'].extend(normals)
+        mesh['normal_w'].extend(normal_w)
         mesh['uvs'].extend(uvs)
         mesh['uvs2'].extend(uvs2)
         mesh['weights'].extend(weights)
@@ -485,6 +498,63 @@ class FlverDocument:
         logging.getLogger(__name__).debug('Repaired QLOC vertex layout for %s (%s -> %s)',mtd,stride,fixed)
         return table
 
+    def _rigid_data(self, mesh):
+        """Put rigid bone-local vertices into model space, without editing bytes."""
+        if mesh['dynamic'] or not self.bones:
+            return mesh['positions'], mesh['normals']
+        bindings = []
+        for vertex in range(len(mesh['positions'])):
+            if mesh['bone_ids']:
+                bone = mesh['bone_ids'][vertex][0]
+                if mesh['bone_list']:
+                    if not 0 <= bone < len(mesh['bone_list']):
+                        raise FlverError('A rigid vertex names a bone outside its mesh')
+                    bone = mesh['bone_list'][bone]
+            else:
+                normal_w = mesh['normal_w'][vertex] if mesh['normal_w'] else None
+                bone = normal_w if normal_w is not None and 0 <= normal_w < len(self.bones) else mesh['default_bone']
+            if bone in (-1, 0xFFFFFFFF):
+                bone = -1
+            elif not 0 <= bone < len(self.bones):
+                raise FlverError('A rigid vertex names a bone outside its model')
+            bindings.append(bone)
+        chains = {}
+        for binding in set(bindings):
+            chain, seen, bone = [], set(), binding
+            while bone >= 0:
+                if bone in seen or bone >= len(self.bones):
+                    raise FlverError('A rigid mesh has an invalid bone hierarchy')
+                seen.add(bone)
+                entry = self.bones[bone]
+                if entry['pos'] != (0., 0., 0.) or entry['rot'] != (0., 0., 0.) or entry['scale'] != (1., 1., 1.):
+                    x, y, z = entry['rot']
+                    sx, cx, sy, cy, sz, cz = math.sin(x), math.cos(x), math.sin(y), math.cos(y), math.sin(z), math.cos(z)
+                    # FLVER Euler order is YZX: scale, then X/Z/Y rotations.
+                    rotation = ((cy*cz, -cy*sz*cx+sy*sx, cy*sz*sx+sy*cx),
+                                (sz, cz*cx, -cz*sx),
+                                (-sy*cz, sy*sz*cx+cy*sx, -sy*sz*sx+cy*cx))
+                    chain.append((entry['pos'], entry['scale'], rotation))
+                bone = entry['parent']
+                if bone < -1:
+                    raise FlverError('A rigid mesh has an invalid bone parent')
+            chains[binding] = chain
+        if not any(chains.values()):
+            return mesh['positions'], mesh['normals']
+        positions, normals = [], []
+        for vertex, binding in enumerate(bindings):
+            point = mesh['positions'][vertex]
+            normal = mesh['normals'][vertex] if vertex < len(mesh['normals']) else (0., 1., 0.)
+            for translation, scale, rotation in chains[binding]:
+                scaled = [point[i]*scale[i] for i in range(3)]
+                point = tuple(sum(row[i]*scaled[i] for i in range(3))+translation[axis]
+                              for axis, row in enumerate(rotation))
+                inverse = [normal[i]/scale[i] if scale[i] else 0. for i in range(3)]
+                normal = tuple(sum(row[i]*inverse[i] for i in range(3)) for row in rotation)
+            length = math.sqrt(sum(value*value for value in normal))
+            positions.append(point)
+            normals.append(tuple(value/length for value in normal) if length else normal)
+        return positions, normals
+
     def mesh_data(self, index):
         """Viewport-ready data for one mesh: triangles index into positions."""
         if not 0 <= index < len(self.meshes):
@@ -494,9 +564,10 @@ class FlverDocument:
         for triangle in mesh['triangles']:
             if max(triangle) >= count:
                 raise FlverError('Face set index points past the vertices')
+        positions, normals = self._rigid_data(mesh)
         return {'material': mesh['material']['name'], 'mat_def': mesh['material']['mat_def'],
                 'dynamic': mesh['dynamic'], 'cull': mesh['cull'], 'bbox': mesh['bbox'],
-                'positions': mesh['positions'], 'normals': mesh['normals'],
+                'positions': positions, 'normals': normals,
                 'uvs': mesh['uvs'], 'uvs2': mesh['uvs2'], 'weights': mesh['weights'],
                 'bone_ids': mesh['bone_ids'], 'bone_list': mesh['bone_list'],
                 'default_bone': mesh['default_bone'], 'triangles': mesh['triangles']}

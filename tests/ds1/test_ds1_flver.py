@@ -1,5 +1,6 @@
 """FLVER2 model reading on synthetic models; no proprietary game bytes."""
 import struct
+import math
 import sys
 import zlib
 from pathlib import Path
@@ -9,6 +10,81 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from flver_fixture import build_flver
 from plugins.ds1.flver import FlverDocument, FlverError
+
+
+def rigid_model():
+    doc = FlverDocument(build_flver())
+    doc.meshes[0]['dynamic'] = False
+    doc.bones.append({**doc.bones[0], 'name': 'decal', 'pos': (10., 20., 30.)})
+    doc.meshes[0]['default_bone'] = 1
+    doc.meshes[0]['bone_list'] = [1]
+    return doc
+
+
+def test_rigid_default_bone_moves_static_decal_without_mutating_source_vertices():
+    doc = rigid_model()
+    raw = list(doc.meshes[0]['positions'])
+    assert doc.meshes[0]['normal_w'] == [127] * 4
+    expected = [(x+10., y+20., z+30.) for x,y,z in raw]
+    assert doc.mesh_data(0)['positions'] == expected
+    assert doc.mesh_data(0)['positions'] == expected
+    assert doc.meshes[0]['positions'] == raw
+
+
+def test_rigid_vertex_indices_resolve_the_mesh_bone_list():
+    doc = rigid_model()
+    doc.meshes[0]['default_bone'] = 0
+    doc.meshes[0]['bone_ids'] = [(0,0,0,0)] * 4
+    assert doc.mesh_data(0)['positions'][0] == (10., 20., 30.)
+
+
+def test_rigid_normal_w_indices_choose_global_bones_per_vertex():
+    doc = rigid_model()
+    doc.meshes[0]['normal_w'] = [0,1,0,1]
+    actual = doc.mesh_data(0)['positions']
+    assert actual[0] == (0.,0.,0.)
+    assert actual[1] == (11.,20.,30.)
+    assert actual[2] == (1.,1.,0.)
+    assert actual[3] == (10.,21.,30.)
+
+
+def test_rigid_parent_rotation_and_scale_transform_positions_and_normals():
+    doc = rigid_model()
+    doc.bones[0].update(pos=(10.,0.,0.), rot=(0.,0.,math.pi/2))
+    doc.bones[1].update(pos=(0.,2.,0.), rot=(0.,math.pi/2,0.),
+                        scale=(2.,1.,1.), parent=0)
+    doc.meshes[0]['normals'] = [(0.,0.,1.)] * 4
+    mesh = doc.mesh_data(0)
+    assert mesh['positions'][1] == pytest.approx((8.,0.,-2.))
+    assert mesh['normals'][1] == pytest.approx((0.,1.,0.))
+
+
+def test_rigid_nonuniform_scale_uses_inverse_scale_for_normals():
+    doc = rigid_model()
+    doc.bones[1]['scale'] = (2.,1.,1.)
+    doc.meshes[0]['normals'] = [(1.,1.,0.)] * 4
+    assert doc.mesh_data(0)['normals'][0] == pytest.approx((1/math.sqrt(5),2/math.sqrt(5),0.))
+
+
+def test_dynamic_mesh_stays_in_model_space_for_skinning():
+    doc = rigid_model()
+    doc.meshes[0]['dynamic'] = True
+    assert doc.mesh_data(0)['positions'] == doc.meshes[0]['positions']
+
+
+@pytest.mark.parametrize('damage', ['bone', 'parent', 'cycle', 'mesh-index'])
+def test_invalid_rigid_binding_is_a_model_error(damage):
+    doc = rigid_model()
+    if damage == 'bone':
+        doc.meshes[0]['default_bone'] = 99
+    elif damage == 'parent':
+        doc.bones[1]['parent'] = 99
+    elif damage == 'cycle':
+        doc.bones[1]['parent'] = 1
+    else:
+        doc.meshes[0]['bone_ids'] = [(99,0,0,0)] * 4
+    with pytest.raises(FlverError, match='bone'):
+        doc.mesh_data(0)
 
 
 def test_header_counts_and_names():
