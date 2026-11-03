@@ -225,7 +225,7 @@ def file_tree(root: Path) -> list[Path]:
 
 
 @contextmanager
-def package_root(source: Path):
+def package_root(source: Path, *, allow_executables=False):
     """Expand only ZIPs; never run package code or follow package links."""
     source = Path(source)
     if source.is_symlink() or (source.exists() and
@@ -240,7 +240,7 @@ def package_root(source: Path):
         raise ValueError("Choose a folder or a supported archive (ZIP, RAR, 7z or TAR)")
     with tempfile.TemporaryDirectory(prefix="lexeditor-mod-import-") as temporary:
         root = Path(temporary)
-        extract(source, root, max_files=MAX_FILES, max_bytes=MAX_BYTES)
+        extract(source, root, max_files=MAX_FILES, max_bytes=MAX_BYTES, allow_executables=allow_executables)
         yield root
 
 
@@ -334,11 +334,11 @@ class ModLibrary:
 
     @staticmethod
     def select_files(files: list[Path], selected: list[str] | None) -> list[Path]:
-        if selected is None:
-            return files
-        choices = [relative_path(value) for value in selected]
+        choices = files if selected is None else [relative_path(value) for value in selected]
         if len(set(choices)) != len(choices) or not set(choices).issubset(files):
             raise ValueError("Choose existing files once each")
+        if any(path.suffix.casefold() == '.exe' for path in choices):
+            raise ValueError('Executable installers are not imported as mods; select the mod data files')
         return choices
 
     def inspect(self, source: Path, adapter, data_root: str = "", selected: list[str] | None = None) -> dict:

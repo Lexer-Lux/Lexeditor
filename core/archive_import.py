@@ -24,7 +24,7 @@ def reader():
     return libarchive.file_reader
 
 
-def extract(source: Path, destination: Path, *, max_files: int, max_bytes: int):
+def extract(source: Path, destination: Path, *, max_files: int, max_bytes: int, allow_executables=False):
     from core.mod_library import relative_path
     seen, count, written, declared = set(), 0, 0, 0
     available = shutil.disk_usage(destination).free
@@ -50,7 +50,7 @@ def extract(source: Path, destination: Path, *, max_files: int, max_bytes: int):
                 seen.add(key)
                 # Executables are never written into an import staging area:
                 # game executables remain read-only, including scratch copies.
-                if relative.suffix.casefold() == '.exe':
+                if not allow_executables and relative.suffix.casefold() == '.exe':
                     raise ValueError(f'{relative}: executable installers are not imported as mods')
                 size = entry.size
                 if size is not None:
