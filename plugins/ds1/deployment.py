@@ -731,8 +731,18 @@ def apply(game_root: Path, project_root: Path | None, *, transform=None, compose
             payload = transform(payload)
             if not isinstance(payload, bytes) or len(payload) > MAX_ARCHIVE:
                 raise ValueError("The parameter transformation returned invalid output")
-        # Reject corrupt/unsupported project output before any backup or live write.
-        _check_asset_like(game_root, relative, payload) if reader is None else reader(payload)
+        payload_hash = hashlib.sha256(payload).hexdigest()
+        live = game_root / relative
+        _assert_no_reparse_points(live, game_root)
+        installed = _read_marker(_marker_path(game_root, relative))
+        unchanged = bool(installed and installed.get('enabled')
+                         and installed.get('activeHash') == payload_hash
+                         and live.is_file() and _hash_file(live) == payload_hash)
+        # Exact installed bytes have already passed format validation. There
+        # is no new archive to parse in that case; the transaction below still
+        # verifies the live file, preserved original and ownership journal.
+        if not unchanged:
+            _check_asset_like(game_root, relative, payload) if reader is None else reader(payload)
         sources[relative] = (candidate, payload, source_hash)
     desired = {relative:hashlib.sha256(row[1]).hexdigest() for relative,row in sources.items()}
     for relative,_reader in targets:
