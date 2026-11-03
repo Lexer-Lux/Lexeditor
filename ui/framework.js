@@ -11598,6 +11598,7 @@ ${contents.path}`});
       const grow = Number(column.grow)
         || (!declaredGrow && automaticGrow >= 0 && index === automaticGrow ? 1 : 0);
       if (grow > 0) return `minmax(0, ${grow}fr)`;
+      if (!declaredGrow && automaticGrow < 0) return "max-content";
       // Content maximums never yield: beside wider columns the track
       // overflows instead of shrinking, and the header cannot wrap into the
       // room there is. A flexible maximum sizes past content when room

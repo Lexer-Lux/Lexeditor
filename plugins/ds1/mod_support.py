@@ -14,7 +14,7 @@ import json
 from time import perf_counter
 
 from core import memory_conflicts, mod_requires, script_mods
-from core.mod_conflicts import MAX_LISTED
+from core.mod_conflicts import merge_marks
 from core.plugin_files import read_bounded
 
 from . import assets, deployment, emevd, mod_loader, texts, tweak_mods
@@ -23,21 +23,6 @@ from .store import MARKER, RELATIVE
 MARKER_TEXT = (Path(__file__).with_name("project-template") / MARKER).read_bytes()
 DATA_FILES = {RELATIVE.as_posix().casefold(), texts.RELATIVE.as_posix().casefold(), texts.MENU_RELATIVE.as_posix().casefold()}
 MAP_PREFIX = "map/mapstudio/"
-
-
-def _merge_marks(first: dict[str, list[str]], second: dict[str, list[str]]) -> dict[str, list[str]]:
-    """Two folder-to-lines reports as one, capped like lines_by_mod does.
-
-    Neither input is changed: one of them may be the adapter's cached data
-    report, reused across calls.
-    """
-    merged = {folder: list(lines) for folder, lines in first.items()}
-    for folder, lines in second.items():
-        merged.setdefault(folder, []).extend(lines)
-    for folder, lines in merged.items():
-        if len(lines) > MAX_LISTED:
-            merged[folder] = lines[:MAX_LISTED] + [f"…and {len(lines) - MAX_LISTED} more"]
-    return merged
 
 
 class Ds1ModAdapter:
@@ -308,10 +293,10 @@ class Ds1ModAdapter:
         game_root = str(Path(game_root).resolve())
         ordered = self._ordered_mods(mods)
         if len(ordered) < 2:
-            return _merge_marks({}, self._memory_conflicts(mods))
+            return merge_marks({}, self._memory_conflicts(mods))
         data_lines = self._load_report(Path(game_root), ordered)
         if data_lines is not None:
-            return _merge_marks(data_lines, self._memory_conflicts(mods))
+            return merge_marks(data_lines, self._memory_conflicts(mods))
         try:
             compared_key = self._report_key(Path(game_root), ordered)
         except OSError:
@@ -321,7 +306,7 @@ class Ds1ModAdapter:
         data_lines = composition.by_mod(data)
         if compared_key is not None:
             self._save_report(Path(game_root), ordered, composition.conflicts, expected_key=compared_key)
-        return _merge_marks(data_lines, self._memory_conflicts(mods))
+        return merge_marks(data_lines, self._memory_conflicts(mods))
 
     @classmethod
     def _content_signature(cls, ordered):

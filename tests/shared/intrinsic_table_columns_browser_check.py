@@ -1,5 +1,6 @@
 """Keep intrinsic numeric columns valid after fitting their headings."""
 from pathlib import Path
+import tempfile
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -56,5 +57,8 @@ with sync_playwright() as pw:
         assert not cut, cut
         widths.append(sizes)
     assert all(abs(a-b)<1 for a,b in zip(*widths)), widths
+    output = Path(tempfile.gettempdir()) / 'lexeditor-dev/intrinsic-columns'
+    output.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(output / 'numeric-columns.png'))
     browser.close()
 print('Intrinsic and nested column sizes remain valid; headers and rows align.')

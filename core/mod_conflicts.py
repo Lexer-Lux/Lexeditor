@@ -16,6 +16,17 @@ def _names(names: list[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + f" and {names[-1]}"
 
 
+def merge_marks(first: dict[str, list[str]], second: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Combine folder reports without mutating either adapter's cached lines."""
+    merged = {folder: list(lines) for folder, lines in first.items()}
+    for folder, lines in second.items():
+        merged.setdefault(folder, []).extend(lines)
+    for folder, lines in merged.items():
+        if len(lines) > MAX_LISTED:
+            merged[folder] = lines[:MAX_LISTED] + [f"…and {len(lines) - MAX_LISTED} more"]
+    return merged
+
+
 def lines_by_mod(conflicts: list[tuple[str, list[str]]], folders: dict[str, str]) -> dict[str, list[str]]:
     """Each mod's conflict lines, keyed by its folder.
 

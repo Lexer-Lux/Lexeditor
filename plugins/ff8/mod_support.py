@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from core import memory_conflicts, script_mods
-from core.mod_conflicts import MAX_LISTED
+from core.mod_conflicts import merge_marks
 
 from . import runtime_layout
 
@@ -26,17 +26,6 @@ IGNORED_SUFFIXES = frozenset({".txt", ".md", ".png", ".jpg", ".jpeg", ".ini", ".
 IGNORED_NAMES = frozenset({"mod.json", "mod.xml"})
 ROOT_TEXT = "direct/, hext/, textures/, sfx/, voice/, ambient/, override/ or save/"
 CHANGE_LIMIT = 1000
-
-
-def _merge_marks(first: dict[str, list[str]], second: dict[str, list[str]]) -> dict[str, list[str]]:
-    """Two folder-to-lines reports as one, capped like lines_by_mod does."""
-    merged = {folder: list(lines) for folder, lines in first.items()}
-    for folder, lines in second.items():
-        merged.setdefault(folder, []).extend(lines)
-    for folder, lines in merged.items():
-        if len(lines) > MAX_LISTED:
-            merged[folder] = lines[:MAX_LISTED] + [f"…and {len(lines) - MAX_LISTED} more"]
-    return merged
 
 
 def _hext_spans(root: Path) -> list[tuple[int, int]] | None:
@@ -215,7 +204,7 @@ class Ff8ModAdapter:
                 continue
             found.append((str(record.get("path", "")),
                           [names.get(str(claimant), str(claimant)) for claimant in record.get("claimants", [])]))
-        return _merge_marks(lines_by_mod(found, folders),
+        return merge_marks(lines_by_mod(found, folders),
                               self._memory_conflicts(rows, names, folders))
 
     def _memory_conflicts(self, rows: dict[str, dict], names: dict[str, str],
