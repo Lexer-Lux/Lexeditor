@@ -596,7 +596,8 @@ async function deploymentAction(action){
   if(!ok)return;
   state.deployBusy=true;render();
   try{const result=await api("/api/deployment/"+action,{});await loadDeployment();
-    if(result.disabledMods?.length)LexeditorUI.showToast(result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});}
+    if(result.disabledMods?.length)LexeditorUI.showAlert({title:"Some mods were switched off",
+      message:result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n")});}
   catch(error){notify(error);}
   finally{state.deployBusy=false;render();}
 }
@@ -606,7 +607,8 @@ function reportTweakRebuild(result){
     error.title="Changes saved, but deployment failed";
     throw error;
   }
-  else if(result.disabledMods?.length)LexeditorUI.showToast("Changes saved. Other enabled mods rebuilt. " + result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n"),{tone:"warning"});
+  else if(result.disabledMods?.length)LexeditorUI.showAlert({title:"Some mods were switched off",
+    message:"Changes saved. Other enabled mods rebuilt.\n\n" + result.disabledMods.map(mod=>`${mod.name} was switched off: ${mod.error}`).join("\n")});
   else if(result.tweaksDeferred)LexeditorUI.showToast("Changes saved. Close the game, then save again to rebuild the tweaks.");
   else if(result.tweaksRebuilt)LexeditorUI.showToast("Changes saved and tweaks rebuilt.");
   else return false;

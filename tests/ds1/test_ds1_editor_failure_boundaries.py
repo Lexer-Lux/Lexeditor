@@ -975,6 +975,27 @@ def test_deployment_failure_stops_save_and_stays_in_a_modal(page, tmp_path):
     page.get_by_role('textbox', name='Author').fill('Still editable')
 
 
+def test_save_reports_disabled_mods_in_a_persistent_modal(page, tmp_path):
+    mount(page)
+    source = (ROOT / 'plugins/ds1/editor.js').read_text('utf-8')
+    start = source.index('function reportTweakRebuild(')
+    end = source.index('\nasync function save()', start)
+    page.add_script_tag(content=source[start:end])
+    assert page.evaluate('''()=>reportTweakRebuild({tweaksRebuilt:true,disabledMods:[
+      {name:'Broken mod',error:'Invalid generated archive'},
+      {name:'Dependent mod',error:'A required mod could not be built.'}
+    ]})''')
+    dialog=page.get_by_role('alertdialog',name='Some mods were switched off',exact=True)
+    dialog.wait_for()
+    assert 'Broken mod was switched off: Invalid generated archive' in dialog.inner_text()
+    assert 'Dependent mod was switched off: A required mod could not be built.' in dialog.inner_text()
+    assert 'Other enabled mods rebuilt' in dialog.inner_text()
+    page.screenshot(path=str(tmp_path/'disabled-mods-after-save.png'))
+    dialog.get_by_role('button',name='Close',exact=True).click()
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role('textbox', name='Author').fill('Still editable')
+
+
 def test_menu_alignment_uses_texture_pack_bounds_for_read_and_write(monkeypatch):
     from plugins.ds1 import texture_packs, formats
     from test_ds1_assets import make_tpf, make_dds
