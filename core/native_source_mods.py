@@ -24,7 +24,7 @@ def _tree(folder: Path) -> dict[str, str]:
 
 
 def _folder(name: str) -> str:
-    if not name.startswith("lexeditor-") or not IDENTITY.fullmatch(name):
+    if not name.startswith("lexeditor-") or not IDENTITY.fullmatch(name.removeprefix("lexeditor-")):
         raise ValueError("Unrecognized Lexeditor mod deployment folder")
     return name
 
