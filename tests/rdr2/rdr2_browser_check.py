@@ -86,7 +86,8 @@ def run(output: Path, executable: str | None):
                 page.set_content(html,wait_until='domcontentloaded')
                 control=page.locator('.lex-inline-label').filter(has_text='Drunkenness').locator('input')
                 expect(control).to_have_count(1)
-                expect(page.locator('.lex-list-row')).to_have_count(3)
+                # Empty grid filler rows are decoration, not fixture records.
+                expect(page.locator('.lex-list-row:not(.lex-filler-row)')).to_have_count(3)
                 page.wait_for_timeout(150)
                 assert not errors,errors
                 if case=='unavailable':

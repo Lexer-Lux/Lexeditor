@@ -354,7 +354,7 @@ def main():
                     assert page.locator('.warband-record-list [data-column-key="samples"]').count()==0
                     page.locator('.warband-module-detail [data-lex-pin-column="samples"]').click()
                     page.wait_for_timeout(400)
-                    assert page.locator('.warband-record-list .lex-column-list-row [data-column-key="samples"]').count()==1
+                    assert page.locator('.warband-record-list .lex-column-list-row:not(.lex-filler-row) [data-column-key="samples"]').count()==1
                     page.screenshot(path=str(ARTIFACTS/f'sounds-pin-{width}.png'),full_page=True)
                     page.get_by_role('button',name='Misc.',exact=True).click()
                     page.get_by_role('tab',name='Particle systems',exact=True).click()
