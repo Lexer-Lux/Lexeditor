@@ -40,7 +40,7 @@ def test_maps_table_shows_counts():
     source = editor()
     for column in ('NPCs', 'Drops', 'Enemies'):
         assert f'label:"{column}"' in source
-    pane = source[source.index('function mapsListPane(){'):source.index('function placementsPane(){')]
+    pane = source[source.index('function mapsListPane(){'):source.index('function lightsPane(){')]
     for gone in ('Parts', 'Models', 'Collision', 'Navigation'):
         assert f'label:"{gone}"' not in pane
     rows = server()
@@ -58,13 +58,13 @@ def test_selection_avoids_remount():
     assert 'render();' not in body.replace('renderMaps();', '')
 
 
-def test_placements_list_hides_its_map_column_on_one_map():
+def test_local_placements_list_hides_its_redundant_map_column():
     source = editor()
-    pane = source[source.index('function placementsPane(){'):source.index('function animCharMatches(){')]
+    pane = source[source.index('function directoryList(){'):source.index('function mapsStrip(){')]
     assert 'label:"Map"' in pane
-    assert 'new Set(here.map(row=>row.table)).size>1' in pane
+    assert 'if(!state.dirLocal)columns.push' in pane
     assert 'dirRowMap(row)' in pane
-    assert 'Show ${row.name} in the map viewport' in pane
+    assert 'Show ${dirRowName(row)} in the map viewport' in pane
 
 
 def test_placements_search_still_matches_the_map_name():
