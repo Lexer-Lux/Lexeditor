@@ -144,7 +144,26 @@ def check_relative(value):
 def _project_files(root, strict):
     """Stream a bounded tree; refuse links before entering directories."""
     count = 0
+    present = set()
+    try:
+        with os.scandir(root) as entries:
+            for entry in entries:
+                count += 1
+                if count > MAX_ASSET_NODES:
+                    if strict:
+                        raise AssetError(f'The asset tree contains more than {MAX_ASSET_NODES} files or folders')
+                    return
+                if entry.name.casefold() in ASSET_ROOTS:
+                    present.add(entry.name.casefold())
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        if strict:
+            raise AssetError(f'{root.name}: {error}') from error
+        return
     for top in ASSET_ROOTS:
+        if top not in present:
+            continue
         stack = [root/top]
         while stack:
             directory = stack.pop()

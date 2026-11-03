@@ -131,6 +131,47 @@ def test_asset_tree_is_streamed_and_bounded(tmp_path,monkeypatch):
     assert len(assets.scan_project(mod,strict=False)) <= 3
 
 
+def test_asset_scan_checks_present_roots_without_probing_absent_folders(tmp_path, monkeypatch):
+    _game, mod = project(tmp_path)
+    (mod / 'menu').mkdir()
+    target = mod / 'menu/data.bin'
+    target.write_bytes(b'content')
+    checked = assets._checked
+    paths = []
+    def check(path):
+        paths.append(Path(path))
+        return checked(path)
+    monkeypatch.setattr(assets, '_checked', check)
+    assert [row['relative'] for row in assets.scan_project(mod)] == ['menu/data.bin']
+    assert mod / 'menu' in paths and target in paths
+    assert all(path.parent != mod or path.name == 'menu' for path in paths)
+
+
+def test_asset_root_listing_is_bounded_even_with_unrelated_files(tmp_path, monkeypatch):
+    _game, mod = project(tmp_path)
+    for index in range(5):
+        (mod / f'notes-{index}.txt').write_text('not deployed')
+    monkeypatch.setattr(assets, 'MAX_ASSET_NODES', 3)
+    with pytest.raises(AssetError, match='more than 3'):
+        assets.scan_project(mod)
+    assert assets.scan_project(mod, strict=False) == []
+
+
+def test_present_asset_root_is_checked_before_descending(tmp_path, monkeypatch):
+    _game, mod = project(tmp_path)
+    (mod / 'menu').mkdir()
+    (mod / 'menu/data.bin').write_bytes(b'content')
+    checked = assets._checked
+    def reject(path):
+        if Path(path) == mod / 'menu':
+            raise AssetError('A protected tweak path contains a junction')
+        return checked(path)
+    monkeypatch.setattr(assets, '_checked', reject)
+    with pytest.raises(AssetError, match='junction'):
+        assets.scan_project(mod)
+    assert assets.scan_project(mod, strict=False) == []
+
+
 def test_asset_links_are_refused_for_builds_and_skipped_in_soft_listing(tmp_path):
     _game,mod = project(tmp_path)
     (mod/'menu').mkdir()
