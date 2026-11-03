@@ -67,7 +67,10 @@ def test_settings_cards_split_and_stay_reachable():
             assert not errors, errors
             page.get_by_label('Setting 0-0-0', exact=True).fill('changed')
             seen, labels = set(), set()
-            while True:
+            pager_root = page.locator(".lex-tweaks-paged")
+            pages = pager_root.evaluate("root => root.lexPaging().starts.length")
+            assert pages > 1
+            for index in range(pages):
                 seen.update(page.locator('[data-card]:visible')
                             .evaluate_all('(nodes)=>nodes.map(n=>+n.dataset.card)'))
                 for label in page.locator('[data-card]:visible input').evaluate_all(
@@ -79,7 +82,7 @@ def test_settings_cards_split_and_stay_reachable():
                     labels.add(label)
                 pager = page.locator('.lex-tweaks-pages').bounding_box()
                 assert pager['y'] + pager['height'] <= 601, pager
-                if not page.get_by_role('button', name='Next page', exact=True).is_enabled():
+                if index + 1 == pages:
                     break
                 page.get_by_role('button', name='Next page', exact=True).click()
             assert seen == set(range(5)), seen
