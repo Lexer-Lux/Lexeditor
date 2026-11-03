@@ -512,15 +512,21 @@ class BuildContext:
             raise TweakError("A game folder is required to read a pristine game file")
         game_root = checked(self.game_root)
         checked(game_root / path)
-        if managed is not None:
-            data = _original(game_root, _read(managed.live(game_root), managed),
-                             _manifest(game_root, managed), managed)
-        else:
-            # Deployment covers structured files and supported assets;
-            # native-managed files use their own journals.
-            checked(deployment._backup_path(game_root, path))
-            checked(deployment._marker_path(game_root, path))
-            source = checked(deployment.vanilla_source(game_root, path))
+        try:
+            if managed is not None:
+                data = _original(game_root, _read(managed.live(game_root), managed),
+                                 _manifest(game_root, managed), managed)
+            else:
+                # These journals and originals belong to the installation,
+                # not the script requesting their bytes. Damage here must
+                # not trigger recovery that switches off an innocent mod.
+                checked(deployment._backup_path(game_root, path))
+                checked(deployment._marker_path(game_root, path))
+                source = checked(deployment.vanilla_source(game_root, path))
+        except (OSError, ValueError, RuntimeError) as error:
+            raise script_mods.ScriptModInfrastructureError(
+                f'Could not read the preserved game input {path.as_posix()}: {error}') from error
+        if managed is None:
             data = _bounded_file(source,assets.MAX_ASSET_BYTES)
             if data is None:
                 raise TweakError(f'{path.name}: the pristine game file is missing')
