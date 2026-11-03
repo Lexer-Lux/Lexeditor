@@ -543,7 +543,7 @@ def test_mod_package_drop_anywhere_opens_the_mods_import(page):
     page.evaluate("dropOn('main', ['mod.zip'])")
     page.wait_for_function("window.calls.some(c => c[0] === 'begin_mod_upload')")
     assert dialog.count() == 1
-    page.get_by_text("PAK package(s) checked").wait_for()
+    page.get_by_text("mod file group(s) checked").wait_for()
     page.evaluate("dropOn('[aria-label=\"Add a mod\"]', ['other.zip'])")
     page.wait_for_timeout(250)
     assert page.evaluate(uploads) == 1

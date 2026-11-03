@@ -77,9 +77,13 @@ class Kf1ModAdapter:
                 raise ValueError("Choose mods from the native loader's mods folder")
             identities = set()
             for mod in mods:
-                report = self.inspect(mod, file_tree(mod))
-                if not report["valid"]:
-                    raise ValueError("; ".join(report["problems"]))
+                from core.mod_builds import ModBuildError
+                try:
+                    report = self.inspect(mod, file_tree(mod))
+                    if not report["valid"]:
+                        raise ValueError("; ".join(report["problems"]))
+                except (OSError, ValueError) as error:
+                    raise ModBuildError([mod], str(error)) from error
                 identity = metadata(mod)["id"]
                 if identity.casefold() in identities:
                     raise ValueError(f"Two enabled mods have the native id {identity}")

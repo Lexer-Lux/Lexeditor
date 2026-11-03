@@ -185,6 +185,7 @@ class Ds1ModAdapter:
         except Exception:
             return None
 
+    @mod_loader.discovery_scope()
     def activate(self, mods: list[Path], game_root: Path) -> dict:
         """Install exactly the chosen set: tweaks and data mods together."""
         game_root = Path(game_root)
@@ -193,6 +194,7 @@ class Ds1ModAdapter:
         started = perf_counter()
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library, cache_root=self._cache_root())
+            mod_loader.invalidate_discovery()
             data_recipe = tweak_mods.data_recipe(library)
             prepared = perf_counter()
             from . import texture_packs

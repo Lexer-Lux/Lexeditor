@@ -20,6 +20,52 @@ NAMES = make_text_archive()
 GAME = {RELATIVE: VANILLA, texts.RELATIVE: NAMES}
 
 
+def test_activation_discovery_is_scoped_and_invalidated_after_builds(tmp_path, monkeypatch):
+    from plugins.ds1 import assets
+    folder = tmp_path / 'mod'
+    (folder / 'menu').mkdir(parents=True)
+    (folder / 'menu/first.bin').write_bytes(b'first')
+    calls = []
+    original = assets.scan_project
+    def scan(*args, **kwargs):
+        calls.append(args[0])
+        return original(*args, **kwargs)
+    monkeypatch.setattr(assets, 'scan_project', scan)
+    with mod_loader.discovery_scope():
+        first = mod_loader.content_files(folder, 'Mod')
+        assert mod_loader.content_files(folder, 'Mod') == first
+        assert len(calls) == 1
+        (folder / 'menu/second.bin').write_bytes(b'second')
+        mod_loader.invalidate_discovery()
+        assert len(mod_loader.content_files(folder, 'Mod')) == 2
+        assert len(calls) == 2
+    (folder / 'menu/third.bin').write_bytes(b'third')
+    assert len(mod_loader.content_files(folder, 'Mod')) == 3
+    assert len(calls) == 3
+
+
+def test_cached_discovery_rechecks_paths_and_file_size(tmp_path, monkeypatch):
+    from plugins.ds1 import assets, tweak_mods
+    folder = tmp_path / 'mod'
+    (folder / 'menu').mkdir(parents=True)
+    target = folder / 'menu/test.bin'
+    target.write_bytes(b'data')
+    checked = tweak_mods.checked
+    with mod_loader.discovery_scope():
+        mod_loader.content_files(folder, 'Mod')
+        def reject(path):
+            if Path(path) == target:
+                raise ValueError('replaced by a link')
+            return checked(path)
+        monkeypatch.setattr(tweak_mods, 'checked', reject)
+        with pytest.raises(ValueError, match='replaced by a link'):
+            mod_loader.content_files(folder, 'Mod')
+        monkeypatch.setattr(tweak_mods, 'checked', checked)
+        monkeypatch.setattr(assets, 'MAX_ASSET_BYTES', 3)
+        with pytest.raises(ValueError, match='too large'):
+            mod_loader.content_files(folder, 'Mod')
+
+
 def test_asset_binder_additions_compose_with_existing_member_edits():
     from dataclasses import replace
     relative = Path('sfx/common.ffxbnd.dcx')

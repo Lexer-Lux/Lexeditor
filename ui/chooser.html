@@ -95,7 +95,15 @@
     @keyframes loading-spin { to { rotate:360deg } }
     .dialog-actions button { align-self:flex-start; padding:9px 20px; color:var(--lex-accent-text); border:0; border-radius:5px; background:var(--lex-accent); cursor:pointer; font-weight:800; }
     button:disabled { cursor:default; filter:grayscale(1); opacity:.45; }
-    @media (max-width:520px) { main { grid-template-columns:minmax(180px,238px); padding:20px; } }
+    #home-search-strip { display:flex; justify-content:flex-end; align-items:center; height:66px; box-sizing:border-box; padding:12px 28px; }
+    #games { padding-top:0; }
+    #home-search { width:min(280px,100%); }
+    #home-search .lex-pager-search { width:100%; }
+    body:has(.resident-handle:not([hidden])) #home-search-strip { padding-right:calc(28px + var(--lex-resident-handle-width,5vw) + .65vw); }
+    body:has(.lexer-handle:not([hidden])) #home-search-strip { padding-left:calc(28px + var(--lex-resident-handle-width,5vw) + .65vw); }
+    #home-empty { padding:48px 28px; text-align:center; color:var(--lex-muted); font:600 15px/1.5 var(--lex-font); }
+    #home-empty[hidden] { display:none; }
+    @media (max-width:520px) { main { grid-template-columns:minmax(180px,238px); padding:20px; } #home-search-strip { padding:12px 20px; } #home-search { width:100%; } }
     .modal-backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:24px; background:#000b; }
     .modal-backdrop[hidden] { display:none; }
     .dialog { width:min(590px,calc(100vw - 48px)); padding:24px; border:1px solid var(--lex-border); border-radius:9px; background:var(--lex-panel); box-shadow:0 24px 70px #000; }
@@ -256,6 +264,8 @@
       <div></div>
       <div id="chooser-window-controls" class="chooser-window-controls lex-shell-end"></div>
     </header>
+    <div id="home-search-strip"><div id="home-search"></div></div>
+    <div id="home-empty" role="status" hidden>No games match this search.</div>
     <main id="games" aria-busy="true"></main>
   <button id="lexer-handle" class="lexer-handle" type="button" hidden aria-label="Open helper versions" title="Developer helper versions across every Lexeditor plugin"><span class="resident-arrow" aria-hidden="true"><svg viewBox="0 0 24 120"><path d="M18 8L6 60 18 112"/></svg></span><span class="lexer-handle-name" aria-hidden="true">DEV</span></button>
   <button id="resident-handle" class="resident-handle" type="button" hidden><span class="resident-save" aria-hidden="true"></span><span class="resident-arrow" aria-hidden="true"><svg viewBox="0 0 24 120"><path d="M6 8L18 60 6 112"/></svg></span><span class="resident-game-name"></span></button>
@@ -307,7 +317,7 @@
     // in half-drawn, but never longer than this: a cover stuck "loading"
     // held the whole menu behind a black screen. Late covers draw in place.
     const COVER_WAIT_MS=6000;
-    const chooser={plugins:[],active:null,timer:null,loading:false,deferredRender:false,settingsLoaded:false,menuReady:false,menuStarted:Date.now(),quoteRequested:false};
+    const chooser={plugins:[],gameQuery:"",active:null,timer:null,loading:false,deferredRender:false,settingsLoaded:false,menuReady:false,menuStarted:Date.now(),quoteRequested:false};
     const updateButton=document.querySelector("#app-update");
     async function refreshAppUpdate(){
       try {
@@ -342,6 +352,8 @@
     windowControls.root.prepend(restartButton);
     document.querySelector("#chooser-window-controls").replaceChildren(
       LexeditorUI.element("div",{class:"lex-shell-right-actions"},LexeditorUI.uiScaleControl(),settingsButton),windowControls.root);
+    const homeSearchHost=document.querySelector("#home-search"),homeEmpty=document.querySelector("#home-empty");
+    homeSearchHost.append(LexeditorUI.bottomSearch({key:"home-games",label:"Search games",value:"",change:value=>{chooser.gameQuery=value;render(chooser.plugins);}}));
     const lexerPanel=document.querySelector("#lexer-panel"),lexerList=document.querySelector("#lexer-panel-list");
     function lexerHelperRow(helper){
       const unavailable=!!helper.error||!helper.latest;
@@ -785,9 +797,12 @@
     }
     function render(plugins){
       const existing=new Map([...games.querySelectorAll(".game")].map(card=>[card.dataset.plugin,card]));
-      const cards=plugins.map(plugin=>{const card=existing.get(plugin.id)||createCard();updateCard(card,plugin);return card;});
+      const query=(chooser.gameQuery||"").trim().toLocaleLowerCase();
+      const visible=query?plugins.filter(plugin=>(plugin.name||"").toLocaleLowerCase().includes(query)):plugins;
+      const cards=visible.map(plugin=>{const card=existing.get(plugin.id)||createCard();updateCard(card,plugin);return card;});
       cards.forEach((card,index)=>{if(games.children[index]!==card)games.insertBefore(card,games.children[index]||null);});
       [...games.children].forEach(child=>{if(!cards.includes(child))child.remove();});
+      homeEmpty.hidden=!query||visible.length!==0;
       const resident=plugins.find(plugin=>plugin.resident);residentHandle.hidden=!resident;residentHandle._plugin=resident||null;lexerHandle.hidden=!chooser.settings?.developerMode;restartButton.hidden=!chooser.settings?.developerMode;if(lexerHandle.hidden&&!lexerPanel.hidden)setLexerPanel(false);if(resident){residentHandle.title=`Return to ${resident.name}`;residentHandle.setAttribute("aria-label",residentHandle.title);residentName.textContent=resident.name;const count=residentSave.querySelector(".lex-save-count"),dirty=Math.max(0,Number(resident.dirtyCount)||0);count.textContent=String(dirty);count.hidden=!dirty;residentSave.classList.toggle("disabled",!dirty);const art=resident.coverArt||{};residentHandle.style.backgroundImage=art.state==="ready"&&art.uri?`url("${art.uri.replaceAll('"','%22')}")`:"none";requestAnimationFrame(sizeResidentHandle);}else{residentName.textContent="";residentSave.classList.add("disabled");residentSave.querySelector(".lex-save-count").hidden=true;}
     }
     async function load(){

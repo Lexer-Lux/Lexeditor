@@ -96,7 +96,7 @@ def main():
                 page.wait_for_timeout(250)
                 page.get_by_role("button", name="Add a mod").click()
                 assert page.get_by_role("button", name="Add a folder…").is_disabled()
-                assert page.get_by_role("button", name="Add a ZIP…").is_disabled()
+                assert page.get_by_role("button", name="Add an archive…").is_disabled()
                 page.get_by_role("button", name="Cancel", exact=True).click()
                 enabled[0] = True
                 selections = []

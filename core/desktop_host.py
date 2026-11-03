@@ -1475,7 +1475,8 @@ class HostApi:
         adapter = self._mod_adapter(plugin_id)
         root = self._settings.snapshot().get("modLibraryPath") or str(default_user_library_root())
         author = bool(adapter and self._github.visible_repository(LEXEDITOR_REPOSITORY))
-        return {"root": root, "verified": bool(adapter and adapter.verified),
+        from core.archive_import import ARCHIVE_EXTENSIONS
+        return {"root": root, "archiveExtensions": list(ARCHIVE_EXTENSIONS), "verified": bool(adapter and adapter.verified),
                 "canManage": bool(adapter and (adapter.verified or author)),
                 "authorTest": bool(adapter and not adapter.verified and author),
                 "message": getattr(adapter, "message", "Mod management is not supported for this game yet."),
@@ -1636,14 +1637,16 @@ class HostApi:
             raise ValueError("Mod management is not supported for this game yet")
         if kind == "folder":
             selected = self._choose_folder()
-        elif kind in {"zip", "ctp"}:
+        elif kind in {"archive", "zip", "ctp"}:
             import webview
-            file_types = ("ZIP archives (*.zip)",) if kind == "zip" else ("Chrono Trigger patches (*.ctp)",)
+            from core.archive_import import ARCHIVE_EXTENSIONS
+            file_types = ("Chrono Trigger patches (*.ctp)",) if kind == "ctp" else (
+                "Mod archives ("+';'.join('*'+suffix for suffix in ARCHIVE_EXTENSIONS)+")",)
             selection = self._bound_window().create_file_dialog(webview.OPEN_DIALOG,
                 allow_multiple=False, file_types=file_types)
             selected = selection[0] if selection else ""
         else:
-            raise ValueError("Choose a folder, ZIP archive, or supported game package")
+            raise ValueError("Choose a folder, archive, or supported game package")
         return {"source": str(selected), "cancelled": not bool(selected)}
 
     def begin_mod_upload(self, plugin_id: str) -> dict:
@@ -1657,7 +1660,8 @@ class HostApi:
             token = uuid.uuid4().hex
             temporary = tempfile.TemporaryDirectory(prefix="lexeditor-mod-drop-")
             self._mod_uploads[token] = {"temporary": temporary, "files": {}, "bytes": 0}
-            return {"token": token, "root": temporary.name}
+            from core.mod_library import MAX_FILES, MAX_BYTES
+            return {"token": token, "root": temporary.name, "maxFiles": MAX_FILES, "maxBytes": MAX_BYTES}
 
     def upload_mod_chunk(self, token: str, name: str, offset: int, encoded: str) -> dict:
         import base64
@@ -1849,7 +1853,7 @@ class HostApi:
         result = mods_service.overview(root, plugin.lexmod, self._mod_state(plugin_id))
         status = self.mod_library_status(plugin_id)
         result = {**result, "root": str(root), "canManage": bool(status.get("canManage")),
-                  "message": status.get("message", ""),
+                  "message": status.get("message", ""), "archiveExtensions": status.get("archiveExtensions", []),
                   "canReorder": self._mod_state(plugin_id) is None or bool(getattr(self._mod_adapter(plugin_id), "priority_key", None)),
                   "canExport": callable(getattr(self._mod_adapter(plugin_id), "export_release", None))}
         self._attach_mod_marks(plugin_id, result)

@@ -4337,6 +4337,7 @@
       },
       ondrop: event => {
         clearLines(event.currentTarget);
+        if (!event.dataTransfer.types.includes(MOD_ORDER_TYPE)) return;
         const from = Number(event.dataTransfer.getData(MOD_ORDER_TYPE));
         if (!Number.isInteger(from) || !movable(from)) return;
         event.preventDefault();
@@ -8044,6 +8045,7 @@ ${contents.path}`});
     document.addEventListener("drop", async event => {
       if (!globalDropFiles(event)) return;
       event.preventDefault();
+      if (document.body.inert) return;
       if (modSupport && !modSupport.canManage) return;
       // The Mods tab only accepts the drop once its first load sets its
       // switches, so it must finish opening first.
@@ -16250,7 +16252,7 @@ ${contents.path}`});
           title: data?.canManage ? "" : (data?.message || "This game's mod loader cannot add mods yet."),
           onclick: () => close("folder")}, "Add a folder…"),
         element("button", {type: "button", class: "lex-dialog-action", disabled: !data?.canManage,
-          onclick: () => close("zip")}, "Add a ZIP…"),
+          onclick: () => close("archive")}, "Add an archive…"),
         element("button", {type: "button", class: "lex-dialog-action primary", onclick: () => close("create")}, "Create a new mod"))
     ]).then(async choice => {
       if (!choice) return;
@@ -16636,13 +16638,19 @@ ${contents.path}`});
       if (importing) return;
       importing = true;
       try {
+        // The browser protects DataTransfer as soon as the drop event returns.
+        // Capture durable entry/File handles before opening the tab or waiting
+        // for the host; reading transfer.items after an await loses real drops.
+        const items = [...transfer.items].map(item => ({
+          entry: item.webkitGetAsEntry?.(), file: item.getAsFile?.(),
+        }));
         try { if (!data) await load(); }
         catch (error) { failure("Could not add the mod", error); return; }
         if (!data?.canManage) {
           failure("Could not add the mod", new Error(data?.message || "This game's mod loader cannot add mods yet."));
           return;
         }
-        let uploadToken = null, cancelled = false;
+        let uploadToken = null, cancelled = false, pendingUpload = null;
         const status = element("p", {role: "status"}, "Reading dropped files…");
         const preview = element("div");
         const inspect = async (finish, actions, source) => {
@@ -16678,7 +16686,7 @@ ${contents.path}`});
                 }));
               }
               result.textContent = report.valid
-                ? `${report.packages.length} PAK package(s) checked. Import does not activate the mod.`
+                ? `${report.packages.length} mod file group(s) checked. Import does not activate the mod.`
                 : report.problems.join("\n");
               result.style.whiteSpace = "pre-line";
               importButton.disabled = !report.valid;
@@ -16700,11 +16708,16 @@ ${contents.path}`});
         const upload = async (finish, actions) => {
           const started = await callWindow("begin_mod_upload", pluginId);
           uploadToken = started.token;
-          const items = [...transfer.items];
+          if (cancelled) return;
           const dropped = [];
+          let count = 0, bytes = 0;
           const visit = async (entry, parent = "") => {
+            if (cancelled) return;
+            if (++count > started.maxFiles) throw Error("The dropped folder contains too many files or folders.");
             if (entry.isFile) {
               const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+              bytes += file.size;
+              if (bytes > started.maxBytes) throw Error("The dropped folder exceeds the import size limit.");
               dropped.push({file, path: parent + file.name});
             } else if (entry.isDirectory) {
               const reader = entry.createReader();
@@ -16716,11 +16729,11 @@ ${contents.path}`});
             }
           };
           for (const item of items) {
-            const entry = item.webkitGetAsEntry?.();
+            const entry = item.entry;
             if (entry) await visit(entry);
-            else { const file = item.getAsFile(); if (file) dropped.push({file, path: file.name}); }
+            else if (item.file) dropped.push({file: item.file, path: item.file.name});
           }
-          if (!dropped.length) throw Error("Drop a folder or ZIP archive.");
+          if (!dropped.length) throw Error("No files were received. Drop a mod folder or an archive again.");
           for (const {file, path} of dropped) {
             for (let offset = 0; offset < file.size || offset === 0; offset += 3 * 1024 * 1024) {
               if (cancelled) return;
@@ -16733,8 +16746,10 @@ ${contents.path}`});
             }
           }
           if (cancelled) return;
-          const source = dropped.length === 1 && dropped[0].path.toLowerCase().endsWith(".zip")
-            ? `${started.root}/${dropped[0].path}` : started.root;
+          const source = items.length === 1 && items[0].entry?.isDirectory
+            ? `${started.root}/${items[0].entry.name}`
+            : dropped.length === 1 && (data?.archiveExtensions || [".zip"]).some(extension => dropped[0].path.toLowerCase().endsWith(extension))
+              ? `${started.root}/${dropped[0].path}` : started.root;
           status.textContent = "";
           await inspect(finish, actions, source);
         };
@@ -16742,16 +16757,19 @@ ${contents.path}`});
           const finish = value => { cancelled = true; close(value); };
           const actions = element("div", {class: "lex-dialog-actions"},
             element("button", {type: "button", class: "lex-dialog-action", onclick: () => finish(null)}, "Cancel"));
-          upload(finish, actions).catch(error => { status.textContent = String(error?.message || error); });
+          pendingUpload = upload(finish, actions).catch(error => { status.textContent = String(error?.message || error); });
           return [status, preview, actions];
         });
+        cancelled = true;
+        await pendingUpload;
         if (uploadToken) await callWindow("end_mod_upload", uploadToken).catch(() => {});
         if (done?.imported) {
           await load();
           selected = data.rows.find(row => row.name === done.imported)?.path || selected;
           draw();
         }
-      } finally { importing = false; }
+      } catch (error) { failure("Could not add the mod", error); }
+      finally { importing = false; }
     };
     return {
       async refresh({invalidateContents=false}={}) {

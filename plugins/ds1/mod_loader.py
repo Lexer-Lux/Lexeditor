@@ -38,6 +38,8 @@ from hashlib import sha256
 from functools import lru_cache
 import json
 from pathlib import Path
+from contextlib import contextmanager
+from contextvars import ContextVar
 import struct
 from threading import Lock
 import zlib
@@ -107,7 +109,51 @@ class Composition:
                             {mod.name: str(mod.folder) for mod in mods})
 
 
+_discovery = ContextVar('ds1_content_discovery', default=None)
+MAX_DISCOVERY_FILES = 32000
+
+
+@contextmanager
+def discovery_scope():
+    """Reuse bounded directory discovery within one activation, never across requests."""
+    token = _discovery.set({})
+    try:
+        yield
+    finally:
+        _discovery.reset(token)
+
+
+def invalidate_discovery():
+    """Builders may add/remove generated data; discover their finished outputs afresh."""
+    cache = _discovery.get()
+    if cache is not None:
+        cache.clear()
+
+
 def content_files(folder: Path, name: str, *, only=None) -> list[tuple[Path, Path]]:
+    from .tweak_mods import checked
+    folder = checked(Path(folder))
+    cache = _discovery.get()
+    key = (folder, None if only is None else frozenset(only))
+    if cache is not None and key in cache:
+        # Discovery is a snapshot, not permission to follow a replaced link
+        # or consume a file that grew beyond its format's limit.
+        from . import record_edits
+        for relative, path in cache[key]:
+            checked(path)
+            limit = record_edits.LIMIT if relative == record_edits.FILENAME else _file_limit(relative)
+            if path.stat().st_size > limit:
+                raise ValueError(f'{name}: {path.name} is too large')
+        return list(cache[key])
+    result = _discover_content_files(folder, name, only=only)
+    if cache is not None and len(result) <= MAX_DISCOVERY_FILES:
+        if len(cache) >= 128 or sum(map(len, cache.values())) + len(result) > MAX_DISCOVERY_FILES:
+            cache.clear()
+        cache[key] = tuple(result)
+    return result
+
+
+def _discover_content_files(folder: Path, name: str, *, only=None) -> list[tuple[Path, Path]]:
     """(key, disk path) of every file read_mod would read, without reading.
 
     The conflict cache stamps these instead of hashing their bytes, so an

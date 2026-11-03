@@ -33,7 +33,7 @@ def test_drop_import_still_filters_and_lands_in_the_mods_tab():
     assert "importDrop: transfer => importDrop(transfer)" in FRAMEWORK
     # The moved preview keeps its folder/file choice and verdict line.
     assert "Package data folder" in FRAMEWORK
-    assert "PAK package(s) checked" in FRAMEWORK
+    assert "mod file group(s) checked" in FRAMEWORK
     assert "begin_mod_upload" in FRAMEWORK
     assert "upload_mod_chunk" in FRAMEWORK
     assert "end_mod_upload" in FRAMEWORK

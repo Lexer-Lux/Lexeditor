@@ -1,4 +1,5 @@
 Pillow==12.3.0
+libarchive-c==5.3
 fonttools>=4.59,<5
 pywebview==6.2.1
 texfury==1.6.2

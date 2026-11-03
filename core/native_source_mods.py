@@ -127,7 +127,10 @@ class NativeSourceModAdapter:
                 key = f"mods.{identity}.enabled".casefold()
                 row = {"enabled": values.get(key, "False").casefold() == "true"}
                 if self.priority_key:
-                    row["order"] = int(values.get(self.priority_key.format(id=identity).casefold(), "1000"))
+                    try:
+                        row["order"] = int(values.get(self.priority_key.format(id=identity).casefold(), "1000"))
+                    except ValueError:
+                        row.update(order=1000, alerts=["The native loader priority is invalid. Reorder this mod to repair it."])
                 result[folder.name] = row
             except (OSError, ValueError, KeyError, TypeError):
                 result[folder.name] = {"enabled": False}

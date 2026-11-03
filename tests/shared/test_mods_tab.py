@@ -4,6 +4,7 @@ Every game gets the same Mods tab, leftmost: its mods in a table, the
 selected one's details beside it, and Lexer's Mod modules not downloaded yet
 greyed at the end. The first-run screen offers Lexer's Mod once per game.
 """
+import pytest
 from test_shared_ui_feedback import framework, page
 
 HOST = """(options) => {
@@ -46,6 +47,7 @@ HOST = """(options) => {
           : row).map(row => options.alerts && row.folder === 'Combat' && row.enabled
           ? {...row, alerts: ['This mod changed since the last build.']} : row), canManage: true,
       remote: [{folder: 'Extra', name: 'Extra', author: 'Lexer', description: 'More.', enabled: true, remote: true}],
+      archiveExtensions: ['.zip','.rar','.7z'],
       lexmod: {repository: 'Lexer-Lux/X', url: 'https://github.com/Lexer-Lux/X', error: ''}}),
     lexmod_update: async () => ({updated: false}),
     save_mod_details: async (plugin, path, details) => {
@@ -319,7 +321,7 @@ def test_the_plus_button_offers_create_and_add(page):
     # Creation lives in the detail header: no add button in the list.
     assert page.locator(".lex-mods-page .lex-table-add").count() == 0
     page.locator(".lex-mods-page .lex-detail-panel-actions").get_by_role("button", name="Add a mod").click()
-    for label in ("Create a new mod", "Add a folder…", "Add a ZIP…", "Cancel"):
+    for label in ("Create a new mod", "Add a folder…", "Add an archive…", "Cancel"):
         page.get_by_role("button", name=label, exact=True).wait_for()
     page.get_by_role("button", name="Cancel", exact=True).click()
 
@@ -374,6 +376,48 @@ def test_native_first_run_skips_nonexistent_tweaks_and_can_close(page):
     page.get_by_role("button", name="Close setup", exact=True).click()
     assert page.locator(".lex-first-run").count() == 0
     assert calls(page, "finish_onboarding")
+
+
+@pytest.mark.parametrize('folder,extension', [(False,'zip'),(False,'rar'),(False,'7z'),(True,'')])
+def test_real_drop_lifetime_preserves_file_and_folder_handles_without_reordering(page, folder, extension):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role('checkbox', name='Mine enabled').wait_for()
+    page.evaluate("""({folder,extension}) => {
+      pywebview.api.begin_mod_upload=async()=>{
+        await new Promise(resolve=>setTimeout(resolve,15));
+        return {token:'drop',root:'C:/upload',maxFiles:100000,maxBytes:1000000};
+      };
+      pywebview.api.upload_mod_chunk=async(...args)=>calls.push(['upload_mod_chunk',args]);
+      pywebview.api.end_mod_upload=async(...args)=>calls.push(['end_mod_upload',args]);
+      pywebview.api.inspect_mod_package=async(...args)=>{
+        calls.push(['inspect_mod_package',args]);
+        return {valid:true,files:['mod.json'],rootFiles:['mod.json'],packages:['Mod'],metadata:{name:'Dropped'}};
+      };
+      const data=new DataTransfer();
+      const file=new File(['{}'],folder?'mod.json':'mod.'+extension);
+      const item=data.items.add(file);
+      if(folder){
+        const child={isFile:true,isDirectory:false,file:callback=>callback(file)};
+        const entry={name:'My mod',isDirectory:true,isFile:false,createReader:()=>{
+          let read=false;
+          return {readEntries:callback=>{callback(read?[]:[child]);read=true;}};
+        }};
+        window.restoreEntry=DataTransferItem.prototype.webkitGetAsEntry;
+        DataTransferItem.prototype.webkitGetAsEntry=()=>entry;
+      }
+      document.querySelectorAll('.lex-mods-page .lex-column-list-row')[1].dispatchEvent(
+        new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:data}));
+      data.items.clear(); // Real drop stores become protected after dispatch.
+      if(folder) DataTransferItem.prototype.webkitGetAsEntry=window.restoreEntry;
+    }""", {'folder':folder,'extension':extension})
+    page.get_by_role('button', name='Import mod', exact=True).wait_for()
+    assert page.get_by_role('button', name='Import mod', exact=True).is_enabled()
+    assert not calls(page,'move_mod')
+    assert calls(page,'inspect_mod_package')[-1][1] == ('C:/upload/My mod' if folder else 'C:/upload/mod.'+extension)
+    assert calls(page,'upload_mod_chunk')[-1][1] == ('My mod/mod.json' if folder else 'mod.'+extension)
+    page.get_by_role('button', name='Cancel', exact=True).click()
+    page.wait_for_function("window.calls.some(([name])=>name==='end_mod_upload')")
 
 
 def test_vanilla_still_switches_mods_and_reads_text_boxes(page):
