@@ -17740,10 +17740,23 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   };
   const scopeLabels = scope => [...scope.querySelectorAll(CELL_TEXT_SELECTOR)]
     .filter(label => cellTextScope(label) === scope);
-  const cellTextFits = label =>
-    label.scrollWidth <= label.clientWidth + 1 &&
-    label.scrollHeight <= label.clientHeight + 1 &&
-    labelLeftOverflow(label) < 1;
+  const cellTextVerticalRoom = label => {
+    const cell = label.closest('.lex-column-list-cell,.lex-column-list-head-cell');
+    if (!cell) return null;
+    const box = cell.getBoundingClientRect(), css = getComputedStyle(cell);
+    const scale = cell.offsetWidth ? box.width / cell.offsetWidth : 1;
+    const top = box.top + (parseFloat(css.borderTopWidth) + parseFloat(css.paddingTop)) * scale;
+    const bottom = box.bottom - (parseFloat(css.borderBottomWidth) + parseFloat(css.paddingBottom)) * scale;
+    const range = document.createRange(); range.selectNodeContents(label);
+    const ink = range.getBoundingClientRect();
+    return {top, bottom, ink, height: Math.max(0, bottom - top)};
+  };
+  const cellTextFits = label => {
+    const room = cellTextVerticalRoom(label);
+    return label.scrollWidth <= label.clientWidth + 1 &&
+      label.scrollHeight <= label.clientHeight + 1 && labelLeftOverflow(label) < 1 &&
+      (!room || room.ink.top >= room.top - 1 && room.ink.bottom <= room.bottom + 1);
+  };
   const cellTextBase = scope => {
     const row = scope.querySelector('.lex-column-list-row');
     return parseFloat(row && getComputedStyle(row).fontSize) || 12;
@@ -17754,7 +17767,8 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     return lists.map(list => {
       for (const row of list.querySelectorAll(':scope > .lex-column-list-row:not(.lex-filler-row)')) {
         const cells = row.querySelectorAll(':scope > .lex-column-list-cell');
-        if (cells.length) return [...cells].map(cell => Math.round(cell.clientWidth)).join(',');
+        if (cells.length) return `${row.getBoundingClientRect().height.toFixed(2)}:` +
+          [...cells].map(cell => Math.round(cell.clientWidth)).join(',');
       }
       return '';
     }).join(';');
@@ -17772,15 +17786,22 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // and half-pixel steps would re-lay-out the list for every one of them.
     const base = cellTextBase(scope);
     let size = base;
+    let heightCeiling = base;
     for (const label of labels) {
-      if (label.scrollWidth <= label.clientWidth + 1) continue;
-      size = Math.min(size, base * label.clientWidth / Math.max(1, label.scrollWidth));
+      const room = cellTextVerticalRoom(label);
+      if (room) heightCeiling = Math.min(heightCeiling,
+        base * room.height / Math.max(1, room.ink.height, label.getBoundingClientRect().height));
+      if (label.scrollWidth > label.clientWidth + 1)
+        size = Math.min(size, base * label.clientWidth / Math.max(1, label.scrollWidth));
     }
-    size = Math.max(LABEL_MIN_PX, Math.floor(size * 2) / 2);
+    // The chosen row count can leave less room than the normal text floor.
+    // Preserve that count and fit the glyphs vertically instead of clipping.
+    const floor = Math.min(LABEL_MIN_PX, Math.max(.5, Math.floor(heightCeiling * 2) / 2));
+    size = Math.max(floor, Math.floor(Math.min(size, heightCeiling) * 2) / 2);
     labels.forEach(label => { label.style.fontSize = `${size}px`; });
     let guard = 0;
-    while (size > LABEL_MIN_PX && guard++ < 12 && !labels.every(cellTextFits)) {
-      size = Math.max(LABEL_MIN_PX, size - .5);
+    while (size > floor && guard++ < 12 && !labels.every(cellTextFits)) {
+      size = Math.max(floor, size - .5);
       labels.forEach(label => { label.style.fontSize = `${size}px`; });
     }
     fitted.set(scope, cellScopeKey(scope, labels));
