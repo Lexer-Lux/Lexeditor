@@ -75,9 +75,13 @@ def main():
                     page.wait_for_selector('[data-tabstrip-id="messages"]')
                     tabs = page.locator('[data-tabstrip-id]').evaluate_all(
                         'nodes=>nodes.map(n=>n.dataset.tabstripId)')
-                    assert tabs == ['maps', 'placements', 'lights', 'messages', 'collision'], tabs
+                    assert set(tabs) == {'maps', 'drops', 'treasure', 'npcs', 'enemies',
+                        'objects', 'players', 'pieces', 'surfaces', 'connections',
+                        'navigation', 'regions', 'loot', 'events', 'lights',
+                        'messages', 'collision'}, tabs
                     page.locator('[data-tabstrip-id="messages"]').click()
                     page.wait_for_function('state.mapTab==="messages"')
+                    page.wait_for_selector('[data-tabstrip-id="messages"][aria-selected="true"]')
                     if page.evaluate('state.mapView.messages===undefined'):
                         note = page.locator('[data-maps-side] .lex-detail-note')
                         assert note.count() == 1

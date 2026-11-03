@@ -169,6 +169,7 @@ def phase_readonly(play, game, output, errors):
             assert page.locator('[data-viewport-action="duplicate"]').is_disabled()
             page.locator('[data-tabstrip-id="maps"]').click()
             page.wait_for_function('state.mapTab==="maps"')
+            page.wait_for_selector('[data-tabstrip-id="maps"][aria-selected="true"]')
             labels = page.locator('[data-maps-side] .lex-column-list-head-cell').evaluate_all(
                 'nodes=>nodes.map(n=>n.textContent)')
             for want in ('Name', 'NPCs', 'Drops', 'Enemies'):
