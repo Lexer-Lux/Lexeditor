@@ -235,8 +235,14 @@ def test_info_page_restores_owned_loader_with_modified_executable(game):
                     Path(screenshot).parent.mkdir(parents=True,exist_ok=True)
                     page.screenshot(path=screenshot)
                 button.click()
-                page.locator('.lex-dialog').get_by_role('button',name='Restore original',exact=True).click()
-                page.wait_for_function('state.deployment?.native?.canRestore===false')
+                with page.expect_response(lambda response: response.url.endswith('/api/deployment/disable')) as reply:
+                    page.locator('.lex-dialog').get_by_role('button',name='Restore original',exact=True).click()
+                assert reply.value.ok, reply.value.text()
+                page.wait_for_function('!state.deployBusy')
+                assert page.evaluate('state.deployment?.native?.canRestore') is False, page.evaluate('''()=>({
+                  deployment:state.deployment,
+                  dialogs:[...document.querySelectorAll('[role="alertdialog"]')].map(e=>e.innerText)
+                })''')
                 assert copies(root) == before
                 assert (root/exe_patches.EXECUTABLE).read_bytes() == built
                 assert not (root/tweak_mods.RUNTIME_DLL).exists()

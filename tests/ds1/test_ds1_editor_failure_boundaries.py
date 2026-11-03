@@ -902,8 +902,10 @@ def test_record_requests_do_not_rescan_optional_build_status(monkeypatch):
         raise AttributeError('Older interpreter lacks a filesystem method')
     monkeypatch.setattr(server.tweak_mods,'needs_rebuild',unavailable)
     replies = []
-    server.Handler.do_GET(SimpleNamespace(path='/api/table?tab=spells',
-        send_json=lambda value,status=200:replies.append((status,json.loads(json.dumps(value))))))
+    handler = SimpleNamespace(path='/api/table?tab=spells',
+        send_json=lambda value,status=200:replies.append((status,json.loads(json.dumps(value)))))
+    handler.send_operation_progress = lambda: server.Handler.send_operation_progress(handler)
+    server.Handler.do_GET(handler)
     assert replies[0][0] == 200 and replies[0][1]['rows'] == rows
     assert 'tweaksNeedRebuild' not in replies[0][1] and not scans
 

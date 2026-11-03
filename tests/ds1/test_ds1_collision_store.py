@@ -234,6 +234,7 @@ def test_collision_http_routes_and_bad_requests_keep_editor_usable(collision_sou
         raw = json.dumps(payload).encode() if payload is not None else b''
         handler = SimpleNamespace(path=path,headers={'Content-Length':str(len(raw))},rfile=io.BytesIO(raw),
                                   send_json=lambda value,status=200:replies.append((status,value)))
+        handler.send_operation_progress = lambda: server.Handler.send_operation_progress(handler)
         (server.Handler.do_POST if payload is not None else server.Handler.do_GET)(handler)
         return replies[-1]
 
