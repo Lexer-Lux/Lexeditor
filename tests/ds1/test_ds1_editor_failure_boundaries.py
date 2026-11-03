@@ -103,6 +103,119 @@ def test_worker_start_failure_does_not_disable_mod(tmp_path, monkeypatch):
     assert json.loads((root / 'mod.json').read_text())['enabled'] is True
 
 
+@pytest.mark.parametrize('payload', [b'{', b'[]', b'\xff', b'{"outputs":[]}',
+    b'{"outputs":{"native/result.txt":"!!"},"inputs":{}}',
+    b'{"outputs":{},"inputs":[]}', b'{"unexpected":true}', b'{"error":true}',
+    b'{"outputs":{},"inputs":{},"cacheable":[]}', b'{"a":'+b'['*2048+b'0'+b']'*2048+b'}'])
+def test_unreadable_worker_protocol_does_not_blame_the_mod(tmp_path, monkeypatch, payload):
+    root = make_script(tmp_path)
+    class Worker:
+        returncode = 0
+        def __init__(self, *args, **kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def communicate(self, incoming, **kwargs):
+            request = json.loads(incoming)
+            Path(request['result']).write_bytes(payload)
+    monkeypatch.setattr(script_worker.subprocess, 'Popen', Worker)
+    with pytest.raises(tweak_mods.TweakError) as caught:
+        script_mods.build_batch([script_mods.catalog_row(root)], tweak_mods.BuildContext({}),
+                               allowed_roots=tweak_mods.ALLOWED_ROOTS, error=tweak_mods.TweakError)
+    assert not caught.value.folders
+    assert not (root/script_mods.MANIFEST_FILE).exists()
+
+
+def test_worker_exit_before_mod_execution_does_not_blame_the_mod(tmp_path, monkeypatch):
+    root = make_script(tmp_path)
+    startup = tmp_path/'failed-startup.py'
+    startup.write_text('raise SystemExit(9)\n')
+    monkeypatch.setattr(script_worker, 'service_command', lambda _: [sys.executable, str(startup)])
+    with pytest.raises(tweak_mods.TweakError) as caught:
+        script_mods.build_batch([script_mods.catalog_row(root)], tweak_mods.BuildContext({}),
+                               allowed_roots=tweak_mods.ALLOWED_ROOTS, error=tweak_mods.TweakError)
+    assert not caught.value.folders
+
+
+def test_worker_response_publication_failure_does_not_blame_the_mod(tmp_path, monkeypatch):
+    root = make_script(tmp_path)
+    startup = tmp_path/'failed-response.py'
+    startup.write_text('import json,sys\nfrom pathlib import Path\n'
+        'request=json.load(sys.stdin)\nPath(request["result"]).write_text(\'{"building":true}\')\n'
+        f'raise SystemExit({script_worker.INFRASTRUCTURE_EXIT})\n')
+    monkeypatch.setattr(script_worker, 'service_command', lambda _: [sys.executable, str(startup)])
+    with pytest.raises(tweak_mods.TweakError) as caught:
+        script_mods.build_batch([script_mods.catalog_row(root)], tweak_mods.BuildContext({}),
+                               allowed_roots=tweak_mods.ALLOWED_ROOTS, error=tweak_mods.TweakError)
+    assert not caught.value.folders
+
+
+@pytest.mark.parametrize('phase', ['prepare', 'acknowledge', 'snapshot', 'publish'])
+def test_worker_engine_io_failures_keep_mod_ownership_unchanged(tmp_path, monkeypatch, phase):
+    root = make_script(tmp_path, source='def build(settings, context):\n'
+        '    context._params=b"synthetic parameter snapshot"\n    return {"native/result.txt":b"valid"}\n')
+    patches = {
+        'prepare': 'def fail(root): raise OSError("cache preparation unavailable")\nscript_worker._seed_compression=fail\n',
+        'snapshot': 'from pathlib import Path\nprevious=Path.write_bytes\n'
+            'def fail(path,data):\n    if path.name=="params.bin": raise OSError("snapshot write unavailable")\n'
+            '    return previous(path,data)\nPath.write_bytes=fail\n',
+        'acknowledge': 'previous=script_worker.atomic_write\n'
+            'def fail(path,data):\n    if data==b\'{"building":true}\': raise OSError("acknowledgement write unavailable")\n'
+            '    return previous(path,data)\nscript_worker.atomic_write=fail\n',
+        'publish': 'previous=script_worker.atomic_write\n'
+            'def fail(path,data):\n    if data!=b\'{"building":true}\': raise OSError("result write unavailable")\n'
+            '    return previous(path,data)\nscript_worker.atomic_write=fail\n',
+    }
+    startup = tmp_path/'worker-io-failure.py'
+    startup.write_text('import sys\nsys.path.insert(0,'+repr(str(ROOT))+')\n'
+        'from plugins.ds1 import script_worker\n'+patches[phase]+'script_worker.main()\n')
+    monkeypatch.setattr(script_worker, 'service_command', lambda _: [sys.executable, str(startup)])
+    with pytest.raises(tweak_mods.TweakError) as caught:
+        script_mods.build_batch([script_mods.catalog_row(root)], tweak_mods.BuildContext({}),
+                               allowed_roots=tweak_mods.ALLOWED_ROOTS, error=tweak_mods.TweakError)
+    assert not caught.value.folders
+    assert not (root/script_mods.MANIFEST_FILE).exists()
+    assert not (root/'native/result.txt').exists()
+
+
+def test_worker_response_read_is_bounded_even_if_the_file_grows(tmp_path, monkeypatch):
+    path = tmp_path/'response.json'
+    path.write_bytes(b'{"large":"'+b'x'*100+b'"}')
+    monkeypatch.setattr(script_worker, 'RESULT_LIMIT', 64)
+    stat = Path.stat
+    from types import SimpleNamespace
+    monkeypatch.setattr(Path, 'stat', lambda target, *args, **kwargs:
+                        SimpleNamespace(st_size=1) if target == path else stat(target, *args, **kwargs))
+    with pytest.raises(script_mods.ScriptModInfrastructureError, match='grew beyond'):
+        script_worker._read_result(path)
+
+
+@pytest.mark.parametrize('snapshot', [b'x'*65, {'bad': 'snapshot'}])
+def test_invalid_parameter_snapshot_never_starts_a_worker(tmp_path, monkeypatch, snapshot):
+    root = make_script(tmp_path)
+    context = tweak_mods.BuildContext({})
+    context._params = snapshot
+    monkeypatch.setattr(script_worker, 'RESULT_LIMIT', 64)
+    monkeypatch.setattr(script_worker.subprocess, 'Popen', lambda *args, **kwargs: pytest.fail('Invalid service state started a worker'))
+    with pytest.raises(script_mods.ScriptModInfrastructureError, match='snapshot'):
+        script_worker.evaluate(root, {}, context)
+
+
+@pytest.mark.parametrize('operation', ['module', 'contributors'])
+@pytest.mark.parametrize('shared_failure', [False, True])
+def test_dependency_wrappers_preserve_original_failure_ownership(tmp_path, monkeypatch, operation, shared_failure):
+    provider = make_script(tmp_path, 'Provider')
+    (provider/'script/helper.py').write_text('VALUE=1\n')
+    origin = tmp_path/'Original failure owner'
+    context = tweak_mods.BuildContext({'Provider': provider})
+    failure = (script_mods.ScriptModInfrastructureError('shared engine failure') if shared_failure else
+               tweak_mods.TweakError('nested provider failure', folders=[origin]))
+    def fail(*args): raise failure
+    monkeypatch.setattr(context, '_current_module', fail)
+    with pytest.raises(script_mods.ModBuildError) as caught:
+        context.module('Provider', 'helper') if operation == 'module' else context.contributors('helper')
+    assert caught.value is failure
+
+
 @pytest.mark.parametrize('phase', ['cached_build', 'build_record'])
 def test_optional_script_cache_failure_still_builds(tmp_path, phase):
     root = make_script(tmp_path)
