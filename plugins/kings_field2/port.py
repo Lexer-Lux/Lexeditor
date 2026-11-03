@@ -17,6 +17,7 @@ BACKUP = ".lexeditor-port-backup.json"
 CRITICAL = ("Verdite2.exe", "bin/Verdite2.dll", *install_spec(__file__).required_paths,
             "content/src/patches/SeparateRun.cs",
             "content/src/patches/ViewDistanceFade.cs", "content/src/patches/ControlProfiles.cs",
+            "content/src/patches/Analog.cs", "content/src/patches/EnemyTurn.cs",
             "content/src/patches/NativeNotifications.cs", "content/manifest.txt")
 
 

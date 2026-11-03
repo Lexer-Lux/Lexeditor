@@ -101,6 +101,20 @@ def test_duplicate_ini_facts_are_rejected():
             native_settings.ini_values(text)
 
 
+def test_look_defaults_match_native_fork_without_overwriting_custom_values(setup):
+    _, data, _ = setup
+    path = data / "interface.ini"
+    before = path.read_bytes()
+    values = {field["key"]: field["value"] for field in model.preferences(data)["fields"]}
+    assert values["kf2.analog.turn"] == values["kf2.analog.pitch"] == 3
+    assert path.read_bytes() == before
+    custom = native_settings.updated_ini(before, {"kf2.analog.turn": "2.25", "kf2.analog.pitch": "1.75"})
+    path.write_bytes(custom)
+    values = {field["key"]: field["value"] for field in model.preferences(data)["fields"]}
+    assert values["kf2.analog.turn"] == 2.25 and values["kf2.analog.pitch"] == 1.75
+    assert path.read_bytes() == custom
+
+
 def test_distance_and_smooth_fade_persist_independently(setup):
     _, data, _ = setup
     prefs = model.preferences(data)

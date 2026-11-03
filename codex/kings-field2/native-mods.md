@@ -15,6 +15,17 @@ Native data defaults to LocalAppData/Verdite2. VERDITE2_DATA selects another
 data directory for both the native port and editor adapter.
 Diagnostics must point both at the same private copy when using both processes.
 
+Native gamepad yaw and pitch default to3; explicit saved sensitivities and
+bindings survive startup, including configurations predating the old defaults
+marker. At sensitivity1, the hooked native look routine produces35 yaw units per
+tick standing,28 moving, and32 pitch (4096 units per revolution,15Hz world).
+Sensitivity3 produces105/84/96, below the port's x4 ceiling, so the proportional
+enemy-turn ratio is3/1. Existing native turns toward the player get x3 top speed
+and x9 acceleration by default. The measured chase baseline11/4 becomes33/36;
+a quarter turn takes94 ticks originally and32 compensated. Non-player turns
+retain their timing; other creature fields remain unchanged. Extra standing
+tracking defaults off, and explicit enemy-turn/tracking preferences are retained.
+
 The native loader enables IDs through interface.ini, section RecompOne,
 mods.<id>.enabled=True. settings.json's legacy ActiveMods array is not read to
 enable mods. Native source mods implement IMod.OnLoad; optional OnUnload and
