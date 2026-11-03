@@ -462,7 +462,7 @@
         return `(${point.column}, ${point.row})`;},
       select:id=>{state.worldMapPoint=null;state.worldMapSky=null;state.selected.world=id;rerenderWorldMap()}});
     if(!state.worldMapTerrain)worldMapNavigation(map,map.lexStage);
-    return LexeditorUI.panelLayout([detailPanel({paginate:{unpaged:true},heading:false,className:"ff8-world-map-panel",body:map}),
+    return LexeditorUI.panelLayout([detailPanel({paginate:false,heading:false,headingOverlay:true,className:"ff8-world-map-panel",body:map}),
       pickedSky?worldSkyDetail(pickedSky,null,worldSkyMapTitle(pickedSky),`World ${formatNumber(pickedSky.x)}, ${formatNumber(pickedSky.z)} · fade ${formatNumber(pickedSky.y)}`):picked?worldDrawPointDetail(picked,null,worldDrawPointMapTitle(picked)):worldSegmentDetail(row)],"world-map",
       {layoutKey:"ff8-world-map",defaultSizes:[1.6,1]});
   }
