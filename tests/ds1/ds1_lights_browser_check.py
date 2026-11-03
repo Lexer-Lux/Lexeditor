@@ -81,6 +81,7 @@ def main():
                         (True, 0xffc46b), (True, 0xffc46b)]
                     page.locator('[data-tabstrip-id="lights"]').click()
                     page.wait_for_function('state.mapTab==="lights"')
+                    page.wait_for_selector('[data-tabstrip-id="lights"][aria-selected="true"]')
                     rows = page.locator('[data-maps-side] .lex-column-list [role="row"]:not(.lex-column-list-header)')
                     assert rows.count() == 2, rows.count()
                     assert 'lamp0' in rows.nth(0).inner_text()
