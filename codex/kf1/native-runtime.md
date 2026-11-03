@@ -39,6 +39,15 @@ recovery refills it every tick. This was reproduced at fixed position and does
 not establish a location-dependent cause. Rendering at 30, 60 and 144 FPS kept
 those amounts unchanged.
 
+The native weapon equip routine is `0x80016A30`: weapon ID is byte
+`0x800A07E4` (Short Sword 0, Knight Sword 2), record pointer `0x800A07E8`.
+Byte `0x800A07DC` is the selected spell ID, not the weapon. An actual native
+Short Sword → Knight Sword → Short Sword equip test, at fixed physical power
+30 and the same open-floor movement, ended each two-second sprint at weapon
+power 4666, 916 and 4666 respectively. Gross drain stayed 333/334 per tick.
+That reproduces the change through weapon choice without establishing that
+the user's reported location change coincided with an equipment change.
+
 ## Built-in death reload
 
 `kf1.autoreload.enabled` is a native port setting, default true, shown under
