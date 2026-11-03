@@ -229,11 +229,12 @@ def _modules_in(archive: zipfile.ZipFile) -> dict[str, dict[str, bytes]]:
 
 
 def install(repository: str, library: Path, *, modules: list[str] | None = None,
-            progress=None, cancel: threading.Event | None = None, fetch=None) -> dict:
+            progress=None, cancel: threading.Event | None = None, fetch=None, install_only=False) -> dict:
     """Download the latest version and install or update its modules.
 
     `modules` limits a fresh install to those folders (one module's Download
     button); modules already installed from this Lexmod are always updated.
+    With install_only, preserve all installed folders and add only the requested modules.
     Everything is staged before anything is installed, so a cancelled or
     failed download leaves the library exactly as it was.
     """
@@ -245,7 +246,9 @@ def install(repository: str, library: Path, *, modules: list[str] | None = None,
     if not upstream:
         raise LexmodError("Lexer's mod has no published modules yet")
     present = installed(library, repository)
-    wanted = set(upstream) if modules is None else set(modules) | set(present)
+    wanted = set(upstream) if modules is None else set(modules)
+    if not install_only:
+        wanted.update(present)
     unknown = (set(modules or ()) - set(upstream))
     if unknown:
         raise LexmodError("Lexer's mod has no module " + ", ".join(sorted(unknown)))
@@ -253,7 +256,7 @@ def install(repository: str, library: Path, *, modules: list[str] | None = None,
     plans = []
     for folder in sorted(wanted & set(upstream)):
         target = library / folder
-        if target.exists() and folder not in present:
+        if target.exists() and (install_only or folder not in present):
             raise LexmodError(f"A mod named {folder} is already in the library and did not come from Lexer's mod")
         plans.append((folder, target, upstream[folder]))
     if cancel is not None and cancel.is_set():
@@ -289,7 +292,7 @@ def install(repository: str, library: Path, *, modules: list[str] | None = None,
         if cancel is not None and cancel.is_set():
             raise Cancelled("The download was cancelled")
         for folder, target, _files in plans:
-            if target.exists():
+            if not install_only and target.exists():
                 retired = staged_root / f"{folder}.previous"
                 target.rename(retired)
             (staged_root / folder).rename(target)

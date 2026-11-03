@@ -272,7 +272,8 @@ class Downloads:
 
         def run():
             try:
-                result = lexmods.install(repository, game_root, modules=modules, progress=progress, cancel=job["cancel"])
+                result = lexmods.install(repository, game_root, modules=modules, progress=progress,
+                                         cancel=job["cancel"], install_only=modules is not None)
                 job.update(state="done", installed=result["installed"], version=result["version"])
             except lexmods.Cancelled:
                 job.update(state="cancelled")
