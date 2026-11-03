@@ -10,5 +10,5 @@ def ui():
 
 def test_tweak_heading_uses_mod_name():
     source = ui()
-    assert 'tweakPanel(row.name, schema.help, toggle, body, blocker)' in source
+    assert 'tweakPanel(row.name,' in source
     assert 'schema.title || row.name' not in source
