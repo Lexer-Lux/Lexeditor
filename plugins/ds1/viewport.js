@@ -653,7 +653,10 @@ window.Ds1Viewport = (() => {
         viewModes.bindScene(scene);
         requestRender();
       },
-      aim() { return [controls.target.x, controls.target.y, controls.target.z]; },
+      aim() {
+        // Like moveTo and focus, the public camera target uses game coordinates.
+        return root.worldToLocal(controls.target.clone()).toArray();
+      },
       dispose() { stop(host); }
     };
     let frames = 0, live = true;

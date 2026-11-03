@@ -85,7 +85,8 @@ def test_map_handedness_and_gizmo_round_trips(tmp_path):
                   ctl.setGizmoMode('translate');window.accept=false;gizmo.dispatchEvent({type:'mouseDown'});
                   gizmo.object.position.x=99;gizmo.dispatchEvent({type:'objectChange'});gizmo.dispatchEvent({type:'mouseUp'});
                   await Promise.resolve();await Promise.resolve();
-                  return {right,left,defaultCamera,colors,hazards,noOpMoves,moves,rotations,handle:gizmo.object.position.toArray()};
+                  ctl.focus('0:0');
+                  return {right,left,defaultCamera,colors,hazards,noOpMoves,moves,rotations,aim:ctl.aim(),handle:gizmo.object.position.toArray()};
                 }''')
                 assert evidence['right']>500>evidence['left']
                 assert evidence['defaultCamera'][2]<-10
@@ -96,6 +97,7 @@ def test_map_handedness_and_gizmo_round_trips(tmp_path):
                 assert evidence['moves'][0]==['0:0',[6,7,8]]
                 assert evidence['rotations'][0][1]==pytest.approx([0,-90,0])
                 assert evidence['handle']==pytest.approx([6,7,-8])
+                assert evidence['aim']==pytest.approx([6,7,8])
                 assert not errors,errors
                 page.screenshot(path=str(tmp_path/'game-coordinates.png'))
             finally:browser.close()
