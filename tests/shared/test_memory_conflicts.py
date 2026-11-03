@@ -12,9 +12,9 @@ import pytest
 
 from core import memory_conflicts, mods_service
 from core.memory_conflicts import carries_native_code, exclusive_lines_by_mod, hext_ranges, overlaps
-from core.mod_conflicts import MAX_LISTED
+from core.mod_conflicts import MAX_LISTED, merge_marks
 from plugins.ds1 import exe_patches, tweak_mods
-from plugins.ds1.mod_support import Ds1ModAdapter, _merge_marks
+from plugins.ds1.mod_support import Ds1ModAdapter
 from plugins.ds1.store import MARKER
 
 
@@ -231,11 +231,30 @@ def test_ds1_unreadable_metadata_is_skipped_not_failed(tmp_path):
 def test_merge_marks_combines_reports_caps_and_changes_neither_input():
     first = {"a": ["data 1"]}
     second = {"a": ["memory 1"], "b": ["memory 2"]}
-    assert _merge_marks(first, second) == {"a": ["data 1", "memory 1"], "b": ["memory 2"]}
+    assert merge_marks(first, second) == {"a": ["data 1", "memory 1"], "b": ["memory 2"]}
     assert (first, second) == ({"a": ["data 1"]}, {"a": ["memory 1"], "b": ["memory 2"]})
-    many = _merge_marks({folder: [f"line {index}" for index in range(MAX_LISTED)] for folder in ("a",)},
+    many = merge_marks({folder: [f"line {index}" for index in range(MAX_LISTED)] for folder in ("a",)},
                         {"a": ["one more", "another"]})
     assert len(many["a"]) == MAX_LISTED + 1 and many["a"][-1] == "…and 2 more"
+
+
+def test_unreadable_mod_does_not_hide_healthy_data_conflicts(tmp_path):
+    library, game = tmp_path / 'library', tmp_path / 'game'
+    (game / 'menu').mkdir(parents=True)
+    (game / 'menu/shared.bin').write_bytes(b'original')
+    first, second, broken = [data_mod(library, name, order)
+                             for order, name in enumerate(('First', 'Second', 'Broken'))]
+    for folder, payload in ((first, b'first'), (second, b'second')):
+        (folder / 'menu').mkdir()
+        (folder / 'menu/shared.bin').write_bytes(payload)
+    bad = broken / 'mod.json'
+    bad.write_text('{ not json', encoding='utf-8')
+    marks = adapter(library).conflicts([first, broken, second], game)
+    assert set(marks) == {str(first), str(second)}
+    assert all('shared.bin' in line for lines in marks.values() for line in lines)
+    row = next(row for row in mods_service.library_rows(library) if row['folder'] == 'Broken')
+    assert row['error'] and not row['enabled']
+    assert bad.read_text('utf-8') == '{ not json'
 
 
 def test_memory_conflicts_module_is_documented_where_it_matters():

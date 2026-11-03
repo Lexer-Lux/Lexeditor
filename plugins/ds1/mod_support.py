@@ -275,6 +275,8 @@ class Ds1ModAdapter:
             folder = Path(row['path'])
             if folder.resolve() not in wanted:
                 continue
+            if row.get('error') and not row['enabled']:
+                continue  # Unreadable metadata is already an off/error library row.
             try:
                 if mod_loader.content_files(folder, row['name']):
                     ordered.append((row['name'], folder))
@@ -307,7 +309,7 @@ class Ds1ModAdapter:
             compared_key = self._report_key(Path(game_root), ordered)
         except OSError:
             compared_key = None
-        data = self._mods(mods)
+        data = self._mods([folder for _name, folder in ordered])
         composition = mod_loader.compose_installed(Path(game_root), data, conflicts_only=True)
         data_lines = composition.by_mod(data)
         if compared_key is not None:

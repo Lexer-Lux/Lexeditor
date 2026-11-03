@@ -56,6 +56,16 @@
         "name": "AMD / FidelityFX CAS",
         "role": "The Contrast Adaptive Sharpening algorithm Lexeditor's Sharpen effect implements.",
         "url": "https://github.com/GPUOpen-Effects/FidelityFX-CAS"
+      },
+      {
+        "name": "Libarchive contributors",
+        "role": "Offline ZIP, RAR, 7z and TAR mod-archive decoding.",
+        "url": "https://github.com/libarchive/libarchive"
+      },
+      {
+        "name": "Changaco / python-libarchive-c",
+        "role": "Python bindings to the archive reader (CC0).",
+        "url": "https://github.com/Changaco/python-libarchive-c"
       }
     ],
     "licenses": [
@@ -74,6 +84,30 @@
       {
         "name": "ReshadeEffectShaderToggler — MIT License",
         "sourcePath": "tools/reshade/addons/REST-1.3.23.633/LICENSE.txt"
+      },
+      {
+        "name": "bzip2 — archive runtime license",
+        "sourcePath": "assets/helpers/libarchive/licenses/bzip2.txt"
+      },
+      {
+        "name": "libarchive — archive runtime license",
+        "sourcePath": "assets/helpers/libarchive/licenses/libarchive.txt"
+      },
+      {
+        "name": "liblzma — archive runtime license",
+        "sourcePath": "assets/helpers/libarchive/licenses/liblzma.txt"
+      },
+      {
+        "name": "lz4 — archive runtime license",
+        "sourcePath": "assets/helpers/libarchive/licenses/lz4.txt"
+      },
+      {
+        "name": "zlib — archive runtime license",
+        "sourcePath": "assets/helpers/libarchive/licenses/zlib.txt"
+      },
+      {
+        "name": "zstd — archive runtime license",
+        "sourcePath": "assets/helpers/libarchive/licenses/zstd.txt"
       }
     ]
   },
