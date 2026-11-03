@@ -109,20 +109,96 @@ Creature records start at `0x8016C544`, stride `0x7C`, with 200 slots. Current H
 spawn `0x80039AFC` copies its maximum from definition `0x80172624 + type*0x78 +0x1A`.
 Damage `0x8003A9CC` follows linked body parts to their parent before subtracting HP.
 Hit Feedback measures the resulting loss against that definition maximum.
-Its only setting is maximum flash duration in seconds (0–5, default 0.6).
+Maximum flash duration is configurable in seconds (0–5, default 0.6).
 Duration is that maximum times min(actual HP lost / definition maximum HP, 1).
-The native check confirms a 1-second maximum and 10% loss give 0.1 seconds.
+Peak strength is (1 - HP after the hit / definition maximum) times the red
+intensity setting (0–100%, default50%). Each damaging hit replaces the current
+pulse and linearly fades to zero. Healing and zero damage do not restart it.
+
+Preview5 exposes generic captured ModelInstance.ColourMixRgb/ColourMix fields.
+The retained GPU colour pass mixes final textured, lit and fogged RGB toward the
+target before quantization, preserving alpha, holes, blending and depth. Native
+RGBC multiplication cannot make a green texel with zero red become red. Hit
+Feedback edits only its draw's new main/mirror instances, with frame identity and
+nested-draw guards; world mirror replay is included and previews excluded. It
+requires the supported retained GPU model path. No native RAM/GTE lighting is
+changed and there is no brown modulation substitute on unsupported renderers.
+
+Actual native damage220->148 on the existing220HP plant gives981ms at a3-second
+maximum. Private GPU captures show zero/37.5%/full-red endpoints and an actual hit
+fading back to green; the partial/full captures have no changed pixels outside
+the expanded creature region. Animated quantized captures do not establish a
+same-texel numeric weight comparison.
 
 Native running `0x8002957C` subtracts 500 per 15 Hz world tick from both 5000-point
 physical/magic power gauges `0x8019942E` and `0x80199432`. Better Sprint changes this charge only
 after actual collision-resolved horizontal movement. Empty power also requires
 removing positive carried run acceleration at `0x80199422`, not merely clearing the
 run input bit. There is no separate added stamina pool.
+Running consumes no magic power by default; disabling that option charges the
+native magic-power gauge too. MP and legitimate casting/item costs remain native.
+Exhaustion latches until release and a fresh run press. Native load, full reset
+and menu handling preserve that latch for an input still held. Scripted physical
+keyboard/controller events through the real mapping routines exercise both
+Classic and Modern paths; this is separate from human controller feel.
 
 Forget Me Not uses actual interaction, lock, empty-search and pickup results.
 Its sidecar binds exploration to card path, slot and native save-block hash.
 It keeps original/newest snapshots per card/slot, capped at 12 snapshots and 8 MiB.
-It excludes the native secret-door behavior `0xFF` rather than marking every door.
+It renders small surface-following billboard glints through native packets with
+registered per-corner depth. Retained GPU geometry and Z-buffer support are
+required; unsupported or unlocated surfaces are omitted. Actual chest and barrel
+search/take, lock, gate/door opening and external-wall occlusion were rendered.
+Opened-but-unclaimed containers remain white; confirmed empty/taken clears them.
+
+Native use dispatches on the definition kind. Ordinary container kinds8/9/21/22
+can initialize record behaviorFF, so FF is not a hidden-wall/liveness predicate.
+Verified ordinary doors are kind3 and the kind2 definition84 barred gate. Hidden
+wall definitions82/CD, unused pedestal89 and kind5 compartments are excluded.
+
+## Additional native feedback and wall controls
+
+Better Poison preserves native HP damage at30 world ticks per event (0.5Hz).
+The old wash coefficient2400/4096 produces native green35; default35% peak
+coefficient1434 produces green21. Its default0.25Hz starts visual pulses every60
+world ticks. Other rates are averaged over native two-second opportunities.
+The40-tick envelope advances after the actual player-stage pacing decision;
+skip decrement on a new pulse so the first native wash sees the full peak.
+Pre-hooks can precede the frame-pacing gate and also run on skipped frames.
+Zero quantized green contributions must skip the wash call, which otherwise
+increments the native averaging count and dims unrelated tints.
+
+Owner-scoped poison status replacement removes stale own notices while retaining
+other queued owners and vanilla messages. Real antidote/expiry can report CURED;
+death, native load, status reset and disable cancel owned status without a cure.
+Native original-font POISON CURED was observed. Notifications remain toggleable.
+
+XP Bar height uses1..16 native pixels, default4. It keeps full viewport width and
+the absolute bottom edge; actual output at2x render scale has8/24 rows for
+settings4/12. Red N modifies only the original N's four compass GT4 faces,
+5/6/9/10, preserving other letters, UVs, palettes and sphere geometry.
+
+Dragon Crystal is inventory item76, countbyte8009B578. Native player state11's
+frame65 branch also requires801B3089 bit8 before consuming one and reviving at
+area1. Better Crystals holds the port's automatic reload only for that eligible
+death and offers the original-font/native-box choice before frame64 advances.
+Revive calls the native branch. Reload calls the port's existing native loader
+with8006E5D4, the slot written only after successful native save/load; it ignores
+the automatic-reload slot override and never calls a save routine. No save or a
+failed card read retains the choice/count. Current primary/secondary keyboard and
+selected digital/analog pad bindings supply the labels. Native font runs advance
+7pixels and stop at24 glyphs; longer labels need multiple runs. Private actual
+revive, load, failure and disable checks preserved both baseline and working cards.
+
+The mod display name `illusory wall` is lowercase. Independent use, attack and
+walk-through booleans default to native use on, others off. Exhaustive kind2
+definitions are82/84/89/CD:82/CD are wall variants,84 is a real barred gate,89 an
+unused pedestal. Native Cross opening verifiedCD's original rock-textured wall.
+Attack follows the actual weapon query call site. Walk-through temporarily uses
+the native opened footprint only for player horizontal/floor collision queries,
+restoring it before rendering or save and guarding area identity. Native WallGuard
+keeps ownership of28080. All eight toggle combinations, ordinary gate exclusion,
+lock refusal, floor preservation and disable restoration passed native checks.
 
 ## Fire Crystal and the two magic menus
 
