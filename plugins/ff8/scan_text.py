@@ -145,7 +145,10 @@ def read_executable(path: Path) -> list[str]:
 
 
 def read_msd(path: Path) -> list[str]:
-    data = path.read_bytes()
+    return _values_from_bytes(path.read_bytes())
+
+
+def _values_from_bytes(data: bytes) -> list[str]:
     table_size = SCAN_COUNT * MSD_OFFSET_SIZE
     if len(data) <= table_size:
         raise ValueError("battle_scans.msd is too short")
@@ -153,6 +156,42 @@ def read_msd(path: Path) -> list[str]:
     if offsets[0] != table_size:
         raise ValueError("battle_scans.msd does not contain 160 Scan offsets")
     return _entries(data, [offset - table_size for offset in offsets], table_size)
+
+
+def merge(vanilla: bytes, mods: list[tuple[str, bytes]], path: str
+          ) -> tuple[bytes | None, list[dict], str]:
+    """Merge Scan descriptions per entry, or return a visible whole-file fallback."""
+    try:
+        baseline = _values_from_bytes(vanilla)
+    except ValueError as error:
+        return None, [], f"vanilla {path} is unsupported: {error}"
+    claims: dict[int, list[tuple[str, str]]] = {}
+    for mod_id, data in mods:
+        try:
+            values = _values_from_bytes(data)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        for index, (value, base) in enumerate(zip(values, baseline)):
+            if value != base:
+                claims.setdefault(index, []).append((mod_id, value))
+        try:
+            reconstructed = build_msd(values)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        if reconstructed != data:
+            return None, [], f"{mod_id} contains changes outside proved Scan entries"
+    merged = list(baseline)
+    for index, values in claims.items():
+        merged[index] = values[-1][1]
+    output = build_msd(merged)
+    conflicts = [
+        {"unit": f"{path}:entry:{index}", "winner": values[-1][0],
+         "claimants": [mod_id for mod_id, _ in values]}
+        for index, values in claims.items()
+        if len(values) > 1 and len({value for _, value in values}) > 1
+    ]
+    _values_from_bytes(output)
+    return output, conflicts, ""
 
 
 def build_msd(descriptions: list[str]) -> bytes:

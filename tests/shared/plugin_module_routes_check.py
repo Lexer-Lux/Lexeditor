@@ -8,6 +8,10 @@ every module that page names.
 import re
 import sys
 import threading
+import tempfile
+import os
+from contextlib import ExitStack
+from unittest.mock import patch
 import urllib.request
 from http.server import HTTPServer
 from pathlib import Path
@@ -26,6 +30,24 @@ def modules(page: str) -> list[str]:
 
 
 def check(name: str) -> list[str]:
+    with ExitStack() as fixtures:
+        if name == 'chrono_trigger':
+            # This service is session-owned: importing it requires the same
+            # explicit paths its launcher supplies, including a valid archive.
+            from plugins.chrono_trigger.plugin import _fixture_archive
+            root = Path(fixtures.enter_context(tempfile.TemporaryDirectory(prefix='lexeditor-route-ct-')))
+            game, project = root / 'game', root / 'project'
+            game.mkdir()
+            project.mkdir()
+            _fixture_archive(game / 'resources.bin', [])
+            fixtures.enter_context(patch.dict(os.environ, {
+                'LEXEDITOR_CHRONO_TRIGGER_ROOT': str(game),
+                'LEXEDITOR_CHRONO_TRIGGER_PROJECT': str(project),
+            }))
+        return check_service(name)
+
+
+def check_service(name: str) -> list[str]:
     import importlib
     module = importlib.import_module(SERVERS.get(name, f"plugins.{name}.server"))
     handler = getattr(module, "Handler", None)
@@ -90,12 +112,17 @@ def boot(base: str, name: str) -> list[str]:
 
 def main() -> int:
     problems = []
-    for page in sorted((ROOT / "plugins").glob("*/editor.html")):
-        problems += check(page.parent.name)
+    available = {page.parent.name for page in (ROOT / 'plugins').glob('*/editor.html')}
+    wanted = set(sys.argv[1:]) or available
+    unknown = wanted - available
+    if unknown:
+        raise ValueError(f'Unknown plugins: {sorted(unknown)}')
+    for name in sorted(wanted):
+        problems += check(name)
     if problems:
         print("FAIL:", *problems, sep="\n  ")
         return 1
-    print("PASS: every plugin serves the modules its page loads")
+    print(f"PASS: {len(wanted)} plugins serve the modules their pages load")
     return 0
 
 

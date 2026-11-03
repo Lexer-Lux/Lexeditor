@@ -1,4 +1,4 @@
-"""Wide boolean boxes use the same pin corner as other value boxes."""
+"""Wide boolean boxes keep the whole pin inside their own corner."""
 import pytest
 from test_shared_ui_feedback import framework, page
 
@@ -23,7 +23,11 @@ def test_boolean_pin_follows_box_style(page,tmp_path,provenance,width):
           return {input:input.toJSON(),pin:pin.toJSON(),tip:pin.left+pin.width*3.71/24};
         }''')
         if style=='box':
-            assert 0<=geometry['input']['right']-geometry['tip']<=16,geometry
+            pin,box=geometry['pin'],geometry['input']
+            assert pin['right']<=box['right']+1,geometry
+            assert pin['left']>=box['left']-1,geometry
+            assert pin['top']>=box['top']-1,geometry
+            assert pin['bottom']<=box['bottom']+1,geometry
         else:
             assert geometry['pin']['right']<=geometry['input']['left'],geometry
     page.screenshot(path=str(tmp_path/'boolean-pin.png'))

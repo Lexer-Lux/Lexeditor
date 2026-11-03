@@ -24,7 +24,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
+sys.path.insert(0, str(ROOT / "tests" / "shared"))
 
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 import browser_guard  # noqa: E402
@@ -40,6 +40,11 @@ STUB = """
     mod_projects:async()=>({canCreate:true,projects:[{name:'Test Mod',path:'Rendered test project',valid:true,current:true}]}),
     set_dirty_count:async()=>null,
     game_process_status:async()=>null,
+    mods_overview:async plugin=>({canManage:true,rows:[{name:'Test Mod',
+      path:`Rendered test library/${plugin}/Test Mod`,folder:'Test Mod',
+      author:'Fixture author',description:'Authored layout fixture',credits:'',
+      enabled:true}],remote:[]}),
+    lexmod_update:async()=>({updated:false}),
     lexeditor_settings:async()=>window.__lexSettings,
     save_lexeditor_settings:async v=>Object.assign(window.__lexSettings,v),
     save_developer_setting_defaults:async v=>Object.assign(window.__lexSettings.defaultValues,v),
@@ -79,6 +84,12 @@ def session_for(plugin_id: str, project: str | None):
         "rdr": "LEXEDITOR_RDR_PROJECT", "warband": "LEXEDITOR_WARBAND_PROJECT",
     }.get(plugin_id)
     extra_env = {variable: project} if variable and project else {}
+    if plugin_id == "chrono_trigger" and project:
+        from chrono_archive_fixture import create_game
+        game = Path(project) / ".lexeditor-chrono-game"
+        create_game(game)
+        extra_env["LEXEDITOR_CHRONO_TRIGGER_ROOT"] = str(game)
+        extra_env["LEXEDITOR_CHRONO_TRIGGER_PROJECT"] = str(Path(project) / "mod")
     # Bannerlord deliberately refuses to boot against an invalid project or game
     # root. Screenshot/verifier runs use an isolated clean module and fake install
     # so those checks exercise the real UI without depending on C:\\Bannermod or

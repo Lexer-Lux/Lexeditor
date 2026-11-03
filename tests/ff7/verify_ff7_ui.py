@@ -78,6 +78,13 @@ const stub={el,clone:structuredClone,columnPreferences:()=>({}),recordId:id=>Str
     // meant every tabbed panel rendered its tabs and dropped what was in them,
     // so tests looked for content that the double had silently discarded.
     (()=>{const selected=(o.tabs||[]).find(tab=>tab.id===o.active)||(o.tabs||[])[0];return el("div",{class:"lex-tabbed-panel-content",role:"tabpanel","aria-label":selected&&(selected.label||selected.id)||""},...(()=>{const v=o.content!==undefined?o.content:o.body;return (Array.isArray(v)?v:[v]).filter(Boolean)})())})()),
+  // The shared Tweaks page: its subtabs over the open page's cards (no
+  // desktop host here, so no ReShade subtab).
+  tweaksPage:o=>{const page=(o.pages||[]).find(entry=>entry.id===o.active)||(o.pages||[])[0];
+    return el("div",{class:"lex-tweaks-paged "+(o.className||"")},
+      // Like the shared bar, one page has no bar: a single tab does nothing.
+      (o.pages||[]).length>1?LexeditorUI.subtabBar({tabs:o.pages,active:page&&page.id,change:o.change||(()=>{})}):null,
+      ...(page?[page.body()].flat().filter(Boolean):[]));},
   integrationStatus:state=>el("span",{class:"lex-integration-status "+String(state||"")},String(state||"")),
   readonlyField:value=>{const f=el("output",{class:"lex-readonly-field"},String(value??"—"));return f;},
   infoIcon:()=>el("span",{class:"test-info-icon"}),
@@ -212,10 +219,10 @@ class PageTests(unittest.TestCase):
                 with patch.object(server, "PLUGIN_ID", "ff7-2013" if index == 0 else "ff7"):
                     self.open()
                 self.click("Tweaks")
-                tab = self.page.get_by_role("tab", name="FFNx", exact=True)
-                self.assertTrue(tab.is_visible())
-                self.assertEqual(tab.get_attribute("aria-selected"), "true")
-                self.assertTrue(self.page.get_by_role("tabpanel", name="FFNx", exact=True).is_visible())
+                # The shared Tweaks page: FFNx is its only page here (no desktop
+                # host, so no ReShade subtab), and it opens straight onto it.
+                self.assertEqual(self.page.get_by_role("tab", name="FFNx", exact=True).count(), 0)
+                self.assertTrue(self.page.locator("main .lex-tweaks-paged").get_by_role("heading", name="FFNx", exact=True).is_visible())
                 self.click("Characters")
                 self.assertEqual(self.page.locator("main button[data-row]").count(), 9)
                 strength = self.page.get_by_label("Strength for Slot0", exact=True)

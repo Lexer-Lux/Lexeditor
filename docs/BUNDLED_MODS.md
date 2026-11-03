@@ -1,9 +1,20 @@
-# Bundled mods and linked tweaks
+# Bundled mods
 
-The shared mod library supports independently selected components of a parent
-mod. A component's required tweaks and game payload are applied in one recoverable
-transaction. These links are opt-in; Lexeditor does not invent links for existing
-mods or execute scripts supplied by an imported package.
+One library mod with several selectable components. A bundle's `mod.json`
+declares its components; each component is a folder inside the bundle that
+the game's loader deploys on its own. Which components deploy is ordinary
+tweak settings: one on/off field per component, rendered by the shared
+tweak-settings UI from the schema `core/bundled_mods.py` derives, stored in
+the bundle's own `settings.json` next to the mod. There is no separate
+dialog, no Apply step and no library-wide bundle state: ticking a component
+saves it like any other setting through `save_mod_settings`, and the game's
+loader reads the saved selection the next time it deploys. A tick deploys at
+once while its bundle is on, like a switch; while the bundle is off the
+saved tick waits for its switch.
+
+A component's `tweaks` list is inert: it once named callbacks the game
+registered in-process, which no game does. The format is still validated so
+old bundles keep importing; nothing reads the names.
 
 ## Package format
 
@@ -19,7 +30,7 @@ Declare components in the parent's `mod.json`:
         "id": "combat",
         "name": "Combat changes",
         "path": "components/combat",
-        "tweaks": ["combat.damage"]
+        "tweaks": []
       }
     ]
   }
@@ -33,47 +44,24 @@ overlap, or traverse links. Component folder names must be distinct among the
 active mods because existing adapters use folder names as deployment IDs.
 Imports retain the complete package; partial bundle imports are rejected.
 
-## Trusted plugin registration
+## Selection and deployment
 
-Register stable tweak IDs in `GamePlugin.bundled_tweaks`. Each value is a
-`core.bundled_mods.BundledTweak(name, read, write)`. Both callbacks receive the
-selected game root. `write` also receives the desired boolean. The plugin must
-resolve its corresponding persistent configuration, use its existing tweak
-implementation, and keep the original game behavior available when disabled.
-Never choose a configuration file or executable callback from untrusted package
-metadata. A read callback must not mutate anything.
+The Mods tab shows a bundle's components in its details SETTINGS section,
+through the same shared settings surface as a tweak mod's settings. The host
+expands each enabled bundle to its ticked components' folders before calling
+the loader, so the loader keeps receiving plain mod folders. A component
+starts off: enabling a bundle never deploys a part the reader did not tick.
 
-Writes must be persistent, idempotent, and reversible through the same callback.
-An exception can happen after a partial write; the shared transaction restores
-the recorded prior values and prior deployment. It verifies each callback's
-readback before accepting success. An ordinary tweak screen integrating a linked
-tweak should call the shared host's `set_bundled_tweak` rather than writing its
-setting independently. Direct external changes are detected in the library and
-block host launch until the linked selection is applied again.
+An adapter opts in with `supports_bundle_components = True` only when it
+consumes the explicit component root list and retains stable folder IDs
+across reload. The FF7R PAK adapter uses this contract; a bundle on a loader
+without component support is refused the same way its import is. DS1 does
+not opt in and no DS1 loader is changed by this feature.
 
-An adapter opts in with `supports_bundle_components = True` only when it consumes
-the explicit component root list, retains stable folder IDs across reload, and
-supports reapplying the previous selection after failure. The FF7R PAK adapter
-uses this contract. Other adapters stay explicitly unsupported until integrated;
-the shared bundle engine does not assume their project composers accept nested
-roots. DS1 does not opt in and no DS1 loader is changed by this feature.
-
-## Selection and recovery
-
-The mod selector shows relationship help for bundle projects. Its Mod library
-view lists component toggles and their assigned tweak names using shared
-controls. Tweak-side toggles select or deselect all attached components. Apply
-persists both sides together. A shared tweak remains enabled while any selected
-component needs it; disabling it deselects all its dependents.
-
-Selection is stored in `<library>/<game>/.bundles.json`. One bounded journal,
-`.bundles-pending.json`, records the prior selection and tweak states before a
-change. Normal failures restore both. If restoration fails or the process stops,
-the journal remains and the library exposes Recover linked mods. New changes
-and host launch are blocked until recovery succeeds. No unbounded backup history
-or deployment copies are created by the shared bundle engine.
-
-Checks: `tests/shared/test_bundled_mods.py` and
-`tests/shared/verify_bundled_mods_ui.py`. Their packages and callbacks are
-synthetic fixtures; they do not create a player mod or establish in-game
-acceptance for a particular gameplay tweak.
+Checks: `tests/shared/test_bundled_mods.py` (schema, values, expansion and
+the host save/deploy paths), `tests/shared/test_library_dissolve.py` (the
+dialog and its backend are gone while drop import, upload and the library
+location stay), and the Mods tab settings test in
+`tests/shared/test_mods_tab.py`. Their packages are synthetic fixtures; they
+do not create a player mod or establish in-game acceptance for a particular
+gameplay tweak.

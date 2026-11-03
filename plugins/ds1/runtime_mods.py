@@ -1,0 +1,310 @@
+"""Prebuilt, relocatable native mods; builders and game runtime share one layout.
+
+LXD1MOD wraps an ordinary LXD1PAT with its link fixups and state claims.
+The payload contains ready-to-run machine code, never Python or assembly.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import struct
+import zlib
+
+from . import exe_patches as patches
+
+MAGIC = b'LXD1MOD\0'
+VERSION = 1
+FILENAME = 'runtime.lxd'
+MAX_SIZE = 16 * 1024 * 1024
+MAX_TOTAL_SIZE = 64 * 1024 * 1024
+MAX_FIXUPS = 65536
+HEADER = struct.Struct('<8s6I')
+# signed displacement += delta, signed displacement -= delta, RVA += delta
+REL_PLUS, REL_MINUS, RVA_PLUS = 1, 2, 3
+
+
+def read(folder: Path) -> bytes:
+    with (Path(folder)/FILENAME).open('rb') as stream:
+        data = stream.read(MAX_SIZE + 1)
+    inspect(data)
+    return data
+
+
+def build(vanilla: bytes, specs: list[dict], *, requires_data=False) -> bytes | None:
+    layout = patches._layout(vanilla, specs)
+    if layout is None:
+        return None
+    patch = patches._runtime_patch(vanilla, layout)
+    offsets, at = {}, 24
+    for kind, rva, length, payload in patches.read_runtime_patch(patch)['records']:
+        offsets[(kind, rva)] = (at, at + 12, length)
+        at += 12 + len(payload)
+    fixups = []
+    if layout['codes']:
+        block = layout['codes'][0][0]
+        record_at, payload_at, _ = offsets[(patches.BLOCK, block)]
+        fixups.append((record_at + 4, RVA_PLUS))
+        for rva, island in layout['placed']:
+            for offset, _target in island['relocations']:
+                fixups.append((payload_at + rva - block + offset, REL_MINUS))
+    if layout['functions']:
+        _, payload_at, count = offsets[(patches.FUNCTIONS, 0)]
+        fixups.extend((payload_at + i * 4, RVA_PLUS) for i in range(count * 3))
+    for spec in specs:
+        for hook in spec['hooks']:
+            _, payload_at, length = offsets[(patches.HOOK, hook['rva'])]
+            if hook['replacement'][0] == 'branch':
+                fixups.append((payload_at + length + 1, REL_PLUS))
+            fixups.extend((payload_at + length + offset, REL_PLUS)
+                          for offset, _name, _target in hook['relocations'])
+    claims = [claim for spec in specs for claim in spec['state']]
+    for spec in specs:
+        if not spec['state']:
+            for name, size in spec['sectionVirtualSize'].items():
+                section = next(section for section in layout['pe'].sections if section['name'] == name)
+                if size > section['vsize']:
+                    claims.append((section['rva'] + section['vsize'], size - section['vsize']))
+    fixed = int(any(island['rva'] is not None for _rva, island in layout['placed']))
+    data = (HEADER.pack(MAGIC, VERSION, len(patch), len(fixups), len(claims), fixed, int(requires_data)) + patch
+            + b''.join(struct.pack('<2I', *item) for item in fixups + claims))
+    data += struct.pack('<I', zlib.crc32(data))
+    inspect(data)
+    return data
+
+
+def inspect(data: bytes) -> dict:
+    if len(data) < HEADER.size + 4 or len(data) > MAX_SIZE:
+        raise patches.PatchError('The prebuilt mod has an invalid size')
+    magic, version, size, count, claimed, fixed, reserved = HEADER.unpack_from(data)
+    if (magic != MAGIC or version != VERSION or fixed not in (0, 1) or reserved not in (0, 1)
+            or count > MAX_FIXUPS or claimed > 4096
+            or HEADER.size + size + (count + claimed) * 8 + 4 != len(data)
+            or zlib.crc32(data[:-4]) != struct.unpack_from('<I', data, len(data)-4)[0]):
+        raise patches.PatchError('The prebuilt mod is damaged or unsupported')
+    patch = data[HEADER.size:HEADER.size+size]
+    if len(patch) < 24 or struct.unpack_from('<I',patch,20)[0] > 4096:
+        raise patches.PatchError('The prebuilt mod has too many patch records')
+    try:
+        decoded = patches.read_runtime_patch(patch)
+    except (struct.error, ValueError) as error:
+        raise patches.PatchError('The prebuilt mod contains a damaged patch') from error
+    at = HEADER.size + size
+    fixups = [struct.unpack_from('<2I', data, at + i * 8) for i in range(count)]
+    claims = [struct.unpack_from('<2I', data, at + (count+i) * 8) for i in range(claimed)]
+    occupied = set()
+    for offset, kind in fixups:
+        if kind not in (REL_PLUS, REL_MINUS, RVA_PLUS) or offset + 4 > size:
+            raise patches.PatchError('The prebuilt mod has an invalid relocation')
+        span = set(range(offset, offset+4))
+        if span & occupied:
+            raise patches.PatchError('The prebuilt mod repeats a relocation')
+        occupied.update(span)
+    if any(not size or rva + size > decoded['imageSize'] for rva, size in claims):
+        raise patches.PatchError('The prebuilt mod has invalid state claims')
+    return {**decoded, 'patch': patch, 'fixups': fixups, 'claims': claims, 'fixed': bool(fixed),
+            'requiresData': bool(reserved)}
+
+
+def link(data: bytes, base: int) -> bytes:
+    """Reference implementation of the runtime link step, used by checks."""
+    module = inspect(data)
+    blocks = [rva for kind, rva, _size, _payload in module['records'] if kind == patches.BLOCK]
+    delta = base - blocks[0] if blocks else 0
+    if module['fixed'] and delta:
+        raise patches.PatchError('This mod requires its fixed code address')
+    result = bytearray(module['patch'])
+    for offset, kind in module['fixups']:
+        dtype = '<I' if kind == RVA_PLUS else '<i'
+        value = struct.unpack_from(dtype, result, offset)[0] + (-delta if kind == REL_MINUS else delta)
+        try:
+            struct.pack_into(dtype, result, offset, value)
+        except struct.error as error:
+            raise patches.PatchError('The prebuilt mod cannot link at this address') from error
+    return bytes(result)
+
+
+def require_data(data: bytes) -> bytes:
+    """Gate existing machine code on its newly attached data/support files."""
+    if inspect(data)['requiresData']:
+        return data
+    result = bytearray(data)
+    struct.pack_into('<I',result,HEADER.size-4,1)
+    struct.pack_into('<I',result,len(result)-4,zlib.crc32(result[:-4]))
+    return bytes(result)
+
+
+def shared_patch(vanilla: bytes, specs: list[dict], modules: list[bytes | dict]) -> bytes | None:
+    """Place loader-owned support beyond each mod's fixed code allocation.
+
+    Compiling each contribution independently must not assign shared menu
+    support the same default address as a position-dependent native mod.
+    """
+    payload = build(vanilla, specs)
+    if payload is None:
+        return None
+    support = inspect(payload)
+    blocks = [rva for kind, rva, _, _ in support['records'] if kind == patches.BLOCK]
+    base = blocks[0] if blocks else 0
+    occupied = []
+    for entry in modules:
+        data = entry['data'] if isinstance(entry,dict) else entry
+        module = inspect(data)
+        module_ranges = [(rva,rva+size) for kind,rva,size,_ in module['records'] if kind == patches.HOOK]
+        module_ranges += [(rva,rva+size) for rva,size in module['claims']]
+        for spec in specs:
+            spans = patches.spans(spec)
+            shared_ranges = spans['hooks'] + spans['state']
+            if any(low < other_high and other_low < high for low,high in shared_ranges
+                   for other_low,other_high in module_ranges):
+                raise patches.PatchError(f"{spec['owner']}: shared native properties conflict with a prebuilt mod",
+                                         folders=patches._folders(spec) or
+                                         ([entry['folder']] if isinstance(entry,dict) else []))
+        occupied.extend((rva, rva+size) for kind, rva, size, _ in module['records']
+                        if kind == patches.BLOCK and module['fixed'])
+    if blocks and not support['fixed']:
+        base = max([base] + [(high+65535) & ~65535 for _, high in occupied])
+    result = link(payload, base)
+    for kind, rva, size, _ in patches.read_runtime_patch(result)['records']:
+        if kind == patches.BLOCK and any(rva < high and low < rva+size for low, high in occupied):
+            raise patches.PatchError('Shared support overlaps a mod requiring a fixed code address')
+    return result
+
+
+def write_release(folder: Path, destination: Path, vanilla: bytes, *, game_root: Path | None = None) -> Path:
+    """Export built contributions without developer files or local paths."""
+    from core import mod_metadata, mod_requires, script_mods
+    from core.mod_library import relative_path
+    from . import assets, menu_dim, mod_loader, tweak_mods, record_edits, native_support, native_rules
+    folder, destination = Path(folder), Path(destination)
+    tweak_mods.checked(folder)
+    if not (folder/mod_metadata.FILE).is_file():
+        raise FileNotFoundError(folder/mod_metadata.FILE)
+    metadata = mod_metadata._stored(folder)
+    scripted = script_mods.is_script_mod(folder)
+    if scripted:
+        manifest = script_mods._read_json(folder/script_mods.MANIFEST_FILE) or {}
+        if (not (manifest.get('build') or {}).get('source')
+                or tweak_mods.build_fingerprint(folder) != tweak_mods.build_fingerprint(folder,produced=True)):
+            raise ValueError('Save and build this mod before exporting; its source or settings have changed')
+        for relative, expected in script_mods._generated_files(folder,tweak_mods.ALLOWED_ROOTS).items():
+            path = folder/relative
+            if not path.is_file() or tweak_mods._sha(path.read_bytes()) != expected:
+                raise ValueError('Save and build this mod before exporting; a built file changed or is missing')
+    mod_id = str(metadata.get('id') or folder.name)
+    if len(relative_path(mod_id).parts) != 1:
+        raise ValueError('The mod needs a valid ID')
+    if mod_id.casefold() in set(assets.ASSET_ROOTS) | {'param','paramdef','mods'}:
+        raise ValueError('The mod ID must not use a reserved game folder name')
+    row = {'path':str(folder),'id':mod_id,'name':metadata.get('name') or mod_id}
+    prebuilt = not scripted and (folder/FILENAME).is_file()
+    specs = [] if prebuilt else tweak_mods._built([row],'native',patches.validate)
+    contributions = list(mod_loader.content_files(folder,metadata.get('name') or mod_id))
+    rules = native_support.rules_output(folder,vanilla)
+    for kind in tweak_mods.BUILT_FOLDERS[1:]:
+        for path in tweak_mods.built_files(folder,kind):
+            if rules is not None and path.relative_to(folder) == native_support.RULES_FILE:
+                continue  # Regenerated from the saved settings for this release.
+            contributions.append((path.relative_to(folder),path))
+    if rules is not None:
+        contributions.append((Path(native_rules.SETTINGS_FILE),folder/native_rules.SETTINGS_FILE))
+        from .store import MARKER
+        marker = folder/MARKER
+        if marker.is_file():
+            contributions.append((Path(MARKER),marker))
+    # Check every retained support component before exporting it. A bad
+    # component cannot hide behind a perfectly valid opaque runtime.lxd.
+    support_specs = []
+    for relative,path in contributions:
+        if relative.parts[0] == native_support.FOLDER:
+            value = json.loads(tweak_mods.read_built(path))
+            native_support.check_source(folder,relative,value)
+            support_specs.append(native_support.validate(value,row['name']))
+    if rules is not None:
+        support_specs.append(native_support.validate(json.loads(rules),row['name']))
+    portable = {}
+    existing_records = None
+    for relative,path in contributions:
+        if relative == record_edits.FILENAME:
+            existing_records = record_edits.read(path)
+            declared = record_edits.decode(existing_records)
+            if not declared:
+                raise ValueError('The portable contribution file has no targets; rebuild the mod before exporting')
+            portable.update(declared)
+            if game_root is not None:
+                originals = mod_loader.vanilla_files(Path(game_root),frozenset(declared))
+                mod_loader.materialize_mod(mod_loader.Mod(row['name'],folder,{},declared),originals)
+    from . import collision_archive
+    portable_loose = {relative for relative,_path in contributions if collision_archive.loose_for(relative) is not None}
+    if portable_loose:
+        if game_root is None:
+            raise ValueError('Locate the installed game to export collision member records')
+        collision_files = {relative:mod_loader._read_data(path,relative) for relative,path in contributions
+                           if relative in portable_loose or collision_archive.header_for(relative) is not None}
+        normalized = mod_loader.normalize_collisions(Path(game_root),[
+            mod_loader.Mod(row['name'],folder,collision_files,portable)])[0]
+        portable = normalized.edits
+    portable_targets = {target for relative in portable for target in collision_archive.pair(relative)}
+    if any(relative in portable_targets for relative,_path in contributions):
+        raise ValueError('The mod contains duplicate archive and record contributions')
+    archives = [(relative,path) for relative,path in contributions if record_edits.supports(relative)]
+    if archives:
+        if game_root is None:
+            raise ValueError('Locate the installed game to export portable record edits')
+        originals = mod_loader.vanilla_files(Path(game_root),frozenset(relative for relative,_path in archives))
+        sources, changed = dict(contributions), {}
+        for relative,_path in archives:
+            for target in collision_archive.pair(relative):
+                if target not in originals or target not in sources:
+                    raise ValueError(f'{target}: the complete export archive unit is missing')
+                changed[target] = mod_loader._read_data(sources[target],target)
+        portable.update(record_edits.create_group(originals,changed))
+        portable_targets = {target for relative in portable for target in collision_archive.pair(relative)}
+    payload = read(folder) if prebuilt else build(vanilla, specs, requires_data=bool(contributions)) if specs else None
+    if payload is not None and inspect(payload)['requiresData'] and not contributions:
+        raise ValueError('This prebuilt mod is missing its required data; rebuild or reinstall it before exporting')
+    if payload is not None and contributions:
+        payload = require_data(payload)
+    if support_specs:
+        shared_patch(vanilla,support_specs,[payload] if payload is not None else [])
+    if payload is None:
+        if not contributions:
+            raise ValueError('This mod has no built contributions to export')
+        pe = patches._checked_pe(vanilla,patches.VANILLA_SIZE,patches.VANILLA_SHA256)
+        patch = patches.RUNTIME_MAGIC+struct.pack('<4I',1,struct.unpack_from('<I',vanilla,pe.size_of_image)[0],
+                                                struct.unpack_from('<I',vanilla,pe.nt+8)[0],0)
+        payload = HEADER.pack(MAGIC,VERSION,len(patch),0,0,0,1)+patch
+        payload += struct.pack('<I',zlib.crc32(payload))
+    target = destination/mod_id
+    target.mkdir(parents=True, exist_ok=False)
+    try:
+        public = {key: metadata[key] for key in (*mod_metadata.FIELDS, 'id', 'version', 'requires') if key in metadata}
+        public.update(id=mod_id, name=metadata.get('name') or mod_id, enabled=True, order=metadata.get('order', 1000),
+                      requires=mod_requires.needs(folder))
+        encoded = (json.dumps(public, indent=2, ensure_ascii=False)+'\n').encode('utf-8')
+        if len(encoded) > 65536:
+            raise ValueError('The release metadata exceeds the loader size limit')
+        (target/'mod.json').write_bytes(encoded)
+        (target/FILENAME).write_bytes(payload)
+        if rules is not None:
+            output = target/native_support.RULES_FILE
+            output.parent.mkdir(parents=True,exist_ok=True)
+            output.write_bytes(rules)
+        if portable:
+            (target/record_edits.FILENAME).write_bytes(existing_records if not archives and not portable_loose and existing_records is not None
+                                                     else record_edits.encode(portable))
+        for relative, source in contributions:
+            if relative in portable_targets or relative in portable_loose or relative == record_edits.FILENAME:
+                continue
+            relative = relative_path(relative.as_posix())
+            output = target/relative
+            output.parent.mkdir(parents=True,exist_ok=True)
+            output.write_bytes(source.read_bytes())
+        if rules is not None:
+            native_support.check_source(target,native_support.RULES_FILE,json.loads(rules))
+    except Exception:
+        import shutil
+        if target.resolve().parent != destination.resolve():
+            raise ValueError('The release folder is outside its destination')
+        shutil.rmtree(target)
+        raise
+    return target

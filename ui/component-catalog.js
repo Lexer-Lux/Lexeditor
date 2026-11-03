@@ -36,6 +36,8 @@
       sample: () => el("div", {class: "lex-reshade-actions"},
         el("button", {type: "button", class: "lex-dialog-action", onclick: () => {}}, "A button it made"),
         el("span", {}, "and a span"))},
+    {id: "compareRecords", level: "utility", summary: "Orders two records by a sort state {key, dir}, pinned property columns included (\"pin:\" keys read the row's values). Every paged list sorts with it, so a pinned column sorts across all pages."},
+    {id: "sortValueOf", level: "utility", summary: "The value a record sorts by for one column key: its own field, or a pinned property's value."},
     {id: "el", level: "utility", summary: "The same function as element. Plugins destructure it under the short name."},
     {id: "newButton", level: "atom", summary: "The standard button.",
       sample: () => el("div", {class: "lex-reshade-actions"},
@@ -69,6 +71,7 @@
     {id: "magnifyIcon", level: "atom", summary: "The magnifier glyph that opens a map at full size.", sample: () => UI.magnifyIcon()},
     {id: "settingsIcon", level: "atom", summary: "The settings glyph.", sample: () => UI.settingsIcon()},
     {id: "folderIcon", level: "atom", summary: "The folder glyph.", sample: () => UI.folderIcon()},
+    {id: "removeIcon", level: "atom", summary: "The remove glyph beside the copy icon.", sample: () => UI.removeIcon()},
     {id: "enabledMark", level: "atom", summary: "The mark on the shared list's enabled column.",
       sample: () => UI.enabledMark()},
     {id: "copyText", level: "atom", summary: "Copies a value to the clipboard and says so.",
@@ -112,16 +115,61 @@
     {id: "recordCard",level:"molecule",summary:"A named game-record preview with an optional ID, properties and hover action. Use a balanced tileGrid to keep rows even.",sample:()=>UI.tileGrid(Array.from({length:6},(_,index)=>UI.recordCard({title:`Enemy ${index+1}`,identity:index+1,action:el("button",{},"Choose enemy")})),{balanced:true,minWidth:150})},
     {id: "inlineLabel",level:"molecule",summary:"A name with inline icons at one shared size.",sample:()=>UI.inlineLabel(UI.infoIcon(),"Example item")},
     {id: "choiceField",level:"molecule",summary:"A value with a separate selection action.",sample:()=>UI.choiceField("Potion",el("button",{},UI.selectionIcon()))},
+    {id: "thingFinderField", level: "molecule", summary: "A linked value with its finder button.",
+      sample: () => UI.thingFinderField("Potion", {label: "Choose an item"})},
     {id: "statCard",level:"molecule",summary:"An image card with directional ranks and corner controls.",sample:()=>UI.statCard({ranks:["8","5","3","6"].map(value=>el("button",{},value)),corner:el("button",{},"+"),footer:"70"})},
     {id: "choicePopover",level:"molecule",summary:"An accessible menu of named choices.",sample:()=>{const menu=UI.choicePopover({choices:[{value:1,label:"First"},{value:2,label:"Second"}]});const button=el("button",{onclick:()=>menu.openFor(button)},"Choose");return button;}},
     {id: "mathFormula", level:"atom", summary:"A mathematical expression with fractions and powers.", sample:()=>UI.mathFormula("HP(L)=C+L*A+floor(10*L^2/B)")},
     {id: "controlGroup", level:"molecule", summary:"Any set of controls with aligned labels.", sample:()=>UI.controlGroup([{label:"Name",control:el("input",{value:"Potion"})},{label:"Count",control:el("input",{type:"number",min:0,max:99,value:2})}])},
+    {id: "soundPreview", level: "molecule", summary: "One sound's preview: a player when the game has a playable file for it, an honest note when it does not. A detail panel adopts the player into its heading with a scrubber.",
+      sample: () => {
+        // A quarter-second 440 Hz beep, synthesized so the sample needs no game.
+        const rate = 8000, count = 2000, data = new Uint8Array(44 + count * 2);
+        const view = new DataView(data.buffer);
+        const text = (at, string) => { for (let i = 0; i < string.length; i++) view.setUint8(at + i, string.charCodeAt(i)); };
+        text(0, "RIFF"); view.setUint32(4, 36 + count * 2, true); text(8, "WAVEfmt ");
+        view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+        view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true);
+        view.setUint16(32, 2, true); view.setUint16(34, 16, true); text(36, "data");
+        view.setUint32(40, count * 2, true);
+        for (let i = 0; i < count; i++)
+          view.setInt16(44 + i * 2, Math.round(12000 * Math.sin(i / rate * 440 * 2 * Math.PI) * (1 - i / count)), true);
+        let binary = "";
+        for (let i = 0; i < data.length; i += 8192)
+          binary += String.fromCharCode.apply(null, data.subarray(i, i + 8192));
+        const beep = "data:audio/wav;base64," + btoa(binary);
+        return el("div", {},
+          UI.detailPanel({title: "Example Sound", body: [UI.detailSection({title: "PREVIEW",
+            body: [UI.soundPreview({src: beep, label: "Play example"})]})]}),
+          UI.soundPreview({note: "No preview"}));
+      }},
+    {id: "audioColumn", level: "molecule", summary: "A table column of per-row play buttons: every sound row plays from the table, one sound at a time across the page.",
+      sample: () => {
+        // A tenth-second 440 Hz beep, synthesized so the sample needs no game.
+        const rate = 8000, count = 800, data = new Uint8Array(44 + count * 2);
+        const view = new DataView(data.buffer);
+        const text = (at, string) => { for (let i = 0; i < string.length; i++) view.setUint8(at + i, string.charCodeAt(i)); };
+        text(0, "RIFF"); view.setUint32(4, 36 + count * 2, true); text(8, "WAVEfmt ");
+        view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+        view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true);
+        view.setUint16(32, 2, true); view.setUint16(34, 16, true); text(36, "data");
+        view.setUint32(40, count * 2, true);
+        for (let i = 0; i < count; i++)
+          view.setInt16(44 + i * 2, Math.round(12000 * Math.sin(i / rate * 440 * 2 * Math.PI) * (1 - i / count)), true);
+        let binary = "";
+        for (let i = 0; i < data.length; i += 8192)
+          binary += String.fromCharCode.apply(null, data.subarray(i, i + 8192));
+        const beep = "data:audio/wav;base64," + btoa(binary);
+        return UI.audioColumn({src: beep}).render({name: "Example sound"});
+      }},
     {id: "stack", level: "template", summary: "A bar over the content it switches: the bar keeps its height, the content takes the rest."},
     {id: "bitmapText", level: "atom", summary: "Text in a game's own bitmap font, one masked glyph per character from --lex-bitmap-atlas."},
     {id: "imageMap", level: "organism", summary: "An image with selectable cells and point markers.", sample:()=>UI.imageMap({columns:4,rows:3,cells:Array.from({length:12},(_,id)=>({id,label:`Cell ${id+1}`,selected:id===3})),points:[{x:.5,y:.5,label:"Point"}]})},
     {id: "mapMagnifier", level: "organism", summary: "An enlarged map with top instructions, crosshair, live readout and optional details({refresh}) beside it; narrow layouts stack the panes.", sample:()=>UI.imageMap({fill:false,columns:4,rows:3,label:"Map with a magnifier",points:[{x:.5,y:.5,label:"Point"}],magnify:()=>({fill:false,columns:4,rows:3,label:"Map with a magnifier",points:[{x:.5,y:.5,label:"Point"}],readout:point=>`cell ${point.column}, ${point.row}`,place:()=>{}})})},
     {id: "modelStage", level: "organism", summary: "A turnable model's stage: the canvas a renderer draws into and the message shown until it has.",
       sample: () => UI.modelStage({message: "This item has no inventory mesh."})},
+    {id: "modelViewModes", level: "molecule", summary: "Corner buttons switching a 3D view between Regular, Fullbright and Wireframe. A stage mounts them; this puts them on any other host.",
+      sample: () => { const host = el("div", {style: "position:relative;min-height:120px;background:#141310;"}); UI.modelViewModes(host); return host; }},
     {id: "iconSlot", level: "atom", summary: "What fills a detail heading's icon box: a picture, a small stage, or a line saying why there is neither.",
       sample: () => UI.iconSlot({message: "No mesh"})},
     {id: "figureGrid", level: "organism", summary: "Pictures side by side, each over its caption.",
@@ -144,6 +192,8 @@
       sample: () => UI.iconValue({icon: UI.infoIcon(), label: "Fire", toggle: UI.element("input", {type: "checkbox"}), control: UI.element("input", {type: "number", value: 100})})},
     {id: "selectionIcon", level: "atom", summary: "The two-arrow mark for choosing between records.",
       sample: () => UI.selectionIcon()},
+    {id: "thingFinderButton", level: "atom", summary: "The button that opens the hold-to-choose record finder.",
+      sample: () => UI.thingFinderButton({label: "Choose a record", prompt: "Choose a record."})},
     {id: "actionRow", level: "molecule", summary: "Buttons that act on the thing above them, in one wrapping row.",
       sample: () => UI.actionRow(UI.element("button", {type: "button"}, "Install"), UI.element("button", {type: "button"}, "Open settings"))},
     {id: "notice", level: "molecule", summary: "A banner above a page: a title, a sentence and the one action that deals with it.",
@@ -151,6 +201,8 @@
         action: UI.element("button", {type: "button", class: "lex-dialog-action primary"}, "Clear cache")})},
     {id: "detailNote", level: "molecule", summary: "A sentence inside a section that is not a property.",
       sample: () => UI.detailNote("Nothing in this section applies to this record.")},
+    {id: "fileLocationButton", level: "molecule", summary: "A folder glyph for a detail header that reveals the record's file in Explorer; a mod replacement wins, and with neither file it sits disabled.",
+      sample: () => UI.fileLocationButton({plugin: "blank", modFile: "textures/example.png"})},
     {id: "toggleRow", level: "molecule", summary: "detailRow whose parts are all switches, laid out as many to a line as fit.",
       sample: () => UI.toggleRow({toggles: [
         {key: "menu", label: "Menu", checked: true, change: () => {}},
@@ -163,6 +215,8 @@
         {label: "MAG", control: el("input", {type: "number", value: "31"})}])},
     {id: "pager", level: "molecule", summary: "Page controls for a long list.",
       sample: () => UI.pager({page: 1, pages: 4, change: () => {}, inline: true})},
+    {id: "compactPager", level: "molecule", summary: "A pagination bar for narrow panels: search on its own row, controls and filters on one row, no position count.",
+      sample: () => UI.compactPager({page: 1, pages: 4, change: () => {}, search: {key: "lex-sample-compact", label: "Search records", value: "", change: () => {}}})},
     {id: "pagerSelect", level: "molecule", summary: "A filter beside the pager.",
       sample: () => UI.pagerSelect({label: "Category", change: () => {},
         options: [{value: "", label: "All categories"}, {value: "rare", label: "Rare"}]})},
@@ -199,6 +253,7 @@
       }},
 
     // ---- organisms -------------------------------------------------------
+    {id: "matrixTable", level: "organism", summary: "A two-axis table on the shared column list: the first column names the rows, the rest are the column axis's values, in a fixed order."},
     {id: "columnList", level: "organism", summary: "The shared list: columns, sorting, selection, pinning, the pointer.",
       sample: () => UI.columnList({rows, key: row => row.id, selected: 2, select: () => {},
         sortState: {key: "name", dir: 1}, sort: () => {}, enabledChange: () => {},
@@ -226,6 +281,13 @@
       sample: () => UI.modLoaderSection({loader: "Sample loader beside the game.",
         output: "Sample output folder.", order: "Sample load order.",
         safety: "Nothing of the game's own is written.", removal: "Delete the folder."})},
+    {id: "tweakPanel", level: "organism", summary: "One tweak mod's panel: title, help, an OFF mark while its mod is disabled, its fields, and why it cannot be used yet when it cannot."},
+    {id: "tweakModPanels", level: "organism", summary: "Every tweak mod's panel from its settings schema, as the Tweaks page's Mods subtab shows them."},
+    {id: "conflictMark", level: "atom", summary: "A red ! on a mod whose changes another enabled mod overrides, or that overrides another; its bubble lists them."},
+    {id: "tweaksPage", level: "template", summary: "A game's Tweaks page: the game's own pages (tweak mods first) as subtabs, and ReShade on a subtab of its own when the game has it. The page loads ReShade and runs its actions itself.",
+      sample: () => UI.tweaksPage({plugin: "catalog-sample", reshade: false, render: () => {},
+        pages: [{id: "mods", label: "Mods", body: () => [UI.tweakPanel("SAMPLE TWEAK", "A tweak mod's settings.", null,
+          [UI.detailField({label: "Strength", control: UI.el("input", {type: "number", min: 0, max: 10, value: 4})})])]}]})},
     {id: "reshadeSection", level: "organism", summary: "ReShade for one game: the switch, each effect and its controls.",
       // Its own sample state, so the section draws in full here whether or not
       // this machine has ReShade in a game.
@@ -249,6 +311,26 @@
       sample: () => UI.creditsPanel("blank")},
     {id: "dataMap", level: "organism", summary: "Which of a game's files Lexeditor understands."},
     {id: "curveEditor", level: "organism", summary: "A formula drawn as a curve, edited by its terms."},
+    {id: "animationViewer", level: "organism", summary: "An animations view: scrub bar with event cues, transport row and playback loop. The caller draws each frame.",
+      sample: () => {
+        const host = el("div", {style: "height:120px;"});
+        const timeline = el("div", {});
+        const canvas = el("canvas", {width: "320", height: "120"});
+        host.append(canvas);
+        const paint = canvas.getContext("2d");
+        UI.animationViewer({host, timeline, frames: {count: 24, duration: 1,
+            events: [{start: 0.25, label: "Cue"}]},
+          statusText: "Sample motion: 24 frames.",
+          render: shown => {
+            paint.fillStyle = "#222";
+            paint.fillRect(0, 0, 320, 120);
+            paint.fillStyle = "#7cf";
+            paint.beginPath();
+            paint.arc(20 + (shown / 23) * 280, 60, 12, 0, 7);
+            paint.fill();
+          }});
+        return el("div", {}, host, timeline);
+      }},
     {id: "soundCoverageTable", level: "organism", summary: "Which interface sounds a theme provides.",
       sample: () => UI.soundCoverageTable([{event: "save", label: "Save", provided: true},
         {event: "back", label: "Back", provided: false}])},
@@ -333,7 +415,7 @@
     {id: "EditHistory", level: "utility", summary: "Undo and redo over a page's own state."},
     {id: "NavigationHistory", level: "utility", summary: "Back and forward between tabs."},
     {id: "createModProject", level: "utility", summary: "Names a new mod, asks the host to create it, and lets the host restart the plugin on it. A page showing a game with no mod uses it for its own Create a mod button."},
-    {id: "gamepadNavigation", level: "utility", summary: "Drives the interface from a game controller: the d-pad and stick move focus, A activates or edits, B closes or goes back, the bumpers change tabs and the triggers change page. Every page that mounts the shared UI installs it, so a game becomes usable on a Steam Deck without adding anything."},
+    {id: "gamepadNavigation", level: "utility", summary: "Drives the interface from a game controller: the d-pad moves focus, the left stick changes the focused value (further is faster) or moves focus elsewhere, A activates or edits, B closes or goes back, the bumpers change tabs and the triggers change page. Every page that mounts the shared UI installs it, so a game becomes usable on a Steam Deck without adding anything."},
     {id: "installBrowserHistoryGuard", level: "utility", summary: "Keeps the browser's own back button in step."},
     {id: "installExtendedMouseHistory", level: "utility", summary: "The mouse's back and forward buttons."},
     {id: "installControlHelp", level: "utility", summary: "Attaches help to controls a page built itself."},

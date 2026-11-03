@@ -40,7 +40,8 @@ def main():
    for delta in (10,40,80,120,80,40,10,0,-40,0):
     page.mouse.move(x+delta,y);page.wait_for_timeout(40)
     moved=divider.bounding_box()['x']-box['x']
-    assert abs(moved-delta)<2,{'pointer':delta,'divider':moved}
+    assert abs(moved)<2,{'pointer':delta,'divider':moved}
+    assert not page.evaluate('document.body.classList.contains("lex-panel-layout-dragging")')
    page.mouse.up()
    page.evaluate("navigate('two')")
    page.evaluate("window.pywebview.api.ui_scale=async percent=>{window.__calls.push({scale:percent});return{percent};}")
@@ -74,14 +75,17 @@ def main():
    page.locator('#plugin-github').click(button='right');assert page.evaluate('window.__calls.some(row=>row.openRepository==="blank")')
    page.evaluate("navigate('three')");page.wait_for_timeout(400)
    divider=page.locator('.lex-panel-layout-divider:visible').first
-   box=divider.bounding_box();start=divider.get_attribute('aria-valuenow')
+   assert divider.get_attribute('aria-valuenow') is None
+   assert divider.evaluate('e=>getComputedStyle(e,"::before").content')=='none'
+   box=divider.bounding_box()
    page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2)
    page.mouse.down();page.mouse.move(box['x']+100,box['y']+box['height']/2,steps=30);page.mouse.up()
    page.wait_for_timeout(200)
    assert not page.evaluate('document.body.classList.contains("lex-panel-layout-dragging")')
-   assert divider.get_attribute('aria-valuenow')!=start
-   assert divider.evaluate('e=>getComputedStyle(e,"::before").height')=='32px'
-   divider.click(button='right');page.wait_for_timeout(200)
+   assert abs(divider.bounding_box()['x']-box['x'])<2
+   page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2,button='right')
+   page.wait_for_timeout(200)
+   assert abs(divider.bounding_box()['x']-box['x'])<2
    field=page.locator('.lex-boolean-field').first;checkbox=field.locator('input[type=checkbox]')
    geometry=field.evaluate("""e=>{const box=e.querySelector('input[type=checkbox]').getBoundingClientRect(),arrow=e.querySelector('.lex-field-boolean-arrow').getBoundingClientRect();return{height:e.getBoundingClientRect().height,boxY:box.y+box.height/2,arrowY:arrow.y+arrow.height/2}}""")
    # Include the reserved reference row beneath the checkbox.

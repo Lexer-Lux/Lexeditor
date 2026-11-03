@@ -1,24 +1,27 @@
-"""Shared component/tweak transactions. Imported manifests never execute code.
+"""Bundle mods: one library mod with several selectable components.
 
-Tweak callbacks are registered by a trusted plugin. They must persist their
-boolean state and make repeated writes idempotent. Loader adapters opt in to
-accepting component roots; the shared host owns selection and recovery.
+A bundle's mod.json declares its components (see `components`). Each
+component is a folder inside the bundle that the game's loader deploys on
+its own. Which components deploy is ordinary tweak settings: one on/off
+field per component, rendered by the shared tweak-settings UI from the
+schema `schema` derives, stored in the bundle's own settings.json next to
+the mod. There is no separate apply step and no library-wide bundle state:
+ticking a component saves it like any other setting, and the game's loader
+reads the saved selection the next time it deploys (a switch deploys at
+once, like every other Mods tab switch).
+
+A component's `tweaks` list is inert: it once named callbacks the game
+registered in-process, which no game does. The format is still validated
+so old bundles keep importing; nothing reads the names.
 """
-from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
-from typing import Callable
 
 from core.mod_library import metadata, relative_path, file_tree
 from core.plugin_files import atomic_write
 
-
-@dataclass(frozen=True)
-class BundledTweak:
-    name: str
-    read: Callable[[Path], bool]
-    write: Callable[[Path, bool], None]
+VALUES_FILE = "settings.json"
 
 
 def components(root: Path) -> list[dict]:
@@ -88,153 +91,86 @@ def inspect_bundle(root, files, adapter):
     return {'valid': not problems, 'problems': problems, 'packages': packages, 'assets': {}, 'notDeployed': []}
 
 
-class BundleManager:
-    def __init__(self, library: Path, game: Path, adapter, tweaks: dict[str, BundledTweak]):
-        self.library, self.game = Path(library).resolve(), Path(game).resolve()
-        self.adapter, self.tweaks = adapter, tweaks
-        self.state_path = self.library / '.bundles.json'
-        self.journal = self.library / '.bundles-pending.json'
+def schema(root: Path) -> dict:
+    """One on/off field per component, shaped like a tweak-mod schema.
 
-    def catalog(self):
-        result = {}
-        for root in sorted(self.library.iterdir()) if self.library.is_dir() else []:
-            if root.is_dir() and not root.name.startswith('.') and not root.is_symlink():
-                for row in components(root):
-                    token = root.name + '/' + row['id']
-                    result[token] = {**row, 'parent': str(root.resolve()), 'token': token}
-        return result
+    The shared tweak-settings UI renders this without any bundle-specific
+    surface. A component starts off: enabling a bundle never deploys a
+    part the reader did not tick.
+    """
+    fields = [{'key': row['id'], 'label': row['name'], 'type': 'bool',
+               'default': False, 'help': ''} for row in components(Path(root))]
+    return {'title': '', 'help': '', 'blocker': '', 'requires': [], 'conflicts': [],
+            'needsDriver': False, 'fields': fields}
 
-    def _read(self, path, fallback):
-        if not path.exists():
-            return fallback
-        value = json.loads(path.read_text('utf-8'))
-        if not isinstance(value, dict) or value.get('version') != 1:
-            raise ValueError('Invalid bundled mod state; restore its saved copy before continuing')
-        return value
 
-    def state(self):
-        default = {'version': 1, 'mods': [], 'components': []}
-        if not self.state_path.exists():
-            default['mods'] = list(self.adapter.active_mod_ids(self.game))
-        return self._read(self.state_path, default)
+def values(root: Path) -> dict:
+    """The reader's component selection over the all-off defaults.
 
-    def _paths(self, state, catalog):
-        mods, selected = state.get('mods'), state.get('components')
-        if not isinstance(mods, list) or not isinstance(selected, list):
-            raise ValueError('Invalid bundled selection')
-        if any(not isinstance(v, str) for v in mods + selected) or len(set(mods)) != len(mods) or len(set(selected)) != len(selected):
-            raise ValueError('Choose each mod and component once')
-        roots = []
-        for name in mods:
-            relative = relative_path(name)
-            root = (self.library / relative).resolve()
-            if len(relative.parts) != 1 or root.parent != self.library or not root.is_dir() or components(root):
-                raise ValueError('Choose standalone mods from this library, and bundle components individually')
-            roots.append(root)
-        for token in selected:
-            if token not in catalog:
-                raise ValueError(f'Unknown bundled component: {token}')
-            row = catalog[token]
-            missing = set(row['tweaks']) - self.tweaks.keys()
-            if missing:
-                raise ValueError('This game has not registered these tweaks: ' + ', '.join(sorted(missing)))
-            roots.append(Path(row['path']))
-        if selected and not getattr(self.adapter, 'supports_bundle_components', False):
+    Stored beside the bundle in settings.json, in the same shape as a
+    tweak mod's values. A stored value that is not on or off falls back
+    to its default instead of failing the whole mod.
+    """
+    root = Path(root)
+    fields = schema(root)['fields']
+    path = root / VALUES_FILE
+    if not path.exists():
+        return {field['key']: False for field in fields}
+    try:
+        stored = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError) as error:
+        raise ValueError(f'{VALUES_FILE} is not readable JSON: {error}') from error
+    stored = stored.get('values', {}) if isinstance(stored, dict) else {}
+    result = {}
+    for field in fields:
+        picked = stored.get(field['key'], False)
+        result[field['key']] = picked if type(picked) is bool else False
+    return result
+
+
+def save_values(root: Path, changes: dict) -> dict:
+    """Validate and store changed component switches; unknown keys are refused."""
+    root = Path(root)
+    known = [field['key'] for field in schema(root)['fields']]
+    if not isinstance(changes, dict):
+        raise ValueError('Settings must be an object')
+    unknown = sorted(set(changes) - set(known))
+    if unknown:
+        raise ValueError('Unknown settings: ' + ', '.join(unknown))
+    current = values(root)
+    for key, picked in changes.items():
+        if type(picked) is not bool:
+            raise ValueError(f'{key} must be on or off')
+        current[key] = picked
+    atomic_write(root / VALUES_FILE,
+                 (json.dumps({'values': current}, indent=2) + '\n').encode('utf-8'))
+    return current
+
+
+def selected_paths(root: Path, selected: dict | None = None) -> list[Path]:
+    """The enabled components' folders, in bundle order."""
+    root = Path(root)
+    picked = values(root) if selected is None else selected
+    return [Path(row['path']) for row in components(root) if picked.get(row['id']) is True]
+
+
+def expand_roots(roots, adapter=None) -> list[Path]:
+    """Replace each bundle with its enabled components' folders.
+
+    The game's loader keeps receiving plain mod folders; only the host
+    knows some came out of a bundle. A bundle on a loader without
+    component support is refused the same way its import is.
+    """
+    expanded = []
+    for root in roots:
+        rows = components(Path(root))
+        if not rows:
+            expanded.append(Path(root))
+            continue
+        if adapter is not None and not getattr(adapter, 'supports_bundle_components', False):
             raise ValueError('This game loader does not support bundled components yet')
-        names = [p.name.casefold() for p in roots]
-        if len(set(names)) != len(names):
-            raise ValueError('Active mod and component folders must have distinct names for this loader')
-        return roots
-
-    def snapshot(self):
-        catalog, state = self.catalog(), self.state()
-        selected = set(state['components'])
-        rows = []
-        for token, row in catalog.items():
-            unknown = set(row['tweaks']) - self.tweaks.keys()
-            error = ('Unregistered tweaks: ' + ', '.join(sorted(unknown))) if unknown else ''
-            if not getattr(self.adapter, 'supports_bundle_components', False):
-                error = 'This game loader does not support bundled components yet.'
-            links = [{'id': key, 'name': self.tweaks[key].name if key in self.tweaks else key}
-                     for key in row['tweaks']]
-            rows.append({**row, 'enabled': token in selected, 'linkedTweaks': links, 'error': error})
-        used = {key for row in catalog.values() for key in row['tweaks']}
-        tweak_rows = []
-        for key in sorted(used & self.tweaks.keys()):
-            actual = self.tweaks[key].read(self.game)
-            if type(actual) is not bool:
-                raise ValueError(f'Tweak {key} did not report a boolean state')
-            owners = [token for token, row in catalog.items() if key in row['tweaks']]
-            expected = any(token in selected for token in owners)
-            tweak_rows.append({'id': key, 'name': self.tweaks[key].name, 'enabled': actual,
-                               'components': owners, 'inconsistent': actual != expected})
-        expected = {p.name for p in self._paths(state, catalog)} if self.state_path.exists() else None
-        deployment_differs = expected is not None and expected != set(self.adapter.active_mod_ids(self.game))
-        return {'components': rows, 'tweaks': tweak_rows, 'selection': state,
-                'inconsistent': deployment_differs or any(t['inconsistent'] for t in tweak_rows),
-                'recoveryRequired': self.journal.exists()}
-
-    def _save(self, path, value):
-        atomic_write(path, (json.dumps(value, indent=2) + '\n').encode())
-
-    def _restore(self, pending, catalog):
-        # Restore persisted tweak settings before recomposing the prior mod set.
-        for key, value in pending['tweaks'].items():
-            if key not in self.tweaks or type(value) is not bool:
-                raise ValueError('A registered tweak is missing during recovery')
-            self.tweaks[key].write(self.game, value)
-            if self.tweaks[key].read(self.game) is not value:
-                raise ValueError(f'Tweak {key} could not be restored')
-        roots = self._paths(pending['before'], catalog)
-        self.adapter.activate(roots, self.game)
-        if set(self.adapter.active_mod_ids(self.game)) != {p.name for p in roots}:
-            raise ValueError('The loader did not restore the previous component selection')
-        self._save(self.state_path, pending['before'])
-        self.journal.unlink()
-
-    def recover(self):
-        if self.journal.exists():
-            self._restore(self._read(self.journal, None), self.catalog())
-
-    def activate(self, mods, selected):
-        if self.journal.exists():
-            raise ValueError('Recover the interrupted bundled mod change before applying another selection')
-        catalog, before = self.catalog(), self.state()
-        after = {'version': 1, 'mods': mods, 'components': selected}
-        roots = self._paths(after, catalog)
-        self._paths(before, catalog)  # Prove rollback can address all prior sources.
-        used = {key for row in catalog.values() for key in row['tweaks']} & self.tweaks.keys()
-        prior = {key: self.tweaks[key].read(self.game) for key in used}
-        if any(type(value) is not bool for value in prior.values()):
-            raise ValueError('A linked tweak did not report a boolean state')
-        pending = {'version': 1, 'before': before, 'after': after, 'tweaks': prior}
-        self._save(self.journal, pending)
-        try:
-            for key in sorted(used):
-                wanted = any(key in catalog[token]['tweaks'] for token in selected)
-                self.tweaks[key].write(self.game, wanted)
-                if self.tweaks[key].read(self.game) is not wanted:
-                    raise ValueError(f'Tweak {key} did not persist the requested state')
-            self.adapter.activate(roots, self.game)
-            if set(self.adapter.active_mod_ids(self.game)) != {p.name for p in roots}:
-                raise ValueError('The loader did not persist the requested component selection')
-            self._save(self.state_path, after)
-            self.journal.unlink()
-        except Exception as error:
-            try:
-                self._restore(pending, catalog)
-            except Exception as recovery:
-                raise RuntimeError(f'{error}. Rollback needs recovery: {recovery}') from error
-            raise
-        return self.snapshot()
-
-    def toggle_tweak(self, key, enabled):
-        if type(enabled) is not bool or key not in self.tweaks:
-            raise ValueError('Choose a registered tweak and a boolean state')
-        catalog, state = self.catalog(), self.state()
-        owners = {token for token, row in catalog.items() if key in row['tweaks']}
-        if not owners:
-            raise ValueError('This tweak is not linked to a bundled component')
-        selected = set(state['components'])
-        selected = selected | owners if enabled else selected - owners
-        return self.activate(state['mods'], sorted(selected))
+        expanded.extend(selected_paths(Path(root)))
+    names = [path.name.casefold() for path in expanded]
+    if len(set(names)) != len(names):
+        raise ValueError('Active mod and component folders must have distinct names for this loader')
+    return expanded

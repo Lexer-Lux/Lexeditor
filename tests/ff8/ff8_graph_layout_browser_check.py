@@ -36,7 +36,7 @@ def main():
   page.evaluate("""()=>{for(const [i,title] of ['HP','STR','VIT','MAG','SPR','SPD','LUCK','XP'].entries()){
    const formula=i===7?'XP(L) = 10 * (L - 1) * A + floor((L - 1)^2 * B / 256)':i===0?'HP(L)=L*A-trunc(10*L*L/B)+C':'STR(L)=trunc((trunc(L*A/10)+trunc(L/B)-trunc(L*L/(2*D))+C)/4)';
    const variables=[...'ABCD'].map(label=>({label,control:LexeditorUI.el('input',{type:'number',value:20,min:0,max:255})}));
-   document.querySelector('#mount').append(LexeditorUI.curveEditor({title,className:'ff8-character-curve',variables,overlayExtrema:true,domain:{min:1,max:100},range:{min:0,max:i===7?100000:255},evaluate:x=>i===7?1000*(x-1):i===0?x*2:0,formula:LexeditorUI.mathFormula(formula)}));}}""")
+   document.querySelector('#mount').append(LexeditorUI.curveEditor({title,className:'ff8-character-curve',variables,overlayExtrema:true,domain:{min:1,max:100},range:{min:0,max:i===7?100000:255},evaluate:x=>i===7?1000*(x-1):i===0?x*2:0,formula:LexeditorUI.mathFormula(formula,{variables})}));}}""")
   page.wait_for_timeout(400)
   cards=page.locator('.ff8-character-curve')
   for i in range(8):

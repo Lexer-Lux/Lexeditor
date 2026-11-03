@@ -26,6 +26,12 @@
     try{
       const dataset=state.activeSource==="mine"?"current":state.activeSource;
       const current=await api(`/api/field?map=${encodeURIComponent(row.key)}&dataset=${encodeURIComponent(dataset)}`),vanilla=state.activeSource==="mine"?await api(`/api/field?map=${encodeURIComponent(row.key)}&dataset=vanilla`):current;
+      // The guard above inserted _loading before the fetch, while the vanilla
+      // row appends it after its detail: same values, different key order, and
+      // the row compare is order-sensitive, so the map read as changed the
+      // moment it was clicked. Drop _loading first so the assign appends it
+      // last like the vanilla row's.
+      delete row._loading;
       Object.assign(row,current,{_loaded:true,_loading:false});
       const vanillaRow=fieldMapRow(state.vanilla,row.key);if(vanillaRow)Object.assign(vanillaRow,clone(vanilla),{_loaded:true,_loading:false});
       const baseIndex=state.base.fields?.findIndex(value=>value.key===row.key)??-1;if(baseIndex>=0)state.base.fields[baseIndex]=clone(row);touchHistoryBaseRow("fields",row.key);
@@ -198,10 +204,11 @@
     // The filters sit on the picture panel's own sides, not in panels of
     // their own (Lexer: "why did you create two panels for these buttons
     // instead of just putting those buttons on the sides of the panel").
-    return el("div",{class:"field-preview-sides"},
-      el("div",{class:"field-preview-layers"},toggleRow({label:"Background layers",columns:1,minimum:80,toggles:layers})),
-      picture,
-      el("div",{class:"field-preview-states"},toggleRow({label:"Background states",columns:1,minimum:80,toggles:[hide,...states]})));
+    picture.lexSideControls({
+      left:el("div",{class:"field-preview-layers"},toggleRow({label:"Background layers",columns:1,minimum:80,toggles:layers})),
+      right:el("div",{class:"field-preview-states"},toggleRow({label:"Background states",columns:1,minimum:80,toggles:[hide,...states]}))});
+    picture.classList.add("field-preview-sides");
+    return picture;
   }
   const fieldTileDefinitions=[
     ["x","DESTINATION X",-32768,32767,"Horizontal destination of this 16 by 16 tile."],["y","DESTINATION Y",-32768,32767,"Vertical destination of this 16 by 16 tile."],["z","DESTINATION Z",0,65535,"Draw-order depth stored by this tile."],["sourceX","SOURCE X",0,255,"Horizontal source coordinate in the MIM texture."],["sourceY","SOURCE Y",0,255,"Vertical source coordinate in the MIM texture."],["texture","TEXTURE",0,15,"MIM texture page selected by this tile."],["palette","PALETTE",0,15,"MIM palette selected by indexed-colour tiles."],["blend","ALPHA",0,3,"Two-bit alpha mode stored in the packed texture word."],["draw","DRAW",0,1,"When off, this tile draws black instead of its MIM pixels."],["depth","COLOUR TYPE",0,3,"Stored colour-depth selector used to read the MIM pixels."],["layer","LAYER",0,255,"New-format background layer used by the preview filter."],["blendType","ALPHA TYPE",0,4,"New-format pixel blend operation."],["parameter","PARAMETER",0,255,"Field-script background parameter. 255 is unconditional."],["state","STATE",0,255,"State paired with the background parameter."]
@@ -236,11 +243,24 @@
     const cameras=row.camera?.cameras||[];
     const camera=cameras.length?detailField({label:"Overlay camera",help:infoHelp("The camera that projects the walkmesh, exits and triggers onto the picture. This is the same choice as on the Camera tab. It changes only the preview."),control:selectControl(fieldOverlayCameraId(row),cameras.map(entry=>({id:entry.id,name:`Camera ${entry.id+1}`})),value=>{state.fieldCameraSelection[row.key]=Number(value);rerenderFields()})}):null;
     showVertices(mesh.triangles[triangleId]);
-    return detailPanel({title:"Triangle",identity:picker,className:"field-triangle-detail",body:[camera,vertexPanel]});
+    return detailPanel({paginate:{unpaged:true},title:"Triangle",identity:picker,className:"field-triangle-detail",body:[camera,vertexPanel]});
   }
-  const fieldDetailTabs=[{id:"tile",label:"Tile",help:"The background is built from 16 by 16 image tiles. Select a tile by number or click it in the picture, then change its position, texture or draw settings."},{id:"camera",label:"Camera",help:"Edit the fixed camera setups stored in this field's .ca file. Each camera has three axis vectors, a position, and a zoom. The picture's overlay uses the selected camera."},{id:"walkmesh",label:"Walkmesh",help:"The walkmesh is the surface on which characters can move. Select a triangle by number or click it in the picture. Orange marks the selected triangle. Move its corners with X, Y and Z, and set which neighbour each edge leads to. Outside this tab the walkmesh is drawn faintly and shows no selection."},{id:"exits",label:"Exits",help:"Edit the gateway exit lines that leave this field. Crossing an exit line loads the target field and places the player at its destination point. A X, A Y and A Z are the first end of the exit line, B the second end, and TO the point where the player arrives in the target field. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."},{id:"doors",label:"Doors",help:"Enable door triggers and set which field script door line each one opens. A trigger with Used off stores door ID 255 and never fires."},{id:"ranges",label:"Camera Ranges",help:"Camera ranges limit how far the view can scroll across this location. Screen ranges define the field screen bounds. Set the top, bottom, left and right edges for the selected range. Some field formats omit these values; those ranges are read-only. The selected field's .inf header is quoted here as its variant and byte size: the variant decides which ranges the file actually stores, and a range it does not store shows Deling's defaults and cannot be edited."},{id:"movie",label:"Movie Camera",help:"Edit the movie camera frames stored in this field's .msk file. Each frame holds four vertices that steer the camera during scripted sequences."},{id:"misc",label:"Misc.",help:"Edit this field's header values, random encounters, and Triple Triad player parameters. Parts of the location that are not editable are listed too."},{id:"scripts",label:"Field Scripts",help:"Edit the JSM field scripts that control events in this location, one instruction per line. Saving validates the methods and rebuilds branches."},{id:"dialogue",label:"Dialogue",help:"Edit the dialogue lines shown by this field's scripts. Keep each line's number and control codes. Unused fields may hold untranslated test text."},{id:"triggers",label:"Triggers",help:"Edit the trigger lines that start field script door or event actions when crossed. Each trigger fires the door ID set on the Doors tab. A X, A Y and A Z are the first end of the trigger line and B the second end. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."}];
+  const fieldDetailTabs=[{id:"tile",label:"Tile",help:"The background is built from 16 by 16 image tiles. Select a tile by number or click it in the picture, then change its position, texture or draw settings."},{id:"camera",label:"Camera",help:"The cameras for this field, in three pages. Position edits the fixed camera setups. Ranges limits how far the view scrolls. Movie edits the movie camera frames. The picture's overlay uses the selected camera."},{id:"walkmesh",label:"Walkmesh",help:"The walkmesh is the surface on which characters can move. Select a triangle by number or click it in the picture. Orange marks the selected triangle. Move its corners with X, Y and Z, and set which neighbour each edge leads to. Outside this tab the walkmesh is drawn faintly and shows no selection."},{id:"exits",label:"Exits",help:"Edit the gateway exit lines that leave this field. Crossing an exit line loads the target field and places the player at its destination point. A X, A Y and A Z are the first end of the exit line, B the second end, and TO the point where the player arrives in the target field. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."},{id:"doors",label:"Doors",help:"Enable door triggers and set which field script door line each one opens. A trigger with Used off stores door ID 255 and never fires."},{id:"misc",label:"Misc.",help:"Edit this field's header values, random encounters, and Triple Triad player parameters. Parts of the location that are not editable are listed too."},{id:"scripts",label:"Field Scripts",help:"Edit the JSM field scripts that control events in this location, one instruction per line. Saving validates the methods and rebuilds branches."},{id:"dialogue",label:"Dialogue",help:"Edit the dialogue lines shown by this field's scripts. Keep each line's number and control codes. Unused fields may hold untranslated test text."},{id:"triggers",label:"Triggers",help:"Edit the trigger lines that start field script door or event actions when crossed. Each trigger fires the door ID set on the Doors tab. A X, A Y and A Z are the first end of the trigger line and B the second end. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."}];
   fieldDetailTabs.push({id:"worldToField",label:"World → Field",help:"Where the player arrives after entering a field from the world map. Select an entry to change its field, position or walkmesh triangle. The panel opens on an arrival for the selected field, when one exists. The table does not store a world-map position. Test changed arrivals in the game."});
-  function fieldDetailHelp(id){return infoHelp(fieldDetailTabs.find(tab=>tab.id===id).help)}
+  // The Camera tab holds three pages: the fixed camera setups (Position),
+  // the scroll ranges, and the movie camera frames. Ranges and Movie used
+  // to be tabs of their own beside Camera.
+  const fieldCameraSubtabs=[{id:"position",label:"Position",help:"Edit the fixed camera setups stored in this field's .ca file. Each camera has three axis vectors, a position, and a zoom. The picture's overlay uses the selected camera."},{id:"ranges",label:"Ranges",help:"Camera ranges limit how far the view can scroll across this location. Screen ranges define the field screen bounds. Set the top, bottom, left and right edges for the selected range. Some field formats omit these values; those ranges are read-only. The selected field's .inf header is quoted here as its variant and byte size: the variant decides which ranges the file actually stores, and a range it does not store shows Deling's defaults and cannot be edited."},{id:"movie",label:"Movie",help:"Edit the movie camera frames stored in this field's .msk file. Each frame holds four vertices that steer the camera during scripted sequences."}];
+  function fieldDetailHelp(id){const tab=fieldDetailTabs.find(tab=>tab.id===id)||fieldCameraSubtabs.find(tab=>tab.id===id);return infoHelp(tab.help)}
+  function fieldCameraPanel(row){
+    const sub=fieldCameraSubtabs.some(tab=>tab.id===state.fieldCameraSubtab)?state.fieldCameraSubtab:"position";
+    state.fieldCameraSubtab=sub;
+    let body=sub==="ranges"?fieldRangesSection(row):sub==="movie"?fieldMovieSection(row):fieldCameraSection(row);
+    // The sub-tab already supplies its name and help, like the outer tabs.
+    const parts=LexeditorUI.sectionParts(body);
+    if(parts.content)body=parts.content;
+    return LexeditorUI.tabbedPanel({paginate:{unpaged:true},tabs:fieldCameraSubtabs,active:sub,label:"Camera",change:value=>{state.fieldCameraSubtab=value;rerenderFields()},content:body});
+  }
   function fieldCameraControl(row,camera,field,axis=null){
     const vector=field.startsWith("axis")?Number(field.slice(4)):null,vanilla=fieldMapRow(state.vanilla,row.key)?.camera?.cameras?.[camera.id];
     const read=value=>vector===null?(axis?value?.[field]?.[axis]:value?.[field]):value?.axis?.[vector]?.[axis],write=(target,val)=>{if(vector===null){if(axis)target[field][axis]=val;else target[field]=val}else target.axis[vector][axis]=val};
@@ -366,17 +386,17 @@
     if(active==="walkmesh")return fieldWalkmeshSection(row);
     if(active==="exits")return fieldExitsSection(row);
     if(active==="doors")return fieldDoorsSection(row);
-    if(active==="ranges")return fieldRangesSection(row);
-    if(active==="movie")return fieldMovieSection(row);
     if(active==="misc")return fieldMiscSection(row);
     if(active==="scripts")return fieldScriptsSection(row);
     if(active==="dialogue")return fieldDialogueSection(row);
     if(active==="triggers")return fieldTriggersSection(row);
-    return fieldCameraSection(row);
+    return fieldCameraPanel(row);
   }
   function fieldDetail(row,prefs){
     if(!row._loaded&&state.fieldDetailTab!=="worldToField"){ensureFieldDetail(row);return sharedDetail(row,prefs,[el("div",{class:"field-empty"},row._error?`This map could not be opened: ${row._error}`:"Reading this field map...")],"field-map-detail",row.key)}
     const tabs=[...fieldDetailTabs].sort((a,b)=>a.label.localeCompare(b.label));
+    if(state.fieldDetailTab==="ranges"){state.fieldDetailTab="camera";state.fieldCameraSubtab="ranges"}
+    if(state.fieldDetailTab==="movie"){state.fieldDetailTab="camera";state.fieldCameraSubtab="movie"}
     const active=tabs.some(tab=>tab.id===state.fieldDetailTab)?state.fieldDetailTab:"camera";
     state.fieldDetailTab=active;
     if(active==='worldToField'){
@@ -385,9 +405,9 @@
         const arrival=state.data.wm2field.rows.find(entry=>row.mapId!=null&&Number(entry.fieldId)===Number(row.mapId));
         state.selected.wm2field=arrival?.id??null;state.filters.wm2field='';state.pages.wm2field=0;
       }
-      return LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:renderWorldToField()});
+      return LexeditorUI.tabbedPanel({paginate:{unpaged:true},tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:renderWorldToField()});
     }
-    const preview=LexeditorUI.detailPanel({title:row.name.toLocaleUpperCase(),headingOverlay:true,body:fieldBackgroundPanels(row,fieldPreviewView(row)),className:"field-map-detail"});
+    const preview=LexeditorUI.detailPanel({paginate:{unpaged:true},title:row.name.toLocaleUpperCase(),headingOverlay:true,body:fieldBackgroundPanels(row,fieldPreviewView(row)),className:"field-map-detail"});
     // The picture's help sits in its own corner, outside the heading that
     // fades away while the picture is hovered.
     preview.append(el("span",{class:"lex-media-help"},infoHelp("The picture shows the background, walkmesh, exits and triggers through the selected camera. On the Tile or Walkmesh tab, click the picture to select a tile or triangle. The filters beside the picture change only this preview.")));
@@ -398,7 +418,10 @@
     const parts=LexeditorUI.sectionParts(body);
     const recordPanel=active==="tile"||active==="walkmesh";
     if(parts.content&&!recordPanel)body=parts.content;
-    const editor=LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:recordPanel?body:LexeditorUI.detailPanel({heading:false,body})});
+    // A tab holding only a table hands the table over bare: the tab content's
+    // fill rules make it the whole panel, with no wrapper margins.
+    const tableOnly=body instanceof Element&&body.classList.contains("lex-column-list");
+    const editor=LexeditorUI.tabbedPanel({paginate:{unpaged:true},tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:recordPanel||tableOnly?body:LexeditorUI.detailPanel({paginate:{unpaged:true},heading:false,body})});
     // Three columns by default: list, picture, tabs. The Deling-style setting
     // stacks the picture over the tabs instead, as Deling does.
     const deling=state.editorSettings?.delingFieldLayout===true;
@@ -410,7 +433,16 @@
   function rerenderWorldMap(){renderWorldMap()}
 
   function initOwner(dataset,kind,id=0){const init=dataset?.init;if(!init)return null;if(kind==="general"||kind==="config")return init[kind];if(kind==="gf")return init.gfs.rows.find(row=>Number(row.id)===Number(id));if(kind==="character")return init.characters.rows.find(row=>Number(row.id)===Number(id));return null}
-  function initFieldSource(field,kind,id=0){const vanilla=initOwner(state.vanilla,kind,id)?.fields?.find(value=>value.field===field.field),references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:initOwner(state.referenceData[reference.id],kind,id)?.fields?.find(value=>value.field===field.field)?.value})).filter(entry=>entry.value!==undefined);return sourceControl(fieldControl(field),()=>field.value,vanilla?.value,references,value=>field.value=field.control==="boolean"?Boolean(value):Number(value))}
+  function initFieldSource(field,kind,id=0){
+    const vanilla=initOwner(state.vanilla,kind,id)?.fields?.find(value=>value.field===field.field),references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:initOwner(state.referenceData[reference.id],kind,id)?.fields?.find(value=>value.field===field.field)?.value})).filter(entry=>entry.value!==undefined);
+    const set=value=>{
+      if(field.lookup?.type==="flags"){
+        const writable=field.lookup.entries.filter(entry=>!entry.readonly).reduce((mask,entry)=>mask|Number(entry.mask??entry.value),0);
+        field.value=(field.value&~writable)|(Number(value)&writable);
+      }else field.value=field.control==="boolean"?Boolean(value):Number(value);
+    };
+    return sourceControl(fieldControl(field),()=>field.value,vanilla?.value,references,set);
+  }
   function startingFields(fields,kind,id=0){return LexeditorUI.tileGrid(fields.map(field=>detailField({label:field.label,help:field.help?infoHelp(field.help):null,control:initFieldSource(field,kind,id),dataType:field.control==="boolean"?"BOOL":field.lookup?.type==="enum"?"ENUM":field.lookup?.type==="flags"?"FLAGS":"INT",min:field.minimum,max:field.maximum})))}
   function startingPicker(label,value,rows,change){return detailField({label,control:selectControl(value,rows.map(row=>({id:row.id,name:row.name})),change)})}
   function initNestedReferences(read){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(state.referenceData[reference.id]?.init)})).filter(entry=>entry.value!==undefined)}
@@ -420,9 +452,9 @@
     const tabs=[{id:"general",label:"General",help:"Set the party, progress and options used when a new game begins."},{id:"characters",label:"Characters",help:"Set each character’s initial stats, equipment, status and magic stock."},{id:"inventory",label:"Inventory",help:"Set the items and quantities given at the start of a new game."}],toolbar=$("#toolbar");toolbar.hidden=false;toolbar.replaceChildren(subtabBar({tabs,active:state.startingTab,label:"Starting data",change:value=>{state.startingTab=value;renderStartingData()}}));
     let body,title;
     if(state.startingTab==="characters"){
-      const rows=state.data.init.characters.rows,row=rows.find(value=>value.id===state.selected.startingCharacter)||rows[0];state.selected.startingCharacter=row.id;const pageSize=state.pageSizes.startingMagic,pages=Math.max(1,Math.ceil(row.magics.length/pageSize));state.pages.startingMagic=Math.min(state.pages.startingMagic,pages-1);const visible=row.magics.slice(state.pages.startingMagic*pageSize,(state.pages.startingMagic+1)*pageSize),controls=new Map(visible.map(slot=>[slot.slot,startingMagicControl(row,slot)])),table=columnList({rows:visible,key:slot=>slot.slot,class:"starting-magic-table ff8-record-list",editable:true,template:"70px minmax(180px,1fr) minmax(90px,130px)",columns:[{key:"slot",label:"Slot",render:slot=>slot.slot+1},{key:"magic",label:"Magic",render:slot=>controls.get(slot.slot).magic},{key:"quantity",label:"Quantity",numeric:true,render:slot=>controls.get(slot.slot).quantity}]}),pageBar=pager({page:state.pages.startingMagic,pages,total:row.magics.length,pageSize,noun:"magic slots",change:value=>{state.pages.startingMagic=value;renderStartingData()}});title="STARTING CHARACTERS";body=[startingPicker("CHARACTER",row.id,rows,value=>{state.selected.startingCharacter=value;state.pages.startingMagic=0;renderStartingData()}),detailSection({title:"CHARACTER STATE",body:startingFields(row.fields,"character",row.id)}),detailSection({title:"MAGIC STOCK",body:[table,pageBar]})];
+      const rows=state.data.init.characters.rows,row=rows.find(value=>value.id===state.selected.startingCharacter)||rows[0];state.selected.startingCharacter=row.id;const pageSize=state.pageSizes.startingMagic,pages=Math.max(1,Math.ceil(row.magics.length/pageSize));state.pages.startingMagic=Math.min(state.pages.startingMagic,pages-1);const visible=row.magics.slice(state.pages.startingMagic*pageSize,(state.pages.startingMagic+1)*pageSize),controls=new Map(visible.map(slot=>[slot.slot,startingMagicControl(row,slot)])),table=columnList({rows:visible,key:slot=>slot.slot,class:"starting-magic-table ff8-record-list",editable:true,template:"70px minmax(180px,1fr) minmax(90px,130px)",columns:[{key:"slot",label:"Slot",render:slot=>slot.slot+1},{key:"magic",label:"Magic",render:slot=>controls.get(slot.slot).magic},{key:"quantity",label:"Quantity",numeric:true,render:slot=>controls.get(slot.slot).quantity}]}),pageBar=pager({inline:true,page:state.pages.startingMagic,pages,total:row.magics.length,pageSize,noun:"magic slots",change:value=>{state.pages.startingMagic=value;renderStartingData()}});title="STARTING CHARACTERS";body=[startingPicker("CHARACTER",row.id,rows,value=>{state.selected.startingCharacter=value;state.pages.startingMagic=0;renderStartingData()}),detailSection({title:"CHARACTER STATE",body:startingFields(row.fields,"character",row.id)}),detailSection({title:"MAGIC STOCK",body:[table,pageBar]})];
     }else if(state.startingTab==="inventory"){
       const rows=state.data.init.inventory.rows,pageSize=state.pageSizes.startingInventory,pages=Math.max(1,Math.ceil(rows.length/pageSize));state.pages.startingInventory=Math.min(state.pages.startingInventory,pages-1);const visible=rows.slice(state.pages.startingInventory*pageSize,(state.pages.startingInventory+1)*pageSize),controls=new Map(visible.map(slot=>[slot.slot,startingInventoryControls(slot)])),table=columnList({rows:visible,key:slot=>slot.slot,class:"starting-inventory-table ff8-record-list lex-page-sized-table",editable:true,template:"70px minmax(220px,1fr) minmax(90px,140px)",columns:[{key:"slot",label:"Slot",render:slot=>slot.slot+1},{key:"item",label:"Item",render:slot=>controls.get(slot.slot).item},{key:"quantity",label:"Quantity",numeric:true,render:slot=>controls.get(slot.slot).quantity}]});table.style.setProperty("--lex-page-row-count",String(pageSize));const pageBar=pager({inline:true,page:state.pages.startingInventory,pages,total:rows.length,pageSize,noun:"inventory slots",change:value=>{state.pages.startingInventory=value;renderStartingData()}});title="STARTING INVENTORY";body=LexeditorUI.pagedPane(table,pageBar);
     }else{title="STARTING DATA";body=[detailSection({title:"PARTY AND PROGRESS",body:startingFields(state.data.init.general.fields,"general")}),detailSection({title:"CONFIG",body:startingFields(state.data.init.config.fields,"config")})]}
-    $("#main").replaceChildren(detailPanel({heading:false,body}));
+    $("#main").replaceChildren(detailPanel({paginate:{unpaged:true},heading:false,body}));
   }

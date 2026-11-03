@@ -134,3 +134,33 @@ def test_a_short_click_shows_a_candidate_and_a_hold_picks_it(page):
     page.mouse.up()
     assert page.evaluate('accepted') == [7]
     assert page.evaluate('shown') == [7]
+
+
+def test_finder_clear_choice_accepts_and_returns_home(page):
+    # A finder that names a clear value offers it in the bar: choosing it
+    # accepts the value and goes back, the way a held candidate does.
+    framework(page)
+    mount_shell(page, developer=False)
+    page.evaluate('''() => {
+      window.accepted = [];
+      window.origins = 0;
+      LexeditorUI.beginSearcher({type:'items', prompt:'Choose the item',
+        target(){}, origin(){ origins++; },
+        accept:(value,label)=>accepted.push([value,label]),
+        clearValue:'-1', clearLabel:'None'});
+    }''')
+    page.locator('.lex-searcher-clear').click()
+    assert page.evaluate('window.accepted') == [['-1', 'None']]
+    assert page.evaluate('window.origins') == 1
+    assert page.locator('.lex-searcher-bar').count() == 0
+
+
+def test_finder_without_a_clear_value_shows_no_clear_button(page):
+    framework(page)
+    mount_shell(page, developer=False)
+    page.evaluate('''() => {
+      LexeditorUI.beginSearcher({type:'items', prompt:'Choose the item',
+        target(){}, origin(){}, accept(){}});
+    }''')
+    assert page.locator('.lex-searcher-clear').count() == 0
+    page.evaluate('LexeditorUI.finishSearcher(false)')

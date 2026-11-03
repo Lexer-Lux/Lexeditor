@@ -2,11 +2,13 @@
   "id": "ds1",
   "name": "Dark Souls Remastered",
   "accent": "#a4824c",
+  "lexmod": "Lexer-Lux/Lexers-Mod-For-DS1",
   "processNames": ["DarkSoulsRemastered.exe"],
   "canLaunch": false,
   "projects": {
     "rootEnv": "LEXEDITOR_DS1_PROJECT",
     "requiredPaths": [".lexeditor-ds1-project"],
+    "requiredAny": [[".lexeditor-ds1-project"], ["mod.json"]],
     "contentTypes": [["Game parameters", [".dcx"]]],
     "templateRoot": "project-template"
   },

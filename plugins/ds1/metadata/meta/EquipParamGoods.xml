@@ -7,7 +7,7 @@
     <weight />
     <basicPrice />
     <sellValue />
-    <behaviorId />
+    <behaviorId Refs="BehaviorParam_PC" />
     <replaceItemId Refs="EquipParamGoods" />
     <sortId />
     <qwcId Obsolete="" />

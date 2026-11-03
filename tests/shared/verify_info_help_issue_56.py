@@ -1,13 +1,14 @@
 """Shared filled-circle help-marker contract for Lexeditor issue 56."""
 
 from pathlib import Path
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
-rdr2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+ff8 = plugin_ui('ff8')
+rdr2 = plugin_ui('rdr2')
 
 
 def require(condition: bool, message: str) -> None:

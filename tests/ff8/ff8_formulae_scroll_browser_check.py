@@ -11,7 +11,6 @@ inside the window. It then turns the tweak off and requires the subtab to
 stay open on the same cards. It sends no writes.
 """
 import json
-import os
 import sys
 import tempfile
 import threading
@@ -39,16 +38,7 @@ mod = Path(fixture.name) / "project" / ".lexeditor-mods" / "Formulae Rework"
 (mod / "script" / "tweak.py").write_text(
     "def build(settings, context):\n    return {}\n\ndef describe(settings, context):\n    return "
     + repr({"formulas": rows, "available": True, "blocker": ""}) + "\n", encoding="utf-8")
-previous_trust = os.environ.get(script_mods.TRUST_ENV)
-os.environ[script_mods.TRUST_ENV] = str(Path(fixture.name) / "trust.json")
-try:
-    script_mods.set_trusted(mod, True)
-    described = script_mods.describe(mod, None)
-finally:
-    if previous_trust is None:
-        os.environ.pop(script_mods.TRUST_ENV, None)
-    else:
-        os.environ[script_mods.TRUST_ENV] = previous_trust
+described = script_mods.describe(mod, None)
 FORMULA_DESCRIPTION = json.dumps(described, ensure_ascii=True)
 
 server = create_server(0)
@@ -62,7 +52,7 @@ try:
         page.on("pageerror", lambda error: errors.append(str(error)))
         # Keep the shipped views and shared controls. Replace only game
         # discovery and shell startup, so CI needs no private installation.
-        # The rows cross the trusted-mod describe() contract above; their
+        # The rows cross the describe() contract above; their
         # arithmetic is fixture text, since this checks layout rather than game code.
         boot = (Path(__file__).resolve().parents[2] / "plugins/ff8/boot.js").read_text(encoding="utf-8")
         boot = boot[:boot.index("  const shell=LexeditorUI.mountShell(")] + """

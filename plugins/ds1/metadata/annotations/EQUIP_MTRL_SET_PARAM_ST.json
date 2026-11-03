@@ -1,0 +1,83 @@
+{
+  "Param": "EQUIP_MTRL_SET_PARAM_ST",
+  "Type": "EQUIP_MTRL_SET_PARAM_ST",
+  "Name": "EQUIP_MTRL_SET_PARAM_ST",
+  "Description": "Determines the materials each upgrade level spends.",
+  "Fields": [
+    {
+      "Field": "materialId01",
+      "Name": "Material 1",
+      "Description": "The inventory item spent from the first slot of this set. None leaves the slot empty."
+    },
+    {
+      "Field": "materialId02",
+      "Name": "Material 2",
+      "Description": "The inventory item spent from the second slot of this set. None leaves the slot empty."
+    },
+    {
+      "Field": "materialId03",
+      "Name": "Material 3",
+      "Description": "The inventory item spent from the third slot of this set. None leaves the slot empty."
+    },
+    {
+      "Field": "materialId04",
+      "Name": "Material 4",
+      "Description": "The inventory item spent from the fourth slot of this set. None leaves the slot empty."
+    },
+    {
+      "Field": "materialId05",
+      "Name": "Material 5",
+      "Description": "The inventory item spent from the fifth slot of this set. None leaves the slot empty."
+    },
+    {
+      "Field": "itemNum01",
+      "Name": "Material 1 count",
+      "Description": "How many of Material 1 one upgrade spends. -1 leaves the slot empty."
+    },
+    {
+      "Field": "itemNum02",
+      "Name": "Material 2 count",
+      "Description": "How many of Material 2 one upgrade spends. -1 leaves the slot empty."
+    },
+    {
+      "Field": "itemNum03",
+      "Name": "Material 3 count",
+      "Description": "How many of Material 3 one upgrade spends. -1 leaves the slot empty."
+    },
+    {
+      "Field": "itemNum04",
+      "Name": "Material 4 count",
+      "Description": "How many of Material 4 one upgrade spends. -1 leaves the slot empty."
+    },
+    {
+      "Field": "itemNum05",
+      "Name": "Material 5 count",
+      "Description": "How many of Material 5 one upgrade spends. -1 leaves the slot empty."
+    },
+    {
+      "Field": "isDisableDispNum01",
+      "Name": "Hide Material 1 count",
+      "Description": "If ON, the forge does not show how many of Material 1 the upgrade takes."
+    },
+    {
+      "Field": "isDisableDispNum02",
+      "Name": "Hide Material 2 count",
+      "Description": "If ON, the forge does not show how many of Material 2 the upgrade takes."
+    },
+    {
+      "Field": "isDisableDispNum03",
+      "Name": "Hide Material 3 count",
+      "Description": "If ON, the forge does not show how many of Material 3 the upgrade takes."
+    },
+    {
+      "Field": "isDisableDispNum04",
+      "Name": "Hide Material 4 count",
+      "Description": "If ON, the forge does not show how many of Material 4 the upgrade takes."
+    },
+    {
+      "Field": "isDisableDispNum05",
+      "Name": "Hide Material 5 count",
+      "Description": "If ON, the forge does not show how many of Material 5 the upgrade takes."
+    }
+  ]
+}

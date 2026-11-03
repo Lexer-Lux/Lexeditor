@@ -1,11 +1,12 @@
 from pathlib import Path
 import re
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 FRAMEWORK_JS = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-RDR2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+RDR2 = plugin_ui('rdr2')
 
 
 def require(condition: bool, message: str) -> None:
@@ -23,8 +24,9 @@ require(re.search(r"\.lex-column-list\s*\{[^}]*display\s*:\s*grid", FRAMEWORK_CS
         "the complete visible page must participate in one parent grid")
 require("grid-template-columns: subgrid" in FRAMEWORK_CSS,
         "headers and every row must share the parent tracks")
-require(re.search(r"\.lex-column-list-head-cell,[^}]*\.lex-column-list-cell\s*\{[^}]*text-align\s*:\s*center", FRAMEWORK_CSS, re.S),
-        "table headers and cells must center by default")
+for selector in ('.lex-column-list-head-cell', '.lex-column-list-cell'):
+    require(re.search(re.escape(selector) + r"\s*\{[^}]*text-align\s*:\s*center", FRAMEWORK_CSS, re.S),
+            f"{selector} must center by default")
 require("lex-column-align-${" in FRAMEWORK_JS and ".lex-column-align-start" in FRAMEWORK_CSS,
         "long prose columns must have an explicit start-alignment escape hatch")
 require('align:"start"' in FRAMEWORK_JS,

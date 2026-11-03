@@ -1,0 +1,11 @@
+{
+  "crossCheck": "https://github.com/soulsmods/Paramdex/blob/master/DS1R/Defs/EquipMtrlSetParam.xml",
+  "notice": "../credits.md",
+  "scope": "Upgrade material set layout, transcribed in this repository's definition style and verified byte for byte against a retail GameParam archive (276 rows of 32 bytes: five item slots, five counts, five hide-count flags, padding). Labels, help text, links and the empty row-name list are authored for Lexeditor. Set names are composed live from the player's own item names; no game text is stored here.",
+  "files": {
+    "defs/EquipMtrlSetParam.xml": {"sha256": "911ab703c71e408b7f6c14dd89eef83cf7b83a362e39a7e7e991a37e46f1a54d"},
+    "meta/EquipMtrlSetParam.xml": {"sha256": "e6035ad20769a7753eb1b0800dffb4bfb9fc9dd23d9c11763def8e2ee8ca9ea0"},
+    "annotations/EQUIP_MTRL_SET_PARAM_ST.json": {"sha256": "ccde32bcba08cb17914d222d4a24db9e6f5b063c6d6c137b2a8477f5fe57a9f7"},
+    "row_names/EquipMtrlSetParam.json": {"sha256": "81899bd04f1d60df3fca6d8a0b2b70549fbc5da3c0a9f9f94106bec0cc3ec506"}
+  }
+}

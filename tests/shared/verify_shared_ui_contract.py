@@ -84,13 +84,15 @@ require('new URL("mod-loading.json", sharedAssetBase)' in framework and
         "shared Info pages do not load the Mod Loading registry")
 for label in ("Mod Loading", "Mod Loader", "Mod Structure", "Overriding"):
     require(label in framework, f"shared Mod Loading panel is missing label: {label}")
-require("parent.append(modLoadingPanel(pluginId))" in framework,
+require("added.push(modLoadingPanel(pluginId))" in framework
+        and "paged.lexAppendCards(...added)" in framework
+        and "parent.append(...added)" in framework,
         "shared Info pages do not inject the Mod Loading panel")
 
 # One central GitHub workspace, filtered per game.
 require('full_name=LEXEDITOR_REPOSITORY.full_name' in host,
         "game GitHub workspaces must use Lexer-Lux/Lexeditor")
-require('issue_label=plugin_id' in host,
+require('issue_label=plugin.tracker_label' in host,
         "game GitHub workspaces must filter the central issue tracker by plugin label")
 require('repository.issue_label' in github and '"--label"' in github,
         "GitHub issue listing must apply the game label filter")
@@ -120,7 +122,8 @@ require(not (ROOT / "ui/design-review.js").exists() and not (ROOT / "ui/design-r
 # shared drawer. The optional viewer must not replace the record fields.
 require("modelPreview" in framework and "lex-model-preview-drawer" in framework,
         "shared Detail-panel model preview drawer is missing")
-require("modelPreview:item.inventoryMesh?" in warband and "body:[core,source]" in warband,
+require("modelPreview:item.inventoryMesh?" in warband and "identity:item.id,body," in warband
+        and "sourceFields.map(key=>detailField" in warband,
         "Warband Items must keep its fields alongside the optional shared model drawer")
 require("detailField" in warband and "/api/items/save" in warband,
         "Warband Items is not using structured editable Detail properties")
@@ -162,15 +165,16 @@ require("const confirmAction = options =>" in framework,
 
 require("reshadeSection" in framework,
         "the shared ReShade section is not defined in the framework")
-require("reshadeSection(" in page_source("plugins/blank"),
-        "plugins/blank does not demonstrate the shared ReShade section")
+require("tweaksPage(" in page_source("plugins/blank"),
+        "plugins/blank does not demonstrate the shared Tweaks page")
 for plugin in sorted((ROOT / "plugins").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
     editor = page_source(plugin)
     if 'id:"tweaks"' not in editor and "id: \"tweaks\"" not in editor:
         continue
-    require("reshadeSection(" in editor,
+    # The shared Tweaks page (tweaksPage) brings ReShade with it.
+    require("reshadeSection(" in editor or "tweaksPage(" in editor,
             f"{plugin.name} has a Tweaks page but does not offer the shared "
             "ReShade section")
 
@@ -181,7 +185,8 @@ for plugin in sorted((ROOT / "plugins").iterdir()):
 # The user changed the shared lane to 7.5%. Do not restore the old 10% rule
 # while bringing back an archived UI patch.
 flat = css.replace(" ", "")
-require("--lex-detail-label-width:7.5%" in flat,
+require("--lex-detail-label-share:7.5;" in flat
+        and "--lex-detail-label-width:calc(var(--lex-detail-label-share)*1%);" in flat,
         "Detail property-name lane does not use the shared 7.5% default")
 require("lex-info-help" in css and "place-items:center" in css.replace(" ", ""),
         "info bubble glyph centering is not defined")

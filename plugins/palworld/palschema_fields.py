@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Iterable
 
-from .palschema import ENUM_REF_PREFIX, MAX_SCHEMA_BYTES, field_schema
+from .palschema import (ENUM_REF_PREFIX, MAX_SCHEMA_BYTES, field_schema,
+                       schema_constraint_error, _coerce_schema_value)
 
 
 SCALAR_SCHEMA_TYPES = {"boolean", "integer", "number", "string"}
@@ -47,6 +49,9 @@ def schema_scalar_writable(spec: dict[str, Any]) -> tuple[bool, str]:
             return False, "Generated enum reference could not be resolved; write disabled."
     elif reference:
         return False, "Generated property uses a referenced constraint that Lexeditor does not yet resolve; write disabled."
+    error = schema_constraint_error(spec)
+    if error:
+        return False, error
     return True, "Generated PalSchema scalar schema matched."
 
 
@@ -58,9 +63,16 @@ def default_for_schema(spec: dict[str, Any]) -> Any:
     if schema_type == "boolean":
         return False
     if schema_type == "integer":
-        return 0
+        bounds = spec.get("constraints", {})
+        value = 0
+        if "minimum" in bounds:
+            value = max(value, math.ceil(bounds["minimum"]))
+        if "maximum" in bounds:
+            value = min(value, math.floor(bounds["maximum"]))
+        return value
     if schema_type == "number":
-        return 0.0
+        bounds = spec.get("constraints", {})
+        return max(bounds.get("minimum", -math.inf), min(0.0, bounds.get("maximum", math.inf)))
     if schema_type == "string":
         return ""
     raise ValueError("Generated property is not a scalar field")
@@ -95,6 +107,8 @@ def available_fields(
             "type": str(spec.get("type", "")),
             "description": str(spec.get("description", "")),
             "enumValues": list(spec.get("enumValues", [])),
+            "minimum": spec.get("constraints", {}).get("minimum"),
+            "maximum": spec.get("constraints", {}).get("maximum"),
             "writable": writable,
             "reason": reason,
         }
@@ -109,26 +123,4 @@ def coerce_new_value(schema_root: Path, table_name: str, field_name: str, value:
     writable, reason = schema_scalar_writable(spec)
     if not writable:
         raise ValueError(reason)
-    schema_type = spec.get("type")
-    if schema_type == "boolean":
-        if not isinstance(value, bool):
-            raise ValueError(f"{field_name} must be a boolean")
-        result: Any = value
-    elif schema_type == "integer":
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise ValueError(f"{field_name} must be an integer")
-        result = value
-    elif schema_type == "number":
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ValueError(f"{field_name} must be numeric")
-        result = float(value)
-    elif schema_type == "string":
-        if not isinstance(value, str):
-            raise ValueError(f"{field_name} must be a string")
-        result = value
-    else:
-        raise ValueError(f"{field_name} is not a schema-backed scalar field")
-    enum_values = list(spec.get("enumValues", []))
-    if enum_values and result not in enum_values:
-        raise ValueError(f"{field_name} must be one of the generated enum values")
-    return result
+    return _coerce_schema_value(spec, value, field_name)

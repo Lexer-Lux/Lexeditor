@@ -17,7 +17,7 @@
   }
   async function saveSettings(){
     const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));if(!edits.length)return;
-    const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};await buildSavedModule();shell.history.clear();setStatus(`Saved ${result.saved} settings and build verified`);renderSettings();shell.refresh();
+    const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits,sha256:state.settings.sha256})});state.settings=await api("/api/settings");state.settingEdits={};await buildSavedModule();shell.history.clear();setStatus(`Saved ${result.saved} settings and build verified`);renderSettings();shell.refresh();
   }
   function discardSettings(){state.settingEdits={};setStatus("Restored the last saved settings");renderSettings();shell.refresh()}
   function renderSettings(){

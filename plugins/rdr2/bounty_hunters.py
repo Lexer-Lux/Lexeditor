@@ -7,6 +7,9 @@ shared dispatch.meta and are reported with that scope made explicit.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+import re
+import math
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 try:
@@ -169,8 +172,23 @@ def _value(node: ET.Element | None) -> str | None:
 
 
 def _phase(root: ET.Element, name: str) -> ET.Element | None:
-    return next((p for p in root.findall("./BountyResponses/BountyDispatch/DispatchPhases/Phase")
-                 if (p.findtext("Name") or "").strip() == name), None)
+    response = _one(root, "BountyResponses/BountyDispatch")
+    return _find_named(_one(response, "DispatchPhases"), "Phase", name)
+
+
+def _one(parent: ET.Element | None, path: str) -> ET.Element | None:
+    for tag in path.split("/"):
+        if parent is None:
+            return None
+        nodes = parent.findall(tag)
+        if len(nodes) != 1:
+            return None
+        parent = nodes[0]
+    return parent
+
+
+def _scalar(node: ET.Element | None) -> ET.Element | None:
+    return node if node is not None and set(node.attrib) == {"value"} and not len(node) and not (node.text or "").strip() else None
 
 
 def _dispatch_group_rows(phase: ET.Element, phase_name: str) -> list[dict]:
@@ -205,8 +223,9 @@ def _dispatch_group_rows(phase: ET.Element, phase_name: str) -> list[dict]:
 def _find_named(parent: ET.Element | None, tag: str, name: str) -> ET.Element | None:
     if parent is None:
         return None
-    return next((item for item in parent.findall(tag)
-                 if (item.findtext("Name") or "").strip() == name), None)
+    items = [item for item in parent.findall(tag)
+             if any((node.text or "").strip() == name for node in item.findall("Name"))]
+    return items[0] if len(items) == 1 and _one(items[0], "Name") is not None else None
 
 
 def _attach_vanilla_values(data: dict) -> None:
@@ -332,17 +351,38 @@ def read_bounty_hunters(response_file: Path, dispatch_file: Path) -> dict:
             "presets": presets,
             "scopeNote": SCOPE_NOTE}
     _attach_vanilla_values(data)
+    values = [(row["id"], row["value"]) for row in settings]
+    values += [(identity, row.get(key)) for row in cooldown_rows for key, identity in row["ids"].items()]
+    for phase in phases:
+        if phase["multiplierId"]:
+            values.append((phase["multiplierId"], phase["multiplier"]))
+        values += [(identity, group.get(key)) for group in phase["groups"] for key, identity in group["ids"].items() if identity]
+    data["readonlyIds"] = []
+    for identity, value in values:
+        target = _response_target(response_root, identity) if not identity.startswith("cooldown/") else _cooldown_target(dispatch_root, identity)
+        try:
+            if target is None:
+                raise ValueError("Unsupported source")
+            _numeric(value, identity, maximum=1.0 if identity.endswith("/Chances") else None)
+        except ValueError:
+            data["readonlyIds"].append(identity)
     return ensure_bounty_hunter_metadata(data)
 
 
 def _numeric(value: object, field: str, minimum: float = 0.0, maximum: float | None = None) -> str:
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ValueError(f"{field} must be numeric")
     text = str(value).strip()
     text_num = text[:-1] if text.lower().endswith("f") else text
+    if not re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", text_num):
+        raise ValueError(f"{field} must be numeric")
     try:
-        number = float(text_num)
-    except ValueError as exc:
+        number = Decimal(text_num)
+    except InvalidOperation as exc:
         raise ValueError(f"{field} must be numeric") from exc
-    if number < minimum or (maximum is not None and number > maximum):
+    if not number.is_finite() or not math.isfinite(float(text_num)):
+        raise ValueError(f"{field} must be finite")
+    if number < Decimal(str(minimum)) or (maximum is not None and number > Decimal(str(maximum))):
         limit = f" between {minimum:g} and {maximum:g}" if maximum is not None else f" at least {minimum:g}"
         raise ValueError(f"{field} must be{limit}")
     return text
@@ -350,26 +390,30 @@ def _numeric(value: object, field: str, minimum: float = 0.0, maximum: float | N
 
 def _response_target(root: ET.Element, edit_id: str) -> ET.Element | None:
     parts = edit_id.split("/")
-    response = root.find("./BountyResponses/BountyDispatch")
-    if response is None:
+    response = _one(root, "BountyResponses/BountyDispatch")
+    name = _one(response, "Name")
+    if response is None or name is None or (name.text or "").strip() != "LAW_BOUNTY_HUNTERS_CSI":
         return None
     if len(parts) == 2 and parts[0] == "response" and parts[1] in RESPONSE_SCALARS:
-        return response.find(parts[1])
+        return _scalar(_one(response, parts[1]))
     if len(parts) == 3 and parts[0] == "phase" and parts[2] == "GroupMultiplier":
         phase = _phase(root, parts[1])
-        return phase.find("GroupMultiplier") if phase is not None else None
+        return _scalar(_one(phase, "GroupMultiplier"))
     if len(parts) == 5 and parts[0] == "phase" and parts[2] in {"fixed", "random"}:
         phase = _phase(root, parts[1])
         if phase is None:
             return None
-        xpath = "./DispatchPeds/DispatchPedGroups/DispatchGroup" if parts[2] == "fixed" else "./DispatchPeds/RandomDispatchPedGroups/DispatchGroup"
-        group = next((g for g in phase.findall(xpath) if (g.findtext("Preset") or "").strip() == parts[3]), None)
+        container = _one(phase, "DispatchPeds/DispatchPedGroups" if parts[2] == "fixed" else "DispatchPeds/RandomDispatchPedGroups")
+        groups = [g for g in container.findall("DispatchGroup") if any((node.text or "").strip() == parts[3] for node in g.findall("Preset"))] if container is not None else []
+        group = groups[0] if len(groups) == 1 and _one(groups[0], "Preset") is not None else None
         if group is None:
             return None
         if parts[4] == "Chances":
-            return group.find("./SelectionConditions/Condition[@type='CAIConditionRandom']/Chances")
+            conditions = _one(group, "SelectionConditions")
+            matches = conditions.findall("Condition[@type='CAIConditionRandom']") if conditions is not None else []
+            return _scalar(_one(matches[0], "Chances")) if len(matches) == 1 else None
         if parts[4] in {"MinNumPeds", "MaxNumPeds", "RandomWeight"}:
-            return group.find(parts[4])
+            return _scalar(_one(group, parts[4]))
     return None
 
 
@@ -377,25 +421,36 @@ def _cooldown_target(root: ET.Element, edit_id: str) -> ET.Element | None:
     parts = edit_id.split("/")
     if len(parts) != 4 or parts[0] != "cooldown" or parts[3] not in {"Min", "Max"}:
         return None
-    cooldown = _find_named(root.find("BountyResponseCooldowns"), "Item", "BountyHuntersGlobalCooldown")
-    group = cooldown.find(parts[1]) if cooldown is not None else None
+    if parts[1] not in (*COOLDOWN_SECTIONS, "DelayInGameHoursAfterMyIncidentTargetUndetected") or not re.fullmatch(r"0|[1-9][0-9]*", parts[2]):
+        return None
+    cooldown = _find_named(_one(root, "BountyResponseCooldowns"), "Item", "BountyHuntersGlobalCooldown")
+    group = _one(cooldown, parts[1])
     if group is None:
         return None
     if parts[1] == "DelayInGameHoursAfterMyIncidentTargetUndetected":
-        return group.find(parts[3]) if parts[2] == "0" else None
+        return _scalar(_one(group, parts[3])) if parts[2] == "0" else None
     try:
         item = group.findall("Item")[int(parts[2])]
     except (ValueError, IndexError):
         return None
-    return item.find(parts[3])
+    return _scalar(_one(item, parts[3]))
 
 
-def apply_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: list[dict]) -> int:
+def prepare_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: list[dict]) -> tuple[int, list[tuple[Path, ET.Element]]]:
+    """Validate a candidate batch without writing either file or its backup."""
+    if not isinstance(edits, list):
+        raise ValueError("Bounty-hunter edits must be a list")
+    if not edits:
+        return 0, []
     response_root, dispatch_root = _parse(response_file), _parse(dispatch_file)
     response_changed = dispatch_changed = 0
     seen = set()
     for edit in edits:
-        edit_id = str(edit.get("id", ""))
+        if not isinstance(edit, dict) or set(edit) != {"id", "value"}:
+            raise ValueError("Bounty-hunter edits require only id and value")
+        edit_id = edit["id"]
+        if not isinstance(edit_id, str):
+            raise ValueError("Bounty-hunter setting id must be text")
         if not edit_id or edit_id in seen:
             raise ValueError(f"duplicate or empty bounty-hunter setting id: {edit_id!r}")
         seen.add(edit_id)
@@ -403,41 +458,31 @@ def apply_bounty_hunter_edits(response_file: Path, dispatch_file: Path, edits: l
         is_chance = edit_id.endswith("/Chances")
         value = _numeric(edit.get("value", ""), edit_id, maximum=1.0 if is_chance else None)
         if target is not None:
+            _numeric(target.get("value"), edit_id, maximum=1.0 if is_chance else None)
             target.set("value", value); response_changed += 1; continue
         target = _cooldown_target(dispatch_root, edit_id)
         if target is not None:
+            _numeric(target.get("value"), edit_id)
             target.set("value", value); dispatch_changed += 1; continue
         raise ValueError(f"unknown or unavailable bounty-hunter setting: {edit_id}")
 
     # Reject impossible min/max ranges before either file is written.
-    check = read_bounty_hunters_from_roots(response_root, dispatch_root)
-    for phase in check["phases"]:
-        for group in phase["groups"]:
-            if group["min"] is not None and group["max"] is not None and float(group["min"].rstrip("f")) > float(group["max"].rstrip("f")):
-                raise ValueError(f"{phase['name']} {group['preset']}: minimum group size exceeds maximum")
-    if response_changed:
-        _write(response_file, response_root)
-    if dispatch_changed:
-        _write(dispatch_file, dispatch_root)
-    return response_changed + dispatch_changed
-
-
-def read_bounty_hunters_from_roots(response_root: ET.Element, dispatch_root: ET.Element) -> dict:
-    """Small validation view used before writes; roots are not serialized."""
-    phases = []
-    response = response_root.find("./BountyResponses/BountyDispatch")
-    for phase in response.findall("./DispatchPhases/Phase") if response is not None else []:
-        name = (phase.findtext("Name") or "").strip()
-        phases.append({"name": name, "groups": _dispatch_group_rows(phase, name)})
-    return {"phases": phases}
-
-
-def _write(path: Path, root: ET.Element) -> None:
-    raw = path.read_bytes()
-    bom = raw.startswith(b"\xef\xbb\xbf")
-    first = raw.decode("utf-8-sig").splitlines()[0]
-    declaration = first if first.lstrip().startswith("<?xml") else '<?xml version="1.0" encoding="UTF-8"?>'
-    body = ET.tostring(root, encoding="unicode")
-    data = (declaration + "\n" + body).encode("utf-8")
-    path.with_suffix(path.suffix + ".bak").write_bytes(raw) if not path.with_suffix(path.suffix + ".bak").exists() else None
-    path.write_bytes((b"\xef\xbb\xbf" if bom else b"") + data)
+    for identity in seen:
+        prefix, field = identity.rsplit('/', 1)
+        pair = {'Min': ('Min', 'Max'), 'Max': ('Min', 'Max'), 'MinNumPeds': ('MinNumPeds', 'MaxNumPeds'), 'MaxNumPeds': ('MinNumPeds', 'MaxNumPeds')}.get(field)
+        if pair is None:
+            continue
+        lookup, doc = (_cooldown_target, dispatch_root) if identity.startswith('cooldown/') else (_response_target, response_root)
+        nodes = [lookup(doc, f'{prefix}/{bound}') for bound in pair]
+        # The undetected cooldown intentionally has only Min.
+        if prefix == 'cooldown/DelayInGameHoursAfterMyIncidentTargetUndetected/0' and field == 'Min':
+            continue
+        if any(node is None for node in nodes):
+            raise ValueError(f'{identity}: range boundaries are unavailable or ambiguous')
+        values = [_numeric(node.get('value'), identity) for node in nodes]
+        if Decimal(values[0].rstrip('fF')) > Decimal(values[1].rstrip('fF')):
+            raise ValueError(f'{identity}: minimum exceeds maximum')
+    prepared = []
+    if response_changed:prepared.append((response_file, response_root))
+    if dispatch_changed:prepared.append((dispatch_file, dispatch_root))
+    return response_changed + dispatch_changed, prepared

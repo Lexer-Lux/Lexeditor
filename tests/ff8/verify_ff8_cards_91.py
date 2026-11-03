@@ -47,6 +47,19 @@ class CardTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             cards.build_hext(b"not the supported executable", [])
 
+    def test_starting_owner_validation(self):
+        for card_id, value in [(76, 1), (110, 1), (True, 1), (77, True),
+                               (77, 1.5), (77, -1), (77, 240)]:
+            with self.subTest(card_id=card_id, value=value), self.assertRaises(ValueError):
+                cards.apply_owner_edits(cards.DEFAULT_OWNERS,
+                    [{"id":card_id,"field":cards.OWNER_FIELD,"value":value}])
+        edit = {"id":77,"field":cards.OWNER_FIELD,"value":1}
+        with self.assertRaises(ValueError):
+            cards.apply_owner_edits(cards.DEFAULT_OWNERS, [edit, edit])
+        owners, changed = cards.apply_owner_edits(cards.DEFAULT_OWNERS, [edit])
+        self.assertEqual(owners, bytes([1]) + cards.DEFAULT_OWNERS[1:])
+        self.assertEqual(changed, 1)
+
 
 def integration(path):
     exe = path.read_bytes()
@@ -93,6 +106,37 @@ def integration(path):
                                           {**second, "value": rows[0]["power"]}])
         assert cards.project_edits(project, exe) == []
         assert (project / cards.HEXT).read_text() == ""
+        owner = {"id":77,"field":cards.OWNER_FIELD,"value":7}
+        cards.save_project(project, exe, [owner, edit])
+        assert cards.project_edits(project, exe) == [edit, owner]
+        patch = cards.build_hext(exe, [owner, edit])
+        writes = [line.split(" = ") for line in patch.splitlines() if " = " in line]
+        assert len(writes) == 3
+        assert int(writes[-1][0], 16) == cards.INITIALIZER
+        assert bytes.fromhex(writes[-1][1]) == cards.owner_initializer(bytes([7])+cards.DEFAULT_OWNERS[1:])
+        before = [(project / name).read_bytes() for name in [cards.MANIFEST, cards.HEXT]]
+        try:
+            cards.save_project(project, exe, [{**owner,"value":1}, {**owner,"id":76}])
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Invalid owner batch was accepted")
+        assert before == [(project / name).read_bytes() for name in [cards.MANIFEST, cards.HEXT]]
+        cards.save_project(project, exe, [{**owner,"value":200}])
+        assert cards.project_edits(project, exe) == [edit]
+        low, high = root / 'low', root / 'high'
+        cards.save_project(low, exe, [owner])
+        high_owner = {**owner,'id':78,'value':8}
+        cards.save_project(high, exe, [high_owner])
+        mods = [{'id':name,'name':name,'path':str(path),'enabled':True}
+                for name,path in [('low',low),('high',high)]]
+        report = runtime_layout.compose(project, root / 'runtime', mod_rows=mods)
+        emitted = sorted((root / 'runtime' / 'hext').rglob('*lexeditor-cards.txt'))
+        assert [path.read_text() for path in emitted] == [cards.build_hext(exe,[owner]),cards.build_hext(exe,[high_owner])]
+        assert any(conflict['mode'] == 'low-to-high patch stream' for conflict in report['conflicts'])
+        # A higher map replaces the entire map, including the lower edit.
+        final_patch = bytes.fromhex(emitted[-1].read_text().split('8DFF20 = ')[1].strip())
+        assert final_patch[-33:] == bytes([200,8])+cards.DEFAULT_OWNERS[2:]
     print("PASS: 110 names, two PE-resolved table writes, untouched executable and record bytes")
     print("PASS: temporary project save/reload, merged edits, ordered runtime output, external conflict rejection, baseline reset")
 
@@ -106,11 +150,14 @@ def http_integration():
             rank = (original["rows"][0]["top"] + 1) % 11
             response = request_json(session.url + "api/cards/save", {"edits": [{"id": 0, "field": "top", "value": rank}]})
             assert response["saved"] == 1
+            response = request_json(session.url + "api/cards/save", {"edits": [{"id":77,"field":"startingOwner","value":7}]})
+            assert response["saved"] == 1
             request_json(session.url + "api/text/save", {"edits": [{"source": "exe_card_names", "sectionId": 60, "recordId": 0, "slot": 0, "value": "Test Card"}]})
             current = request_json(session.url + "api/cards")
             vanilla = request_json(session.url + "api/cards?dataset=vanilla")
             assert current["rows"][0]["top"] == rank
             assert current["rows"][0]["name"] == "Test Card"
+            assert current["rows"][77]["startingOwner"] == 7
             assert vanilla == original
         with FF8Session({"LEXEDITOR_FF8_PROJECT": temporary}) as session:
             assert request_json(session.url + "api/cards")["rows"] == current["rows"]

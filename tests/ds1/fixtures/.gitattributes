@@ -1,0 +1,2 @@
+# Preserve the pinned upstream fixture's exact Git blob on Windows.
+modengine2_launcher.cpp -text

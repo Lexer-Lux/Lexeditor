@@ -1,10 +1,16 @@
-"""Reviewed DS1R monster families and the resistance-only editing boundary.
+"""Reviewed DS1R monster and boss families and the editing boundary.
 
 Evidence: pinned Smithbox DS1R NpcParam row names, NPC_TYPE and PARAMDEF in
-metadata/SOURCE.json. Names alone are insufficient: the live npcType must also
-be Standard Enemy (0). Stray Demon is 0 too, so a type-only filter is unsafe.
-Mixed boss families (Capra/Taurus, Pinwheel, Butterfly, Sanctuary Guardian),
-boss body parts, named NPCs, test rows, and unknown/custom IDs are not admitted.
+metadata/SOURCE.json. Names alone are insufficient: the live npcType must
+also match. Stray Demon is 0 too, so a type-only filter is unsafe for
+monsters; bosses fight at types 0 and 1 instead, with Gwyndolin alone at
+the friendly type (2). Mixed families (Capra/Taurus, Pinwheel, Butterfly,
+Sanctuary Guardian) list every variant under Bosses: the rows are one
+enemy, and the tab says which. Boss body parts (tails, heads, arms, legs,
+wings) are admitted only by the row IDs in PLACED_BOSS_PARTS and
+PLACED_MONSTERS: those rows are placed in vanilla maps and take hits, so
+the player fights them. Every other body part, named NPCs, test rows, and
+unknown/custom IDs are admitted nowhere.
 Egg Carrier's named NPC variant (321001) is type 2 and therefore excluded.
 These are parameter variants, not proof of individual map placements.
 """
@@ -33,8 +39,69 @@ MONSTER_FAMILIES = frozenset({
 })
 
 
+# Placed rows the name families cannot admit, admitted by row ID.
+# 342101 is named "Undead Dragon - Legs" in the pinned reference, but it is
+# the standalone Bounding Demon of Izalith (1,408 HP, placed in Lost Izalith),
+# not a boss limb: NAME_OVERRIDES gives it the name the player knows.
+PLACED_MONSTERS = frozenset({342101})
+NAME_OVERRIDES = {342101: 'Bounding Demon of Izalith'}
+# Boss body parts the player hits in vanilla maps; they list with their boss.
+# 342100 is the 2-HP leg limb of the Undead Dragon boss, distinct from 342101.
+PLACED_BOSS_PARTS = frozenset({
+    273100, 342100, 342200, 343100, 347200, 353100, 353101, 451100, 520100,
+    520200, 526100, 535200, 535300, 535301, 540000, 540100,
+})
+
+
 def classified_monster(row_id, reference_name, npc_type):
+    if row_id in PLACED_MONSTERS:
+        return True
     return row_id >= 120000 and reference_name in MONSTER_FAMILIES and npc_type == 0
+
+
+BOSS_FAMILIES = frozenset({
+    'Stray Demon', 'Firesage Demon', 'Asylum Demon', 'Capra Demon',
+    'Taurus Demon', 'Iron Golem', 'Smough', 'Priscilla',
+    'Moonlight Butterfly', 'Pinwheel', 'Undead Dragon', 'Hellkite Drake',
+    'Sanctuary Guardian (Old)', 'Sanctuary Guardian', 'Hydra',
+    'Knight Artorias', 'Manus, Father of the Abyss', 'Kalameet',
+    'Great Grey Wolf Sif (DLC)', 'Centipede Demon', 'Great Grey Wolf Sif',
+    'Gravelord Nito', 'Bed Of Chaos', 'Bed Of Chaos (Moving)',
+    'Ceaseless Discharge', 'Gaping Dragon', 'Dragonslayer Ornstein',
+    'Dragonslayer Ornstein (Giant)', 'Chaos Witch Quelaag',
+    'Seath the Scaleless', 'Gwyndolin', 'Gargoyle',
+    'Gargoyle [Anor Londo]', 'Gwyn, Lord of Cinder', 'Four Kings',
+})
+
+
+def classified_boss(row_id, reference_name, npc_type):
+    if row_id in PLACED_BOSS_PARTS:
+        return True
+    if row_id < 120000 or reference_name not in BOSS_FAMILIES:
+        return False
+    # Bosses fight as Standard Enemy (0) or boss type (1); Gwyndolin
+    # alone keeps the friendly type (2) into his boss fight.
+    return npc_type in (0, 1) or reference_name == 'Gwyndolin'
+
+
+def duplicate_stem(name, row_id):
+    """The family stem of a Lexeditor-duplicated row name ("Rat (1000000)"),
+    or None. No family name ends in digits in parentheses, so the suffix
+    only matches names this editor wrote when duplicating."""
+    suffix = f' ({row_id})'
+    if name and name.endswith(suffix) and len(name) > len(suffix):
+        return name[:-len(suffix)]
+    return None
+
+
+def base_stem(name):
+    """A row name without any Lexeditor duplicate suffixes."""
+    stem = name or ''
+    while True:
+        head, space, tail = stem.rpartition(' (')
+        if not space or not tail.endswith(')') or not tail[:-1].isdigit():
+            return stem
+        stem = head
 
 
 # All help lives with the property definition. Guard status fields and other
@@ -43,19 +110,61 @@ def classified_monster(row_id, reference_name, npc_type):
 RESISTANCES = {}
 for key, kind in [('def_phys', 'Physical'), ('def_mag', 'Magic'),
                   ('def_fire', 'Fire'), ('def_thunder', 'Lightning')]:
-    RESISTANCES[key] = (kind, 'Damage defense',
-        f'Defense rating against {kind.lower()} damage. This is not a fixed amount subtracted from each hit.')
+    RESISTANCES[key] = (f'{kind} defense', 'Defense')
 for key, kind in [('def_slash', 'Slash'), ('def_blow', 'Strike'), ('def_thrust', 'Thrust')]:
-    RESISTANCES[key] = (kind + ' (%)', 'Physical defense modifiers',
-        f'Adjusts physical defense against {kind.lower()} attacks by this percentage. '
-        '25 means 25% more defense, not 25% less damage.')
+    RESISTANCES[key] = (f'{kind} vs physical (%)', 'Defense')
 for key, kind in [('resist_poison', 'Poison'), ('resist_desease', 'Toxic'),
                   ('resist_blood', 'Bleed'), ('resist_curse', 'Curse')]:
-    RESISTANCES[key] = (kind, 'Status buildup resistance',
-        f'Resistance to {kind.lower()} buildup. This is separate from damage defense and is not a percentage.')
+    RESISTANCES[key] = (f'{kind} resistance', 'Defense')
+# Weapons and spells of these kinds deal extra damage to an enemy that has
+# the flag (Divine weapons, Occult weapons; Abyssal is the Abyss Walking flag).
+WEAKNESSES = {'isWeakSaint': 'Weak to Divine',
+              'isWeakA': 'Weak to Occult',
+              'isWeakB': 'Abyssal'}
+for key, label in WEAKNESSES.items():
+    RESISTANCES[key] = (label, 'Defense')
 for key, kind in [('physGuardCutRate', 'Physical'), ('magGuardCutRate', 'Magic'),
                   ('fireGuardCutRate', 'Fire'), ('thunGuardCutRate', 'Lightning'),
                   ('slashGuardCutRate', 'Slash'), ('blowGuardCutRate', 'Strike'),
                   ('thrustGuardCutRate', 'Thrust')]:
-    RESISTANCES[key] = (kind + ' (%)', 'Guard absorption',
-        f'Reduces {kind.lower()} damage while this monster guards. This does not apply to an unguarded hit.')
+    RESISTANCES[key] = (kind + ' (%)', 'Blocking')
+
+# Reviewed combat stats, drops and passive effects. Damage
+# multipliers state their unchanged baseline of 1, the way effect
+# multipliers do.
+NPC_STATS = {
+    'hp': ('HP', 'Basics'),
+    'mp': ('MP', 'Basics'),
+    'stamina': ('Stamina', 'Basics'),
+    'staminaRecoverBaseVel': ('Stamina recovery (stamina/second)', 'Basics'),
+    'superArmorDurability': ('Poise', 'Basics'),
+    'superArmorRecoverCorrection': ('Poise recovery', 'Basics'),
+    'superArmorBrakeKnockbackDist': ('Poise-break stagger', 'Basics'),
+    'disableRespawn': ('No bonfire reset', 'Basics'),
+    'teamType': ('Team', 'Basics'),
+    'weakPartsDamageRate': ('Damage taken: weak point (x)', 'Body'),
+    'staminaGuardDef': ('Stamina guard (%)', 'Blocking'),
+    'hitHeight': ('Body height (metres)', 'Body'),
+    'hitRadius': ('Body radius (metres)', 'Body'),
+    'hitYOffset': ('Body offset (metres)', 'Body'),
+    'getSoul': ('Souls', 'Value & rewards'),
+    'humanityLotId': ('Humanity drop table', 'Value & rewards'),
+    'dropType': ('Drop style', 'Value & rewards'),
+    'GameClearSpEffectID': ('Cleared-game effect', 'Effects & references'),
+}
+for index in range(1, 9):
+    NPC_STATS[f'partsDamageRate{index}'] = (
+        f'Damage taken: Part {index} (x)', 'Body')
+for key, kind in [('poisonGuardResist', 'Poison'), ('diseaseGuardResist', 'Toxic'),
+                  ('bloodGuardResist', 'Bleed'), ('curseGuardResist', 'Curse')]:
+    NPC_STATS[key] = (f'{kind} guard (%)', 'Blocking')
+# Six slots, one live: vanilla fills only the first (399 of 400 lot users
+# across 556 NPC rows; the rest is a test row). The others wait for mods.
+NPC_STATS['itemLotId_1'] = ('Drop table 1', 'Value & rewards')
+for index in range(2, 7):
+    NPC_STATS[f'itemLotId_{index}'] = (
+        f'Drop table {index}', 'Value & rewards')
+for index in range(8):
+    NPC_STATS[f'spEffectID{index}'] = (
+        f'Passive effect {index + 1}', 'Effects & references')
+NPC_FIELDS = {**RESISTANCES, **NPC_STATS}

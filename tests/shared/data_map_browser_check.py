@@ -46,6 +46,10 @@ def html_for(game):
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
+    # Shared feature modules are part of the real page too. Leaving Unreal
+    # Config unresolved stops Remake before its shell can be constructed.
+    html=re.sub(r'<script src="/shared/([A-Za-z0-9_./-]+\.js)"></script>',
+                lambda m:'<script>'+(ROOT/'ui'/m[1]).read_text(encoding='utf-8').replace('</script','<\\/script')+'</script>',html)
     # A plugin page loads its code and styles from modules beside it. There is
     # no server here, so every one the page names is inlined where it stands,
     # or nothing of the plugin runs and it looks like a plugin that failed to boot.
@@ -63,6 +67,7 @@ with sync_playwright() as p:
     try:
         for game in GAMES:
             for width,height in [(900,620),(1200,800),(1600,1000)]:
+                print(f"checking Data Map {game} at {width}x{height}", flush=True)
                 errors=[]
                 page=browser.new_page(viewport={'width':width,'height':height})
                 page.on('pageerror',lambda e:errors.append(str(e)))
@@ -121,7 +126,7 @@ with sync_playwright() as p:
                 else:
                     open_target=OPEN_TARGETS.get(game,'items')
                     fixture_rows=[{**row,'target':open_target} for row in ROWS]
-                    page.evaluate('''rows=>{
+                    page.evaluate(r'''rows=>{
                       const mapPayload={rows};
                       window.fetch=input=>/\/api\/data-?map/.test(String(input))
                         ? Promise.resolve({ok:true,status:200,json:async()=>mapPayload})

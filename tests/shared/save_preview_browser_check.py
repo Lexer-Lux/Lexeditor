@@ -14,5 +14,16 @@ with sync_playwright() as pw:
  p.keyboard.press('Escape');assert tip.count()==0
  p.mouse.move(0,400);p.locator('.lex-settings-save-control').hover();tip.wait_for()
  p.locator('.lex-settings-save-control').click();assert tip.count()==0
+ # Newest first (Lexer: "new things get placed on the top of the list"):
+ # a change made after the others reads at the top, though it comes later in
+ # the data.
+ p.mouse.move(0,400)
+ p.evaluate("()=>{window.after={magic:[{name:'Aero',power:30}],settings:{maxSpell:10}};window.count=1;document.querySelector('.lex-settings-save-control').lexNoteChanges()}")
+ p.evaluate("()=>{window.after={magic:[{name:'Aero',power:31}],settings:{maxSpell:20}};window.count=2;document.querySelector('.lex-settings-save-control').lexNoteChanges()}")
+ p.evaluate("()=>{window.after={magic:[{name:'Aero',power:31}],settings:{maxSpell:25}};document.querySelector('.lex-settings-save-control').lexNoteChanges()}")
+ p.locator('.lex-settings-save-control').evaluate('n=>n.disabled=false')
+ p.locator('.lex-settings-save-control').hover();tip.wait_for()
+ labels=tip.locator('li strong').all_text_contents()
+ assert 'maxSpell' in labels[0] and 'Aero' in labels[1], labels
  b.close()
 print('Save preview lists exact cross-record changes, supports Escape, and closes on save.')

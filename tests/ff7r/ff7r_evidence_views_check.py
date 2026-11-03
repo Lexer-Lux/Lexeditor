@@ -24,6 +24,7 @@ from __future__ import annotations
 
 DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -34,6 +35,8 @@ import ff7r_browser_check as bc
 
 ROOT = bc.ROOT
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0,str(ROOT / 'tests' / 'shared'))
+from paged_detail import reveal
 
 from plugins.ff7r import archive, server  # noqa: E402
 
@@ -170,6 +173,7 @@ def run(output: Path, executable: str | None) -> None:
                 assert EVIDENCE not in fetched, fetched
                 pending = page.evaluate("state.tweaksPending")
                 assert pending == 0, pending
+                reveal(page,page.get_by_text(re.compile('runtime tweaks',re.I),exact=True))
                 text = page.locator("#main").inner_text()
                 assert "still reading" not in text, text
                 assert "runtime tweaks" in text.lower(), text

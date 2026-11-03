@@ -1,0 +1,53 @@
+{
+  "Param": "SHOP_LINEUP_PARAM",
+  "Type": "SHOP_LINEUP_PARAM",
+  "Name": "SHOP_LINEUP_PARAM",
+  "Description": "Determines the parameters for shops.",
+  "Fields": [
+    {
+      "Field": "equipId",
+      "Name": "Item ID",
+      "Description": "The item this shop row sells. Equipment Type sets its list."
+    },
+    {
+      "Field": "value",
+      "Name": "Sale Price (souls)",
+      "Description": "What this item costs in a shop. The attunement menu ignores it."
+    },
+    {
+      "Field": "mtrlId",
+      "Name": "Material ID",
+      "Description": "Extra items this purchase also costs. None means the buyer pays souls only."
+    },
+    {
+      "Field": "eventFlag",
+      "Name": "Stock Flag ID",
+      "Description": "Where the game saves how many of this item sold. The game needs it only when Quantity limits stock."
+    },
+    {
+      "Field": "qwcId",
+      "Name": "World Tendency ID",
+      "Description": "Unused in this game. A Demon's Souls leftover."
+    },
+    {
+      "Field": "sellQuantity",
+      "Name": "Quantity",
+      "Description": "How many of this item the shop can sell. -1 means unlimited. Limited stock needs a Stock Flag ID to save what sold."
+    },
+    {
+      "Field": "shopType",
+      "Name": "Shop Type",
+      "Description": "Which shop menu shows this row. A row never appears in another menu."
+    },
+    {
+      "Field": "equipType",
+      "Name": "Equipment Type",
+      "Description": "Which item list holds the Item ID. Must match the item above."
+    },
+    {
+      "Field": "pad_0",
+      "Name": "",
+      "Description": ""
+    }
+  ]
+}

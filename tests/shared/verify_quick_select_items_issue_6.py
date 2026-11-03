@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import copy
 import os
-import shutil
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
@@ -12,7 +12,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PROJECT = Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul")
 EDITOR = ROOT / "plugins" / "rdr2" / "editor.html"
 SERVER = ROOT / "plugins" / "rdr2" / "server.py"
 DATA_MAP = ROOT / "plugins" / "rdr2" / "data_map.py"
@@ -27,7 +26,17 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-editor = EDITOR.read_text(encoding="utf-8")
+def entry_xml(node):
+    node = copy.deepcopy(node)
+    # Appending a sibling changes the separator after the previous last item;
+    # that whitespace is outside the item whose content must stay intact.
+    node.tail = None
+    return ET.tostring(node, encoding='unicode')
+
+
+from plugin_ui import plugin_ui
+
+editor = plugin_ui('rdr2')
 server_source = SERVER.read_text(encoding="utf-8")
 data_map_source = DATA_MAP.read_text(encoding="utf-8")
 
@@ -60,22 +69,35 @@ for banned in ('el("input"', "datalist", "validatedKeyEditor"):
 require('("quickselectitems.ymt",' in data_map_source and '"integrated"' in data_map_source,
         "Data Map does not mark quickselectitems.ymt integrated")
 
-# The source contract above is repository-local. The mutation acceptance below
-# intentionally uses the author's private RDR2 project because it needs real
-# catalog/quick-select XML with one-slot, multi-slot and unmapped cases. Name
-# that prerequisite before shutil turns it into an opaque WinError 3 on CI.
-fixture_root = PROJECT / "MyOverhaul"
-for name in ("catalog_sp.ymt", "quickselectitems.ymt", "install.xml"):
-    source = fixture_root / name
-    if not source.is_file():
-        raise FileNotFoundError(f"Missing RDR2 project fixture: {source}")
+def fixture(mod):
+    """Authored XML covering single, multiple, absent and unrelated mappings."""
+    keys = ('ITEM_ONE', 'ITEM_REMOVE', 'ITEM_MULTI', 'ITEM_UNTOUCHED', 'ITEM_UNMAPPED')
+    root = ET.Element('fixture')
+    items = ET.SubElement(ET.SubElement(root, 'catalog'), 'items')
+    for key in keys:
+        ET.SubElement(items, 'item', key=key)
+    ET.ElementTree(root).write(mod / 'catalog_sp.ymt', encoding='utf-8')
+    root = ET.Element('CQuickSelect')
+    group = ET.SubElement(ET.SubElement(root, 'ItemGroups'), 'Item',
+                          key='QUICK_SELECT_ITEM_TYPE_SATCHEL_ITEM')
+    items = ET.SubElement(group, 'Items')
+    for index, key in enumerate(keys[:-1]):
+        item = ET.SubElement(items, 'Item', key=key)
+        ET.SubElement(item, 'Unrelated').text = 'preserve me'
+        slots = ET.SubElement(item, 'Slots')
+        for slot in (('PLAYER_PROVISIONS', 'PLAYER_TONICS') if key == 'ITEM_MULTI'
+                     else ('PLAYER_PROVISIONS',)):
+            row = ET.SubElement(slots, 'Item')
+            ET.SubElement(row, 'Id').text = slot
+            ET.SubElement(row, 'SortOrder', value=str((index + 1) * 10))
+    ET.ElementTree(root).write(mod / 'quickselectitems.ymt', encoding='utf-8')
+    (mod / 'install.xml').write_text('<install/>', encoding='utf-8')
 
 with tempfile.TemporaryDirectory(prefix="lexeditor-issue-6-", ignore_cleanup_errors=True) as temp_name:
     mod = Path(temp_name) / "mod"
     mod.mkdir()
-    for name in ("catalog_sp.ymt", "quickselectitems.ymt", "install.xml"):
-        shutil.copy2(fixture_root / name, mod / name)
-    os.environ["LEXEDITOR_RDR2_PROJECT"] = str(PROJECT)
+    fixture(mod)
+    os.environ["LEXEDITOR_RDR2_PROJECT"] = temp_name
     os.environ["LEXEDITOR_MOD_ROOT"] = str(mod)
     sys.path.insert(0, str(ROOT))
     from plugins.rdr2 import server  # noqa: E402
@@ -101,16 +123,28 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-issue-6-", ignore_cleanup_err
     replacement = next(slot for slot in before["slotsByGroup"][original["group"]]
                        if slot != old_slot["id"])
     untouched_key = next(key for key in items if key not in {one_slot, remove_key, multi_slot})
+    original_digest = digest(mod / 'quickselectitems.ymt')
+    try:
+        server.apply_quick_select_edits([
+            {'item': one_slot, 'slots': [{'id': replacement, 'sortOrder': 45}]},
+            {'item': unmapped, 'slots': [{'id': 'PLAYER_PROVISIONS', 'sortOrder': 1.5}]},
+        ])
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('Accepted fractional sort order before the first save')
+    require(digest(mod / 'quickselectitems.ymt') == original_digest, 'first rejected batch changed XML')
+    require(server.get_quick_select() == before, 'first rejected batch leaked cached mappings')
+    require(not (mod / 'quickselectitems.ymt.bak').exists(), 'rejected batch created a backup')
     tree_before = ET.parse(mod / "quickselectitems.ymt")
-    untouched_before = ET.tostring(next(
+    untouched_before = entry_xml(next(
         node for node in tree_before.findall("./ItemGroups/Item/Items/Item")
-        if node.get("key") == untouched_key), encoding="unicode")
+        if node.get("key") == untouched_key))
 
     changed = server.apply_quick_select_edits([
         {"item": one_slot, "slots": [{"id": replacement,
                                          "sortOrder": old_slot["sortOrder"]}]},
-        {"item": unmapped, "slots": [{"id": "PLAYER_PROVISIONS",
-                                        "sortOrder": None}]},
+        {"item": unmapped, "slots": [{"id": "PLAYER_PROVISIONS"}]},
         {"item": remove_key, "slots": []},
     ])
     require(changed == 3, f"expected three changed item mappings, got {changed}")
@@ -126,11 +160,12 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-issue-6-", ignore_cleanup_err
     require(after["items"][multi_slot] == before["items"][multi_slot],
             "unrelated multi-slot mapping changed")
     tree_after = ET.parse(mod / "quickselectitems.ymt")
-    untouched_after = ET.tostring(next(
+    untouched_after = entry_xml(next(
         node for node in tree_after.findall("./ItemGroups/Item/Items/Item")
-        if node.get("key") == untouched_key), encoding="unicode")
+        if node.get("key") == untouched_key))
     require(untouched_after == untouched_before, "unrelated XML entry changed")
     require((mod / "quickselectitems.ymt.bak").is_file(), "save did not create a backup")
+    require(digest(mod / 'quickselectitems.ymt.bak') == original_digest, 'backup lost the original XML')
 
     before_invalid = digest(mod / "quickselectitems.ymt")
     try:
@@ -143,5 +178,23 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-issue-6-", ignore_cleanup_err
         raise SystemExit("FAIL: server accepted a free-entry slot ID")
     require(digest(mod / "quickselectitems.ymt") == before_invalid,
             "rejected slot changed the file")
+
+    for invalid in (None, True, False, 1.5, float('nan'), float('inf'), -1, 1_000_001, '1.5'):
+        snapshot = server.get_quick_select()
+        backup = digest(mod / 'quickselectitems.ymt.bak')
+        try:
+            server.apply_quick_select_edits([
+                {'item': one_slot, 'slots': [{'id': replacement, 'sortOrder': 45}]},
+                {'item': unmapped, 'slots': [{'id': 'PLAYER_PROVISIONS', 'sortOrder': invalid}]},
+            ])
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f'Accepted invalid sort order: {invalid!r}')
+        require(server.get_quick_select() == snapshot, 'rejected batch changed cached mappings')
+        require(digest(mod / 'quickselectitems.ymt') == before_invalid, 'rejected batch changed XML')
+        require(digest(mod / 'quickselectitems.ymt.bak') == backup, 'rejected batch changed backup')
+    server._files.clear()
+    require(server.get_quick_select() == after, 'saved assignments did not survive reload')
 
 print("PASS: Lexeditor #6 controlled item quick-select assignments")

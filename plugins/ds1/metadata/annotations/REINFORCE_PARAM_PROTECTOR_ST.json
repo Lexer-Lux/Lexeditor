@@ -1,0 +1,83 @@
+{
+  "Param": "REINFORCE_PARAM_PROTECTOR_ST",
+  "Type": "REINFORCE_PARAM_PROTECTOR_ST",
+  "Name": "REINFORCE_PARAM_PROTECTOR_ST",
+  "Description": "Determines the parameters for reinforcing armor.",
+  "Fields": [
+    {
+      "Field": "physicsDefRate",
+      "Name": "Physical Defense (x)",
+      "Description": "Physical defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
+    },
+    {
+      "Field": "magicDefRate",
+      "Name": "Magic Defense (x)",
+      "Description": "Magic defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
+    },
+    {
+      "Field": "fireDefRate",
+      "Name": "Fire Defense (x)",
+      "Description": "Fire defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
+    },
+    {
+      "Field": "thunderDefRate",
+      "Name": "Lightning Defense (x)",
+      "Description": "Lightning defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
+    },
+    {
+      "Field": "slashDefRate",
+      "Name": "Slash Defense (x)",
+      "Description": "Slash defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
+    },
+    {
+      "Field": "blowDefRate",
+      "Name": "Strike Defense (x)",
+      "Description": "Strike defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
+    },
+    {
+      "Field": "thrustDefRate",
+      "Name": "Thrust Defense (x)",
+      "Description": "Thrust defense at this upgrade level, compared with the unupgraded armor. 1 means unchanged, 2 means double."
+    },
+    {
+      "Field": "resistPoisonRate",
+      "Name": "Poison Resistance (x)",
+      "Description": "Poison resistance at this upgrade level, compared with the unupgraded armor. 1 means unchanged, higher resists more."
+    },
+    {
+      "Field": "resistDiseaseRate",
+      "Name": "Toxic Resistance (x)",
+      "Description": "Toxic resistance at this upgrade level, compared with the unupgraded armor. 1 means unchanged, higher resists more."
+    },
+    {
+      "Field": "resistBloodRate",
+      "Name": "Bleed Resistance (x)",
+      "Description": "Bleed resistance at this upgrade level, compared with the unupgraded armor. 1 means unchanged, higher resists more."
+    },
+    {
+      "Field": "resistCurseRate",
+      "Name": "Curse Resistance (x)",
+      "Description": "Curse resistance at this upgrade level, compared with the unupgraded armor. 1 means unchanged, higher resists more."
+    },
+    {
+      "Field": "residentSpEffectId1",
+      "Name": "Resident SpEffect Offset: 1",
+      "Description": "Moves the armor's first wearer effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
+    },
+    {
+      "Field": "residentSpEffectId2",
+      "Name": "Resident SpEffect Offset: 2",
+      "Description": "Moves the armor's second wearer effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
+    },
+    {
+      "Field": "residentSpEffectId3",
+      "Name": "Resident SpEffect Offset: 3",
+      "Description": "Moves the armor's third wearer effect up its list at this upgrade level, usually to a stronger form. 0 keeps the base effect."
+    },
+    {
+      "Field": "materialSetId",
+      "Name": "Material Set Offset",
+      "Description": "Which upgrade stones this level needs, as a step up from the armor's base list. 0 keeps the base list."
+    }
+  ]
+}

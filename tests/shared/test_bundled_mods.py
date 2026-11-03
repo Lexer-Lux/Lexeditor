@@ -1,31 +1,36 @@
-"""Linked component deployment, durable settings, and transaction failures."""
+"""Bundle components as ordinary tweak settings: schema, values, expansion.
+
+A bundle's components used to be ticked in the Mod Library dialog and
+applied as one transaction. Now each component is an on/off setting from
+the bundle's own schema, saved beside the mod and deployed with it.
+"""
 import json
 from pathlib import Path
 import sys
-from types import SimpleNamespace
 import threading
+from types import SimpleNamespace
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from core.bundled_mods import BundleManager, BundledTweak, components, inspect_bundle
+from core import bundled_mods, mods_service
+from core.bundled_mods import components, expand_roots, inspect_bundle, schema, save_values, selected_paths, values
 from core.desktop_host import HostApi
-from core.mod_library import ModLibrary, file_tree
+from core.mod_library import ModLibrary
 
 
 class Loader:
     supports_bundle_components = True
-    fail = False
+
+    def __init__(self):
+        self.deployed = None
 
     def inspect(self, root, files):
         return {'valid': Path('data.bin') in files, 'problems': [], 'packages': ['data.bin']}
 
     def activate(self, roots, game):
-        # A failed deploy may already have replaced part of its output.
-        (game / 'loaded.json').write_text(json.dumps([p.name for p in roots]))
-        if self.fail:
-            self.fail = False
-            raise OSError('deployment failed')
+        self.deployed = [Path(path).name for path in roots]
+        (game / 'loaded.json').write_text(json.dumps(self.deployed))
 
     def active_mod_ids(self, game):
         path = game / 'loaded.json'
@@ -37,194 +42,198 @@ def fixture(root):
     game.mkdir(parents=True)
     bundle = library / 'Collection'
     rows = []
-    for key, tweaks in [('combat', ['damage']), ('balance', ['damage', 'cost'])]:
+    for key, tweaks in [('combat', ['damage']), ('balance', [])]:
         child = bundle / key
         child.mkdir(parents=True)
         (child / 'data.bin').write_bytes(key.encode())
         rows.append({'id': key, 'name': key.title(), 'path': key, 'tweaks': tweaks})
-    (bundle / 'mod.json').write_text(json.dumps({'name': 'Collection', 'bundle': {'version': 1, 'components': rows}}))
-    def read(key):
-        path = game / (key + '.json')
-        return json.loads(path.read_text()) if path.exists() else False
-    def write(key, value):
-        (game / (key + '.json')).write_text(json.dumps(value))
-    tweaks = {key: BundledTweak(key.title() + ' tweak', lambda game, key=key: read(key),
-                               lambda game, value, key=key: write(key, value)) for key in ('damage', 'cost')}
-    return BundleManager(library, game, Loader(), tweaks)
+    (bundle / 'mod.json').write_text(json.dumps({'name': 'Collection', 'enabled': False, 'bundle': {
+        'version': 1, 'components': rows}}))
+    return bundle, game
 
 
-def test_repeated_component_toggles_shared_dependencies_and_reopen(tmp_path):
-    manager = fixture(tmp_path)
-    for _ in range(3):
-        manager.activate([], ['Collection/combat', 'Collection/balance'])
-        fresh = BundleManager(manager.library, manager.game, Loader(), manager.tweaks)
-        assert fresh.state()['components'] == ['Collection/combat', 'Collection/balance']
-        assert fresh.adapter.active_mod_ids(fresh.game) == ['combat', 'balance']
-        assert all(t['enabled'] for t in fresh.snapshot()['tweaks'])
-        manager.activate([], ['Collection/combat'])
-        assert manager.tweaks['damage'].read(manager.game) is True
-        assert manager.tweaks['cost'].read(manager.game) is False
-        manager.activate([], [])
-        assert not any(t['enabled'] for t in manager.snapshot()['tweaks'])
-        assert manager.adapter.active_mod_ids(manager.game) == []
-    assert not manager.journal.exists()
+def test_schema_lists_one_switch_per_component_default_off(tmp_path):
+    bundle, _game = fixture(tmp_path)
+    result = schema(bundle)
+    assert [(field['key'], field['label'], field['type'], field['default'])
+            for field in result['fields']] == [('combat', 'Combat', 'bool', False),
+                                               ('balance', 'Balance', 'bool', False)]
+    assert values(bundle) == {'combat': False, 'balance': False}
+    assert selected_paths(bundle) == []
 
 
-def test_reverse_tweak_switches_components_and_preserves_other_dependencies(tmp_path):
-    manager = fixture(tmp_path)
-    manager.toggle_tweak('damage', True)
-    assert set(manager.state()['components']) == {'Collection/combat', 'Collection/balance'}
-    manager.toggle_tweak('cost', False)
-    assert manager.state()['components'] == ['Collection/combat']
-    assert manager.tweaks['damage'].read(manager.game)
-    manager.toggle_tweak('damage', False)
-    assert manager.state()['components'] == []
-    assert not manager.snapshot()['inconsistent']
+def test_save_round_trips_and_rejects_unknown_or_non_boolean(tmp_path):
+    bundle, _game = fixture(tmp_path)
+    assert save_values(bundle, {'combat': True}) == {'combat': True, 'balance': False}
+    assert values(bundle) == {'combat': True, 'balance': False}
+    assert json.loads((bundle / 'settings.json').read_text()) == {
+        'values': {'combat': True, 'balance': False}}
+    assert [path.name for path in selected_paths(bundle)] == ['combat']
+    with pytest.raises(ValueError, match='Unknown settings: cost'):
+        save_values(bundle, {'cost': True})
+    with pytest.raises(ValueError, match='combat must be on or off'):
+        save_values(bundle, {'combat': 'yes'})
+    with pytest.raises(ValueError, match='Settings must be an object'):
+        save_values(bundle, ['combat'])
+    assert values(bundle) == {'combat': True, 'balance': False}
 
 
-@pytest.mark.parametrize('failure', ['deploy', 'tweak', 'state'])
-def test_failure_restores_payload_settings_and_persisted_selection(tmp_path, monkeypatch, failure):
-    manager = fixture(tmp_path)
-    manager.activate([], ['Collection/combat'])
-    before = manager.state_path.read_bytes()
-    if failure == 'deploy':
-        manager.adapter.fail = True
-    elif failure == 'tweak':
-        original = manager.tweaks['cost']
-        calls = []
-        def fail(game, enabled):
-            original.write(game, enabled)
-            calls.append(enabled)
-            if len(calls) == 1:
-                raise OSError('tweak failed after writing')
-        manager.tweaks['cost'] = BundledTweak(original.name, original.read, fail)
-    else:
-        save = manager._save
-        calls = []
-        def fail(path, value):
-            if path == manager.state_path and not calls:
-                calls.append(True)
-                raise OSError('state write failed')
-            save(path, value)
-        monkeypatch.setattr(manager, '_save', fail)
-    with pytest.raises(OSError):
-        manager.activate([], ['Collection/balance'])
-    assert manager.state_path.read_bytes() == before
-    assert manager.adapter.active_mod_ids(manager.game) == ['combat']
-    assert manager.tweaks['damage'].read(manager.game) is True
-    assert manager.tweaks['cost'].read(manager.game) is False
-    assert not manager.journal.exists()
+def test_bad_stored_values_fall_back_but_corrupt_json_is_loud(tmp_path):
+    bundle, _game = fixture(tmp_path)
+    (bundle / 'settings.json').write_text(json.dumps({'values': {'combat': 'yes', 'balance': True}}))
+    assert values(bundle) == {'combat': False, 'balance': True}
+    (bundle / 'settings.json').write_text('{broken')
+    with pytest.raises(ValueError, match='settings.json is not readable JSON'):
+        values(bundle)
 
 
-def test_failed_rollback_is_durable_and_recoverable_after_restart(tmp_path, monkeypatch):
-    manager = fixture(tmp_path)
-    manager.activate([], ['Collection/combat'])
-    original = manager.adapter.activate
-    monkeypatch.setattr(manager.adapter, 'activate', lambda *_: (_ for _ in ()).throw(OSError('loader unavailable')))
-    with pytest.raises(RuntimeError, match='Rollback needs recovery'):
-        manager.activate([], ['Collection/balance'])
-    assert manager.snapshot()['recoveryRequired']
-    with pytest.raises(ValueError, match='Recover'):
-        manager.activate([], [])
-    fresh = BundleManager(manager.library, manager.game, Loader(), manager.tweaks)
-    fresh.recover()
-    assert fresh.state()['components'] == ['Collection/combat']
-    assert not fresh.snapshot()['inconsistent']
-    assert not fresh.journal.exists()
+def test_expand_roots_replaces_bundles_and_rejects_collisions(tmp_path):
+    bundle, _game = fixture(tmp_path)
+    plain = bundle.parent / 'Plain'
+    plain.mkdir()
+    (plain / 'mod.json').write_text(json.dumps({'name': 'Plain'}))
+    save_values(bundle, {'balance': True})
+    assert expand_roots([plain, bundle], Loader()) == [plain, bundle / 'balance']
+    assert expand_roots([bundle], Loader()) == [bundle / 'balance']
+    save_values(bundle, {'combat': False, 'balance': False})
+    assert expand_roots([bundle], Loader()) == []
+    clone = bundle.parent / 'Clone'
+    clone.mkdir()
+    (clone / 'balance').mkdir()
+    (clone / 'balance' / 'data.bin').write_bytes(b'x')
+    (clone / 'mod.json').write_text(json.dumps({'name': 'Clone', 'bundle': {'version': 1, 'components': [
+        {'id': 'balance', 'name': 'Balance', 'path': 'balance', 'tweaks': []}]}}))
+    save_values(clone, {'balance': True})
+    save_values(bundle, {'balance': True})
+    with pytest.raises(ValueError, match='distinct names'):
+        expand_roots([bundle, clone], Loader())
 
 
-def test_unknown_tweaks_bad_paths_and_unsupported_loaders_fail_before_mutation(tmp_path):
-    manager = fixture(tmp_path)
-    manager.tweaks.pop('cost')
-    with pytest.raises(ValueError, match='not registered'):
-        manager.activate([], ['Collection/balance'])
-    assert not manager.journal.exists()
-    manager.adapter.supports_bundle_components = False
-    with pytest.raises(ValueError, match='does not support'):
-        manager.activate([], ['Collection/combat'])
-    root = manager.library / 'Collection'
-    metadata = json.loads((root / 'mod.json').read_text())
+def test_bundles_are_refused_on_loaders_without_component_support(tmp_path):
+    bundle, _game = fixture(tmp_path)
+    save_values(bundle, {'combat': True})
+    adapter = Loader()
+    adapter.supports_bundle_components = False
+    with pytest.raises(ValueError, match='does not support bundled components'):
+        expand_roots([bundle], adapter)
+    assert not inspect_bundle(bundle, [Path('combat/data.bin')], adapter)['valid']
+
+
+def test_component_layout_is_still_validated(tmp_path):
+    bundle, _game = fixture(tmp_path)
+    metadata = json.loads((bundle / 'mod.json').read_text())
     metadata['bundle']['components'][0]['path'] = '../escape'
-    (root / 'mod.json').write_text(json.dumps(metadata))
-    with pytest.raises(ValueError): components(root)
-    assert not list(manager.game.glob('*.json'))
-
-
-def test_loader_silent_failure_is_detected_and_tweaks_are_rolled_back(tmp_path, monkeypatch):
-    manager = fixture(tmp_path)
-    manager.activate([], [])
-    monkeypatch.setattr(manager.adapter, 'activate', lambda *_: None)
-    with pytest.raises(ValueError, match='did not persist'):
-        manager.activate([], ['Collection/combat'])
-    assert manager.state()['components'] == []
-    assert not manager.tweaks['damage'].read(manager.game)
-    assert not manager.journal.exists()
+    (bundle / 'mod.json').write_text(json.dumps(metadata))
+    with pytest.raises(ValueError):
+        components(bundle)
+    with pytest.raises(ValueError):
+        schema(bundle)
 
 
 def test_bundle_import_and_standalone_regression(tmp_path):
-    manager = fixture(tmp_path)
+    bundle, _game = fixture(tmp_path)
     library = ModLibrary(tmp_path / 'imported')
-    source = manager.library / 'Collection'
-    report = library.inspect(source, manager.adapter)
+    report = library.inspect(bundle, Loader())
     assert report['valid'] and len(report['packages']) == 2
-    imported = library.import_mod('test', source, manager.adapter, 'Imported')
+    imported = library.import_mod('test', bundle, Loader(), 'Imported')
     assert len(components(imported)) == 2
-    assert not inspect_bundle(source, [Path('mod.json')], manager.adapter)['valid']
+    assert not inspect_bundle(bundle, [Path('mod.json')], Loader())['valid']
     plain = tmp_path / 'plain'
     plain.mkdir()
     (plain / 'data.bin').write_bytes(b'unchanged standalone')
-    assert library.inspect(plain, manager.adapter)['valid']
+    assert library.inspect(plain, Loader())['valid']
 
 
-def host_fixture(manager):
+def test_mod_row_exposes_components_like_script_settings(tmp_path):
+    bundle, _game = fixture(tmp_path)
+    save_values(bundle, {'combat': True})
+    row = mods_service.mod_row(bundle)
+    assert row['components']['error'] == ''
+    assert [field['key'] for field in row['components']['schema']['fields']] == ['combat', 'balance']
+    assert row['components']['values'] == {'combat': True, 'balance': False}
+    (bundle / 'combat' / 'data.bin').unlink()
+    (bundle / 'combat').rmdir()
+    broken = mods_service.mod_row(bundle)
+    assert broken['components']['error'] != ''
+    assert broken['name'] == 'Collection'
+
+
+def host_for(library, game, adapter):
     host = HostApi.__new__(HostApi)
     host._mod_library_lock = threading.RLock()
-    host._bundle_manager = lambda _: manager
-    host._mod_adapter = lambda _: manager.adapter
-    host._installations = SimpleNamespace(snapshot=lambda _: {'root': str(manager.game)})
-    host._plugins = {'test': SimpleNamespace(managed_mod=None, mod_adapter=manager.adapter, bundled_tweaks=manager.tweaks)}
-    host._managed_mod_results = {}
-    host.game_process_status = lambda _: {'running': False}
-    host.mod_library_status = lambda _: {'canManage': True, 'root': str(manager.library.parent), 'message': ''}
+    host._game_mods = lambda _plugin: library
+    host._mod_adapter = lambda _plugin: adapter
+    host._installations = SimpleNamespace(snapshot=lambda _plugin: {'root': str(game)})
+    host.game_process_status = lambda _plugin: {'running': False}
+    host.mod_library_status = lambda _plugin: {'canManage': True, 'root': str(library.parent),
+                                               'message': ''}
     return host
 
 
-def test_real_host_api_checks_game_running_and_exposes_relationship(tmp_path):
-    manager = fixture(tmp_path)
-    host = host_fixture(manager)
-    result = host.activate_library_mods('test', [], ['Collection/combat'])
-    assert result['entries'][0]['components'][0]['linkedTweaks'][0]['name'] == 'Damage tweak'
-    host.set_bundled_tweak('test', 'damage', False)
-    assert not manager.state()['components']
-    host.game_process_status = lambda _: {'running': True}
+def test_component_tick_saves_and_deploys_at_once_while_on(tmp_path):
+    bundle, game = fixture(tmp_path)
+    library = bundle.parent
+    info = json.loads((bundle / 'mod.json').read_text())
+    info['enabled'] = True
+    (bundle / 'mod.json').write_text(json.dumps(info))
+    adapter = Loader()
+    host = host_for(library, game, adapter)
+    row = HostApi.save_mod_settings(host, 'test', str(bundle), {'combat': True, 'balance': True})
+    assert row['components']['values'] == {'combat': True, 'balance': True}
+    assert adapter.deployed == ['combat', 'balance']
+    assert json.loads((game / 'loaded.json').read_text()) == ['combat', 'balance']
+
+
+def test_component_tick_while_off_saves_without_deploying(tmp_path):
+    bundle, game = fixture(tmp_path)
+    adapter = Loader()
+    host = host_for(bundle.parent, game, adapter)
+    HostApi.save_mod_settings(host, 'test', str(bundle), {'combat': True})
+    assert values(bundle) == {'combat': True, 'balance': False}
+    assert adapter.deployed is None
+
+
+def test_deploy_failure_keeps_the_saved_tick(tmp_path):
+    bundle, game = fixture(tmp_path)
+    info = json.loads((bundle / 'mod.json').read_text())
+    info['enabled'] = True
+    (bundle / 'mod.json').write_text(json.dumps(info))
+    adapter = Loader()
+    host = host_for(bundle.parent, game, adapter)
+    host.game_process_status = lambda _plugin: {'running': True}
     with pytest.raises(ValueError, match='Close the game'):
-        host.set_bundled_tweak('test', 'damage', True)
+        HostApi.save_mod_settings(host, 'test', str(bundle), {'combat': True})
+    assert values(bundle) == {'combat': True, 'balance': False}
+
+
+def test_activate_guards_match_the_old_apply(tmp_path):
+    bundle, game = fixture(tmp_path)
+    adapter = Loader()
+    host = host_for(bundle.parent, game, adapter)
+    host.game_process_status = lambda _plugin: {'running': True}
     with pytest.raises(ValueError, match='Close the game'):
-        host.activate_library_mods('test', [], ['Collection/combat'])
+        HostApi._activate_mods(host, 'test', [str(bundle)])
+    host.game_process_status = lambda _plugin: {'running': False}
+    with pytest.raises(ValueError, match='Choose each mod once'):
+        HostApi._activate_mods(host, 'test', [str(bundle), str(bundle)])
+    with pytest.raises(ValueError, match='Choose each mod once'):
+        HostApi._activate_mods(host, 'test', [str(tmp_path / 'elsewhere')])
 
 
-def test_external_setting_or_deployment_change_is_not_silently_accepted(tmp_path):
-    manager = fixture(tmp_path)
-    manager.activate([], ['Collection/combat'])
-    manager.tweaks['damage'].write(manager.game, False)
-    assert manager.snapshot()['inconsistent']
-    host = host_fixture(manager)
-    with pytest.raises(ValueError, match='before launching'):
-        host.launch_game('test')
-    manager.activate([], ['Collection/combat'])
-    assert not manager.snapshot()['inconsistent']
-    manager.adapter.activate([], manager.game)
-    assert manager.snapshot()['inconsistent']
-
-
-def test_real_pak_adapter_deploys_and_removes_linked_component(tmp_path):
+def test_real_pak_adapter_deploys_and_removes_a_ticked_component(tmp_path, monkeypatch):
     from plugins.ff7r.mod_support import PakModAdapter
+    from plugins.ff7r import tooling
     from plugins.ff7r.tooling import pack_directory, get_file
-    manager = fixture(tmp_path)
-    exe = manager.game / 'End/Binaries/Win64/ff7remake_.exe'
+    # Use the hash-pinned bundled helper in this test's own cache. A fresh CI
+    # runner must not depend on an installation in the developer's user folder.
+    monkeypatch.delenv('LEXEDITOR_REPAK', raising=False)
+    monkeypatch.setattr(tooling, 'user_data_dir', lambda: tmp_path / 'helper-cache')
+    assert tooling.helper_install()['installed']
+    bundle, game = fixture(tmp_path)
+    exe = game / 'End/Binaries/Win64/ff7remake_.exe'
     exe.parent.mkdir(parents=True)
     exe.write_bytes(b'fixture')
-    for row in manager.catalog().values():
+    for row in components(bundle):
         root = Path(row['path'])
         (root / 'data.bin').unlink()
         content = tmp_path / ('content-' + row['id'])
@@ -232,13 +241,20 @@ def test_real_pak_adapter_deploys_and_removes_linked_component(tmp_path):
         asset.parent.mkdir(parents=True)
         asset.write_bytes(row['id'].encode())
         pack_directory(content, root / (row['id'] + '_P.pak'), version='V4')
-    manager.adapter = PakModAdapter()
-    manager.activate([], ['Collection/combat'])
-    deployed = manager.game / 'End/Content/Paks/~mods/LexeditorLibrary'
+    adapter = PakModAdapter()
+    save_values(bundle, {'combat': True})
+    adapter.activate(expand_roots([bundle], adapter), game)
+    deployed = game / 'End/Content/Paks/~mods/LexeditorLibrary'
     assert get_file(deployed / 'combat_P.pak', 'End/Content/combat.txt') == b'combat'
-    assert manager.tweaks['damage'].read(manager.game)
-    fresh = BundleManager(manager.library, manager.game, PakModAdapter(), manager.tweaks)
-    assert not fresh.snapshot()['inconsistent']
-    fresh.toggle_tweak('damage', False)
+    save_values(bundle, {'combat': False})
+    adapter.activate(expand_roots([bundle], adapter), game)
     assert not list(deployed.glob('*.pak'))
-    assert not fresh.tweaks['damage'].read(manager.game)
+
+
+def test_bundled_mods_module_has_no_apply_time_machinery():
+    assert not hasattr(bundled_mods, 'BundleManager')
+    assert not hasattr(bundled_mods, 'BundledTweak')
+    assert not hasattr(HostApi, 'mod_library_entries')
+    assert not hasattr(HostApi, 'activate_library_mods')
+    assert not hasattr(HostApi, 'set_bundled_tweak')
+    assert not hasattr(HostApi, 'recover_bundled_mods')

@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 import struct
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 FIELD_PALETTE_RE = re.compile(r"^Game/field/palette_bin/plt(\d+)\.bin$", re.IGNORECASE)
@@ -72,8 +72,10 @@ def load_palette(store: OverlayStore, path: str, source: str = "mine") -> dict:
 
 
 def _parse_hex(value: str) -> tuple[int, int, int]:
-    text = str(value).strip()
-    if len(text) != 7 or not text.startswith("#"):
+    if not isinstance(value, str):
+        raise ValueError("Palette color must be text")
+    text = value.strip()
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", text):
         raise ValueError("Palette color must be #RRGGBB")
     try:
         return tuple(int(text[offset:offset + 2], 16) for offset in (1, 3, 5))
@@ -82,6 +84,7 @@ def _parse_hex(value: str) -> tuple[int, int, int]:
 
 
 def save_palette(store: OverlayStore, path: str, expected_sha256: str, edits: list[dict]) -> dict:
+    validate_edits(edits)
     current = load_palette(store, path, "mine")
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -90,12 +93,18 @@ def save_palette(store: OverlayStore, path: str, expected_sha256: str, edits: li
     seen = set()
     by_token = {row["token"]: row for row in current["rows"]}
     for edit in edits:
-        token = str(edit["token"])
+        if not isinstance(edit, dict):
+            raise ValueError("Palette edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("Palette token must be text")
+        if set(edit) - {"token", "hex"}:
+            raise ValueError("Only the palette color value is editable")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate palette color edit")
         seen.add(token)
         row = by_token[token]
-        red, green, blue = _parse_hex(edit["hex"])
+        red, green, blue = _parse_hex(edit.get("hex", ""))
         raw = (0x8000 if row["preservedBit15"] else 0)
         raw |= _component5(red)
         raw |= _component5(green) << 5

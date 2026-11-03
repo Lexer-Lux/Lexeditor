@@ -86,11 +86,15 @@ class PluginRequestHandler(BaseHTTPRequestHandler):
         self.send_bytes(data, mimetypes.guess_type(Path(target).name)[0]
                         or "application/octet-stream", status)
 
-    def send_bytes(self, data: bytes, content_type: str, status: int = 200) -> None:
+    def send_bytes(self, data: bytes, content_type: str, status: int = 200,
+                   cache: str | None = None) -> None:
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
-            self.send_header("Cache-Control", NO_STORE)
+            from core.network_policy import disabled
+            if disabled() and content_type.startswith('text/html'):
+                self.send_header('Content-Security-Policy', "default-src 'self' data: blob: http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:*; frame-src 'self' http://127.0.0.1:* http://localhost:*")
+            self.send_header("Cache-Control", cache or NO_STORE)
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)

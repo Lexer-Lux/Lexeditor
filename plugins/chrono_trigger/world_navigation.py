@@ -7,11 +7,12 @@ live trigger records only. Counts, the unknown block, script addresses,
 sentinel records, unmodelled flag bits and trailing bytes are preserved.
 """
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 import re
 import struct
 
-from .project import OverlayStore, digest, validate_resource_path
+from .project import OverlayStore, digest, validate_resource_path, validate_edits
 
 
 EVENT_TABLE_RE = re.compile(r"^Game/world/EventTable/EventTable_(\d+)\.dat$", re.IGNORECASE)
@@ -153,7 +154,7 @@ def load_world_navigation(store: OverlayStore, source: str = "mine", language: s
 
 
 def _bounded(name: str, value, low: int, high: int) -> int:
-    number = int(value)
+    number = integer_value(value, name)
     if not low <= number <= high:
         raise ValueError(f"{name} must be between {low} and {high}")
     return number
@@ -162,6 +163,7 @@ def _bounded(name: str, value, low: int, high: int) -> int:
 def save_world_navigation(
     store: OverlayStore, path: str, expected_sha256: str, edits: list[dict], language: str = "en"
 ) -> dict:
+    validate_edits(edits)
     current = _parse_file(store, path, "mine", language)
     payload, _ = store.read(path, "mine")
     if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
@@ -171,12 +173,21 @@ def save_world_navigation(
     seen = set()
 
     for edit in edits:
-        token = str(edit.get("token", ""))
+        if not isinstance(edit, dict):
+            raise ValueError("World navigation edit must be an object")
+        token = edit.get("token", "")
+        if not isinstance(token, str):
+            raise ValueError("World navigation token must be text")
         if token in seen or token not in by_token:
             raise ValueError("Invalid or duplicate world navigation edit")
         seen.add(token)
         row = by_token[token]
-        values = dict(edit.get("values") or {})
+        values = edit.get("values", {})
+        if not isinstance(values, dict):
+            raise ValueError("World navigation values must be an object")
+        for field in ("enabled", "halfTileLeft", "halfTileUp"):
+            if field in values and type(values[field]) is not bool:
+                raise ValueError(f"World navigation {field} must be a boolean")
         if row["recordType"] == "exit":
             allowed = {
                 "xTile", "enabled", "yTile", "nameIndex", "destinationScene",
@@ -199,6 +210,8 @@ def save_world_navigation(
             if bool(values.get("halfTileUp", row["halfTileUp"])):
                 facing_raw |= 0x10
             if row["scripted"]:
+                if "facing" in values:
+                    raise ValueError("A scripted world exit has no facing field")
                 if "destinationScene" in values:
                     raise ValueError("A scripted world exit cannot be converted into a destination exit")
                 maximum = max(0, min(3, current["scriptAddressCount"] - 1))

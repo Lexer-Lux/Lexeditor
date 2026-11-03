@@ -1,0 +1,22 @@
+{
+  "crossCheck": "https://raw.githubusercontent.com/soulsmods/Paramdex/master/DS1/Defs/CharaInitParam.xml",
+  "notice": "../credits.md",
+  "scope": "Starting class and gift layout, transcribed in this repository's definition style and verified byte for byte against a retail GameParam archive (314 rows of 240 bytes: stats, gear, spells, items, gestures, covenant). Labels, help text, links and reference names are authored for Lexeditor; class stats were cross-checked against published starting values.",
+  "files": {
+    "defs/CharaInitParam.xml": {
+      "sha256": "d3d35cff3b368ee467fd2c9e288a4878563c5abfe791ba7d4793e03c47a485d3"
+    },
+    "meta/CharaInitParam.xml": {
+      "sha256": "83f90ce464ecff20a5259e9b9c753b43ca8abb1e3eb21098eeb7016453863bb7"
+    },
+    "annotations/CHARACTER_INIT_PARAM.json": {
+      "sha256": "d4af5c2517cde181365f1fff360f79cb6356054627506d9080e8f2a4e27ba162"
+    },
+    "row_names/CharaInitParam.json": {
+      "sha256": "8c74cfbd3d398ce9f180f054665b58e797eeac385ac54fecef8edfc731e90a27"
+    },
+    "enums/CHARACTER_INIT_SEX.json": {
+      "sha256": "b8c16cb12e5878c2853bd437c341e8fc9960f9d0bce2968719dcba1d75fb168a"
+    }
+  }
+}
