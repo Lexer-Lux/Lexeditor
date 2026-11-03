@@ -4919,12 +4919,12 @@ function renderTweaks(){
     :"No tweaks are switched on. Switch one on in the Mods tab to change its settings here."}):null;
   const applied=status.applied.length?status.applied.join(", "):status.state==="vanilla"?"None, original game files":"Unknown";
   const installed=detailPanel({title:"INSTALLED GAME",
-    help:"Play installs your enabled tweaks and applies their changes when the game starts. The loader adds multiplayer protection, but cannot guarantee against account restrictions. Modded play uses separate characters that Steam Cloud can sync. Removing the loader returns to your vanilla characters and keeps your modded progress for reinstalling. One original and one recent backup help recover damaged modded saves. Restore original removes the loader and restores changed game files.",
+    help:"Save rebuilds changed tweaks; Play starts the game through Steam. The loader adds multiplayer protection, but cannot guarantee against account restrictions. Modded play uses separate characters that Steam Cloud can sync. Removing the loader returns to your vanilla characters and keeps your modded progress for reinstalling. One original and one recent backup help recover damaged modded saves. Restore original removes the loader and restores changed game files.",
     body:[detailField({label:"APPLIED",control:readonlyField(applied)}),
       (status.staleMods||[]).length?LexeditorUI.detailNote(state.readOnly
-        ?"The enabled tweaks changed since the last build. Close the game, then press Play to rebuild them."
+        ?"The enabled tweaks changed since the last build. Close the game, then save to rebuild them."
         :"The enabled tweaks changed since the last build. Save to rebuild them."):null,
-      status.state==="vanilla"&&!status.problem&&!status.needsRebuild&&(status.tweaks||[]).some(row=>row.enabled)?LexeditorUI.detailNote("These tweaks are on but not installed yet. Press Play to install them."):null,
+      status.state==="vanilla"&&!status.problem&&!status.needsRebuild&&(status.tweaks||[]).some(row=>row.enabled)?LexeditorUI.detailNote("These tweaks are on but not installed yet. Open Information and choose Apply to install them."):null,
       status.loaderMessage?detailField({label:"LAST GAME START",control:readonlyField(status.loaderMessage),
         help:infoHelp("What the loader reported the last time the game started. If the game was updated or another tool changed it, the loader changes nothing and says so here.")}):null,
       empty?missingMods:null,
