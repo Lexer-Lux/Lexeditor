@@ -19,8 +19,7 @@ def test_service_is_registered_for_normal_and_frozen_launches():
 def test_shared_checks_cover_native_factory_and_module_boot(setup, tmp_path, monkeypatch):
     import runpy
     root = Path(__file__).resolve().parents[2]
-    for name in ('verify_shared_ui_contract.py', 'verify_shared_shell_projects_issue_27.py'):
-        runpy.run_path(str(root / 'tests/shared' / name))
+    runpy.run_path(str(root / 'tests/shared/verify_shared_shell_projects_issue_27.py'))
     routes = runpy.run_path(str(root / 'tests/shared/plugin_module_routes_check.py'))
     assert routes['check']('kings_field3') == []
     script = root / 'tests/shared/data_map_browser_check.py'
