@@ -78,6 +78,15 @@
     ]
   },
   "plugins": {
+    "kings-field2": {
+      "contributions": [
+        {"name": "Voicedrew11 / Verdite2 contributors", "role": "Existing PC port, native settings limits, source-mod integration and game-routine research.", "url": "https://github.com/Voicedrew11/verdite2"},
+        {"name": "flaffy / RecompOne contributors", "role": "C# source-mod, hook, event and configuration interfaces.", "url": "https://github.com/BlackLabelHQ/RecompOne"},
+        {"name": "Acranon / verdite2-mods contributors", "role": "Run/interact research and existing source-mod conventions.", "url": "https://github.com/Acranon/verdite2-mods"}
+      ],
+      "thanks": [],
+      "licenses": [{"name": "Verdite2 integration references — MIT notices", "sourcePath": "plugins/kings_field2/credits.md"}]
+    },
     "blank": {
       "contributions": [
         {

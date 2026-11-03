@@ -82,6 +82,33 @@
     ]
   },
   "plugins": {
+    "kings-field2": {
+      "contributions": [
+        {
+          "name": "Voicedrew11 / Verdite2 contributors",
+          "role": "Existing PC port, native settings limits, source-mod integration and game-routine research.",
+          "url": "https://github.com/Voicedrew11/verdite2"
+        },
+        {
+          "name": "flaffy / RecompOne contributors",
+          "role": "C# source-mod, hook, event and configuration interfaces.",
+          "url": "https://github.com/BlackLabelHQ/RecompOne"
+        },
+        {
+          "name": "Acranon / verdite2-mods contributors",
+          "role": "Run/interact research and existing source-mod conventions.",
+          "url": "https://github.com/Acranon/verdite2-mods"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Verdite2 integration references — MIT notices",
+          "sourcePath": "plugins/kings_field2/credits.md",
+          "text": "# King's Field II / Verdite2 credits\n\n- **Voicedrew11 / Verdite2 contributors** — Existing PC port, native settings\n  schema and limits, source-mod integration and game-routine research.\n  <https://github.com/Voicedrew11/verdite2>\n- **flaffy / RecompOne contributors** — Native C# source-mod compilation, events,\n  hook and configuration interfaces. <https://github.com/BlackLabelHQ/RecompOne>\n- **Acranon / verdite2-mods contributors** — Research reference for separating\n  run and interaction, and existing native mod conventions.\n  <https://github.com/Acranon/verdite2-mods>\n\nThe game and disc contents belong to FromSoftware. No disc data is distributed\nwith this plugin. This integration currently invokes the separately installed\nVerdite2 port; it does not distribute a compiled game.\n\n## MIT notices\n\nVerdite2: Copyright (c) 2026 Voicedrew11.\n\nRecompOne: Copyright (c) 2026 flaffy.\n\nverdite2-mods: Copyright (c) 2026 Acranon.\n\nEach project above is offered under the following MIT terms:\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        }
+      ]
+    },
     "blank": {
       "contributions": [
         {

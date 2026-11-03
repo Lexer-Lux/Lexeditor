@@ -1,6 +1,11 @@
 {
   "schema": 1,
   "plugins": {
+    "kings-field2": {
+      "loader": "Verdite2 / RecompOne's existing C# source-mod compiler and runtime hook loader. Installed-game acceptance of the Lexeditor adapter is in progress.",
+      "structure": "Each native source mod has a root mod.json with id and name, and C# source. Lexeditor stages owned copies under the native Verdite2 data/mods directory and preserves independently installed packages.",
+      "overriding": "Native dependencies and hook semantics govern composition. Lexeditor preserves external ActiveMods entries, rejects duplicate native ids, and does not infer hook conflicts from source filenames. Close the game before changing deployed mods."
+    },
     "blank": {
       "loader": "Template only — not implemented.",
       "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
