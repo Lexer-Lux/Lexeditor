@@ -15,6 +15,7 @@ from time import perf_counter
 
 from core import memory_conflicts, mod_requires, script_mods
 from core.mod_conflicts import MAX_LISTED
+from core.plugin_files import read_bounded
 
 from . import assets, deployment, emevd, mod_loader, texts, tweak_mods
 from .store import MARKER, RELATIVE
@@ -367,7 +368,11 @@ class Ds1ModAdapter:
             path = self._report_path()
             if path.stat().st_size > self.REPORT_LIMIT:
                 return None
-            report = json.loads(path.read_text(encoding="utf-8"))
+            with path.open('rb') as stream:
+                payload = read_bounded(stream, self.REPORT_LIMIT + 1)
+            if len(payload) > self.REPORT_LIMIT:
+                return None
+            report = json.loads(payload)
             if report.get("key") != self._report_key(game_root, ordered, content=content):
                 return None
             cached = report["conflicts"]

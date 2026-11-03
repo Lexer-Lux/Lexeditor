@@ -755,6 +755,27 @@ def test_report_location_failure_is_optional(tmp_path, monkeypatch):
     adapter._save_report(tmp_path, [], [], installed=True)
 
 
+def test_conflict_report_growth_is_bounded_and_discarded(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from plugins.ds1 import mod_support
+    path = tmp_path/'report.json'
+    path.write_bytes(b' ' * 1024)
+    monkeypatch.setattr(Ds1ModAdapter, '_report_path', staticmethod(lambda: path))
+    monkeypatch.setattr(Ds1ModAdapter, 'REPORT_LIMIT', 16)
+    stat = Path.stat
+    monkeypatch.setattr(Path, 'stat', lambda file, **kwargs:
+                        SimpleNamespace(st_size=1) if file == path else stat(file, **kwargs))
+    read = mod_support.read_bounded
+    sizes = []
+    def observe(stream, limit):
+        payload = read(stream, limit)
+        sizes.append(len(payload))
+        return payload
+    monkeypatch.setattr(mod_support, 'read_bounded', observe)
+    assert Ds1ModAdapter()._read_report(tmp_path, []) is None
+    assert sizes == [17]
+
+
 @pytest.mark.parametrize('report', [None, {'folder': b'bad'}, {'folder': [b'bad']}, {'folder': ['okay']}])
 def test_bad_optional_host_reports_cannot_break_mods_overview(tmp_path, report):
     from core.desktop_host import HostApi
