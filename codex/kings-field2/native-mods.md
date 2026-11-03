@@ -93,6 +93,16 @@ did not. Disabling only Better UI removed the name and retained those choices.
 
 ## Damage, power and exploration
 
+Loose-pickup eligibility uses definition kind `0x40`, a live behavior byte and
+`record+0x38 == 0xFF`. The last condition is checked by native pickup `0x8004831C`
+itself, so it must not be removed by analogy with another game's object layout.
+The behavior byte at `+4` is not the definition kind: actual loose item/gold
+records can carry `0x10`/`0x62`. Container-linked items remain manual. In an
+installed preview4 private run, untouched retail item91 and gold70 collected
+through the normal mod/native path after moving only the player to their actual
+positions. Inventory rose0→1 and gold72→73; no item fields or restrictions were
+rewritten. This supplements the capacity, quest and container fixture checks.
+
 Creature records start at `0x8016C544`, stride `0x7C`, with 200 slots. Current HP is `u16+0x1A`;
 spawn `0x80039AFC` copies its maximum from definition `0x80172624 + type*0x78 +0x1A`.
 Damage `0x8003A9CC` follows linked body parts to their parent before subtracting HP.
