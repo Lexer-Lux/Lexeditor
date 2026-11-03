@@ -4,6 +4,8 @@ BND3/DCX facts: Apache-2.0 SoulsTemplates (see credits.md). PARAM cell codecs
 are reused from Lexeditor's DS3 integration; no SoulsFormats code is used.
 """
 from dataclasses import dataclass
+from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import lru_cache
 import hashlib
 import json
@@ -474,20 +476,38 @@ def _compression_key(plain):
     return hashlib.sha256(b'ds1-dcx-zlib9\0' + zlib.ZLIB_RUNTIME_VERSION.encode() + b'\0' + plain).digest()
 
 
+_compression_sources = ContextVar('ds1_compression_sources', default=None)
+
+
+@contextmanager
+def compression_sources(sources):
+    """Owned prior outputs are an optional fallback, consumed only on a miss."""
+    token = _compression_sources.set(iter(sources))
+    try:
+        yield
+    finally:
+        _compression_sources.reset(token)
+
+
 def remember_compression(source):
     """Prime optional compression reuse from a verified generated archive."""
     from . import composition_cache
     try:
         # Only seed ordinary-size high-compression streams. Large texture
         # packs have their own exact installed-output reuse in texture_packs.
-        plain = inflate(source)
         if len(source) < 78 or source[77] >> 6 != 3:
             return
+        plain = inflate(source)
         root, key = composition_cache.user_root(), _compression_key(plain)
+        compressed = bytes(source[76:])
+    except Exception:
+        return None
+    try:
         if composition_cache.load(root, key) is None:
-            composition_cache.store(root, key, bytes(source[76:]))
+            composition_cache.store(root, key, compressed)
     except Exception:
         pass  # Existing outputs only accelerate a build; never gate it.
+    return key, compressed
 
 
 def deflate(original, plain, *, max_size=MAX_ARCHIVE):
@@ -515,6 +535,20 @@ def deflate(original, plain, *, max_size=MAX_ARCHIVE):
                 return candidate
     except Exception:
         pass  # Optional cache failures never prevent an ordinary build.
+    try:
+        sources = _compression_sources.get()
+        if sources is not None:
+            for source in sources:
+                remembered = remember_compression(source)
+                if remembered is None or remembered[0] != key:
+                    continue
+                compressed = remembered[1]
+                struct.pack_into('>II', header, 28, len(plain), len(compressed))
+                candidate = bytes(header) + compressed
+                if inflate(candidate, max_size=max_size) == plain:
+                    return candidate
+    except Exception:
+        pass  # Damaged or unavailable owned outputs fall back to compression.
     compressed = zlib.compress(plain, 9)
     if cache_root is not None:
         try:

@@ -18,9 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import struct
-import zlib
 
-from .formats import FormatError, MAX_ARCHIVE, inflate
+from .formats import FormatError, MAX_ARCHIVE, inflate, deflate
 
 RELATIVE = Path('msg/ENGLISH/item.msgbnd.dcx')
 MENU_RELATIVE = Path('msg/ENGLISH/menu.msgbnd.dcx')
@@ -324,10 +323,7 @@ class TextDocument:
                 old = entries[position]
                 entries[position] = Entry(old.member_id, old.name, old.flags, build_fmg(old.data, groups, texts))
         plain = build_bnd3(self.plain, entries)
-        compressed = zlib.compress(plain, 9)
-        header = bytearray(self.original[:76])
-        struct.pack_into('>II', header, 28, len(plain), len(compressed))
-        return bytes(header) + compressed
+        return deflate(self.original, plain)
 
 
 class MenuDocument(TextDocument):
