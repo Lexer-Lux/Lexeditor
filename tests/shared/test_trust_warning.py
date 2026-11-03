@@ -101,7 +101,7 @@ def test_an_older_single_yes_counts_as_no_mod_seen(tmp_path):
 
 def test_first_enable_warns_and_cancel_keeps_the_mod_off(page):
     mount(page, warned(page))
-    page.get_by_role("checkbox", name="Switch Mine").check()
+    page.get_by_role("checkbox", name="Switch Mine").click()
     box = dialog(page)
     box.get_by_role("heading", name="Enable this mod?").wait_for()
     message = box.locator(".lex-important-message").inner_text()
@@ -117,16 +117,16 @@ def test_first_enable_warns_and_cancel_keeps_the_mod_off(page):
 
 def test_confirming_enables_and_that_mod_is_not_warned_about_again(page):
     mount(page, warned(page))
-    page.get_by_role("checkbox", name="Switch Mine").check()
+    page.get_by_role("checkbox", name="Switch Mine").click()
     dialog(page).get_by_role("button", name="Enable", exact=True).click()
     page.wait_for_function("window.calls.some(c => c[0] === 'set_mod_enabled')")
     assert calls(page, "set_mod_enabled") == [["game", "C:/lib/game/Mine", True]]
     assert calls(page, "acknowledge_trust_warning") == [["c:/lib/game/mine"]]
     # Disabling never warns, and this mod's accepted warning does not return.
-    page.get_by_role("checkbox", name="Switch Mine").uncheck()
+    page.get_by_role("checkbox", name="Switch Mine").click()
     page.wait_for_function("window.calls.filter(c => c[0] === 'set_mod_enabled').length === 2")
     assert dialog(page).count() == 0
-    page.get_by_role("checkbox", name="Switch Mine").check()
+    page.get_by_role("checkbox", name="Switch Mine").click()
     page.wait_for_function("window.calls.filter(c => c[0] === 'set_mod_enabled').length === 3")
     assert dialog(page).count() == 0
     assert len(calls(page, "acknowledge_trust_warning")) == 1
@@ -187,10 +187,10 @@ def test_mod_dropdown_enable_warns_first(page):
 
 def test_each_mod_gets_its_own_first_warning(page):
     mount(page, warned(page))
-    page.get_by_role("checkbox", name="Switch Mine").check()
+    page.get_by_role("checkbox", name="Switch Mine").click()
     dialog(page).get_by_role("button", name="Enable", exact=True).click()
     page.wait_for_function("window.calls.some(c => c[0] === 'set_mod_enabled')")
-    page.get_by_role("checkbox", name="Switch Other").check()
+    page.get_by_role("checkbox", name="Switch Other").click()
     dialog(page).get_by_role("heading", name="Enable this mod?").wait_for()
     dialog(page).get_by_role("button", name="Enable", exact=True).click()
     page.wait_for_function("window.calls.filter(c => c[0] === 'set_mod_enabled').length === 2")
