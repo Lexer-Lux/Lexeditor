@@ -626,8 +626,33 @@ def align_menu_textures(game_root: Path, composition: Composition, layout: bytes
     supplements = [payload(Path(f'menu/menu_{index}.tpf.dcx')) for index in range(6)
                    if Path(f'menu/menu_{index}.tpf.dcx') in composition.files
                    or (game_root/f'menu/menu_{index}.tpf.dcx').is_file()]
-    combined = texture_packs.align_menu(layout,payload(main),supplements,
-                                       current=_read_data(game_root/main,main))
+    source = payload(main)
+    combined = None
+    cache_key = None
+    cache_root = None
+    try:
+        digest = sha256(b'menu-texture-alignment\0' + _composition_revision())
+        for data in (layout, source, *supplements):
+            digest.update(len(data).to_bytes(8, 'little'))
+            digest.update(data)
+        cache_key = digest.digest()
+        cache_root = composition_cache.user_root()
+        cached = composition_cache.load(cache_root, cache_key)
+        if cached is not None:
+            # Checksummed cache entries still cross a format boundary. A broken
+            # pack is disposable; it must never prevent normal regeneration.
+            texture_packs.read(inflate(cached, max_size=texture_packs.MAX_ASSET_BYTES))
+            combined = cached
+    except Exception:
+        pass
+    if combined is None:
+        combined = texture_packs.align_menu(layout, source, supplements,
+                                           current=_read_data(game_root/main, main))
+        if cache_root is not None and cache_key is not None:
+            try:
+                composition_cache.store(cache_root, cache_key, combined)
+            except Exception:
+                pass
     if combined != deployment.vanilla_source(game_root,main).read_bytes():
         composition.files[main] = combined
     else:
