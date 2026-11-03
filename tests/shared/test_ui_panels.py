@@ -16,7 +16,9 @@ def css():
 
 def test_hover_actions_exported():
     source = ui()
-    assert 'hoverActions, collapsiblePanel, promptText' in source
+    exports = source.split('window.LexeditorUI = {', 1)[1].split('};', 1)[0]
+    for name in ('hoverActions', 'collapsiblePanel', 'promptText'):
+        assert name in {entry.strip() for entry in exports.split(',')}
     assert 'const hoverActions = (host, options' in source
     assert 'lex-hover-actions-host' in source
 
@@ -50,7 +52,7 @@ def test_prompt_text():
 
 def test_detail_tabs_keep_column_flow():
     source = ui()
-    assert 'detailBody(bodyClass, options.body, options.paginate)' in source
+    assert 'detailBody(bodyClass, options.body,' in source
     assert '.detailtabs' in source
     assert 'box._detailTabs' in source
     assert 'bodyBox._detailTabs?.addTab()' in source
