@@ -9836,7 +9836,9 @@ ${contents.path}`});
   // back to shipped order and silently drop the developer arrangement.
   const syncPagerCards = pager => {
     if (!pager?.lexOrderCards) return;
-    let live = [...pager.querySelectorAll(".lex-tweak-column > *, .lex-tweak-off-page > *")];
+    // Off-page cards are stored separately from the visible columns. Their
+    // DOM order after the current page does not represent their logical order.
+    let live = [...pager.querySelectorAll(".lex-tweak-column > *")];
     if (!live.length) {
       const grid = pager.querySelector(".lex-tweak-card-grid");
       live = grid ? [...grid.children].filter(node => node instanceof Element &&
