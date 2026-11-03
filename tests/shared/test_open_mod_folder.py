@@ -7,7 +7,7 @@ from core.desktop_host import HostApi
 
 def make_host(tmp, projects):
     host = HostApi.__new__(HostApi)
-    host._plugins = {"ds1": Mock()}
+    host._plugins = {"ds1": Mock(mod_adapter=None)}
     host._projects = Mock()
     host._projects.snapshot.return_value = {"projects": projects}
     host._settings = Mock()
