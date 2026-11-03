@@ -1,5 +1,6 @@
 """FF7 theme: menu font pipeline, skin/sound wiring, provenance (F8)."""
 import json
+import re
 import struct
 import sys
 from pathlib import Path
@@ -152,3 +153,41 @@ def test_theme_provenance_is_recorded():
     third_party = (FF7 / "credits.md").read_text(encoding="utf-8")
     assert "usfont_h.tex" in third_party
     assert "never redistributed" in third_party.lower()
+
+
+def test_table_headers_stay_light_on_dark():
+    """Table headers keep light text on the dark menu blue.
+
+    The shared header fg falls back to --lex-highlight and its bg to
+    --lex-list-header-bg (sorted: --lex-sort-header-fg/bg), so resolve
+    the theme's variables exactly that way and require strong contrast.
+    """
+    css = (FF7 / "editor.css").read_text(encoding="utf-8")
+    variables = dict(re.findall(r"--([\w-]+)\s*:\s*([^;{}]+);", css))
+
+    def resolve(name, fallback):
+        value = (variables.get(name) or variables.get(fallback) or "").strip()
+        assert re.fullmatch(r"#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?", value or ""), (
+            "cannot contrast-check non-hex " + name)
+        return value
+
+    def luminance(hexcode):
+        hexcode = hexcode.lstrip("#")
+        if len(hexcode) == 3:
+            hexcode = "".join(char * 2 for char in hexcode)
+        levels = [int(hexcode[index:index + 2], 16) / 255 for index in (0, 2, 4)]
+        linear = [channel / 12.92 if channel <= 0.03928
+                  else ((channel + 0.055) / 1.055) ** 2.4 for channel in levels]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    def contrast(first, second):
+        light, dark = sorted((luminance(first), luminance(second)), reverse=True)
+        return (light + 0.05) / (dark + 0.05)
+
+    pairs = ((resolve("lex-list-header-fg", "lex-highlight"),
+              resolve("lex-list-header-bg", "lex-panel-2")),
+             (resolve("lex-sort-header-fg", "lex-highlight"),
+              resolve("lex-sort-header-bg", "lex-panel-2")))
+    for foreground, background in pairs:
+        assert contrast(foreground, background) >= 7, (foreground, background)
+

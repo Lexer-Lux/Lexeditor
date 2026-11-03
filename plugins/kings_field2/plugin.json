@@ -1,0 +1,39 @@
+{
+  "id": "kings-field2",
+  "name": "King's Field II",
+  "accent": "#b5a05d",
+  "processNames": [
+    "Verdite2.exe"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_KF2_ROOT",
+    "requiredPaths": [
+      "bin/Verdite2.exe",
+      "bin/RecompOne.Runtime.dll",
+      "content/config/kf2.json"
+    ],
+    "executable": "bin/Verdite2.exe",
+    "launchPath": "Verdite2.exe",
+    "steamAppId": "",
+    "installDirNames": [
+      "Verdite2"
+    ],
+    "defaultRoots": [
+      "D:/Programs/LexersVerdite2"
+    ]
+  },
+  "nativePort": {
+    "booleanEncoding": "text",
+    "dataEnv": "VERDITE2_DATA",
+    "dataDirectory": "Verdite2",
+    "configPath": "content/config/kf2.json",
+    "configIdentity": [
+      "SLUS-00158",
+      "KingsField2"
+    ],
+    "gameIdentity": "Japanese King's Field II / US King's Field, SLUS-00158",
+    "modLoading": {
+      "removal": "Disable a mod in Mods with the game closed. Its folder and saved settings remain available."
+    }
+  }
+}

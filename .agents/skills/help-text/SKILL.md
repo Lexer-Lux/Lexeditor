@@ -13,7 +13,7 @@ and what to set it to, in short plain sentences.
 - **No bubble** when the label and the control already say everything. "Name",
   "Price" or "Enabled" with a checkbox needs nothing. A bubble that repeats its
   label is noise, and noise teaches the reader to skip every bubble.
-- **A bubble** when the reader cannot guess the gameplay effect, the unit, a
+- **A bubble** when the reader cannot guess the gameplay effect, a
   limit, or a trap (for example, "0 disables the drop").
 - Tabs and sections get a bubble only when their purpose is not obvious from
   the name.
@@ -27,7 +27,7 @@ different bubbles for one value is a bug.
 ## What to write
 
 1. What it is, in game terms: what the player sees change.
-2. How to set it, if that is not obvious: unit, range, what the extremes do.
+2. How to set it, if that is not obvious: range and what the extremes do. Never name the unit: units always ride the label's unit control beside the number, never the bubble.
 3. Known limits or traps, if any.
 
 Leave out file offsets, byte layouts, encodings and parser behaviour unless

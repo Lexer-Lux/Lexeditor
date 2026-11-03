@@ -93,6 +93,11 @@ SLOW = {
     "verify_ff7_rendered": 900,
     "verify_ff7_rendered_neutral": 900,
     "verify_no_clipped_text": 900,
+    # Twenty plugins, with a cold load and a settle after every main tab.
+    # The prescribed settles alone can exceed the ordinary three-minute cap.
+    "verify_no_dead_space": 900,
+    # Every plugin/edition at three sizes, with paging, filter and adapter checks.
+    "data_map_browser_check": 900,
     "verify_browser_regressions": 600,
     "verify_rdr2_runtime": 600,
     # Opens all nineteen plugins through the real chooser one at a time. FF7
@@ -100,6 +105,9 @@ SLOW = {
     # flevel.lgp, so the run needs well over the common timeout that every
     # other check gets. Reported as TIMEOUT, this said nothing about the code.
     "verify_plugins_open": 900,
+    # A full rendered sweep of every effect field (153 edits, save/reload,
+    # screenshots): ~85s unloaded, past 180s under parallel browsers.
+    "ds1_effects_browser_check": 600,
 }
 
 

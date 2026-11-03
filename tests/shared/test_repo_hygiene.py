@@ -36,12 +36,13 @@ ROOT_ENTRIES = {
     ".agents", ".gitattributes", ".gitignore", ".gitmodules", ".github", "AGENTS.md", "README.md",
     "Lexeditor.cmd", "install.ps1", "app.py", "pytest.ini", "requirements.txt",
     "requirements-test.txt", "assets", "codex", "core", "docs", "plugins", "shaders",
-    "tests", "tools", "ui", "worklog",
+    "tests", "tools", "ui", "worklog", "todo.txt",
 }
 
 
 def test_repository_root_stays_small():
     # Application modules belong in core/, checks in tests/, utilities in tools/.
+    # todo.txt is the user's task source, maintained in place while completing it.
     top = {p.split("/", 1)[0] for p in tracked()}
     assert top <= ROOT_ENTRIES, sorted(top - ROOT_ENTRIES)
 

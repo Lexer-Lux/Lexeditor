@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <logicId />
+    <battleGoalID />
+    <nearDist />
+    <midDist />
+    <farDist />
+    <outDist />
+    <BackHomeLife_OnHitEneWal />
+    <goalID_ToCaution />
+    <idAttackCannotMove />
+    <goalID_ToFind />
+    <callHelp_ActionAnimId />
+    <callHelp_CallActionId />
+    <eye_dist />
+    <ear_dist />
+    <ear_soundcut_dist />
+    <nose_dist />
+    <maxBackhomeDist />
+    <backhomeDist />
+    <backhomeBattleDist />
+    <nonBattleActLife />
+    <BackHome_LookTargetTime />
+    <BackHome_LookTargetDist />
+    <SightTargetForgetTime />
+    <SoundTargetForgetTime />
+    <BattleStartDist />
+    <callHelp_MyPeerId />
+    <callHelp_CallPeerId />
+    <targetSys_DmgEffectRate />
+    <TeamAttackEffectivity />
+    <eye_angX />
+    <eye_angY />
+    <ear_angX />
+    <ear_angY />
+    <callHelp_CallValidMinDistTarget />
+    <callHelp_CallValidRange />
+    <callHelp_ForgetTimeByArrival />
+    <callHelp_MinWaitTime />
+    <callHelp_MaxWaitTime />
+    <goalAction_ToCaution Enum="NPC_THINK_GOAL_ACTION" />
+    <goalAction_ToFind Enum="NPC_THINK_GOAL_ACTION" />
+    <callHelp_ReplyBehaviorType Enum="NPC_THINK_REPLY_BEHAVIOR_TYPE" />
+    <disablePathMove IsBool="" />
+    <skipArrivalVisibleCheck IsBool="" />
+    <thinkAttr_doAdmirer IsBool="" />
+    <enableNaviFlg_Edge IsBool="" />
+    <enableNaviFlg_LargeSpace IsBool="" />
+    <enableNaviFlg_Ladder IsBool="" />
+    <enableNaviFlg_Hole IsBool="" />
+    <enableNaviFlg_Door IsBool="" />
+    <enableNaviFlg_InSideWall IsBool="" />
+    <enableNaviFlg_reserve0 Padding="" />
+    <enableNaviFlg_reserve1 Padding="" />
+    <pad0 Padding="" />
+  </Field>
+</PARAMMETA>

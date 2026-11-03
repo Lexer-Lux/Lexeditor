@@ -13,6 +13,7 @@ from __future__ import annotations
 DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import argparse
 import base64
+import inspect
 import os
 from pathlib import Path
 import shutil
@@ -24,7 +25,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(r"D:\Documents\Mods\rdr2\RDR2-Overhaul\tools\reverse-engineering")))
+sys.path.insert(0, str(ROOT / "tests" / "shared"))
 
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 import browser_guard  # noqa: E402
@@ -40,6 +41,11 @@ STUB = """
     mod_projects:async()=>({canCreate:true,projects:[{name:'Test Mod',path:'Rendered test project',valid:true,current:true}]}),
     set_dirty_count:async()=>null,
     game_process_status:async()=>null,
+    mods_overview:async plugin=>({canManage:true,rows:[{name:'Test Mod',
+      path:`Rendered test library/${plugin}/Test Mod`,folder:'Test Mod',
+      author:'Fixture author',description:'Authored layout fixture',credits:'',
+      enabled:true}],remote:[]}),
+    lexmod_update:async()=>({updated:false}),
     lexeditor_settings:async()=>window.__lexSettings,
     save_lexeditor_settings:async v=>Object.assign(window.__lexSettings,v),
     save_developer_setting_defaults:async v=>Object.assign(window.__lexSettings.defaultValues,v),
@@ -61,17 +67,11 @@ STUB = """
 
 
 def session_for(plugin_id: str, project: str | None):
-    """Return the plugin's own session class, not the shared base class."""
+    """Use the same registered service factory as the desktop host."""
     module = __import__(f"plugins.{plugin_id}.plugin", fromlist=["PLUGIN"])
-    from core.service_session import LocalPluginSession
-    candidates = [getattr(module, name) for name in dir(module)]
-    session_class = next(
-        (value for value in candidates
-         if isinstance(value, type) and issubclass(value, LocalPluginSession)
-         and value is not LocalPluginSession),
-        None)
-    if session_class is None:
-        raise SystemExit(f"no session class in plugins/{plugin_id}/plugin.py")
+    factory = module.PLUGIN.session_factory
+    if factory is None:
+        raise SystemExit(f"no hosted session in plugins/{plugin_id}/plugin.py")
     variable = {
         "bannerlord": "LEXEDITOR_BANNERLORD_PROJECT",
         "ff8": "LEXEDITOR_FF8_PROJECT", "ff7": "LEXEDITOR_FF7_PROJECT",
@@ -79,6 +79,12 @@ def session_for(plugin_id: str, project: str | None):
         "rdr": "LEXEDITOR_RDR_PROJECT", "warband": "LEXEDITOR_WARBAND_PROJECT",
     }.get(plugin_id)
     extra_env = {variable: project} if variable and project else {}
+    if plugin_id == "chrono_trigger" and project:
+        from chrono_archive_fixture import create_game
+        game = Path(project) / ".lexeditor-chrono-game"
+        create_game(game)
+        extra_env["LEXEDITOR_CHRONO_TRIGGER_ROOT"] = str(game)
+        extra_env["LEXEDITOR_CHRONO_TRIGGER_PROJECT"] = str(Path(project) / "mod")
     # Bannerlord deliberately refuses to boot against an invalid project or game
     # root. Screenshot/verifier runs use an isolated clean module and fake install
     # so those checks exercise the real UI without depending on C:\\Bannermod or
@@ -98,10 +104,7 @@ def session_for(plugin_id: str, project: str | None):
         extra_env["LEXEDITOR_BANNERLORD_ROOT"] = str(game)
     # --live passes no project, so the plugin resolves its own real one from the
     # environment the desktop shell would give it.
-    try:
-        return session_class(extra_env)
-    except TypeError:
-        return session_class()
+    return factory(extra_env=extra_env) if "extra_env" in inspect.signature(factory).parameters else factory()
 
 
 def main() -> int:

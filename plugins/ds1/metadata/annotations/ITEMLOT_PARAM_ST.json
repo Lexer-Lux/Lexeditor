@@ -1,0 +1,348 @@
+{
+  "Param": "ITEMLOT_PARAM_ST",
+  "Type": "ITEMLOT_PARAM_ST",
+  "Name": "ITEMLOT_PARAM_ST",
+  "Description": "Determines the contents of treasures and other item rewards.",
+  "Fields": [
+    {
+      "Field": "lotItemId01",
+      "Name": "Item ID",
+      "Description": "The ID of the item awarded by this slot."
+    },
+    {
+      "Field": "lotItemId02",
+      "Name": "Item ID",
+      "Description": "The ID of the item awarded by this slot."
+    },
+    {
+      "Field": "lotItemId03",
+      "Name": "Item ID",
+      "Description": "The ID of the item awarded by this slot."
+    },
+    {
+      "Field": "lotItemId04",
+      "Name": "Item ID",
+      "Description": "The ID of the item awarded by this slot."
+    },
+    {
+      "Field": "lotItemId05",
+      "Name": "Item ID",
+      "Description": "The ID of the item awarded by this slot."
+    },
+    {
+      "Field": "lotItemId06",
+      "Name": "Item ID",
+      "Description": "The ID of the item awarded by this slot."
+    },
+    {
+      "Field": "lotItemId07",
+      "Name": "Item ID",
+      "Description": "The ID of the item awarded by this slot."
+    },
+    {
+      "Field": "lotItemId08",
+      "Name": "Item ID",
+      "Description": "The ID of the item awarded by this slot."
+    },
+    {
+      "Field": "lotItemCategory01",
+      "Name": "Item Category",
+      "Description": "The item category the awarded item belongs to."
+    },
+    {
+      "Field": "lotItemCategory02",
+      "Name": "Item Category",
+      "Description": "The item category the awarded item belongs to."
+    },
+    {
+      "Field": "lotItemCategory03",
+      "Name": "Item Category",
+      "Description": "The item category the awarded item belongs to."
+    },
+    {
+      "Field": "lotItemCategory04",
+      "Name": "Item Category",
+      "Description": "The item category the awarded item belongs to."
+    },
+    {
+      "Field": "lotItemCategory05",
+      "Name": "Item Category",
+      "Description": "The item category the awarded item belongs to."
+    },
+    {
+      "Field": "lotItemCategory06",
+      "Name": "Item Category",
+      "Description": "The item category the awarded item belongs to."
+    },
+    {
+      "Field": "lotItemCategory07",
+      "Name": "Item Category",
+      "Description": "The item category the awarded item belongs to."
+    },
+    {
+      "Field": "lotItemCategory08",
+      "Name": "Item Category",
+      "Description": "The item category the awarded item belongs to."
+    },
+    {
+      "Field": "lotItemBasePoint01",
+      "Name": "Weight",
+      "Description": "How likely this slot is to win its roll, compared with the other slots. Each roll grants one slot at most. Set every other slot to 0 and this above 0 to always grant this item."
+    },
+    {
+      "Field": "lotItemBasePoint02",
+      "Name": "Weight",
+      "Description": "How likely this slot is to win its roll, compared with the other slots. Each roll grants one slot at most. Set every other slot to 0 and this above 0 to always grant this item."
+    },
+    {
+      "Field": "lotItemBasePoint03",
+      "Name": "Weight",
+      "Description": "How likely this slot is to win its roll, compared with the other slots. Each roll grants one slot at most. Set every other slot to 0 and this above 0 to always grant this item."
+    },
+    {
+      "Field": "lotItemBasePoint04",
+      "Name": "Weight",
+      "Description": "How likely this slot is to win its roll, compared with the other slots. Each roll grants one slot at most. Set every other slot to 0 and this above 0 to always grant this item."
+    },
+    {
+      "Field": "lotItemBasePoint05",
+      "Name": "Weight",
+      "Description": "How likely this slot is to win its roll, compared with the other slots. Each roll grants one slot at most. Set every other slot to 0 and this above 0 to always grant this item."
+    },
+    {
+      "Field": "lotItemBasePoint06",
+      "Name": "Weight",
+      "Description": "How likely this slot is to win its roll, compared with the other slots. Each roll grants one slot at most. Set every other slot to 0 and this above 0 to always grant this item."
+    },
+    {
+      "Field": "lotItemBasePoint07",
+      "Name": "Weight",
+      "Description": "How likely this slot is to win its roll, compared with the other slots. Each roll grants one slot at most. Set every other slot to 0 and this above 0 to always grant this item."
+    },
+    {
+      "Field": "lotItemBasePoint08",
+      "Name": "Weight",
+      "Description": "How likely this slot is to win its roll, compared with the other slots. Each roll grants one slot at most. Set every other slot to 0 and this above 0 to always grant this item."
+    },
+    {
+      "Field": "cumulateLotPoint01",
+      "Name": "Accumulation Weight",
+      "Description": "Extra Weight this slot gains each time the lot is rolled. Needs the Lot section roll count, and past its max only slots with a bonus can win. 0 turns the bonus off."
+    },
+    {
+      "Field": "cumulateLotPoint02",
+      "Name": "Accumulation Weight",
+      "Description": "Extra Weight this slot gains each time the lot is rolled. Needs the Lot section roll count, and past its max only slots with a bonus can win. 0 turns the bonus off."
+    },
+    {
+      "Field": "cumulateLotPoint03",
+      "Name": "Accumulation Weight",
+      "Description": "Extra Weight this slot gains each time the lot is rolled. Needs the Lot section roll count, and past its max only slots with a bonus can win. 0 turns the bonus off."
+    },
+    {
+      "Field": "cumulateLotPoint04",
+      "Name": "Accumulation Weight",
+      "Description": "Extra Weight this slot gains each time the lot is rolled. Needs the Lot section roll count, and past its max only slots with a bonus can win. 0 turns the bonus off."
+    },
+    {
+      "Field": "cumulateLotPoint05",
+      "Name": "Accumulation Weight",
+      "Description": "Extra Weight this slot gains each time the lot is rolled. Needs the Lot section roll count, and past its max only slots with a bonus can win. 0 turns the bonus off."
+    },
+    {
+      "Field": "cumulateLotPoint06",
+      "Name": "Accumulation Weight",
+      "Description": "Extra Weight this slot gains each time the lot is rolled. Needs the Lot section roll count, and past its max only slots with a bonus can win. 0 turns the bonus off."
+    },
+    {
+      "Field": "cumulateLotPoint07",
+      "Name": "Accumulation Weight",
+      "Description": "Extra Weight this slot gains each time the lot is rolled. Needs the Lot section roll count, and past its max only slots with a bonus can win. 0 turns the bonus off."
+    },
+    {
+      "Field": "cumulateLotPoint08",
+      "Name": "Accumulation Weight",
+      "Description": "Extra Weight this slot gains each time the lot is rolled. Needs the Lot section roll count, and past its max only slots with a bonus can win. 0 turns the bonus off."
+    },
+    {
+      "Field": "getItemFlagId01",
+      "Name": "Item Flag",
+      "Description": "Flag the game sets after it grants this slot. 0 uses the Lot section flag instead. A set flag may stop the slot from dropping again, but this is not established."
+    },
+    {
+      "Field": "getItemFlagId02",
+      "Name": "Item Flag",
+      "Description": "Flag the game sets after it grants this slot. 0 uses the Lot section flag instead. A set flag may stop the slot from dropping again, but this is not established."
+    },
+    {
+      "Field": "getItemFlagId03",
+      "Name": "Item Flag",
+      "Description": "Flag the game sets after it grants this slot. 0 uses the Lot section flag instead. A set flag may stop the slot from dropping again, but this is not established."
+    },
+    {
+      "Field": "getItemFlagId04",
+      "Name": "Item Flag",
+      "Description": "Flag the game sets after it grants this slot. 0 uses the Lot section flag instead. A set flag may stop the slot from dropping again, but this is not established."
+    },
+    {
+      "Field": "getItemFlagId05",
+      "Name": "Item Flag",
+      "Description": "Flag the game sets after it grants this slot. 0 uses the Lot section flag instead. A set flag may stop the slot from dropping again, but this is not established."
+    },
+    {
+      "Field": "getItemFlagId06",
+      "Name": "Item Flag",
+      "Description": "Flag the game sets after it grants this slot. 0 uses the Lot section flag instead. A set flag may stop the slot from dropping again, but this is not established."
+    },
+    {
+      "Field": "getItemFlagId07",
+      "Name": "Item Flag",
+      "Description": "Flag the game sets after it grants this slot. 0 uses the Lot section flag instead. A set flag may stop the slot from dropping again, but this is not established."
+    },
+    {
+      "Field": "getItemFlagId08",
+      "Name": "Item Flag",
+      "Description": "Flag the game sets after it grants this slot. 0 uses the Lot section flag instead. A set flag may stop the slot from dropping again, but this is not established."
+    },
+    {
+      "Field": "getItemFlagId",
+      "Name": "Award Item Flag",
+      "Description": "The event flag set to ON after acquiring anything within this itemlot."
+    },
+    {
+      "Field": "cumulateNumFlagId",
+      "Name": "Cumulative Award Item Flag",
+      "Description": "Holds the number of drawings for cumulative lots. The base event flag specified here + cumulateNumMax are used to save the number of drawings."
+    },
+    {
+      "Field": "cumulateNumMax",
+      "Name": "Cumulative Max Draw Count",
+      "Description": "The maximum number of lottery draws for cumulative lots."
+    },
+    {
+      "Field": "lotItem_Rarity",
+      "Name": "Rarity",
+      "Description": "Determines the SFX used to display the rarity of the treasure lot."
+    },
+    {
+      "Field": "lotItemNum01",
+      "Name": "Item Amount",
+      "Description": "The amount of the specified item given if the item in this slot is rolled."
+    },
+    {
+      "Field": "lotItemNum02",
+      "Name": "Item Amount",
+      "Description": "The amount of the specified item given if the item in this slot is rolled."
+    },
+    {
+      "Field": "lotItemNum03",
+      "Name": "Item Amount",
+      "Description": "The amount of the specified item given if the item in this slot is rolled."
+    },
+    {
+      "Field": "lotItemNum04",
+      "Name": "Item Amount",
+      "Description": "The amount of the specified item given if the item in this slot is rolled."
+    },
+    {
+      "Field": "lotItemNum05",
+      "Name": "Item Amount",
+      "Description": "The amount of the specified item given if the item in this slot is rolled."
+    },
+    {
+      "Field": "lotItemNum06",
+      "Name": "Item Amount",
+      "Description": "The amount of the specified item given if the item in this slot is rolled."
+    },
+    {
+      "Field": "lotItemNum07",
+      "Name": "Item Amount",
+      "Description": "The amount of the specified item given if the item in this slot is rolled."
+    },
+    {
+      "Field": "lotItemNum08",
+      "Name": "Item Amount",
+      "Description": "The amount of the specified item given if the item in this slot is rolled."
+    },
+    {
+      "Field": "enableLuck01",
+      "Name": "Apply Luck Modifier",
+      "Description": "Lets Item Discovery change this slot's chance. Higher Discovery lowers this slot's chance. Set it on the None slot, so high Discovery means fewer empty rolls."
+    },
+    {
+      "Field": "enableLuck02",
+      "Name": "Apply Luck Modifier",
+      "Description": "Lets Item Discovery change this slot's chance. Higher Discovery lowers this slot's chance. Set it on the None slot, so high Discovery means fewer empty rolls."
+    },
+    {
+      "Field": "enableLuck03",
+      "Name": "Apply Luck Modifier",
+      "Description": "Lets Item Discovery change this slot's chance. Higher Discovery lowers this slot's chance. Set it on the None slot, so high Discovery means fewer empty rolls."
+    },
+    {
+      "Field": "enableLuck04",
+      "Name": "Apply Luck Modifier",
+      "Description": "Lets Item Discovery change this slot's chance. Higher Discovery lowers this slot's chance. Set it on the None slot, so high Discovery means fewer empty rolls."
+    },
+    {
+      "Field": "enableLuck05",
+      "Name": "Apply Luck Modifier",
+      "Description": "Lets Item Discovery change this slot's chance. Higher Discovery lowers this slot's chance. Set it on the None slot, so high Discovery means fewer empty rolls."
+    },
+    {
+      "Field": "enableLuck06",
+      "Name": "Apply Luck Modifier",
+      "Description": "Lets Item Discovery change this slot's chance. Higher Discovery lowers this slot's chance. Set it on the None slot, so high Discovery means fewer empty rolls."
+    },
+    {
+      "Field": "enableLuck07",
+      "Name": "Apply Luck Modifier",
+      "Description": "Lets Item Discovery change this slot's chance. Higher Discovery lowers this slot's chance. Set it on the None slot, so high Discovery means fewer empty rolls."
+    },
+    {
+      "Field": "enableLuck08",
+      "Name": "Apply Luck Modifier",
+      "Description": "Lets Item Discovery change this slot's chance. Higher Discovery lowers this slot's chance. Set it on the None slot, so high Discovery means fewer empty rolls."
+    },
+    {
+      "Field": "cumulateReset01",
+      "Name": "Reset Cumulative Count",
+      "Description": "Starts the Lot section roll count over when this slot wins. Set it on the rare item, so the bonus resets after it drops."
+    },
+    {
+      "Field": "cumulateReset02",
+      "Name": "Reset Cumulative Count",
+      "Description": "Starts the Lot section roll count over when this slot wins. Set it on the rare item, so the bonus resets after it drops."
+    },
+    {
+      "Field": "cumulateReset03",
+      "Name": "Reset Cumulative Count",
+      "Description": "Starts the Lot section roll count over when this slot wins. Set it on the rare item, so the bonus resets after it drops."
+    },
+    {
+      "Field": "cumulateReset04",
+      "Name": "Reset Cumulative Count",
+      "Description": "Starts the Lot section roll count over when this slot wins. Set it on the rare item, so the bonus resets after it drops."
+    },
+    {
+      "Field": "cumulateReset05",
+      "Name": "Reset Cumulative Count",
+      "Description": "Starts the Lot section roll count over when this slot wins. Set it on the rare item, so the bonus resets after it drops."
+    },
+    {
+      "Field": "cumulateReset06",
+      "Name": "Reset Cumulative Count",
+      "Description": "Starts the Lot section roll count over when this slot wins. Set it on the rare item, so the bonus resets after it drops."
+    },
+    {
+      "Field": "cumulateReset07",
+      "Name": "Reset Cumulative Count",
+      "Description": "Starts the Lot section roll count over when this slot wins. Set it on the rare item, so the bonus resets after it drops."
+    },
+    {
+      "Field": "cumulateReset08",
+      "Name": "Reset Cumulative Count",
+      "Description": "Starts the Lot section roll count over when this slot wins. Set it on the rare item, so the bonus resets after it drops."
+    }
+  ]
+}

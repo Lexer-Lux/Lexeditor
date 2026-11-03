@@ -44,6 +44,12 @@ async function editor() {
   for (const name of ['columnList','detailPanel','detailSection','detailField','multiNumberRow','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','showToast','notice','detailNote','detailText','loadingPanel','provenanceControl','statCard','choicePopover'])
     ui[name] = (...args) => node(name, args[0], ...carried(args[0]));
   ui.columnPreferences = () => ({pinButton:(key,label)=>node('pin',{key,label})});
+  // The shared Tweaks page draws the open page's cards; ReShade is its own
+  // business (no host here, so none).
+  ui.tweaksPage = options => {
+    const page = options.pages.find(entry => entry.id === options.active) || options.pages[0];
+    return node('tweaksPage', options, ...[page.body()].flat());
+  };
   ui.actionRow = (...args) => node('actionRow',{},...args);
   // Lexeditor asks its own questions now instead of calling window.confirm, so
   // the answer this test wants comes from the same flag it always did.
@@ -87,10 +93,12 @@ test('Memoria subtab keeps launcher handoff while Lexeditor features are separat
   const e = await editor();
   // Opening Tweaks reads the mod's ReShade state, so navigate is async now.
   await e.run('navigate("tweaks")');
-  const strip = e.targets['#toolbar'].children[0];
-  assert.equal(strip.tag, 'subtabBar');
-  assert.equal(strip.attrs.active, 'memoria');
-  assert.deepEqual(Array.from(strip.attrs.tabs.map(tab=>tab.label)), ['Memoria','Improved Interface','Better Eat','XP Bars','HP/MP Bars','Row Rework']);
+  const page = e.targets['#main'].children[0];
+  assert.equal(page.tag, 'tweaksPage');
+  assert.equal(page.attrs.active, 'memoria');
+  assert.deepEqual(Array.from(page.attrs.pages.map(tab=>tab.label)), ['Memoria','Improved Interface','Better Eat','XP Bars','HP/MP Bars','Row Rework']);
+  // ReShade is the shared page's own subtab, never a section in these pages.
+  assert.ok(!JSON.stringify(e.targets['#main']).includes('reshadeSection'));
   // The Memoria page says the settings live in Memoria's own launcher; how it
   // is laid out is the shared settings panel's business, so the assertion is
   // that the handoff is stated, not where in a tree it sits.

@@ -6,9 +6,9 @@ out of its boolean box and the element type icons get cut off."
 A J-Element value and its element flags were two parts side by side. The flags'
 part kept an empty label column and the provenance rail beside them, so at the
 panel's minimum each element switch was 25px wide: its type rail hung outside
-the box and its icon was cut to a pixel. This drags the list/detail divider as
-far as it goes and checks, on both tabs, that every switch's rail, icon and
-name sit inside its own box.
+the box and its icon was cut to a pixel. This narrows the window until the
+detail pane sits on its minimum and checks, on both tabs, that every
+switch's rail, icon and name sit inside its own box.
 """
 from __future__ import annotations
 
@@ -50,13 +50,9 @@ def main() -> int:
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 120)
             cdp.eval("navigate('magic')")
             wait_eval(cdp, "document.querySelector('.magic-detail')!==null", 30)
-            divider = cdp.eval("""(()=>{const box=document.querySelector('.lex-list-detail-divider').getBoundingClientRect();
-              return [box.left+box.width/2,box.top+box.height/2]})()""")
-            x, y = divider
-            cdp.call("Input.dispatchMouseEvent", {"type": "mousePressed", "x": x, "y": y, "button": "left", "buttons": 1, "clickCount": 1})
-            for step in range(1, 21):
-                cdp.call("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x + step * 60, "y": y, "button": "left", "buttons": 1})
-            cdp.call("Input.dispatchMouseEvent", {"type": "mouseReleased", "x": x + 1200, "y": y, "button": "left", "buttons": 0, "clickCount": 1})
+            cdp.call("Emulation.setDeviceMetricsOverride", {
+                "width": 1000, "height": 900, "deviceScaleFactor": 1, "mobile": False,
+            })
             time.sleep(0.5)
             results = {}
             for tab in ("Attack", "Junction"):
@@ -66,6 +62,7 @@ def main() -> int:
                 results[tab] = cdp.eval(SWITCHES)
                 assert results[tab]["switches"] > 0 and not results[tab]["bad"], (tab, results[tab])
             assert results["Junction"]["icons"] >= 16, results
+            assert results["Junction"]["panel"] <= 480, results
             image = screenshot(cdp, "ff8-magic-narrow.png")
             print(json.dumps({"results": results, "screenshot": str(image)}))
         return 0

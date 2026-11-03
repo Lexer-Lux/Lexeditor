@@ -9,6 +9,8 @@ display glyph.
 
 from __future__ import annotations
 
+from core.numeric_values import integer_value
+
 from dataclasses import dataclass
 import re
 
@@ -321,14 +323,17 @@ def apply_edits(data: bytes, sections: dict[int, dict], edits: list[dict]) -> tu
     grouped: dict[int, dict[tuple[int, int], str]] = {}
     seen: set[tuple[int, int, int]] = set()
     for edit in edits:
-        text_id = int(edit["sectionId"])
-        record_id = int(edit["recordId"])
-        slot = int(edit["slot"])
+        text_id = integer_value(edit["sectionId"], "Kernel text section id")
+        record_id = integer_value(edit["recordId"], "Kernel text record id")
+        slot = integer_value(edit["slot"], "Kernel text slot")
         key = (text_id, record_id, slot)
         if key in seen or not TEXT_SECTION_FIRST <= text_id <= TEXT_SECTION_LAST:
             raise ValueError("Invalid or duplicate kernel text edit")
         seen.add(key)
-        grouped.setdefault(text_id, {})[(record_id, slot)] = str(edit.get("value", ""))
+        value = edit.get("value", "")
+        if not isinstance(value, str):
+            raise ValueError("Kernel text value must be text")
+        grouped.setdefault(text_id, {})[(record_id, slot)] = value
 
     changed = 0
     for text_id, replacements in grouped.items():

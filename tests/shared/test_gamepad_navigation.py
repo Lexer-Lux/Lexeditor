@@ -143,7 +143,7 @@ def test_background_pad_cannot_edit_activate_navigate_or_replay_on_return():
               window.__axis(0,0);
             }""")
             assert _tick(page, 6100) is True
-            page.evaluate("()=>window.__press(15)")
+            page.evaluate("()=>window.__axis(0.5,0)")
             _tick(page, 6200)
             assert page.locator('#amount').input_value() == '15'
             page.evaluate("()=>{window.__events=[];window.__hidden=true;}")
@@ -316,41 +316,59 @@ def test_the_pad_changes_values_pages_and_tabs():
         try:
             page = _page(browser)
             pad = "LexeditorUI.gamepadNavigation"
-            # A number field is bounded, so left and right move it, clamped,
-            # and send the same events a typed edit does.
+            # Lexer: "D-pad should switch between properties or whatever, left
+            # stick (analog sensitive) to change the value." Right on the
+            # d-pad leaves the number alone and walks to the next control.
             page.evaluate("()=>LexeditorUI.gamepadNavigation.setPadFocus("
                           "document.getElementById('amount'))")
-            page.evaluate("()=>window.__press(15)")
+            page.evaluate("()=>window.__press(13)")
             _tick(page, 0)
-            assert page.evaluate("()=>document.getElementById('amount').value") == "15"
-            page.evaluate("()=>window.__press(15,false)")
+            page.evaluate("()=>window.__press(13,false)")
+            _tick(page, 50)
+            assert page.evaluate("()=>document.getElementById('amount').value") == "10"
+            assert _focused(page) == "name", _focused(page)
+
+            # The left stick moves the value: a flick is one step at once, the
+            # value follows live, clamped, and the change goes out once, when
+            # the stick is let go.
+            page.evaluate("()=>{window.__events.length=0;LexeditorUI.gamepadNavigation.setPadFocus("
+                          "document.getElementById('amount'))}")
+            page.evaluate("()=>window.__axis(0.3,0)")
             _tick(page, 100)
-            for step in range(4):
-                _tick(page, 200 + step * 100)
-                page.evaluate("()=>window.__press(15)")
-                _tick(page, 250 + step * 100)
-                page.evaluate("()=>window.__press(15,false)")
-                _tick(page, 300 + step * 100)
+            assert page.evaluate("()=>document.getElementById('amount').value") == "15"
+            page.evaluate("()=>window.__axis(1,0)")
+            for step in range(20):
+                _tick(page, 150 + step * 50)
             assert page.evaluate("()=>document.getElementById('amount').value") == "20"
-            assert page.evaluate(
-                "()=>window.__events.filter(e=>e.startsWith('amount:change')).length") >= 2
+            assert _focused(page) == "amount", "the stick on a value never walks off it"
+            assert page.evaluate("()=>window.__events.filter(e=>e.includes(':change')).length") == 0
+            page.evaluate("()=>window.__axis(0,0)")
+            _tick(page, 1200)
+            assert page.evaluate("()=>window.__events.filter(e=>e.includes(':change'))") == ["amount:change:20"]
 
-            page.evaluate("()=>LexeditorUI.gamepadNavigation.setPadFocus("
-                          "document.getElementById('level'))")
-            page.evaluate("()=>window.__press(14)")
-            _tick(page, 2000)
-            assert page.evaluate("()=>document.getElementById('level').value") == "40"
-            page.evaluate("()=>window.__press(14,false)")
-            _tick(page, 2100)
+            # Further means faster: a light touch on a slider of 0-100 moves
+            # it a step or two in a second, full tilt most of the range.
+            def push(node, x, start):
+                page.evaluate(f"()=>{{LexeditorUI.gamepadNavigation.setPadFocus(document.getElementById('{node}'));"
+                              f"document.getElementById('{node}').value=50}}")
+                page.evaluate(f"()=>window.__axis({x},0)")
+                for step in range(21):
+                    _tick(page, start + step * 50)
+                page.evaluate("()=>window.__axis(0,0)")
+                _tick(page, start + 1100)
+                return int(page.evaluate(f"()=>document.getElementById('{node}').value"))
+            gentle, hard = push("level", -0.25, 3000), push("level", -1, 6000)
+            assert 20 <= gentle < 50, gentle  # a flick step plus about two a second
+            assert hard == 0, hard
 
-            # A known set of choices is a select, and the pad moves through it.
+            # A known set of choices is a select, and the stick moves through it.
             page.evaluate("()=>LexeditorUI.gamepadNavigation.setPadFocus("
                           "document.getElementById('mode'))")
-            page.evaluate("()=>window.__press(15)")
-            _tick(page, 2200)
+            page.evaluate("()=>window.__axis(0.5,0)")
+            _tick(page, 9000)
+            page.evaluate("()=>window.__axis(0,0)")
+            _tick(page, 9050)
             assert page.evaluate("()=>document.getElementById('mode').value") == "Beta"
-            page.evaluate("()=>window.__press(15,false)")
-            _tick(page, 2300)
 
             # The bumpers are the tabs.
             page.evaluate("()=>window.__events.length=0")
@@ -709,3 +727,40 @@ def test_the_home_screen_walks_its_cards_and_opens_settings():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_the_loop_never_polls_while_another_app_has_the_focus():
+    """Polling holds the browser's DirectInput acquire and blocks a game.
+
+    A page Lexeditor leaves open while Dark Souls starts would otherwise keep
+    the pad for itself for the whole session. The loop stops the moment the
+    page cannot take pad input and resumes on the next focus.
+    """
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = _page(browser)
+            page.evaluate("""()=>{
+              window.__focused = false;
+              document.hasFocus = () => window.__focused;
+              window.__sourceCalls = 0;
+              const pad = LexeditorUI.gamepadNavigation;
+              pad.setPadSource(() => { window.__sourceCalls++; return [window.__pad]; });
+              pad.install();
+            }""")
+            page.wait_for_timeout(1300)  # past the one-second retry
+            assert page.evaluate("()=>LexeditorUI.gamepadNavigation.state().running") is False
+            assert page.evaluate("()=>window.__sourceCalls") == 0
+            page.evaluate("""()=>{
+              window.__focused = true;
+              document.dispatchEvent(new FocusEvent('focusin'));
+            }""")
+            page.wait_for_function("()=>LexeditorUI.gamepadNavigation.state().running", timeout=5000)
+            page.wait_for_function("()=>window.__sourceCalls > 0", timeout=5000)
+            page.evaluate("()=>{ window.__focused = false; }")
+            page.wait_for_function("()=>!LexeditorUI.gamepadNavigation.state().running", timeout=5000)
+            calls = page.evaluate("()=>window.__sourceCalls")
+            page.wait_for_timeout(400)
+            assert page.evaluate("()=>window.__sourceCalls") == calls
+        finally:
+            browser.close()

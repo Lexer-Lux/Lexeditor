@@ -7,8 +7,8 @@ happen". Two rules answer both: a tab is never narrower than its own name, and
 the whole strip shrinks together into the window instead of clipping one label
 or scrolling. This measures the rendered strip of a real plugin page.
 
-FF8 is the hard case - nineteen tabs in the game's wide lettering, wider than the
-window at the theme's own size - and Blank is the easy one, five short names
+FF8 is the hard case - nineteen tabs with New Game enabled, wider than the
+window at the theme's own size - and Blank is the easy one, six short names
 that must still spread across the row. FF7 is left out on purpose: its editor
 page is written into the served HTML and this harness never gives its frame an
 animation frame, so its strip cannot be measured from here.
@@ -16,6 +16,7 @@ animation frame, so its strip cannot be measured from here.
 from __future__ import annotations
 
 import sys
+import json
 import tempfile
 from pathlib import Path
 
@@ -36,7 +37,7 @@ MEASURE = """(()=>{
     buttons=[...nav.querySelectorAll('button[data-tab]')];
   const text=label=>{const range=document.createRange();
     range.selectNodeContents(label);return range.getBoundingClientRect().width;};
-  return {found:true, tabs:buttons.length,
+  return {found:true, tabs:buttons.map(button=>button.dataset.tab),
     lane:nav.clientWidth, strip:nav.scrollWidth,
     frameScrolls:frame.scrollWidth>frame.clientWidth+1,
     fonts:[...new Set(labels.map(l=>Math.round(
@@ -70,12 +71,19 @@ def measure(session, widths, ready):
 
 def test_ff8_nineteen_tabs_fit_one_row():
     with tempfile.TemporaryDirectory(prefix="lexeditor-navstrip-ff8-") as project:
-        with FF8Session({"LEXEDITOR_FF8_PROJECT": project}) as session:
+        settings=Path(project)/"editor-settings.json"
+        settings.write_text(json.dumps({"showNewGame":True}),encoding="utf-8")
+        with FF8Session({"LEXEDITOR_FF8_PROJECT": project,
+                         "LEXEDITOR_FF8_EDITOR_SETTINGS":str(settings)}) as session:
             rows = measure(session, (1600, 1280),
                            "typeof state!=='undefined'&&!state.booting")
     for width, row in rows.items():
         assert row["found"], row
-        assert row["tabs"] == 19, (width, row)
+        assert set(row["tabs"]) == {
+            "abilities","cards","characters","encounters","enemies","fields",
+            "gfs","items","models","starting","refine","sfx","shops","text",
+            "textures","weapons","world","settings","mods",
+        } and len(row["tabs"]) == 19, (width,row)
         assert not row["clipped"], (width, row)
         assert len(row["fonts"]) == 1, (width, row)
         # The strip fills the lane the frame leaves it and stops there, so the
@@ -92,7 +100,8 @@ def test_blank_tabs_share_the_row():
                        "!!document.querySelector('.lex-shell-header nav')")
     row = rows[1600]
     assert row["found"], row
-    assert row["tabs"] == 5, row
+    assert set(row["tabs"]) == {"mods","template","organism","molecule","atom","utility"}
+    assert len(row["tabs"]) == 6, row
     assert not row["clipped"], row
     assert not row["swallowed"], row
     assert row["strip"] >= row["lane"], row

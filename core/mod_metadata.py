@@ -1,0 +1,107 @@
+"""The metadata every mod carries, for every game: one `mod.json` in its root.
+
+Lexeditor reads whatever popular mods already ship, so a mod may arrive
+without this file. It never stays that way: creating a mod, or adding one to
+the library, asks for anything missing before the mod is stored. Only the name
+is required; the rest may be blank.
+
+    {"name": "...", "author": "...", "description": "...", "credits": "..."}
+
+Games keep their own keys in the same file (load order, enabled state, a
+tweak's script, a bundle's components); writing the standard fields keeps
+them untouched. Credits travel with the mod they credit.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from core.plugin_files import read_bounded
+
+FILE = "mod.json"
+FIELDS = ("name", "author", "description", "credits")
+# Name and author stay bounded: they render in table cells, headers and
+# dialog inputs. Description and credits are free text with no cap.
+LIMITS = {"name": 120, "author": 200}
+MAX_BYTES = 8 * 1024 * 1024
+
+
+class MetadataError(ValueError):
+    """A mod's metadata is missing its name or is not valid."""
+
+
+def _stored(root: Path) -> dict:
+    root = Path(root)
+    if root.is_symlink() or (root.exists() and getattr(root.lstat(), 'st_file_attributes', 0) & 0x400):
+        raise MetadataError('A mod folder must not be a symlink or junction')
+    path = root / FILE
+    if not path.is_file():
+        return {}
+    try:
+        if path.is_symlink() or getattr(path.lstat(), 'st_file_attributes', 0) & 0x400:
+            raise ValueError('mod metadata must not be a link')
+        with path.open('rb') as stream:
+            raw = read_bounded(stream, MAX_BYTES+1)
+        if len(raw)>MAX_BYTES:
+            raise ValueError('exceeds the 8 MiB metadata limit')
+        value = json.loads(raw.decode('utf-8-sig'))
+    except (OSError, ValueError, RecursionError) as error:
+        raise MetadataError(f"{FILE} is not readable JSON: {error}") from error
+    if not isinstance(value, dict):
+        raise MetadataError(f"{FILE} must contain an object")
+    return value
+
+
+def clean(values: dict) -> dict:
+    """The four standard fields, validated: text, trimmed, named."""
+    if not isinstance(values, dict):
+        raise MetadataError("Mod details must be an object")
+    result = {}
+    for key in FIELDS:
+        value = values.get(key, "")
+        if value is None:
+            value = ""
+        if not isinstance(value, str):
+            raise MetadataError(f"The mod's {key} must be text")
+        value = value.strip()
+        limit = LIMITS.get(key)
+        if limit is not None and len(value) > limit:
+            raise MetadataError(f"The mod's {key} is longer than {limit} characters")
+        result[key] = value
+    if not result["name"]:
+        raise MetadataError("A mod needs a name")
+    return result
+
+
+def read(root: Path) -> dict:
+    """The standard fields as stored, and which required ones are missing.
+
+    A mod without a usable name reports it in `missing` and borrows its
+    folder name for display only; nothing is written until someone names it.
+    """
+    return _standard(root,_stored(root))
+
+
+def _standard(root: Path, stored: dict) -> dict:
+    """Display fields from the same decoded declaration as game-specific keys."""
+    result = {}
+    for key in FIELDS:
+        value = stored.get(key, "")
+        result[key] = value.strip() if isinstance(value, str) else ""
+    missing = [] if result["name"] else ["name"]
+    version = stored.get("version", "")
+    return {**result, "version": version if isinstance(version, str) else "",
+            "missing": missing, "displayName": result["name"] or Path(root).name}
+
+
+def write(root: Path, values: dict) -> dict:
+    """Store the standard fields, keeping every other key the mod has."""
+    fields = clean(values)
+    stored = _stored(root)
+    stored.update(fields)
+    path = Path(root) / FILE
+    from core.plugin_files import atomic_write
+    encoded = (json.dumps(stored, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    if len(encoded)>MAX_BYTES:
+        raise MetadataError('mod.json exceeds the 8 MiB metadata limit')
+    atomic_write(path, encoded)
+    return read(root)

@@ -37,6 +37,9 @@ def test_menu_renders_cards_covers_and_fallbacks(plugins_override=None, loading_
             {'id': 'no-cover', 'name': 'No Cover Game', 'status': 'warning', 'canOpen': False,
              'problems': ['Something is missing'], 'statusText': 'Something is missing',
              'coverArt': {'state': 'missing', 'uri': '', 'error': 'gone'}},
+            *({'id': f'kf{index}', 'name': "King's Field " + roman, 'status': 'added', 'canOpen': True,
+               'coverArt': {'state': 'missing', 'uri': ''}}
+              for index, roman in enumerate(('I', 'II', 'III'), 1)),
         ]
         stub = (f"window.pywebview={{api:new Proxy({{lexeditor_settings:async()=>({json.dumps(settings)}),"
                 f"plugins:async()=>({json.dumps(plugins)}),"
@@ -73,7 +76,9 @@ def test_menu_renders_cards_covers_and_fallbacks(plugins_override=None, loading_
                 assert bar['width'] == '1px', bar
                 assert bar['colour'] == bar['border'], bar
                 assert bar['colour'] != bar['accent'], bar
-                assert page.locator('.game').count() == 2
+                assert page.locator('.game').count() == 5
+                for index, roman in enumerate(('I', 'II', 'III'), 1):
+                    assert page.locator(f'.game[data-plugin="kf{index}"] .cover-fallback').inner_text() == 'KF' + roman
                 assert page.locator('#modal').is_hidden()
                 # The ready cover paints real pixels.
                 cover = page.locator('.game[data-plugin="with-cover"] .game-cover')

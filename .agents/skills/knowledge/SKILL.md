@@ -27,4 +27,4 @@ description: Where Lexeditor game knowledge lives. Use before writing or reorgan
 - Before retiring a legacy store there, confirm its useful knowledge is
   accounted for here, then remove it and keep only the storage-only `AGENTS.md`.
 - Review private-source notes before publishing them here: no credentials,
-  private binaries, proprietary game dumps or unrelated personal data.
+  private binaries or unrelated personal data.

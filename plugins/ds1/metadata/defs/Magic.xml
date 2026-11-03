@@ -103,7 +103,7 @@
     <Field Def="u8 slotLength">
       <DisplayName>必要スロット</DisplayName>
       <Description>装備に必要なスロット数 ＞メニュー用</Description>
-      <Maximum>3</Maximum>
+      <Maximum>255</Maximum>
       <SortID>1600</SortID>
     </Field>
     <Field Def="u8 requirementIntellect">

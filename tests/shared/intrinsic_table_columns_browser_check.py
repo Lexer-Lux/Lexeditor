@@ -35,5 +35,26 @@ with sync_playwright() as pw:
                 level:boxes.every(box=>Math.abs(box.y-boxes[0].y)<1)};
         }""")
         assert all(result.values()), result
+    # A coordinates-only table has no description to absorb spare width.
+    # Both compact and wide panes must show the full numbers at the same size.
+    widths = []
+    for width in (500, 1000):
+        page.evaluate("""width => {
+            const U=LexeditorUI, main=document.querySelector('main');
+            main.style.width=width+'px';
+            main.replaceChildren(U.columnList({rows:[{id:1,x:-123456789,y:32767,z:123456789}],
+                columns:['id','x','y','z'].map(key=>({key,label:key.toUpperCase(),numeric:true}))}));
+        }""", width)
+        page.wait_for_timeout(150)
+        sizes = page.locator('.lex-column-list-row [data-column-key]').evaluate_all(
+            'cells=>cells.map(cell=>cell.getBoundingClientRect().width)')
+        assert len(sizes) == 4, sizes
+        # The sign and thousands separators take room too: a column sized
+        # from bare digits cut the last digit off "-123,456,789".
+        cut = page.locator('.lex-column-list-row .lex-magnitude-integer').evaluate_all(
+            'spans=>spans.filter(span=>span.scrollWidth>span.clientWidth+.5).map(span=>span.textContent)')
+        assert not cut, cut
+        widths.append(sizes)
+    assert all(abs(a-b)<1 for a,b in zip(*widths)), widths
     browser.close()
 print('Intrinsic and nested column sizes remain valid; headers and rows align.')

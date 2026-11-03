@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 import re
 import shutil
+from core.numeric_values import finite_number
 
 from .paths import contained_project_path
 from .source_revision import (
@@ -265,7 +266,7 @@ def save_mcm_defaults(
                 raise ValueError(f"{property_name} requires an integer")
             value = int(numeric)
         else:
-            value = float(incoming)
+            value = finite_number(incoming, property_name)
             if not math.isfinite(value):
                 raise ValueError(f"{property_name} requires a finite number")
         if row["min"] is not None and value < row["min"]:

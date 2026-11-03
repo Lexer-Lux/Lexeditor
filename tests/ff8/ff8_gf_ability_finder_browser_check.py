@@ -8,6 +8,7 @@ from any category because ability IDs are global.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -38,6 +39,10 @@ def main() -> int:
                 rows = table.locator(".lex-column-list-row")
                 finders = table.locator("button[aria-label^='Choose an ability']")
                 assert finders.count() == rows.count() > 0, (finders.count(), rows.count())
+                shared = table.evaluate(
+                    "node => [...node.querySelectorAll(\"button[aria-label^='Choose an ability']\")]"
+                    ".every(entry => entry.classList.contains('lex-thing-finder'))")
+                assert shared, "the ability finder is not the shared thing finder"
                 assert table.locator(".lex-column-list-cell[data-column-key='ability'] select").count() == 0, "the ability is still a dropdown"
 
                 # The first row's name opens that ability on its category page.
@@ -56,6 +61,13 @@ def main() -> int:
                 # Pick an ability from another category with the finder.
                 finders.first.click()
                 page.wait_for_function("()=>state.tab==='abilities'", timeout=20000)
+                bar = page.locator(".lex-searcher-bar")
+                bar.wait_for(timeout=20000)
+                assert "Choose an ability" in page.locator(".lex-searcher-prompt").inner_text()
+                assert not page.locator(".lex-nav-frame").is_visible()
+                shots = os.environ.get("LEXEDITOR_TEST_SHOTS")
+                if shots:
+                    page.screenshot(path=str(Path(shots) / "ff8-thing-finder.png"))
                 page.evaluate("state.filters.gfAbilities=state.data.abilityMenu.rows[5].name;state.pages.gfAbilities=0;renderAbilities()")
                 candidate = page.locator(".ff8-record-list .lex-column-list-row").first
                 candidate.wait_for(timeout=20000)

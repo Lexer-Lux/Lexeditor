@@ -8,7 +8,7 @@ def _serialized_name(value: str) -> bytes:
     return bytes([(len(raw) >> 8) & 0x7F, len(raw) & 0xFF]) + raw
 
 
-def fixture() -> bytes:
+def fixture(*, hp_type: int = 7) -> bytes:
     records = ["Cloud", "Tifa"] + [f"TestCharacter{index:02d}" for index in range(3, 25)]
     properties = ["HPMax", "MPMax", "Strength", "Spilit", "Mode"]
     names = ["None", *records, *properties, "ModeA", "ModeB"]
@@ -61,7 +61,7 @@ def fixture() -> bytes:
         key_positions.append(len(blob) - frozen_start)
         blob += b"\0" * 8 + struct.pack("<iiI", index, -1, 1)
 
-    prop_types = [7, 7, 5, 5, 11]
+    prop_types = [hp_type, 7, 5, 5, 11]
     prop_positions = []
     for type_id in prop_types:
         prop_positions.append(len(blob) - frozen_start)
@@ -75,7 +75,8 @@ def fixture() -> bytes:
             row = (900, 60, 25, 30)
         else:
             row = (800 + index * 25, 40 + index, 20 + index, 18 + index)
-        blob += struct.pack("<iihh", *row)
+        layout = "<qihh" if hp_type == 8 else "<fihh" if hp_type == 9 else "<iihh"
+        blob += struct.pack(layout, *row)
         mode_positions.append(len(blob) - frozen_start)
         blob += b"\0" * 8  # Frozen NameProperty placeholder.
 

@@ -73,7 +73,8 @@ def main() -> int:
                 one = cdp.eval("""(()=>{const root=document.querySelector('.lex-paged-list-detail'),master=root.querySelector('.lex-barrelled-master'),detail=(root.querySelector(':scope>.lex-detail')||root.querySelector(':scope>.lex-panel-layout,:scope>.lex-list-detail-pane,.lex-detail')),divider=root.querySelector('.lex-list-detail-divider'),box=divider.getBoundingClientRect(),table=root.querySelector('.lex-barrel-grid>.lex-list'),last=table.querySelector('.lex-column-list-head-cell:last-child')?.getBoundingClientRect(),tableBox=table.getBoundingClientRect(),pair=master.getBoundingClientRect().width+detail.getBoundingClientRect().width,scale=Math.min(1,pair/(340+420));return{x:box.left+box.width/2,y:box.top+box.height/2,minimum:340*scale,before:master.getBoundingClientRect().width,tableFit:table.scrollWidth<=table.clientWidth+1&&last.right<=tableBox.right+1};})()""")
                 cdp.eval(f"""(()=>{{const divider=document.querySelector('.lex-list-detail-divider');divider.dispatchEvent(new PointerEvent('pointerdown',{{bubbles:true,cancelable:true,button:0,buttons:1,pointerId:7,clientX:{one['x']},clientY:{one['y']}}}));divider.dispatchEvent(new PointerEvent('pointermove',{{bubbles:true,buttons:1,pointerId:7,clientX:{one['x'] + 120},clientY:{one['y']}}}));divider.dispatchEvent(new PointerEvent('pointerup',{{bubbles:true,button:0,buttons:0,pointerId:7,clientX:{one['x'] + 120},clientY:{one['y']}}}));}})()""")
                 one["after"] = cdp.eval("document.querySelector('.lex-barrelled-master').getBoundingClientRect().width")
-                assert one["tableFit"] and one["after"] > one["before"] + 20, one
+                assert one["tableFit"] and abs(one["after"] - one["before"]) < 2, one
+                assert not cdp.eval("document.body.classList.contains('lex-panel-layout-dragging')"), one
                 cdp.eval("document.querySelector('.lex-list-detail-divider').dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}))")
                 double_click_width = cdp.eval("document.querySelector('.lex-barrelled-master').getBoundingClientRect().width")
                 assert abs(double_click_width - one["after"]) < 2, {"one": one, "doubleClick": double_click_width}
@@ -119,7 +120,8 @@ def main() -> int:
                     clicked:Number(second?.dataset.key),
                     pageSize:size,pages:Math.ceil(allRows.length/(size*3)),
                     pager:!!root.querySelector('.lex-pager'),
-                    split:Number(root.querySelector('.lex-list-detail-divider')?.getAttribute('aria-valuenow')),
+                    split:root.querySelector('.lex-list-detail-divider')?.getAttribute('aria-valuenow'),
+                    template:root.querySelector('.lex-list-detail-divider')?.closest('.lex-panel-layout')?.style.getPropertyValue('--lex-panel-layout-template'),
                     overflow:masters.map(master=>({scroll:master.scrollHeight,client:master.clientHeight,style:getComputedStyle(master).overflowY})),
                     horizontalFit:masters.map(master=>{const box=master.getBoundingClientRect(),last=master.querySelector('.lex-column-list-head-cell:last-child')?.getBoundingClientRect();return{scroll:master.scrollWidth,client:master.clientWidth,lastRight:last?.right,panelRight:box.right};}),
                     panelWidth,pairWidth,expectedPanelMinimum,
@@ -130,7 +132,7 @@ def main() -> int:
                 assert result["barrels"] == 3 and result["headers"] == [1, 1, 1], result
                 assert result["visibleIds"] == result["expectedIds"], result
                 assert result["pager"] == (result["pages"] > 1), result
-                assert result["split"] >= 60, result
+                assert result["split"] is None and "minmax(" in (result.get("template") or ""), result
                 assert result["panelWidth"] >= result["expectedPanelMinimum"] - 2, result
                 assert all(value["style"] in {"hidden", "visible"} and value["scroll"] <= value["client"] + 1
                            for value in result["overflow"]), result

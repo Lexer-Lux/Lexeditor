@@ -20,10 +20,11 @@ def test_formula_variables_link_pointer_and_keyboard_to_controls():
             page.add_style_tag(content='main{display:grid!important;grid-template-columns:1fr 1fr;gap:20px}')
             page.evaluate('''()=>{const U=LexeditorUI;
                 for(const mathematical of [true,false]){
+                  const variables=['A','B'].map(label=>({label,control:U.el('input',{type:'number',value:2,'aria-label':label})}));
                   document.querySelector('main').append(U.curveEditor({title:mathematical?'Math':'Text',
                     domain:{min:1,max:100},range:{min:0,max:250},evaluate:L=>L*2+10,
-                    variables:['A','B'].map(label=>({label,control:U.el('input',{type:'number',value:2,'aria-label':label})})),
-                    formula:mathematical?U.mathFormula('A*L+B'):'A*L+B'}));
+                    variables,
+                    formula:mathematical?U.mathFormula('A*L+B',{variables}):'A*L+B'}));
                 }
             }''')
             for title, token_selector in [('Math','.lex-curve-math-atom mi'), ('Text','.lex-curve-path-formula tspan')]:

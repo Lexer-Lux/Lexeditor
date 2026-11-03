@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from core.bounded import whole_number
+from core.numeric_values import integer_value
 
 from .ffx_table import FFXTableError, parse_table
 from .treasures import sha256_bytes
@@ -130,10 +131,7 @@ def apply_table_edits(data: bytes, edits: list[dict], table: str = "command") ->
             raise FFXCommandError("Each FFX animation edit must be an object")
         if set(edit) != {"id", "animation1", "animation2"}:
             raise FFXCommandError("Each FFX animation edit must contain only id, animation1 and animation2")
-        try:
-            record_id = int(edit["id"])
-        except (TypeError, ValueError) as error:
-            raise FFXCommandError("FFX ability record ID must be an integer") from error
+        record_id = integer_value(edit["id"], "FFX ability record ID", FFXCommandError)
         if not parsed.min_index <= record_id <= parsed.max_index:
             raise FFXCommandError(
                 f"FFX ability record ID must be between {parsed.min_index} and {parsed.max_index}"

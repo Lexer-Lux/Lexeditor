@@ -5,7 +5,6 @@ enable_ff8_interaction_indicators, and the switch is written off again when
 no enabled mod asks for it. A fixture library stands in for the reader's.
 """
 import json
-import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -28,10 +27,6 @@ class InteractionIndicatorTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(prefix="ff8-interaction-indicators-")
         self.addCleanup(temp.cleanup)
         self.temp = Path(temp.name)
-        previous = os.environ.get(script_mods.TRUST_ENV)
-        os.environ[script_mods.TRUST_ENV] = str(self.temp / "trust.json")
-        self.addCleanup(lambda: os.environ.pop(script_mods.TRUST_ENV, None) if previous is None
-                        else os.environ.__setitem__(script_mods.TRUST_ENV, previous))
         self.project, self.game = self.temp / "project", self.temp / "game"
         self.library = self.project / ".lexeditor-mods"
         self.game.mkdir()
@@ -44,7 +39,6 @@ class InteractionIndicatorTests(unittest.TestCase):
             "help": "Shows a fixed HUD cue when the field interaction selector has a target. "
                     "It never presses a button or starts the interaction for you."}), encoding="utf-8")
         self._set_enabled(False)
-        script_mods.set_trusted(self.mod, True)
 
     def _set_enabled(self, enabled):
         (self.mod / "mod.json").write_text(json.dumps(
@@ -80,8 +74,11 @@ class InteractionIndicatorTests(unittest.TestCase):
 
     def test_editor_exposes_non_invasive_semantics(self):
         editor = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
-        self.assertIn('"aria-label":row.name', editor)
-        self.assertIn("panel(schema.title||row.name.toUpperCase(),schema.help,toggle,body,blocker)", editor)
+        self.assertIn('LexeditorUI.tweakModPanels({rows:settings.tweaks||[]', editor)
+        row = next(row for row in gameplay_settings.load(self.project, self.game)["tweaks"]
+                   if row["id"] == "interaction-indicators")
+        self.assertIn("never presses a button", row["schema"]["help"])
+        self.assertIs(row["schema"]["needsDriver"], True)
         mod = Path(paths.MODS_ROOT) / "Interaction Indicators"
         if not script_mods.is_script_mod(mod):
             self.skipTest(f"The Interaction Indicators tweak mod is not installed in {paths.MODS_ROOT}")

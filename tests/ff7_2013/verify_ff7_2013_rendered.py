@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str((ROOT / "tools").resolve()))
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ff7"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from paged_detail import reveal
 import verify_ff7_rendered_neutral as neutral
 
 target = neutral.target
@@ -55,6 +57,9 @@ def open_current_modules(self, edition: str = "ff7") -> None:
 
 class FF72013Discard(target.RenderedTests):
     open = open_current_modules
+
+    def control(self, group, key):
+        return reveal(self.page, super().control(group, key))
 
     def test_discard_restores_saved_baseline(self) -> None:
         self.install()

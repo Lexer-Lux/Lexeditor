@@ -330,8 +330,10 @@ def verify_settings_integration() -> None:
     require("tweaks[row.id]=change" in editor and "post(settingsPayload())" in editor,
             "tweak changes are absent from the save path")
     require("checked:row.enabled" in editor, "the generic tweak checkbox is missing")
-    require("schema.title||row.name.toUpperCase()" in editor and "schema.help" in editor,
-            "the generic tweak UI does not use the mod's title and help")
+    framework = (ROOT / "ui/framework.js").read_text(encoding="utf-8")
+    require("tweakPanel(row.name, schema.help, toggle, body, blocker)" in framework
+            and "schema.help" in editor,
+            "the generic tweak UI does not use the mod's name and help")
 
 
 

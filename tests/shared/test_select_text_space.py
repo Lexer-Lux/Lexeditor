@@ -25,7 +25,10 @@ def test_ai_dropdown_labels_fit(page):
         results=page.locator('select').evaluate_all('''nodes=>nodes.map(n=>{
           const s=getComputedStyle(n),c=document.createElement('canvas').getContext('2d');
           c.font=`${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
-          return {padding:parseFloat(s.paddingRight),space:n.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)-22,
+          // Corrected reserve: pad-left plus the measured 15px arrow zone
+          // (plus a live inner rail), never padding plus 22.
+          const rail=parseFloat(s.getPropertyValue('--lex-internal-reference-width'))||0;
+          return {padding:parseFloat(s.paddingRight),space:n.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.borderLeftWidth)-parseFloat(s.borderRightWidth)-15-rail,
             ink:c.measureText(n.selectedOptions[0].textContent).width};
         })''')
         assert all(r['padding']<=7 and r['ink']<=r['space']+1 for r in results),results

@@ -55,6 +55,58 @@ between opponents that pass the same deck ID. A pool preview must therefore
 use the selected CARDGAME call's level mask. The exact hand and available rare
 cards depend on match-time state, so a static editor must not invent them.
 
+## Rare-card ownership and selection
+
+The native hand builder receives the side and deck ID. Deck zero skips rare
+selection. For a nonzero deck, it compares all 33 ownership bytes at
+`0x1CFEF85` against that ID. Index 0 is card 77, and index 32 is card 109.
+These bytes share the card inventory array at `0x1CFEF38`; rare cards use an
+owner byte where common cards use a count/seen byte. They are mutable save
+state, not an executable table of five-card decks.
+
+Matching rare cards are considered in ascending card-ID order. A candidate
+succeeds when the native RNG result modulo 100 is less than the rare-card
+chance. After the first success, each remaining candidate uses half the
+original chance, rounded down; the chance does not halve again on each
+success. Selection stops at five cards. The common-card builder fills any
+remaining slots.
+
+`verify_ff8_card_hand_levels.py` executes the actual supported routine for all
+33 rare cards and all 256 ownership byte values. It checks zero chance,
+deck zero, mismatched ownership, unchanged ownership state and the strict
+percentage boundary. A controlled multi-card case proves the ordering,
+five-card limit and half-chance rule. Only RNG is replaced. This is native
+execution evidence, not a live match acceptance result.
+
+The initial ownership is code, not a stored card-list table. After loading
+`init.out` into the GF/start-data records, `0x56DA10` calls the separate card
+initializer at `0x8DFF20`. It clears common-card counts and assigns rare cards
+77–109 to owners 200–232 respectively. The same focused verifier executes
+this initializer and checks all 33 assignments, common-card counts, the return
+stack and adjacent state. Editing `init.out` cannot change these assignments:
+they are made afterward. A modded starting assignment requires a guarded
+Hext change to the card initializer; existing saves retain their current
+owners unless another proven path changes them.
+
+The editor's authored Hext replacement occupies only `0x8DFF20..0x8DFF6F`;
+the next function at `0x8DFF70` remains untouched. Its 47-byte routine clears
+the original inventory and seen flags, preserves unrelated flag bits,
+initializes the RNG state, and copies a 33-byte inline starting-owner map.
+The generated patch requires the supported executable's exact hash. No
+executable file or existing save is edited.
+
+The verifier compares the replacement against the original initializer for
+all 256 initial flag patterns and four owner maps (1,024 comparisons). Only
+the requested rare-owner bytes differ. Adjacent state, nonvolatile registers,
+the return stack and the following function bytes remain intact; edited owners
+also feed the native hand builder. This does not establish live-game acceptance.
+
+Starting maps are complete Hext replacements: the last enabled map wins in
+load order, including its unchanged assignments. Property patches still write
+only changed scalar bytes. The editor allows opponent owners 0–239; zero is
+excluded by native rare selection. Values 240–255 are not offered as opponent
+decks because their other ownership-state effects are not established for editing.
+
 An argument can be a literal or a variable reference. The latter selects a
 variable whose value is read during play; it is not the current match value.
 Edits preserve the original argument opcode and unrelated script bytes.

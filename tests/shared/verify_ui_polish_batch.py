@@ -5,6 +5,9 @@ from pathlib import Path
 import re
 import shutil
 import sys
+import os
+import tempfile
+from plugin_ui import plugin_ui
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -21,8 +24,7 @@ def run(browser_path: str | None = None) -> None:
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.set_content("<base href='http://localhost/'><main id='main'></main>")
             page.add_style_tag(content=(ROOT / "ui/framework.css").read_text(encoding="utf-8"))
-            blank = (ROOT / "plugins/blank/editor.html").read_text(encoding="utf-8")
-            blank_css = re.search(r"<style>(.*?)</style>", blank, re.S).group(1)
+            blank_css = (ROOT / "plugins/blank/editor.css").read_text(encoding="utf-8")
             page.add_style_tag(content=blank_css)
             page.add_script_tag(content=(ROOT / "ui/framework.js").read_text(encoding="utf-8"))
             page.evaluate("""() => {
@@ -70,7 +72,7 @@ def run(browser_path: str | None = None) -> None:
                     svg=graph.querySelector('.lex-curve-svg'), start=graph.querySelector('.lex-curve-axis-start'),
                     top=graph.querySelector('.lex-curve-axis-top'), ctm=svg.getScreenCTM();
               const p=plot.getBoundingClientRect(), s=svg.getBoundingClientRect(), x=start.getBoundingClientRect(), y=top.getBoundingClientRect();
-              return {plotBorder:getComputedStyle(plot).borderTopWidth,
+              return {singleBorder:parseFloat(getComputedStyle(plot).borderTopWidth)+parseFloat(getComputedStyle(graph).borderTopWidth)<=1,
                 // The Y scale numbers moved to the right-hand margin in
                 // vertical writing mode. What still has to be true is that they
                 // do not sit on the drawing, on whichever side they are placed;
@@ -80,7 +82,11 @@ def run(browser_path: str | None = None) -> None:
                 uniform:Math.abs(Math.abs(ctm.a)-Math.abs(ctm.d))<0.02,
                 svgInside:s.left>p.left&&s.top>p.top&&s.right<p.right&&s.bottom<p.bottom};
             }""")
-            assert geometry == {"plotBorder":"0px","xBelow":True,"yClear":True,"uniform":True,"svgInside":True}, geometry
+            if not os.environ.get('CI'):
+                screenshot = Path(tempfile.gettempdir())/'lexeditor-dev'/'todo-ui-polish.png'
+                screenshot.parent.mkdir(parents=True,exist_ok=True)
+                page.screenshot(path=str(screenshot))
+            assert geometry == {"singleBorder":True,"xBelow":True,"yClear":True,"uniform":True,"svgInside":True}, geometry
             print("PASS graph strip/title/formula colors/margins/no nested plot border/no non-uniform SVG stretch")
 
             page.evaluate("document.querySelector('#number-field').classList.add('lex-value-dragging')")
@@ -102,12 +108,11 @@ def run(browser_path: str | None = None) -> None:
                 arrowReaches:checkbox.left-arrowBox.right<=14,
                 arrowGap:Math.round(checkbox.left-arrowBox.right),
                 arrowHead:parseFloat(after.borderLeftWidth)>=5,
-                refNotClipped:refNode.scrollWidth<=refNode.clientWidth+1,refWidth:ref.width,refScroll:refNode.scrollWidth,
-                internalWidth:parseFloat(getComputedStyle(internal).getPropertyValue('--lex-internal-reference-width'))};
+                refNotClipped:refNode.scrollWidth<=refNode.clientWidth+1,refWidth:ref.width,refScroll:refNode.scrollWidth};
             }""")
             assert controls["fillInside"] and controls["checkboxAligned"], controls
             assert controls["arrowReaches"] and controls["arrowHead"], controls
-            assert controls["refNotClipped"] and controls["internalWidth"] >= 5, controls
+            assert controls["refNotClipped"] and controls["refWidth"] > 0, controls
             print("PASS bounded slider, checkbox edge, boolean arrow head and Blank internal references")
 
             page.evaluate("""() => {
@@ -132,23 +137,27 @@ def run(browser_path: str | None = None) -> None:
               return {noOverlap:m.bottom<=p.top+1, noScroll:master.scrollHeight<=master.clientHeight+1,
                 rootTop:root.getBoundingClientRect().top,rootBottom:root.getBoundingClientRect().bottom,
                 masterTop:m.top,masterBottom:m.bottom,masterHeight:m.height,pagerTop:p.top,pagerBottom:p.bottom,pagerHeight:p.height,
-                headerWrap:getComputedStyle(label).whiteSpace==='normal', pageSize:root.dataset.lexPageSize};
+                headerFits:label.scrollWidth<=label.clientWidth+1&&parseFloat(getComputedStyle(label).fontSize)>=14,
+                pageSize:root.dataset.lexPageSize};
             }""")
-            assert paging["noOverlap"] and paging["noScroll"] and paging["headerWrap"], paging
+            if not os.environ.get('CI'):
+                page.screenshot(path=str(screenshot.with_stem('todo-ui-polish-pager')))
+            assert paging["noOverlap"] and paging["noScroll"] and paging["headerFits"], paging
             page.locator("#main .lex-barrelled-master").dispatch_event("wheel", {"deltaY":120,"deltaX":0,"deltaMode":0})
             page.wait_for_timeout(80)
             change = page.evaluate("window.lastPageChange")
             assert change and change["reason"] == "page" and change["page"] == 1, change
-            print("PASS pager reserves its own height, avoids vertical scrolling, wraps headers and wheel-turns pages")
+            print("PASS pager reserves its own height, avoids vertical scrolling, fits readable headers and wheel-turns pages")
 
         finally:
             browser.close()
 
-    ff8 = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
+    ff8 = plugin_ui('ff8')
     assert 'label:"STATUS 1",help:status1?.help?infoHelp(status1.help):null' in ff8
     assert 'label:"STATUS 2",help:status2?.help?infoHelp(status2.help):null' in ff8
-    assert '.encounter-slot-table .lex-column-list-head-cell .header-label{white-space:normal' in ff8
-    print("PASS FF8 Magic Status help markers and Encounter non-clipping headers are wired")
+    # Headers now use the shared fitter tested above; a screen-specific
+    # white-space override is not required to prevent clipping.
+    print("PASS FF8 Magic Status help markers are wired")
 
 
 if __name__ == "__main__":

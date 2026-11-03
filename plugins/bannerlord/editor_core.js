@@ -11,7 +11,7 @@
     effects:null,savedEffects:null,effectIndex:0,
     perks:null,savedPerks:null,perkIndex:0,
     xpSources:null,savedXpSources:null,xpSourceIndex:0,
-    source:null,savedSourceText:null,reshade:null,reshadeLoading:false
+    source:null,savedSourceText:null
   };
 
   async function api(path,options){
@@ -64,7 +64,7 @@
     return el("input",{type:"checkbox",checked:!!value,onchange:event=>{change(event.target.checked);refresh()}});
   }
   function textareaInput(value,change,attrs={}){
-    return el("textarea",{...attrs,oninput:event=>{change(event.target.value);refresh()}},value??"");
+    return LexeditorUI.textArea({...attrs,value:value??"",oninput:event=>{change(event.target.value);refresh()}});
   }
   function numberInput(value,change,attrs={}){
     return el("input",{type:"number",step:"any",value:Number(value),...attrs,oninput:event=>{if(event.target.value!=="")change(Number(event.target.value));refresh()}});

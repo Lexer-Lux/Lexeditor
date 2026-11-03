@@ -2,6 +2,7 @@
   "id": "ff8",
   "name": "Final Fantasy 8",
   "accent": "#366bc2",
+  "lexmod": "Lexer-Lux/Lexers-Mod-For-FF8",
   "processNames": [
     "FF8_EN.exe",
     "FF8_Launcher.exe"

@@ -1,5 +1,6 @@
 """Shared fixed-u32 gil-price table mechanics for proved FFX kernel files."""
 from __future__ import annotations
+from core.numeric_values import integer_value
 
 from dataclasses import dataclass
 import struct
@@ -44,12 +45,7 @@ def parse_prices(data: bytes, *, filename: str, target_base: int, error_type) ->
 
 
 def _bounded(value, minimum: int, maximum: int, label: str, error_type) -> int:
-    if isinstance(value, bool):
-        raise _error(error_type, f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise _error(error_type, f"{label} must be an integer") from error
+    parsed = integer_value(value, label, error_type)
     if not minimum <= parsed <= maximum:
         raise _error(error_type, f"{label} must be between {minimum} and {maximum}")
     return parsed

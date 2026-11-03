@@ -16,9 +16,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-import math
 import struct
 from typing import Any
+
+from core.numeric_values import finite_number, integer_value
 
 
 class DataObjectError(ValueError):
@@ -476,16 +477,27 @@ class DataObjectPackage:
             f"No record with name index {name_index} and number {name_number}")
 
     def apply_edits(self, edits: list[dict]) -> int:
-        changed = 0
+        if not isinstance(edits, list):
+            raise DataObjectError("Edits must be an array")
+        pending = []
+        seen = set()
         for edit in edits:
             if not isinstance(edit, dict):
                 raise DataObjectError("Every edit must be an object")
+            if set(edit) - {"nameIndex", "nameNumber", "property", "value"}:
+                raise DataObjectError("Edit contains unsupported fields")
             try:
-                name_index = int(edit["nameIndex"])
-                name_number = int(edit.get("nameNumber", 0))
-                property_name = str(edit["property"])
-            except (KeyError, TypeError, ValueError) as error:
+                name_index = integer_value(edit["nameIndex"], "Name index", DataObjectError)
+                name_number = integer_value(edit.get("nameNumber", 0), "Name number", DataObjectError)
+                property_name = edit["property"]
+            except KeyError as error:
                 raise DataObjectError("Edit identity is incomplete") from error
+            if not isinstance(property_name, str):
+                raise DataObjectError("Property must be text")
+            identity = (name_index, name_number, property_name)
+            if identity in seen:
+                raise DataObjectError("Duplicate field edit")
+            seen.add(identity)
             record = self.record(name_index, name_number)
             field = next((item for item in record.fields if item.name == property_name), None)
             if field is None:
@@ -497,29 +509,21 @@ class DataObjectPackage:
                 if not isinstance(value, bool):
                     raise DataObjectError(f"{property_name} must be true or false")
             elif field.type_id == 9:
-                if isinstance(value, bool):
-                    raise DataObjectError(f"{property_name} must be a finite number")
-                try:
-                    value = float(value)
-                except (TypeError, ValueError) as error:
-                    raise DataObjectError(f"{property_name} must be a finite number") from error
-                if not math.isfinite(value):
-                    raise DataObjectError(f"{property_name} must be a finite number")
+                value = finite_number(value, property_name, DataObjectError)
             else:
-                if isinstance(value, bool):
-                    raise DataObjectError(f"{property_name} must be an integer")
-                try:
-                    numeric = float(value)
-                    if not math.isfinite(numeric) or not numeric.is_integer():
-                        raise ValueError
-                    value = int(numeric)
-                except (TypeError, ValueError) as error:
-                    raise DataObjectError(f"{property_name} must be an integer") from error
+                value = integer_value(value, property_name, DataObjectError)
                 if field.minimum is not None and value < field.minimum:
                     raise DataObjectError(f"{property_name} must be at least {field.minimum}")
                 if field.maximum is not None and value > field.maximum:
                     raise DataObjectError(f"{property_name} must be at most {field.maximum}")
-            encoded = struct.pack(_STRUCTS[field.type_id], value)
+            try:
+                encoded = struct.pack(_STRUCTS[field.type_id], value)
+            except (OverflowError, struct.error) as error:
+                raise DataObjectError(f"{property_name} is outside its storage range") from error
+            pending.append((field, value, encoded))
+
+        changed = 0
+        for field, value, encoded in pending:
             before = bytes(self.bytes[field.offset:field.offset + field.size])
             if encoded != before:
                 self.bytes[field.offset:field.offset + field.size] = encoded

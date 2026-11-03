@@ -78,6 +78,48 @@
     ]
   },
   "plugins": {
+    "kf1": {
+      "contributions": [
+        {
+          "name": "Andrew / Verdite1 contributors",
+          "role": "Existing King's Field I archive/recomp source port, native rendering and input research (MIT).",
+          "url": "https://github.com/Voicedrew11/verdite1/tree/archive/recomp"
+        },
+        {
+          "name": "RecompOne contributors",
+          "role": "Existing recompilation runtime and source-mod loader (MIT). No disc bytes or generated recompilation source is distributed by Lexeditor.",
+          "url": "https://github.com/BlackLabelHQ/RecompOne"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
+    "kings-field2": {
+      "contributions": [
+        {
+          "name": "Voicedrew11 / Verdite2 contributors",
+          "role": "Existing PC port, native settings limits, source-mod integration and game-routine research.",
+          "url": "https://github.com/Voicedrew11/verdite2"
+        },
+        {
+          "name": "flaffy / RecompOne contributors",
+          "role": "C# source-mod, hook, event and configuration interfaces.",
+          "url": "https://github.com/BlackLabelHQ/RecompOne"
+        },
+        {
+          "name": "Acranon / verdite2-mods contributors",
+          "role": "Run/interact research and existing source-mod conventions.",
+          "url": "https://github.com/Acranon/verdite2-mods"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Verdite2 integration references — MIT notices",
+          "sourcePath": "plugins/kings_field2/credits.md"
+        }
+      ]
+    },
     "blank": {
       "contributions": [
         {
@@ -843,6 +885,11 @@
     "ds1": {
       "contributions": [
         {
+          "name": "MetalCrow, Ainsley Harriott, Ashley and Sean Pesce / Dark Souls 1 PvP Fixes and Overhaul",
+          "role": "AGPLv3 anti-ban reporting filters and player anti-cheat protections adapted into the online loader. Pinned source and local changes are recorded in runtime/overhaul/SOURCE.json.",
+          "url": "https://github.com/metal-crow/Dark-Souls-1-Overhaul"
+        },
+        {
           "name": "Vawser and Smithbox contributors",
           "role": "Dark Souls Remastered detection reference and MIT-licensed DS1 item, NPC, attack, behavior and projectile definitions, annotations, row names and enums. No upstream executable code or dependencies are copied.",
           "url": "https://github.com/vawser/Smithbox"
@@ -851,6 +898,38 @@
           "name": "TKGP / JKAnderson - SoulsTemplates",
           "role": "Apache-2.0 BND3 and DCX format reference for fixed-size, byte-preserving item edits. No template code is bundled.",
           "url": "https://github.com/JKAnderson/SoulsTemplates"
+        },
+        {
+          "name": "Grimrukh / soulstruct",
+          "role": "GPL-3.0-or-later FLVER2 model format facts behind the model reader; no upstream code is bundled.",
+          "url": "https://github.com/Grimrukh/soulstruct"
+        },
+        {
+          "name": "Three.js authors",
+          "role": "MIT-licensed 3D library vendored for the map viewport (three.module.js, OrbitControls and TransformControls, pinned to r170).",
+          "url": "https://github.com/mrdoob/three.js"
+        },
+        {
+          "name": "Meowmaritus / SoulsAssetPipeline",
+          "role": "GPL-3.0-or-later TAG0 tagfile and spline-animation facts behind the animation reader (commit d11caf9); no upstream code is bundled.",
+          "url": "https://github.com/Meowmaritus/SoulsAssetPipeline"
+        },
+        {
+          "name": "PredatorCZ / HavokLib",
+          "role": "GPL-3.0-or-later spline-decompression facts behind the animation sampler; no upstream code is bundled.",
+          "url": "https://github.com/PredatorCZ/HavokLib"
+        },
+        {
+          "name": "Installed Dark Souls Remastered (title art)",
+          "role": "The Title texture from the installed menu/<language>/menu_local.tpf.dcx, rendered to PNG into the private ds1-theme cache at serve time; never redistributed."
+        },
+        {
+          "name": "Installed Dark Souls Remastered (menu fonts)",
+          "role": "Menu font sources from the installed font/<language>/ folder (DSFont24.ccm.dcx, TalkFont24.ccm.dcx, *.fnt), cached raw in the private ds1-theme cache at serve time; never redistributed."
+        },
+        {
+          "name": "Installed Dark Souls Remastered (interface sounds)",
+          "role": "Sound inventory from the installed sound/frpg_sm*.fsb banks with their frpg_sm*.fev event projects, cached in the private ds1-theme cache at serve time; never redistributed."
         }
       ],
       "thanks": [],
@@ -921,6 +1000,27 @@
         {
           "name": "Chrono Trigger research sources — licenses and evidence limits",
           "sourcePath": "plugins/chrono_trigger/credits.md"
+        }
+      ]
+    },
+    "kings-field3": {
+      "contributions": [
+        {
+          "name": "Andrew / Voicedrew11 and Verdite3 contributors",
+          "role": "Native port, settings schema and source-mod integration.",
+          "url": "https://github.com/Voicedrew11/verdite3"
+        },
+        {
+          "name": "flaffy / RecompOne contributors",
+          "role": "Native C# source-mod compiler, hooks and player configuration interfaces.",
+          "url": "https://github.com/BlackLabelHQ/RecompOne"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Verdite3 and RecompOne — MIT",
+          "sourcePath": "plugins/kings_field3/credits.md"
         }
       ]
     }

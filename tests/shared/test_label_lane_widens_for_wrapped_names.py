@@ -1,14 +1,16 @@
-"""A multi-word property name widens its lane instead of wrapping and shrinking.
+"""A multi-word property name widens its lane and wraps, never shrinks.
 
 The lane widened only for a single word too long to fit, so "MDEF (RIGHT)" in
 FF9's card values broke over two clipped 13px lines while the value box beside
 it took the rest of a 780px panel. A name that only fits by wrapping now asks
-for the room first; the grid still caps the lane at half the row.
+for the room first: the lane grows so every name lays out on at most two
+lines at full size, capped at half the row, and the pane only shrinks past
+the cap. Wrapping comes before shrinking, so two full-size lines are correct.
 """
 from test_shared_ui_feedback import page, framework
 
 
-def test_wrapped_names_widen_the_lane_and_stay_on_one_line(page):
+def test_wrapped_names_widen_the_lane_and_keep_full_size(page):
     framework(page)
     page.evaluate('''() => {
       const U = LexeditorUI, main = document.querySelector('main');
@@ -21,10 +23,49 @@ def test_wrapped_names_widen_the_lane_and_stay_on_one_line(page):
     page.wait_for_timeout(800)
     labels = page.evaluate('''() => [...document.querySelectorAll('.lex-detail-field-label-text')].map(text => {
       const css = getComputedStyle(text);
+      const label = text.closest('.lex-detail-field-label');
+      const pane = label.closest('.lex-tweak-card-grid') || label.parentElement?.parentElement;
       return {name: text.textContent, size: parseFloat(css.fontSize),
         lines: Math.round(text.getBoundingClientRect().height / parseFloat(css.lineHeight)),
-        left: text.getBoundingClientRect().left};
+        left: text.getBoundingClientRect().left,
+        floor: parseFloat(pane.style.getPropertyValue('--lex-detail-label-floor')) || 0};
     })''')
-    assert all(label['lines'] == 1 for label in labels), labels
+    assert all(label['lines'] <= 2 for label in labels), labels
     assert len({label['size'] for label in labels}) == 1, 'one size for every name in the panel'
+    assert all(label['size'] == 13 for label in labels), 'wrapping comes before shrinking'
     assert len({round(label['left']) for label in labels}) == 1, labels
+    assert all(label['floor'] > 0 for label in labels), 'the lane widened for the wrapped names'
+
+
+def test_a_hugged_name_is_never_cut_by_the_clamp(page):
+    """A narrowed help-hug must not rewrap its name past two lines.
+
+    The hug narrowed "Poise-break stagger" to its longest line, which
+    rewrapped it to three lines the clamp cut ("Poise- / brea…"), and the
+    fit could not see it: the label contained the cut box just fine. The
+    narrow viewport forces the pile-up; widening must refit every name
+    whole, not just the first.
+    """
+    page.set_viewport_size({"width": 440, "height": 900})
+    framework(page)
+    page.evaluate("""() => {
+      const U = LexeditorUI, main = document.querySelector('main');
+      const field = label => U.detailField({label, showType: true, help: U.infoHelp('Help for ' + label),
+        control: U.el('input', {type: 'number', value: 3, min: 0, max: 10})});
+      const card = names => U.detailSection({title: 'BASICS', body: names.map(field)});
+      const grid = U.el('div', {class: 'lex-tweak-card-grid',
+        style: 'display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;'});
+      grid.append(card(['HP', 'Effective HP', 'MP']),
+        card(['Stamina', 'Stamina recovery', 'Poise']),
+        card(['Poise recovery', 'Poise-break stagger', 'No bonfire reset']));
+      main.append(U.detailPanel({title: 'Stray Demon', body: [grid]}));
+    }""")
+    page.wait_for_timeout(800)
+    page.set_viewport_size({"width": 1600, "height": 900})
+    page.wait_for_timeout(1200)
+    state = page.evaluate("""() => [...document.querySelectorAll('.lex-detail-field-label-text')].map(text => ({
+      name: text.textContent,
+      cut: text.scrollHeight > text.clientHeight + 1 || text.scrollWidth > text.clientWidth,
+    }))""")
+    assert len(state) == 9, state
+    assert all(not row['cut'] for row in state), state

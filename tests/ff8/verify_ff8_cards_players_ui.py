@@ -12,6 +12,14 @@ def run(browser_path=None,screenshot=None):
             page.set_default_timeout(5000)
             errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
             page.route('**/*',lambda route:route.abort())
+            # Display actual private installed artwork locally without copying
+            # it into the public repository. CI can still test the controls.
+            if Path(r'D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe').exists():
+                import sys
+                sys.path.insert(0,str(ROOT))
+                from plugins.ff8.card_art import png_bytes
+                page.route('**/assets/cards/*.png',lambda route:route.fulfill(
+                    content_type='image/png',body=png_bytes(int(Path(route.request.url).stem))))
             page.route('http://fixture/',lambda route:route.fulfill(content_type='text/html',body='<main id="main"></main><div id="toolbar"></div>'))
             page.goto('http://fixture/')
             page.add_style_tag(path=str(ROOT/'ui/framework.css'))
@@ -19,6 +27,7 @@ def run(browser_path=None,screenshot=None):
             page.add_script_tag(path=str(ROOT/'plugins/ff8/cards_ui.js'))
             page.evaluate('''() => {
               const U=LexeditorUI,card={id:0,name:'Geezard',top:1,bottom:2,left:3,right:10,element:0,power:5};
+              const rare={...card,id:77,name:'Chubby Chocobo',startingOwner:200};
               const map={id:12,key:'balamb',name:'Balamb',_loaded:true,players:[{id:0,entity:'queen_est',script:'talk',params:[
                 {id:0,name:'Deck',value:1,editable:true,mode:'literal'},
                 {id:1,name:'Region rule',value:4,editable:false,mode:'variable'},
@@ -30,6 +39,7 @@ def run(browser_path=None,screenshot=None):
               window.state={tab:'cards',activeSource:'mine',selected:{},filters:{fields:'old search'},data:{cards:{rows:[card],elements:[{id:0,name:'None'}]},fields:{rows:[map]},text:{rows:[]}},
                 base:{cards:[structuredClone(card)]},vanilla:{cards:{rows:[structuredClone(card)]},fields:{rows:[structuredClone(map)]}}};
               window.fetch=async url=>{if(url!='/api/card-players')throw Error('Unexpected request '+url);return {json:async()=>({ready:true,players:[{map:'balamb',entity:'queen_est',id:0,deckMode:'literal',deckId:1},{map:'balamb',entity:'student',id:1,deckMode:'literal',deckId:1}]})}};
+              state.data.cards.rows.push(rare);state.base.cards.push(structuredClone(rare));state.vanilla.cards.rows.push(structuredClone(rare));
               window.cardsUI=FF8CardsUI({...U,el:U.el,state,
                 rowOf:(data,view,id)=>data[view].rows.find(row=>row.id===id),filtered:()=>state.data.cards.rows,
                 showPaged:(view,rows,columns,detail)=>detail(rows[0]),
@@ -82,6 +92,21 @@ def run(browser_path=None,screenshot=None):
             page.get_by_role('button',name='Open deck 1',exact=True).click()
             page.get_by_role('button',name='Open student',exact=True).wait_for()
             assert page.get_by_role('button',name='Open queen_est',exact=True).count()==1
+            page.get_by_role('button',name='Add rare card to deck 1',exact=True).click()
+            page.get_by_role('button',name='Chubby Chocobo',exact=True).click()
+            assert page.evaluate('state.data.cards.rows[1].startingOwner') == 1
+            page.get_by_role('button',name='Remove Chubby Chocobo from deck 1',exact=True).wait_for()
+            page.get_by_role('button',name='Pin Starting rare cards column',exact=True).click()
+            page.get_by_role('columnheader',name='Starting rare cards',exact=False).wait_for()
+            page.get_by_role('button',name='Unpin Starting rare cards column',exact=True).click()
+            assert {'id':77,'field':'startingOwner','value':1} in page.evaluate('cardsUI.edits()')
+            if screenshot:page.screenshot(path=str(Path(screenshot).with_stem('ff8-card-decks')))
+            page.get_by_role('button',name='Remove Chubby Chocobo from deck 1',exact=True).click()
+            assert page.evaluate('state.data.cards.rows[1].startingOwner') == 0
+            assert page.get_by_text('No starting rare cards in this deck.',exact=True).count()==1
+            page.evaluate("state.activeSource='vanilla';cardsUI.render()")
+            assert page.get_by_role('button',name='Add rare card to deck 1',exact=True).is_disabled()
+            page.evaluate("state.activeSource='mine';cardsUI.render()")
             page.get_by_role('button',name='Open queen_est',exact=True).click()
             page.get_by_role('button',name='Open deck 1',exact=True).wait_for()
             assert page.get_by_role('button',name='Open student',exact=True).count()==0
@@ -118,6 +143,28 @@ def run(browser_path=None,screenshot=None):
             page.get_by_label('queen_est Trade rule', exact=True).select_option('3')
             assert page.evaluate('state.data.fields.rows[0].players[0].params.find(p=>p.id===2).value') == 3
             if screenshot:page.screenshot(path=str(Path(screenshot).with_stem('ff8-card-rules')))
+            # Mod contents only leaves the edited opponent; the untouched one filters out.
+            page.get_by_role('tab',name='PLAYERS',exact=True).click()
+            prows='.ff8-card-players .lex-barrelled-master .lex-list-row:not(.lex-filler-row)'
+            toggle=page.locator('.ff8-card-players .lex-pager-toggle input[aria-label="Mod contents only"]')
+            assert toggle.count()==1 and toggle.is_enabled()
+            assert page.locator(prows).count()==2
+            toggle.check()
+            page.wait_for_function('()=>[...document.querySelectorAll("'+prows+'")].length===1')
+            assert 'queen_est' in page.locator(prows).first.inner_text()
+            toggle.uncheck()
+            page.wait_for_function('()=>[...document.querySelectorAll("'+prows+'")].length===2')
+            # Decks follow their members and rare cards: deck 1 holds edited
+            # queen_est, deck 200 is untouched once the rare card is restored.
+            page.get_by_role('tab',name='DECKS',exact=True).click()
+            page.evaluate('state.data.cards.rows[1].startingOwner=200;cardsUI.render()')
+            drows='.ff8-card-decks .lex-barrelled-master .lex-list-row:not(.lex-filler-row)'
+            dtoggle=page.locator('.ff8-card-decks .lex-pager-toggle input[aria-label="Mod contents only"]')
+            assert dtoggle.count()==1
+            assert page.locator(drows).count()==2
+            dtoggle.check()
+            page.wait_for_function('()=>[...document.querySelectorAll("'+drows+'")].length===1')
+            assert page.locator(drows).first.get_attribute('data-key')=='1'
             assert not errors,errors
             print('PASS current Cards/Players tabs, rank edits, native identifier, editable literal, protected variable and read-only source')
         finally:browser.close()

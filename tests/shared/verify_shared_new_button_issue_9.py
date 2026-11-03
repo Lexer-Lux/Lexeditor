@@ -1,10 +1,11 @@
 from pathlib import Path
+from plugin_ui import plugin_ui
 
 
 ROOT = Path(__file__).resolve().parents[2]
 FRAMEWORK_JS = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-RDR2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+RDR2 = plugin_ui("rdr2")
 
 
 def require(condition: bool, message: str) -> None:
@@ -20,14 +21,18 @@ require(".lex-new-button" in FRAMEWORK_CSS,
         "the shared primitive needs a plugin-neutral default style")
 require("const newButton=window.LexeditorUI.newButton;" in RDR2,
         "RDR2 must consume the shared primitive instead of rebuilding it")
-require("button.lex-new-button" in RDR2 and "border:1px dashed var(--border)" in RDR2,
-        "the RDR2 theme must own the requested dark dashed treatment")
-require("font:400 27px/1 var(--rdr-font-display)" in RDR2,
-        "the RDR2 plus must use the installed Redemption display face")
-require("transform:translateY(2px)" in RDR2,
-        "the RDR2 theme must correct the display face's plus-glyph metrics once")
-require(RDR2.count("newButton(") >= 20,
-        "all RDR2 creation paths must use the shared primitive")
+# The later shared-button and drawn-plus changes supersede the private RDR2
+# dashed/font treatment. One sizing token serves both pager and detail adds.
+require('width: var(--lex-new-button-size, 32px)' in FRAMEWORK_CSS and
+        'height: var(--lex-new-button-size, 32px)' in FRAMEWORK_CSS,
+        "shared add controls must use the same square sizing token")
+require('.lex-new-button-plus::before' in FRAMEWORK_CSS and
+        '.lex-new-button-plus::after' in FRAMEWORK_CSS and
+        'translate: -50% -50%' in FRAMEWORK_CSS,
+        "the shared drawn plus must retain its centered horizontal and vertical bars")
+for module in ("items", "effects", "loot", "crafting", "challenges", "shops"):
+    require("newButton(" in (ROOT / "plugins/rdr2" / f"{module}.js").read_text(encoding="utf-8"),
+            f"RDR2 {module} creation paths must use the shared primitive")
 require('newButton({title:"Add recipe",onclick:toggleRecipe})' in RDR2,
         "the empty Items Recipe field must use the shared Add control")
 require('}"Add recipe")' not in RDR2 and '},"Add recipe")' not in RDR2,

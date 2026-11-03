@@ -12,6 +12,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -240,7 +241,7 @@ def field_schema(schema_root: Path | None, table_name: str, field_name: str) -> 
     if schema_type is None and isinstance(spec.get("oneOf"), list):
         schema_type = "complex"
     description = spec.get("description") if isinstance(spec.get("description"), str) else ""
-    enum_values: list[Any] = []
+    enum_values: list[Any] = deepcopy(spec.get("enum", [])) if isinstance(spec.get("enum"), list) else []
     reference = spec.get("$ref") if isinstance(spec.get("$ref"), str) else ""
     if reference.startswith(ENUM_REF_PREFIX):
         enum_name = _json_pointer_name(reference.removeprefix(ENUM_REF_PREFIX))
@@ -261,7 +262,44 @@ def field_schema(schema_root: Path | None, table_name: str, field_name: str) -> 
         "description": description,
         "enumValues": enum_values,
         "reference": reference,
+        "constraints": {key: deepcopy(value) for key, value in spec.items()
+                        if key not in {"type", "description", "$ref", "enum", "title", "default",
+                                       "examples", "$comment", "$schema", "$id", "deprecated"}},
     }
+
+
+def schema_constraint_error(spec: dict[str, Any]) -> str:
+    """Refuse constraints we cannot enforce, rather than dropping them on write."""
+    constraints = spec.get("constraints", {})
+    if not isinstance(constraints, dict):
+        return "Generated property constraints are invalid; write disabled."
+    unsupported = set(constraints) - {"minimum", "maximum"}
+    if unsupported:
+        return "Generated property has unresolved constraints: " + ", ".join(sorted(unsupported)) + "; write disabled."
+    for key, value in constraints.items():
+        if (spec.get("type") not in {"integer", "number"} or isinstance(value, bool)
+                or not isinstance(value, (int, float)) or not math.isfinite(value)):
+            return f"Generated {key} is not a finite numeric bound; write disabled."
+    if constraints.get("minimum", -math.inf) > constraints.get("maximum", math.inf):
+        return "Generated numeric bounds are reversed; write disabled."
+    if (spec.get("type") == "integer" and "minimum" in constraints and "maximum" in constraints
+            and math.ceil(constraints["minimum"]) > math.floor(constraints["maximum"])):
+        return "Generated numeric bounds contain no integer; write disabled."
+    return ""
+
+
+def _validate_schema_constraints(spec: dict[str, Any], value: Any, path: str) -> None:
+    error = schema_constraint_error(spec)
+    if error:
+        raise ValueError(f"{path}: {error}")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if not math.isfinite(value):
+            raise ValueError(f"{path} must be finite")
+        constraints = spec.get("constraints", {})
+        if "minimum" in constraints and value < constraints["minimum"]:
+            raise ValueError(f"{path} must be at least {constraints['minimum']}")
+        if "maximum" in constraints and value > constraints["maximum"]:
+            raise ValueError(f"{path} must be at most {constraints['maximum']}")
 
 
 def _value_matches_schema(value: Any, schema_type: str, enum_values: list[Any]) -> bool:
@@ -320,11 +358,17 @@ def _record_schema(schema_root: Path | None, table_name: str, field_name: str, v
     schema_type = str(spec.get("type", "complex"))
     enum_values = list(spec.get("enumValues", []))
     matches = _value_matches_schema(value, schema_type, enum_values)
+    try:
+        _validate_schema_constraints(spec, value, f"{table_name}.{field_name}")
+    except ValueError:
+        matches = False
     return {
         "schemaState": "matched" if matches else "value-mismatch",
         "schemaType": schema_type,
         "schemaDescription": str(spec.get("description", "")),
         "enumValues": enum_values,
+        "minimum": spec.get("constraints", {}).get("minimum"),
+        "maximum": spec.get("constraints", {}).get("maximum"),
         "schemaKind": _schema_kind(schema_type),
         "schemaWritable": matches and _schema_kind(schema_type) != "complex",
         "schemaReason": (
@@ -395,6 +439,8 @@ def flatten_records(data: dict[str, Any], *, writable: bool, schema_root: Path |
                     "schemaType": metadata["schemaType"],
                     "schemaDescription": metadata["schemaDescription"],
                     "enumValues": metadata["enumValues"],
+                    "minimum": metadata.get("minimum"),
+                    "maximum": metadata.get("maximum"),
                 })
     return records
 
@@ -412,7 +458,10 @@ def _coerce_scalar(original: Any, value: Any, path: str) -> Any:
     if kind == "float":
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError(f"{path} must remain numeric")
-        return float(value)
+        result = float(value)
+        if not math.isfinite(result):
+            raise ValueError(f"{path} must be finite")
+        return result
     if kind == "string":
         if not isinstance(value, str):
             raise ValueError(f"{path} must remain a string")
@@ -445,6 +494,7 @@ def _coerce_schema_value(spec: dict[str, Any], value: Any, path: str) -> Any:
         raise ValueError(f"{path} is not a schema-backed scalar property")
     if enum_values and result not in enum_values:
         raise ValueError(f"{path} must be one of the generated enum values")
+    _validate_schema_constraints(spec, result, path)
     return result
 
 
@@ -503,6 +553,7 @@ class RawPatchDocument:
                     original, str(spec.get("type", "")), list(spec.get("enumValues", []))
                 ):
                     raise ValueError(f"{path} does not match the active generated PalSchema schema")
+                _validate_schema_constraints(spec, original, path)
                 replacement = _coerce_schema_value(spec, edit.get("value"), path)
             else:
                 replacement = _coerce_scalar(original, edit.get("value"), path)

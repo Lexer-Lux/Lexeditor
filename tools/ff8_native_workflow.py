@@ -15,16 +15,21 @@ on:
       - 'plugins/ff8/ffnx_gameplay_extensions/**'
       - 'plugins/ff8/ffnx_status_bars/**'
       - 'tools/prepare_ff8_native_build.py'
+      - 'tools/prepare_ff8_native_dependencies.py'
       - 'tools/ff8_native_workflow.py'
       - 'plugins/ff8/ffnx_issue_51/**'
       - 'plugins/ff8/ffnx_toasts/**'
       - 'tests/ff8/verify_ff8_hp_colors_issue_481.py'
+      - 'tests/ff8/verify_ff8_cast_debit_binary.py'
       - 'tests/ff8/verify_ff8_modern_controls_binary.py'
       - 'tests/ff8/verify_ff8_vehicle_drive.py'
       - 'tests/ff8/verify_ff8_vehicle_cap_binary.py'
       - 'tests/ff8/verify_ff8_reptile_atb_binary.py'
       - 'tests/ff8/verify_ff8_interaction_indicators_302.py'
       - 'tests/ff8/test_ff8_interaction_indicators_issue_302.py'
+      - 'tests/ff8/test_ff8_hp_colors_issue_481.py'
+      - 'ui/framework.js'
+      - 'ui/framework.css'
       - 'plugins/ff8/gameplay_settings.py'
       - 'plugins/ff8/editor.html'
       - '.github/workflows/ff8-stock-build.yml'
@@ -63,6 +68,12 @@ jobs:
         run: |
           $free = (Get-PSDrive D).Free
           if ($free -lt 25GB) { throw "FFNx needs about 16 GB plus dependency cache; less than 25 GB is free." }
+      - name: Prepare pinned x264 Git transport overlay
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python editor/tools/prepare_ff8_native_dependencies.py ffnx --overlay dependency-ports --provenance candidate/DEPENDENCIES.txt
       - uses: actions/cache/restore@v4
         with:
           path: D:\vcpkg-cache
@@ -76,7 +87,8 @@ jobs:
           foreach ($arch in @('x86','x64')) {
             @("set(VCPKG_TARGET_ARCHITECTURE $arch)", 'set(VCPKG_CRT_LINKAGE static)', 'set(VCPKG_LIBRARY_LINKAGE static)', 'set(VCPKG_BUILD_TYPE release)') | Set-Content -Encoding ascii "triplets/$arch-windows-static.cmake"
           }
-          python -m pip install cmake==4.2.0 ninja pefile==2024.8.26 unicorn==2.1.4 pillow pytest
+          python -m pip install cmake==4.2.0 ninja pefile==2024.8.26 unicorn==2.1.4 pillow pytest playwright
+          python -m playwright install chromium
           cmd /c ffnx\vcpkg\bootstrap-vcpkg.bat -disableMetrics
       - name: Configure x86 derivative with both required compile gates
         id: configure
@@ -88,7 +100,7 @@ jobs:
           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -prerelease -latest -property InstallationPath
           cmd /c "call `"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x86 && set > $env:RUNNER_TEMP\vcvars.txt"
           Get-Content "$env:RUNNER_TEMP\vcvars.txt" | ForEach-Object { if ($_ -match '^(.*?)=(.*)$') { Set-Content "env:\$($matches[1])" $matches[2] } }
-          cmake -S ffnx -B ffnx/.build -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-D_DLL_VERSION=1.24.3-lexeditor51-runtime' "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/triplets" '-DVCPKG_TARGET_TRIPLET=x86-windows-static' '-DFFNX_DEPLOY_TO_GAME_DIRS=OFF' '-DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON' '-DFFNX_LEXEDITOR_LIVE_CONDITIONS=ON'
+          cmake -S ffnx -B ffnx/.build -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-D_DLL_VERSION=1.24.3-lexeditor51-runtime' "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/triplets" "-DVCPKG_OVERLAY_PORTS=$env:GITHUB_WORKSPACE/dependency-ports" '-DVCPKG_TARGET_TRIPLET=x86-windows-static' '-DFFNX_DEPLOY_TO_GAME_DIRS=OFF' '-DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON' '-DFFNX_LEXEDITOR_LIVE_CONDITIONS=ON'
           foreach ($gate in @('FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME','FFNX_LEXEDITOR_LIVE_CONDITIONS')) {
             if (-not (Select-String -Path ffnx/.build/CMakeCache.txt -Pattern "^${gate}:BOOL=ON$" -Quiet)) { throw "Required compile gate disabled: $gate" }
           }
@@ -119,7 +131,7 @@ jobs:
           'MSVC x86 Release; static Release-only dependencies; Shared Magic and Live Conditions compiled; game deployment disabled.' | Add-Content candidate/BUILD.txt
           Get-FileHash candidate/* -Algorithm SHA256 | Format-Table -AutoSize | Out-String -Width 300 | Add-Content candidate/BUILD.txt
           python editor/tests/ff8/verify_ff8_linked_runtime.py --verifier ffnx/tools/verify_issue51_runtime_artifact.py --driver candidate/AF3DN.P
-          python editor/tests/ff8/verify_ff8_no_magic_consumption.py --driver candidate/AF3DN.P
+          python editor/tests/ff8/verify_ff8_cast_debit_binary.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_modern_controls_binary.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_vehicle_cap_binary.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_reptile_atb_binary.py --driver candidate/AF3DN.P

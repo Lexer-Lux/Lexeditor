@@ -7,22 +7,22 @@
     {
       "Field": "variationId",
       "Name": "Behavior Variation ID",
-      "Description": "Used when calculating the ID for attack parameters. It is not used directly on the actual machine."
+      "Description": "Part of the ID the game builds to find this move's attack data. The game never reads it alone."
     },
     {
       "Field": "behaviorJudgeId",
       "Name": "Behavior Judgement ID",
-      "Description": "Used when calculating the ID for attack parameters. This ID matches the action judgment ID entered in TAE."
+      "Description": "Must match the judgement ID in this move's animation file. Part of the ID the game builds to find attack data."
     },
     {
       "Field": "ezStateBehaviorType_old",
       "Name": "ID Calculation Rule",
-      "Description": "The EzState behavior type to use for ID calculation."
+      "Description": "Unknown. An old rule for building attack IDs. Its effect is not documented."
     },
     {
       "Field": "refType",
       "Name": "Call ID Type",
-      "Description": "Which param type to reference for attack behavior."
+      "Description": "Which kind of data this move runs. Must match the Call ID below."
     },
     {
       "Field": "pad0",
@@ -32,32 +32,32 @@
     {
       "Field": "refId",
       "Name": "Call ID",
-      "Description": "The ID to call for attack behavior. Param used is determined by refType."
+      "Description": "The move data this behavior runs. Call ID Type above sets its list."
     },
     {
       "Field": "sfxVariationId",
       "Name": "Particle Variation ID",
-      "Description": "Offset applied to the particle ID invoked in the TAE event."
+      "Description": "Shifts which visual effect plays with this move. 0 probably plays the effect the animation names."
     },
     {
       "Field": "stamina",
       "Name": "Action Cost: Stamina",
-      "Description": "Set the amount of stamina consumed during action."
+      "Description": "Stamina this move costs. 0 makes it free."
     },
     {
       "Field": "mp",
       "Name": "Action Cost: MP",
-      "Description": "Set the amount of MP consumed during action."
+      "Description": "MP this move costs. The game has no MP pool, so this does nothing."
     },
     {
       "Field": "category",
       "Name": "Action Category",
-      "Description": "The action category this behavior belongs to."
+      "Description": "Which buffs can strengthen this move. None means no buff targets it."
     },
     {
       "Field": "heroPoint",
       "Name": "Action Cost: Humanity",
-      "Description": "Set the amount of humanity consumed during action."
+      "Description": "Humanity this move costs. 0 makes it free."
     },
     {
       "Field": "pad1",

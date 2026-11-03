@@ -296,7 +296,8 @@ def test_data_map_keeps_each_known_p0data_gap_visible(service):
     assert "mesh/rig" in gaps["StreamingAssets/p0data4.bin"]["notes"]
     assert "event-script" in gaps["StreamingAssets/p0data7.bin"]["notes"]
     text_note = gaps["x64/FF9_Data/resources.assets (EmbeddedAsset/Text)"]["notes"].lower()
-    assert "read-only" in text_note and "editing" in text_note
+    assert "editable" in text_note and "text overlay" in text_note
+    assert "unsupported" in text_note
 
 
 def test_dashboard_exposes_read_only_mod_compatibility_snapshot(service):

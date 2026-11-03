@@ -63,8 +63,12 @@ def island(name, code="01000000" + "C3" * 12, **extra):
 
 class CombinerTests(unittest.TestCase):
     def setUp(self):
+        # These check the file layout's arithmetic on a tiny image, page by
+        # page; the 64 KB island boundary the loader needs is checked in
+        # RuntimePatchTests.
         for key, value in (("VANILLA_SIZE", len(VANILLA)),
-                           ("VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest())):
+                           ("VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest()),
+                           ("ISLAND_ALIGNMENT", 0x1000)):
             patcher = mock.patch.object(exe_patches, key, value)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -145,11 +149,79 @@ class CombinerTests(unittest.TestCase):
                 {"version": 1, "hooks": [{"rva": HOOK_A, "original": "E800000000", "bytes": "909090909090"}]}),
             "unwind data is not version 1": lambda: self.compose({"version": 1, "islands": [island("a", code="02000000" + "C3" * 12)]}),
             "section grows into the next": lambda: self.compose({"version": 1, "sectionVirtualSize": {".data": 0x1001}}),
-            "unsupported description": lambda: self.compose({"version": 2}),
+            "unsupported description": lambda: self.compose({"version": 3}),
         }
         for label, action in cases.items():
             with self.subTest(label), self.assertRaises(exe_patches.PatchError):
                 action()
+
+    def test_grown_state_is_owned_by_one_tweak(self):
+        """.data's tail (0x2100-0x2180 here) is state; two tweaks never share a byte."""
+        def grows(size=0x180, state=None):
+            spec = {"version": 1, "sectionVirtualSize": {".data": size}}
+            return spec if state is None else {**spec, "state": state}
+        low = [{"rva": 0x2100, "size": 0x20}]
+        high = [{"rva": 0x2120, "size": 0x18}]
+        # Side by side, each naming its own bytes; the section takes the larger size.
+        out = self.compose(grows(state=low), grows(state=high))
+        self.assertEqual(struct.unpack_from("<I", out, SECTIONS + 40 + 8)[0], 0x180)
+        # Undeclared growth owns the whole tail it grows, so a neighbour past
+        # it is fine and one inside it is refused.
+        self.compose(grows(0x120), grows(state=high))
+        refusals = {
+            "same bytes": (grows(state=low), grows(state=[{"rva": 0x211C, "size": 8}])),
+            "inside undeclared growth": (grows(0x120), grows(state=[{"rva": 0x2110, "size": 4}])),
+            "both undeclared": (grows(0x120), grows(0x140)),
+        }
+        for label, specs in refusals.items():
+            with self.subTest(label), self.assertRaisesRegex(exe_patches.PatchError, "both keep state"):
+                self.compose(*specs)
+        for label, spec in {
+                "outside the growth": grows(0x120, [{"rva": 0x2120, "size": 4}]),
+                "inside the original section": grows(state=[{"rva": 0x20F0, "size": 4}]),
+                "state without growth": {"version": 1, "state": low},
+                "malformed": grows(state=[{"rva": 0x2100}])}.items():
+            with self.subTest(label), self.assertRaises(exe_patches.PatchError):
+                self.compose(spec)
+
+
+
+class RuntimePatchTests(unittest.TestCase):
+    """The in-memory loader's description: the same layout, no executable."""
+
+    def setUp(self):
+        for key, value in (("VANILLA_SIZE", len(VANILLA)),
+                           ("VANILLA_SHA256", hashlib.sha256(VANILLA).hexdigest())):
+            patcher = mock.patch.object(exe_patches, key, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def specs(self):
+        return [exe_patches.validate({"version": 1, "islands": [island("payload")],
+                                      "hooks": [{"rva": HOOK_A, "original": "E800000000",
+                                                 "branch": {"opcode": "E8", "island": "payload", "offset": 4}}]},
+                                     "Alpha")]
+
+    def test_nothing_enabled_needs_no_loader(self):
+        self.assertIsNone(exe_patches.runtime_patch(VANILLA, []))
+
+    def test_code_lands_on_the_first_64kb_boundary_past_the_image_and_hooks_reach_it(self):
+        parsed = exe_patches.read_runtime_patch(exe_patches.runtime_patch(VANILLA, self.specs()))
+        self.assertEqual(parsed["imageSize"], 0x5000)
+        kinds = {kind: (rva, length, payload) for kind, rva, length, payload in parsed["records"]}
+        block_rva = kinds[exe_patches.BLOCK][0]
+        self.assertEqual(block_rva, 0x10000)
+        hook_rva, length, payload = kinds[exe_patches.HOOK]
+        self.assertEqual((hook_rva, length, payload[:length]), (HOOK_A, 5, bytes.fromhex("E800000000")))
+        replacement = payload[length:]
+        self.assertEqual(replacement[0], 0xE8)
+        self.assertEqual(struct.unpack_from("<i", replacement, 1)[0], block_rva + 4 - (HOOK_A + 5))
+
+    def test_a_damaged_description_is_refused(self):
+        data = exe_patches.runtime_patch(VANILLA, self.specs())
+        for broken in (data[:-1], b"NOTAPAT\0" + data[8:], data + b"\0"):
+            with self.assertRaises(exe_patches.PatchError):
+                exe_patches.read_runtime_patch(broken)
 
 
 if __name__ == "__main__":

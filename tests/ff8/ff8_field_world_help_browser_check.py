@@ -14,11 +14,12 @@ def main():
     field = re.search(r'const fieldDetailTabs=(\[.*?\]);', source).group(1)
     additions = re.findall(r'fieldDetailTabs.push\((\{.*?\})\);', source)
     field = field[:-1] + ''.join(',' + entry for entry in additions) + ']'
+    camera = re.search(r'const fieldCameraSubtabs=(\[.*?\]);', source).group(1)
     # Every subtab carries its own help, so the number of markers is the number
     # of tabs - counted from the arrays rather than pinned, because the tabs
     # move between screens (the encounter rules and groups now live on the
     # Encounters tab) and a pinned number says nothing about the rule.
-    tabs = len(re.findall(r'\{id:', field)) + len(re.findall(r'\{id:', world))
+    tabs = len(re.findall(r'\{id:', field)) + len(re.findall(r'\{id:', camera)) + len(re.findall(r'\{id:', world))
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         page = browser.new_page(viewport={'width': 1536, 'height': 900})
@@ -32,7 +33,7 @@ def main():
             document.body.append(LexeditorUI.el('button', {id:'neutral-focus',style:'position:fixed;bottom:0;left:0;z-index:10000'},'Neutral focus'));
             for (const tabs of groups) document.querySelector('main').append(
                 LexeditorUI.subtabBar({tabs, active: tabs[0].id, change: () => window.changes++}));
-        }""", page.evaluate('[' + field + ',' + world + ']'))
+        }""", page.evaluate('[' + field + ',' + camera + ',' + world + ']'))
         markers = page.locator('.lex-subtab-bar .lex-info-help')
         assert markers.count() == tabs, (markers.count(), tabs)
         assert page.locator('button button').count() == 0

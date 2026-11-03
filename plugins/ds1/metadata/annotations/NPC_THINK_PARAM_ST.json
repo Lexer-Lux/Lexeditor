@@ -1,0 +1,273 @@
+{
+  "Param": "NPC_THINK_PARAM_ST",
+  "Type": "NPC_THINK_PARAM_ST",
+  "Name": "NPC_THINK_PARAM_ST",
+  "Description": "Determines the parameters for enemy AI.",
+  "Fields": [
+    {
+      "Field": "logicId",
+      "Name": "Logic Script ID",
+      "Description": "The AI script that drives this enemy."
+    },
+    {
+      "Field": "battleGoalID",
+      "Name": "Battle Goal ID",
+      "Description": "The combat script this enemy runs in battle."
+    },
+    {
+      "Field": "nearDist",
+      "Name": "Battle Distance: Short (metres)",
+      "Description": "Targets closer than this count as near. The enemy picks close-range attacks."
+    },
+    {
+      "Field": "midDist",
+      "Name": "Battle Distance: Medium (metres)",
+      "Description": "Targets closer than this count as mid-range. The enemy picks mid-range attacks."
+    },
+    {
+      "Field": "farDist",
+      "Name": "Battle Distance: Long (metres)",
+      "Description": "Targets closer than this count as far. The enemy picks ranged attacks."
+    },
+    {
+      "Field": "outDist",
+      "Name": "Battle Distance: End (metres)",
+      "Description": "Targets past this are out of range. The enemy stops trying combat moves."
+    },
+    {
+      "Field": "BackHomeLife_OnHitEneWal",
+      "Name": "Goal Duration on Wall Collision (seconds)",
+      "Description": "How long this enemy keeps walking home after hitting a barrier."
+    },
+    {
+      "Field": "goalID_ToCaution",
+      "Name": "Caution State: Goal ID",
+      "Description": "What this enemy does when it grows wary."
+    },
+    {
+      "Field": "idAttackCannotMove",
+      "Name": "Action ID on Blocked Movement",
+      "Description": "The attack this enemy uses when rubble blocks its path."
+    },
+    {
+      "Field": "goalID_ToFind",
+      "Name": "Search State: Goal ID",
+      "Description": "What this enemy does when it spots a target."
+    },
+    {
+      "Field": "callHelp_ActionAnimId",
+      "Name": "Call for Help: Animation ID (Respond)",
+      "Description": "The gesture this enemy plays when answering a call for help."
+    },
+    {
+      "Field": "callHelp_CallActionId",
+      "Name": "Call for Help: Animation ID (Call)",
+      "Description": "The gesture this enemy plays when calling for help."
+    },
+    {
+      "Field": "eye_dist",
+      "Name": "Visual Search Distance (metres)",
+      "Description": "How far this enemy sees."
+    },
+    {
+      "Field": "ear_dist",
+      "Name": "Auditory Search Distance (cm)",
+      "Description": "How far this enemy hears."
+    },
+    {
+      "Field": "ear_soundcut_dist",
+      "Name": "Auditory Dampening Distance (metres)",
+      "Description": "Past this distance, sounds fade and may go unheard."
+    },
+    {
+      "Field": "nose_dist",
+      "Name": "Olfactory Search Distance (metres)",
+      "Description": "How far this enemy smells the player."
+    },
+    {
+      "Field": "maxBackhomeDist",
+      "Name": "Battle Act: Return Home Distance (metres)",
+      "Description": "Past this distance from home, this enemy always turns back."
+    },
+    {
+      "Field": "backhomeDist",
+      "Name": "Battle Act: Return Home Distance (Combat) (metres)",
+      "Description": "Past this distance from home, this enemy fights while falling back."
+    },
+    {
+      "Field": "backhomeBattleDist",
+      "Name": "Battle Act: Return Home Abort Distance (metres)",
+      "Description": "Past this distance, this enemy gives up going home and keeps fighting."
+    },
+    {
+      "Field": "nonBattleActLife",
+      "Name": "Battle Act: Non-Combat Act Duration (seconds)",
+      "Description": "How long this enemy waits before acting on a sensed target."
+    },
+    {
+      "Field": "BackHome_LookTargetTime",
+      "Name": "Return Home: Target Look-At Duration (seconds)",
+      "Description": "How long this enemy watches its target while walking home."
+    },
+    {
+      "Field": "BackHome_LookTargetDist",
+      "Name": "Return Home: Target Look-At Distance (metres)",
+      "Description": "How far this enemy watches its target while walking home."
+    },
+    {
+      "Field": "SightTargetForgetTime",
+      "Name": "Visual Target Forget Duration (frames)",
+      "Description": "How long this enemy remembers a seen target."
+    },
+    {
+      "Field": "SoundTargetForgetTime",
+      "Name": "Auditory Target Forget Duration (frames)",
+      "Description": "How long this enemy remembers a heard target."
+    },
+    {
+      "Field": "BattleStartDist",
+      "Name": "Battle Start Distance (metres)",
+      "Description": "How close a spotted target must be before this enemy attacks."
+    },
+    {
+      "Field": "callHelp_MyPeerId",
+      "Name": "Call for Help: Respond Friend Group ID",
+      "Description": "This enemy's friend group. It answers calls from this group."
+    },
+    {
+      "Field": "callHelp_CallPeerId",
+      "Name": "Call for Help: Call Friend Group ID",
+      "Description": "The friend group this enemy calls to. Only that group answers."
+    },
+    {
+      "Field": "targetSys_DmgEffectRate",
+      "Name": "Damage Effect Rate",
+      "Description": "How strongly pain draws this enemy's focus. The exact effect is not established."
+    },
+    {
+      "Field": "TeamAttackEffectivity",
+      "Name": "Team Attack Weight",
+      "Description": "Share of the 100-point attacker budget this enemy takes. When attackers' shares reach 100, no more join in. Higher values mean fewer simultaneous attackers."
+    },
+    {
+      "Field": "eye_angX",
+      "Name": "Visual Search: Vertical Angle (degrees)",
+      "Description": "How tall the sight cone is."
+    },
+    {
+      "Field": "eye_angY",
+      "Name": "Visual Search: Horizontal Angle (degrees)",
+      "Description": "How wide the sight cone is."
+    },
+    {
+      "Field": "ear_angX",
+      "Name": "Auditory Search: Vertical Angle (degrees)",
+      "Description": "How tall the hearing cone is."
+    },
+    {
+      "Field": "ear_angY",
+      "Name": "Auditory Search: Horizontal Angle (degrees)",
+      "Description": "How wide the hearing cone is. 180 covers every direction."
+    },
+    {
+      "Field": "callHelp_CallValidMinDistTarget",
+      "Name": "Call for Help: Minimum Distance to Target (metres)",
+      "Description": "This enemy cannot call for help closer to its target than this."
+    },
+    {
+      "Field": "callHelp_CallValidRange",
+      "Name": "Call for Help: Maximum Distance to Friend (metres)",
+      "Description": "Friends past this cannot hear the call."
+    },
+    {
+      "Field": "callHelp_ForgetTimeByArrival",
+      "Name": "Call for Help: Respond Duration (seconds)",
+      "Description": "How long a called friend stays alert after answering."
+    },
+    {
+      "Field": "callHelp_MinWaitTime",
+      "Name": "Call for Help: Minimum Delay (tenths of a second)",
+      "Description": "Shortest wait before a called friend responds. Set in tenths of a second, so 101 means 10.1 seconds."
+    },
+    {
+      "Field": "callHelp_MaxWaitTime",
+      "Name": "Call for Help: Maximum Delay (tenths of a second)",
+      "Description": "Longest wait before a called friend responds. Set in tenths of a second, so 101 means 10.1 seconds."
+    },
+    {
+      "Field": "goalAction_ToCaution",
+      "Name": "Caution State: Goal Action",
+      "Description": "What this enemy does the moment it grows wary."
+    },
+    {
+      "Field": "goalAction_ToFind",
+      "Name": "Search State: Goal Action",
+      "Description": "What this enemy does the moment it spots a target."
+    },
+    {
+      "Field": "callHelp_ReplyBehaviorType",
+      "Name": "Call for Help: Post-Response Action Type",
+      "Description": "How a called friend moves to the caller."
+    },
+    {
+      "Field": "disablePathMove",
+      "Name": "Disable Path Movement",
+      "Description": "If ON, this enemy walks straight at its goal. It ignores paths and may hit walls."
+    },
+    {
+      "Field": "skipArrivalVisibleCheck",
+      "Name": "Skip Arrival Line of Sight Check",
+      "Description": "If ON, this enemy counts itself arrived without seeing its goal."
+    },
+    {
+      "Field": "thinkAttr_doAdmirer",
+      "Name": "Is Entourage",
+      "Description": "If ON, this enemy plays a follower role."
+    },
+    {
+      "Field": "enableNaviFlg_Edge",
+      "Name": "Can Navigate: Cliff",
+      "Description": "If ON, this enemy can cross cliff paths."
+    },
+    {
+      "Field": "enableNaviFlg_LargeSpace",
+      "Name": "Can Navigate: Wide",
+      "Description": "If ON, this enemy can cross wide paths."
+    },
+    {
+      "Field": "enableNaviFlg_Ladder",
+      "Name": "Can Navigate: Ladder",
+      "Description": "If ON, this enemy can climb ladders."
+    },
+    {
+      "Field": "enableNaviFlg_Hole",
+      "Name": "Can Navigate: Hole",
+      "Description": "If ON, this enemy can drop through holes."
+    },
+    {
+      "Field": "enableNaviFlg_Door",
+      "Name": "Can Navigate: Door",
+      "Description": "If ON, this enemy can pass through doors."
+    },
+    {
+      "Field": "enableNaviFlg_InSideWall",
+      "Name": "Can Navigate: In the Wall",
+      "Description": "If ON, this enemy can move inside walls."
+    },
+    {
+      "Field": "enableNaviFlg_reserve0",
+      "Name": "",
+      "Description": ""
+    },
+    {
+      "Field": "enableNaviFlg_reserve1",
+      "Name": "",
+      "Description": ""
+    },
+    {
+      "Field": "pad0",
+      "Name": "",
+      "Description": ""
+    }
+  ]
+}
