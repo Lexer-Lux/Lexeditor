@@ -99,6 +99,21 @@ def test_duplicate_ini_facts_are_rejected():
             model.ini_values(text)
 
 
+def test_new_stick_defaults_preserve_saved_sensitivity(setup):
+    _, data, _ = setup
+    path = data / "interface.ini"
+    original = path.read_bytes()
+    values = {field["key"]: field["value"] for field in MODEL.preferences(data)["fields"]}
+    assert values["kf3.analog.turn"] == values["kf3.analog.pitch"] == 3
+    assert values["kf3.mouse.turn"] == 1
+    assert path.read_bytes() == original
+    saved = original.replace(b"[RecompOne]\r\n", b"[RecompOne]\r\nkf3.analog.turn=2.4\r\nkf3.analog.pitch=1.7\r\n")
+    path.write_bytes(saved)
+    values = {field["key"]: field["value"] for field in MODEL.preferences(data)["fields"]}
+    assert values["kf3.analog.turn"] == 2.4 and values["kf3.analog.pitch"] == 1.7
+    assert path.read_bytes() == saved
+
+
 def test_running_game_is_never_modified(setup, monkeypatch):
     game, data, library = setup
     source = mod(library)
