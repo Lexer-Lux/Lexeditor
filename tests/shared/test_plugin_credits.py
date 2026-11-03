@@ -1,8 +1,11 @@
 """Central plugin credits retain notices; pinned distributions keep licenses."""
 import hashlib
+import json
 from pathlib import Path
 import re
 import unittest
+
+from core.plugin_metadata import static_plugin_ids, validate_credits_bundle
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGINS = ROOT / "plugins"
@@ -12,6 +15,7 @@ PLUGINS = ROOT / "plugins"
 # The vendored FF8 Ultimate Editor source also keeps its upstream GPL copy;
 # the complete notice and attribution remain in the central credits page.
 ALLOWED_LICENSE_FILES = frozenset({
+    "plugins/ds1/modengine/LICENSE-MIT",
     "plugins/ff8/ffnx_issue_51/package/COPYING.TXT",
     "plugins/ff8/vendor/ff8ue/LICENSE",
 })
@@ -25,14 +29,21 @@ def plugin_dirs() -> list[Path]:
 
 
 class PluginCreditsTests(unittest.TestCase):
-    def test_every_plugin_has_exactly_one_top_level_credits_md(self):
+    def test_every_plugin_has_offline_credits_and_authored_markdown_is_valid(self):
         dirs = plugin_dirs()
         self.assertTrue(dirs, "no plugins discovered")
+        # The offline bundle is the app's Credits page for every plugin,
+        # including native-port plugins whose attributions live in its source
+        # manifest rather than a duplicate per-plugin Markdown file.
+        bundle = json.loads((ROOT / 'ui/credits.json').read_text('utf-8'))
+        validate_credits_bundle(bundle, static_plugin_ids(ROOT))
         for plugin in dirs:
             matches = [path for path in plugin.iterdir()
                        if path.is_file() and path.name.lower() == "credits.md"]
-            self.assertEqual(len(matches), 1,
-                             f"{plugin.name} must hold exactly one credits.md")
+            self.assertLessEqual(len(matches), 1,
+                                 f"{plugin.name} has duplicate credits.md files")
+            if not matches:
+                continue
             credits = matches[0]
             self.assertEqual(credits.name, "credits.md",
                              f"{plugin.name} credits file must be exactly credits.md")
@@ -55,6 +66,15 @@ class PluginCreditsTests(unittest.TestCase):
         for relative in sorted(ALLOWED_LICENSE_FILES):
             self.assertTrue((ROOT / relative).is_file(),
                             f"allowlisted credit file is missing: {relative}")
+
+    def test_modengine_original_license_is_complete_in_offline_credits(self):
+        path = 'plugins/ds1/modengine/LICENSE-MIT'
+        text = (ROOT / path).read_text('utf-8')
+        bundle = json.loads((ROOT / 'ui/credits.json').read_text('utf-8'))
+        notices = [notice for notice in bundle['plugins']['ds1']['licenses']
+                   if notice['sourcePath'] == path]
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0]['text'], text)
 
     def test_vendored_ff8ue_license_is_pinned_and_in_central_credits(self):
         # read_text normalizes checkout line endings so Linux and Windows

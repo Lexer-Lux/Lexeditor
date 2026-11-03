@@ -971,6 +971,10 @@
         {
           "name": "Smithbox metadata - MIT notice and provenance",
           "sourcePath": "plugins/ds1/credits.md"
+        },
+        {
+          "name": "ModEngine — original MIT license notice",
+          "sourcePath": "plugins/ds1/modengine/LICENSE-MIT"
         }
       ]
     },
