@@ -53,7 +53,7 @@ assert 'status.className = `lex-project-source-status ${selectedSource?.enabled 
 assert '`${selectedSource.readOnly === false ? "📝"' not in framework
 assert 'class: "lex-save-count"' in framework and ".lex-save-count" in css
 assert re.search(r"--lex-command-row-height:\s*9vh;", css)
-command_row=re.search(r"\.lex-shell-command-row\s*\{([^}]+)\}",css,re.DOTALL)
+command_row=re.search(r"\.lex-shell-command-row\s*\{([^}]*\bgrid-template-columns:[^}]+)\}",css,re.DOTALL)
 assert command_row
 for dimension in ('height','min-height','max-height'):
     assert re.search(rf"(?<![\w-]){dimension}:\s*calc\(var\(--lex-command-row-height\)\s*\*\s*var\(--lex-ui-scale,\s*1\)\)",command_row[1]), dimension
