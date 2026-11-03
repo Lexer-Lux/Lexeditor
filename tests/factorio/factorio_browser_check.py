@@ -292,7 +292,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                         assert not errors, errors
                         page.wait_for_function('node=>Number(getComputedStyle(node).opacity)>=.99', arg=warning.element_handle())
                         page.screenshot(path=str(OUT / 'factorio-invalid-save.png'))
-                        warning.click()
+                        page.get_by_role("alertdialog").get_by_role("button", name="Close", exact=True).click()
                         warning.wait_for(state='detached')
                     assert control.input_value() == invalid
                     assert page.evaluate('dirtyCount()') == 4
