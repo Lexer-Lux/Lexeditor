@@ -78,12 +78,12 @@ window.Ds1Viewport = (() => {
     const viewModes = LexeditorUI.modelViewModes(host, {onChange: requestRender});
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 10000);
-    camera.position.set(0, 30, 60);
+    camera.position.set(0, 30, -60);
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 0.9));
     const sun = new THREE.DirectionalLight(0xffffff, 1.4);
-    sun.position.set(1, 2, 1);
+    sun.position.set(1, 2, -1);
     scene.add(sun);
     const front = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.FrontSide});
     const double = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.DoubleSide});
@@ -235,6 +235,9 @@ window.Ds1Viewport = (() => {
     const seenIds = new Set();
     const geometries = new Map();
     const root = new THREE.Group();
+    // DS1's game space is left-handed; Three's viewing space is right-handed.
+    // Reflect the scene once, keeping each editable local transform in game units.
+    root.scale.z = -1;
     scene.add(root);
     const groups = new Map();
     // Map lights are unlit markers, not scene lighting: a hundred
@@ -276,8 +279,12 @@ window.Ds1Viewport = (() => {
     const collisionMaterial = (hitFilter, layer, hidden = false) => {
       const cacheKey = `${hitFilter ?? "x"}:${layer}:${hidden}`;
       if (!collisionMats.has(cacheKey)) {
-        const color = hitFilter === 15 ? 0xe5484d : hitFilter === 14 ? 0xf76b15
-          : hitFilter === 13 ? 0x8e4ec6 : layer === "navigation" ? 0x6699ff : 0x12a594;
+        const low = layer === "collisionLow";
+        const color = layer === "navigation" ? 0xec6cff
+          : hitFilter === 15 ? (low ? 0xffa1a5 : 0xe5484d)
+          : hitFilter === 14 ? (low ? 0xffd98a : 0xf76b15)
+          : hitFilter === 13 ? (low ? 0xd9adff : 0x8e4ec6)
+          : low ? 0x5cdb73 : 0xffc247;
         collisionMats.set(cacheKey, new THREE.MeshBasicMaterial({color,
           side: THREE.DoubleSide, transparent: true, opacity: hidden ? 0.07 : 0.28,
           depthFunc: hidden ? THREE.GreaterDepth : THREE.LessEqualDepth, depthWrite: false,
@@ -369,7 +376,7 @@ window.Ds1Viewport = (() => {
       if (box.isEmpty()) return;
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3()).length();
-      camera.position.set(center.x + size * 0.6, center.y + size * 0.45, center.z + size * 0.6);
+      camera.position.set(center.x + size * 0.6, center.y + size * 0.45, center.z - size * 0.6);
       camera.far = Math.max(1000, size * 10);
       camera.updateProjectionMatrix();
       controls.target.copy(center);
@@ -413,11 +420,22 @@ window.Ds1Viewport = (() => {
     scene.add(pointMarker);
     const gizmo = new TransformControls(camera, canvas);
     scene.add(gizmo.getHelper());
-    // Test seam: project a world point to page pixels, so drag tests
+    // TransformControls assumes a right-handed parent for rotations. Its
+    // handle stays in viewing space; the inverse scene matrix converts edits
+    // back to the part's unchanged game-space transform.
+    const transformHandle = new THREE.Object3D();
+    transformHandle.name = 'Game transform handle';
+    scene.add(transformHandle);
+    const syncTransformHandle = group => {
+      group.updateWorldMatrix(true,false);
+      group.matrixWorld.decompose(transformHandle.position,transformHandle.quaternion,transformHandle.scale);
+    };
+    // Test seam: project a game-space point to page pixels, so drag tests
     // can grab the gizmo without hunting pixels in screenshots.
     host._viewportProject = (x, y, z) => {
       const rect = canvas.getBoundingClientRect();
-      const point = new THREE.Vector3(x, y, z).project(camera);
+      root.updateWorldMatrix(true,false);
+      const point = root.localToWorld(new THREE.Vector3(x, y, z)).project(camera);
       return [rect.left + (point.x + 1) / 2 * rect.width, rect.top + (1 - point.y) / 2 * rect.height];
     };
     const readOnly = hooks.readOnly !== false;
@@ -425,7 +443,10 @@ window.Ds1Viewport = (() => {
       selected = key && groups.has(key) ? key : null;
       pointMarker.visible = false;
       const group = selected ? groups.get(selected) : null;
-      if (group && group.userData.part.movable && hooks.transforms !== false) gizmo.attach(group);
+      if (group && group.userData.part.movable && hooks.transforms !== false) {
+        syncTransformHandle(group);
+        gizmo.attach(transformHandle);
+      }
       else gizmo.detach();
       if (group && group.children.length) {
         highlight.setFromObject(group);
@@ -447,12 +468,17 @@ window.Ds1Viewport = (() => {
     gizmo.addEventListener("objectChange", () => {
       if (!selected) return;
       const group = groups.get(selected);
+      transformHandle.updateWorldMatrix(true,false);
+      root.updateWorldMatrix(true,false);
+      new THREE.Matrix4().copy(root.matrixWorld).invert().multiply(transformHandle.matrixWorld)
+        .decompose(group.position,group.quaternion,group.scale);
       if (group.children.length) highlight.setFromObject(group);
       requestRender();
     });
     const snapBack = (group, back, backRot) => {
       group.position.copy(back);
       if (backRot) group.rotation.copy(backRot);
+      syncTransformHandle(group);
       if (group.children.length) highlight.setFromObject(group);
       requestRender();
     };
@@ -464,17 +490,16 @@ window.Ds1Viewport = (() => {
         ? [group.rotation.x / DEG, group.rotation.y / DEG, group.rotation.z / DEG]
         : [group.position.x, group.position.y, group.position.z];
       const start = spinning ? startRot : startPos;
-      const moved = spinning
-        ? pos.some((axis, index) => axis !== start.getComponent(index) / DEG)
-        : pos.some((axis, index) => axis !== start.getComponent(index));
+      const before = [start.x,start.y,start.z].map(axis => spinning ? axis / DEG : axis);
+      const moved = pos.some((axis,index) => Math.abs(axis - before[index]) > 1e-7);
       const back = startPos.clone(), backRot = startRot.clone();
       startPos = null; startRot = null;
       const commit = spinning ? hooks.onRotate : hooks.onMove;
-      if (readOnly) {
+      if (readOnly || !moved) {
         // Vanilla readers were just offered a mod; nothing is committed,
         // so the part snaps back to where it stands.
         snapBack(group, back, backRot);
-      } else if (moved && commit) {
+      } else if (commit) {
         // A refused commit (a second drag mid-save, a failed write)
         // snaps back too; the page reports why.
         Promise.resolve(commit(selected, pos)).then(ok => {
@@ -533,7 +558,7 @@ window.Ds1Viewport = (() => {
           pointMarker.position.copy(group.localToWorld(new THREE.Vector3(...position)));
           if (focus) {
             const offset = camera.position.clone().sub(controls.target);
-            if (!offset.lengthSq()) offset.set(1, 0.7, 1);
+            if (!offset.lengthSq()) offset.set(1, 0.7, -1);
             controls.target.copy(pointMarker.position);
             camera.position.copy(pointMarker.position).add(offset.normalize().multiplyScalar(8));
             userMoved = true;
@@ -556,7 +581,7 @@ window.Ds1Viewport = (() => {
         group.getWorldPosition(target);
         const span = new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3()).length() || 4;
         const offset = camera.position.clone().sub(controls.target);
-        if (!offset.lengthSq()) offset.set(1, 0.7, 1);
+        if (!offset.lengthSq()) offset.set(1, 0.7, -1);
         offset.normalize().multiplyScalar(Math.min(Math.max(span * 2, 8), 24));
         controls.target.copy(target);
         camera.position.copy(target).add(offset);
@@ -567,6 +592,7 @@ window.Ds1Viewport = (() => {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.position.set(pos[0], pos[1], pos[2]);
+        if (key === selected) syncTransformHandle(group);
         if (key === selected && group.children.length) highlight.setFromObject(group);
         requestRender();
       },
@@ -574,6 +600,7 @@ window.Ds1Viewport = (() => {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.rotation.set(rot[0] * DEG, rot[1] * DEG, rot[2] * DEG);
+        if (key === selected) syncTransformHandle(group);
         if (key === selected && group.children.length) highlight.setFromObject(group);
         requestRender();
       },
@@ -581,6 +608,7 @@ window.Ds1Viewport = (() => {
         const group = key && groups.get(key);
         if (!group || !group.userData.part.movable) return;
         group.scale.set(scale[0], scale[1], scale[2]);
+        if (key === selected) syncTransformHandle(group);
         if (key === selected && group.children.length) highlight.setFromObject(group);
         requestRender();
       },

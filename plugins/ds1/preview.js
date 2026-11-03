@@ -58,7 +58,7 @@ window.Ds1Preview = (() => {
     controls.enableDamping = true;
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 0.9));
     const sun = new THREE.DirectionalLight(0xffffff, 1.4);
-    sun.position.set(1, 2, 1);
+    sun.position.set(1, 2, -1);
     scene.add(sun);
     const trash = [];
     const front = new THREE.MeshStandardMaterial({color: 0x9aa3ad, roughness: 0.95, metalness: 0, side: THREE.FrontSide});
@@ -82,6 +82,7 @@ window.Ds1Preview = (() => {
       for (const item of trash) item.dispose();
     };
     const root = new THREE.Group();
+    root.scale.z = -1; // Convert left-handed game space to Three's right-handed view.
     scene.add(root);
     const texCache = new Map();
     const texLoader = new THREE.TextureLoader();
@@ -123,7 +124,7 @@ window.Ds1Preview = (() => {
     const size = box.isEmpty() ? 2 : box.getSize(new THREE.Vector3()).length();
     if (!box.isEmpty()) {
       const center = box.getCenter(new THREE.Vector3());
-      camera.position.set(center.x + size * 0.6, center.y + size * 0.45, center.z + size * 0.6);
+      camera.position.set(center.x + size * 0.6, center.y + size * 0.45, center.z - size * 0.6);
       camera.far = Math.max(100, size * 10);
       camera.updateProjectionMatrix();
       controls.target.copy(center);

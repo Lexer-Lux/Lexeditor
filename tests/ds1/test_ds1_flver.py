@@ -47,9 +47,11 @@ def test_strip_triangulation_flips_winding():
     assert mesh['triangles'] == [(0, 1, 2), (3, 2, 1)]
 
 
-def test_qloc_layout_repaired_from_mtd():
-    doc = FlverDocument(build_flver(qloc=True))
-    assert any('Repaired QLOC' in note for note in doc.notes)
+def test_qloc_layout_repaired_from_mtd(caplog):
+    with caplog.at_level('DEBUG',logger='plugins.ds1.flver'):
+        doc = FlverDocument(build_flver(qloc=True))
+    assert 'Repaired QLOC' in caplog.text
+    assert doc.notes == []
     mesh = doc.mesh_data(0)
     assert mesh['positions'][2] == (1.0, 1.0, 0.0)
     assert mesh['bone_ids'] == [(0, 0, 0, 0)] * 4

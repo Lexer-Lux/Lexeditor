@@ -27,6 +27,7 @@ from .msb import MAP_DIR
 
 MODEL_FILES = {1: ('obj', '.objbnd.dcx'), 2: ('chr', '.chrbnd.dcx'), 4: ('chr', '.chrbnd.dcx')}
 MAX_GEOMETRY = 512 * 1024 * 1024
+COMMON_BODY_TEXTURES = (Path('parts/Common_Body.tpf'),Path('parts/Common_Body_M.tpf'))
 
 
 def _overlay(project, relative):
@@ -182,6 +183,17 @@ def _stamp(location):
     except OSError:
         return None
     return (stat.st_mtime_ns, stat.st_size)
+
+
+def _texture_stamp(stamp, kind, location, game_root, project):
+    """Shared human texture edits invalidate both memory and disk geometry."""
+    if kind != 'member' or not str(location).lower().endswith(('.chrbnd.dcx','.partsbnd.dcx')):
+        return stamp
+    sources=[]
+    for relative in COMMON_BODY_TEXTURES:
+        path=_overlay(project,relative) or (Path(game_root)/relative if game_root else None)
+        sources.append((str(path),_stamp(path)) if path is not None else None)
+    return (*stamp,tuple(sources))
 
 
 @functools.lru_cache(maxsize=8)
@@ -530,6 +542,17 @@ def _resolve_textures(kind, location, member, needed, game_root=None, project=No
         if not missing:
             break
         take(label, blob, missing)
+    if missing and kind == 'member' and str(location).lower().endswith(('.chrbnd.dcx','.partsbnd.dcx')):
+        # Human skin is shared by player parts and embedded NPC bodies (for
+        # example the woman inside c2711), rather than stored in that binder.
+        for relative in COMMON_BODY_TEXTURES:
+            path = _overlay(project,relative) or (Path(game_root)/relative if game_root else None)
+            if not missing or path is None or not path.is_file():
+                continue
+            try:
+                take(relative.as_posix(),path.read_bytes(),missing)
+            except OSError as error:
+                notes.append(f'{relative.name}: {error}')
     if missing:
         for name in list(missing):
             binder = _sibling_binder(game_root, project, name)
@@ -954,7 +977,8 @@ def model_geometry(game_root, project, map_name, model, known=None):
     except OSError as error:
         raise FlverError(f'Cannot read {Path(location).name}') from error
     area = Path(map_name).stem.split('_')[0]
-    return _payload(_cached_map(kind, str(location), member, (stat.st_mtime_ns, stat.st_size),
+    stamp=_texture_stamp((stat.st_mtime_ns,stat.st_size),kind,location,game_root,project)
+    return _payload(_cached_map(kind, str(location), member, stamp,
                                   game_root, project, area), known)
 
 
@@ -990,7 +1014,7 @@ def chr_geometry(game_root, project, chr_id, skin=False):
     except OSError as error:
         raise FlverError(f'Cannot read {Path(location).name}') from error
     return _payload(_cached_textured('member', str(location), member,
-                                        (stat.st_mtime_ns, stat.st_size), skin,
+                                        _texture_stamp((stat.st_mtime_ns,stat.st_size),'member',location,game_root,project), skin,
                                         game_root, project))
 
 
@@ -1140,7 +1164,7 @@ def part_geometry(game_root, project, stem):
     except OSError as error:
         raise FlverError(f'Cannot read {Path(location).name}') from error
     return _payload(_cached_textured('member', str(location), member,
-                                        (stat.st_mtime_ns, stat.st_size), False,
+                                        _texture_stamp((stat.st_mtime_ns,stat.st_size),'member',location,game_root,project), False,
                                         game_root, project))
 
 
@@ -1216,7 +1240,7 @@ def asset_geometry(game_root, project, relative, side, member=None):
         stat = Path(location).stat()
     except OSError as error:
         raise FlverError(f'Cannot read {Path(location).name}') from error
-    stamp = (stat.st_mtime_ns, stat.st_size)
+    stamp = _texture_stamp((stat.st_mtime_ns,stat.st_size),kind,location,game_root,project)
     area = None
     if len(relative.parts) > 1 and relative.parts[0] == 'map':
         area = relative.parts[1].split('_')[0] or None

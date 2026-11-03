@@ -159,10 +159,11 @@ window.Ds1Anim = (() => {
     controls.enableDamping = true;
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 0.9));
     const sun = new THREE.DirectionalLight(0xffffff, 1.4);
-    sun.position.set(1, 2, 1);
+    sun.position.set(1, 2, -1);
     scene.add(sun);
     const trash = [];
     const rig = new THREE.Group();
+    rig.scale.z = -1; // Convert left-handed game space without changing local bone transforms.
     scene.add(rig);
     const mover = new THREE.Group();
     rig.add(mover);
@@ -297,7 +298,7 @@ window.Ds1Anim = (() => {
     if (box.isEmpty()) for (const bone of bones) box.expandByPoint(bone.getWorldPosition(new THREE.Vector3()));
     const size = box.isEmpty() ? 2 : box.getSize(new THREE.Vector3()).length();
     const center = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
-    camera.position.set(center.x + size * 0.6, center.y + size * 0.45, center.z + size * 0.6);
+    camera.position.set(center.x + size * 0.6, center.y + size * 0.45, center.z - size * 0.6);
     camera.far = Math.max(100, size * 10);
     camera.updateProjectionMatrix();
     controls.target.copy(center);

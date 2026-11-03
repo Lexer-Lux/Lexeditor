@@ -9,6 +9,7 @@ DS1 versions are 0x2000B-0x2000D; anything else is refused. Read-only:
 models are viewed, never rewritten, so there is no pack path to keep
 byte-exact.
 """
+import logging
 import struct
 
 from .formats import FormatError, inflate
@@ -481,7 +482,7 @@ class FlverDocument:
         fixed = sum(FORMAT_SIZES[fmt] if sem is not None else fmt for sem, fmt in table)
         if fixed != header['vsize']:
             return None
-        self.notes.append(f'Repaired QLOC vertex layout for {mtd} ({stride} -> {fixed})')
+        logging.getLogger(__name__).debug('Repaired QLOC vertex layout for %s (%s -> %s)',mtd,stride,fixed)
         return table
 
     def mesh_data(self, index):

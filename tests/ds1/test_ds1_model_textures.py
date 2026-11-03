@@ -50,6 +50,29 @@ def test_chr_geometry_serves_textures(tmp_path):
     assert set(geometry['textures']) == {'tex0'}
 
 
+def test_embedded_human_skin_uses_shared_body_textures_and_tracks_mod_edits(tmp_path):
+    game=tmp_path/'game';project=tmp_path/'mod'
+    (game/'chr').mkdir(parents=True);(game/'parts').mkdir()
+    colors={'BD_F_body':(255,0,0,255),'FC_F_face':(0,0,255,255)}
+    for index,name in enumerate(colors):
+        stem=f'c{2711+index}'
+        (game/'chr'/(stem+'.chrbnd.dcx')).write_bytes(make_chrbnd(build_flver(tex_name=name),stem))
+    def shared(values):
+        return make_tpf([(name,make_dds_rgba(2,2,[color]*4)) for name,color in values.items()])
+    (game/'parts/Common_Body.tpf').write_bytes(shared(colors))
+    for index,(name,color) in enumerate(colors.items()):
+        result=viewport.chr_geometry(game,project,f'c{2711+index}')
+        assert pixel(result['textures'][name])==color[:3]
+        assert result['notes']==[]
+    (project/'parts').mkdir(parents=True)
+    colors={name:(0,255,0,255) for name in colors}
+    (project/'parts/Common_Body.tpf').write_bytes(shared(colors))
+    assert pixel(viewport.chr_geometry(game,project,'c2711')['textures']['BD_F_body'])==(0,255,0)
+    colors['BD_F_body']=(255,0,255,255)
+    (project/'parts/Common_Body.tpf').write_bytes(shared(colors))
+    assert pixel(viewport.chr_geometry(game,project,'c2711')['textures']['BD_F_body'])==(255,0,255)
+
+
 def test_part_without_tpf_renders_gray_with_note(tmp_path):
     game = game_with_part(tmp_path, 'WP_A_0100')
     geometry = viewport.part_geometry(game, None, 'WP_A_0100')
