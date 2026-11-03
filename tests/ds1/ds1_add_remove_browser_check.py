@@ -80,7 +80,7 @@ def main():
                         'state.tab==="maps" && state.rows.some(r=>r.id==="2:0") && !state.error')
                     page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row:not(.lex-filler-row)').length===directoryMatches().length")
                     first = page.locator('.lex-list-row[data-key="%s:2:0"]' % MAP)
-                    assert first.inner_text().split() == ["Rat"]
+                    assert first.locator('[data-column-key="name"] .lex-column-cell-text').inner_text() == "Rat"
                     first.click()
                     page.wait_for_function('state.row?.id==="2:0" && !state.error')
                     page.locator('[data-row-action="duplicate"]').click()
@@ -100,7 +100,7 @@ def main():
                     assert len(MsbDocument((mod / MAP_DIR / MAP).read_bytes()).placements()) == 5
                     page.wait_for_function("document.querySelectorAll('[data-maps-side] .lex-list-row:not(.lex-filler-row)').length===directoryMatches().length")
                     dupe = page.locator('.lex-list-row[data-key="%s:2:1"]' % MAP)
-                    assert dupe.inner_text().split() == ["Rat"]
+                    assert dupe.locator('[data-column-key="name"] .lex-column-cell-text').inner_text() == "Rat"
                     dupe.click()
                     page.wait_for_function('state.row?.id==="2:1" && !state.error')
                     page.locator('[data-row-action="remove"]').click()

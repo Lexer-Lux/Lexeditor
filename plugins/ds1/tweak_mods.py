@@ -613,6 +613,9 @@ class BuildContext:
             source = self._remember('module', mod_id, script_mods.source_fingerprint(root))
             return self._current_module(root,name,source)
         except BaseException as error:
+            if isinstance(error, (script_mods.ScriptModInfrastructureError, script_mods.ScriptModRollbackError)) or (
+                    isinstance(error, script_mods.ModBuildError) and error.folders):
+                raise
             raise TweakError(f'{mod_id}: {error}', folders=[root]) from error
 
     def _current_module(self, root, name, source):
@@ -652,6 +655,9 @@ class BuildContext:
             try:
                 result.append((mod_id,self._current_module(Path(root),module_name,source)))
             except BaseException as error:
+                if isinstance(error, (script_mods.ScriptModInfrastructureError, script_mods.ScriptModRollbackError)) or (
+                        isinstance(error, script_mods.ModBuildError) and error.folders):
+                    raise
                 raise TweakError(f'{mod_id}: {error}',folders=[root]) from error
         return tuple(result)
 
