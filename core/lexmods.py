@@ -156,7 +156,8 @@ def catalog(repository: str) -> dict:
             continue
         modules.append({"folder": folder, "name": str(info.get("name") or folder),
                         "author": str(info.get("author") or ""), "description": str(info.get("description") or ""),
-                        "enabled": info.get("enabled") is not False})
+                        "enabled": info.get("enabled") is not False,
+                        "id": str(info.get("id") or folder), "version": str(info.get("version") or version["version"])})
     if not modules:
         raise LexmodError("Lexer's mod has no published modules yet")
     return {**version, "repository": repository, "url": f"https://github.com/{repository}",

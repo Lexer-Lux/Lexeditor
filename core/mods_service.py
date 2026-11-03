@@ -42,7 +42,7 @@ def mod_row(folder: Path) -> dict:
     try:
         info = metadata(folder)
         row.update({key: info.get(key, "") for key in mod_metadata.FIELDS})
-        row.update({"version": info.get("version", ""), "missing": info.get("missing", []),
+        row.update({"id": str(info.get("id") or folder.name), "version": info.get("version", ""), "missing": info.get("missing", []),
                     "enabled": info.get("enabled") is True, "order": info.get("order", 1000)})
     except (ValueError, OSError) as error:
         row.update({"name": folder.name, "author": "", "description": "", "credits": "", "version": "",
@@ -193,6 +193,7 @@ def overview(game_root: Path, repository: str, state: dict | None = None, *,
             row["requirementsError"] = entry["error"]
     result = {"rows": rows, "remote": [], "lexmod": None, "repositories": []}
     local = {row["folder"].casefold() for row in rows}
+    local_ids = {row.get("id", row["folder"]).casefold() for row in rows}
     seen = set()
     for source in (repository, *repositories):
         if not source or source.casefold() in seen:
@@ -209,8 +210,9 @@ def overview(game_root: Path, repository: str, state: dict | None = None, *,
             continue
         entry["version"] = remote["version"]
         result["remote"].extend(
-            {**module, "repository": source, "version": remote["version"], "remote": True}
+            {**module, "repository": source, "version": module.get("version") or remote["version"], "remote": True}
             for module in remote["modules"] if module["folder"].casefold() not in local
+            and module.get("id", module["folder"]).casefold() not in local_ids
         )
     return result
 

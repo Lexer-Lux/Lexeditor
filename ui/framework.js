@@ -16697,11 +16697,11 @@ ${contents.path}`});
               element("span", {class: "lex-mods-name-text"}, row.name), modFlagsMark(row.on ? row.conflicts : null, row.alerts))},
             {key: "author", label: "Author", render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.author || "—")},
             {key: "version", label: "Version", width: "max-content", align: "center",
-              help: "The version the mod gives itself. A module you have not downloaded yet shows none.",
+              help: "The version the mod gives itself. If the mod has no version, a downloadable entry shows the repository version.",
               render: row => element("span", {class: row.remote ? "lex-mods-remote" : ""}, row.version || "—")},
             {key: "on", label: "On", sortable: false, render: row => row.remote
               ? element("button", {type: "button", class: "lex-mods-download", "aria-label": `Download ${row.name}`,
-                  onclick: event => { event.stopPropagation(); selected = keyOf(row); draw();
+                  onclick: event => { event.stopPropagation(); showRepositories = false; selected = keyOf(row); draw();
                     const button = document.querySelector(".lex-mods-page .lex-detail-panel .lex-mods-detail-download");
                     button?.click(); }}, "Download")
               : element("input", {type: "checkbox", checked: row.on, "aria-label": `Switch ${row.name}`,
