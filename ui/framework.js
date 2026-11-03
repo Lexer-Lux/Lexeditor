@@ -3650,6 +3650,8 @@
       };
       const paint = () => {
         fill.style.setProperty("--lex-value-ratio", String(ratio()));
+      };
+      const place = () => {
         // A face, stepper or lock beside the input makes the host taller
         // or wider than the box, and the fill then paints outside the
         // box. Measure the box and pin the fill to it - but only when
@@ -3673,8 +3675,7 @@
       input.__lexValueSliderPaint = paint;
       input.addEventListener("input", paint);
       input.addEventListener("change", paint);
-      if (typeof ResizeObserver === "function") new ResizeObserver(paint).observe(node);
-      requestAnimationFrame(paint);
+      paint();
       const box = () => (control instanceof Element && control.matches(".lex-unit-field")
         ? control : input);
       const setFromPointer = event => {
@@ -3771,7 +3772,12 @@
             return host;
           })();
       fillHost?.prepend(fill);
-      requestAnimationFrame(paint);
+      if (typeof ResizeObserver === "function") {
+        const observer = new ResizeObserver(place);
+        observer.observe(input);
+        observer.observe(fillHost);
+      }
+      requestAnimationFrame(place);
     }
 
   };

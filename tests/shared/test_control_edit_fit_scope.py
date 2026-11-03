@@ -22,6 +22,12 @@ def test_numeric_edit_fitting_stays_with_edited_control(page, count):
       const inputs=[...document.querySelectorAll('input[type=number]')];
       const counts=inputs.map(()=>0);
       let layoutScans=0,markerScans=0;
+      let dispatching=false,synchronousRects=0;
+      const bounds=Element.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect=function(){
+        if(dispatching)synchronousRects++;
+        return bounds.call(this);
+      };
       for(const prototype of [Document.prototype,Element.prototype]){
         const original=prototype.querySelectorAll;
         prototype.querySelectorAll=function(selector){
@@ -36,11 +42,13 @@ def test_numeric_edit_fitting_stays_with_edited_control(page, count):
       });
       for(let i=0;i<5;i++){
         inputs[0].value=String(30+i);
+        dispatching=true;
         inputs[0].dispatchEvent(new Event('input',{bubbles:true}));
         inputs[0].dispatchEvent(new Event('change',{bubbles:true}));
+        dispatching=false;
         await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
       }
-      return {edited:counts[0],unrelated:counts.slice(1).reduce((a,b)=>a+b,0),layoutScans,markerScans,
+      return {edited:counts[0],unrelated:counts.slice(1).reduce((a,b)=>a+b,0),layoutScans,markerScans,synchronousRects,
         values:inputs.slice(1).every((input,i)=>input.value===String(40+(i+1)%60))};
     }''')
     assert result['values']
@@ -48,6 +56,7 @@ def test_numeric_edit_fitting_stays_with_edited_control(page, count):
     assert result['unrelated'] == 0, result
     assert result['layoutScans'] == 0, result
     assert result['markerScans'] == 0, result
+    assert result['synchronousRects'] == 0, result
 
 
 def test_reference_follows_its_value_size(page):

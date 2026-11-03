@@ -446,6 +446,7 @@ def main():
                     runs.push(performance.now()-start);}
                   return Math.min(...runs);}''')
             assert timings[400]<timings[40]*3+40,timings
+            print('Numeric edit latency (40/400 fields, ms):',timings,flush=True)
             page.reload();page.evaluate("dispatchEvent(new Event('pywebviewready'))")
             page.locator('.lex-detail-field').first.wait_for()
             page.wait_for_timeout(400)
