@@ -78,6 +78,7 @@ def main():
                     page.wait_for_function("(n) => state.tab==='maps' && state.mapView && state.rows.length===n", arg=len(placements))
                     page.locator('[data-tabstrip-id="enemies"]').click()
                     page.wait_for_function('state.mapTab==="enemies"')
+                    page.wait_for_selector('[data-tabstrip-id="enemies"][aria-selected="true"]')
                     page.wait_for_selector('[data-maps-dir] .lex-column-list.lex-list-fill',
                                            timeout=30000)
                     assert page.locator('[data-maps-dir] .lex-column-list.lex-list-fill').count() == 1
@@ -148,7 +149,8 @@ def main():
                     npc.select_option(str(other_npc))
                     page.wait_for_function("(x) => state.pending===0 && state.row.fields.find(f=>f.key==='npcId').value===x", arg=other_npc)
                     if chest is not None:
-                        page.locator('[data-tabstrip-id="enemies"]').click()
+                        page.locator('[data-tabstrip-id="objects"]').click()
+                        page.wait_for_selector('[data-tabstrip-id="objects"][aria-selected="true"]')
                         box = page.get_by_role("searchbox", name="Search the world")
                         box.click(); box.press("ControlOrMeta+a"); box.press("Backspace"); box.fill(chest["name"])
                         if not root:

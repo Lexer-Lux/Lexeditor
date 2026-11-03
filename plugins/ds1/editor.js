@@ -403,6 +403,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   document.querySelector("#main")?.replaceChildren(LexeditorUI.loadingPanel({label:`Loading ${sub}`}));
 
   const token=++navigation;await edits;
+  lastSubByTab[state.tab]=state.tab==="maps"?state.mapTab:state.sub;
   const changedTab=tab!==state.tab;state.tab=tab;state.bandForm=null;state.taeForm=null;
   // A bare tab switch (shell tab strip, history Back) returns to the tab's
   // own last subtab. Without this the previous tab's sub rode along as the
@@ -413,7 +414,10 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab==="npcs"&&!state.npcTabs.some(entry=>entry.id===sub))sub="npcs";
   else if(tab==="drops"&&!state.worldTabs.some(entry=>entry.id===sub))sub="drops";
     else if(tab==="attacks"&&!state.attackTabs.some(entry=>entry.id===sub))sub="attacks";
-  else if(tab==="maps"){state.mapTab=DIRECTORY_TABS.includes(sub)?sub:"maps";sub="placements";}
+  else if(tab==="maps"){
+    state.mapTab=[...DIRECTORY_TABS,"maps","lights","messages","collision"].includes(sub)?sub:"maps";
+    sub="placements";
+  }
   else if(tab==="animations"&&!state.animTabs.some(entry=>entry.id===sub))sub="animations";
   else if(tab==="effects"&&!state.effectTabs.some(entry=>entry.id===sub))sub="effects-all";
   // Without the curve table, Stats opens on the first list with rows instead of an error.
@@ -426,7 +430,7 @@ async function navigate(tab,sub=state.sub,selected=null){
   else if(tab==="scripts"&&!state.scriptTabs.some(entry=>entry.id===sub))sub="ingame";
   if(tab==="animations"&&changedTab)state.animScope={level:"anims"};
   if(sub!==state.sub||changedTab||selected){state.sub=sub;state.selected=selected;state.query="";state.page=0;}
-  lastSubByTab[tab]=state.sub;
+  lastSubByTab[tab]=tab==="maps"?state.mapTab:state.sub;
   try{
     if(["items","enemies","npcs","drops","attacks","ai","maps","animations","effects","stats","misc","models","textures","sound","text","scripts"].includes(tab))await loadItems();
     if(tab==="maps")await loadMaps();
