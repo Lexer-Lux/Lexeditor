@@ -486,6 +486,8 @@ class GameInstallationManager:
 
     @staticmethod
     def _steam_candidates(app_id: str, install_names: tuple[str, ...]) -> list[Path]:
+        if not app_id:
+            return []
         steam_roots: list[Path] = []
         for hive, key_name, value_name in (() if winreg is None else (
             (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath"),

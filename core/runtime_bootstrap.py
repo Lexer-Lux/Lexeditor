@@ -8,6 +8,7 @@ import sys
 
 SERVICE_MODULES = frozenset({
     'plugins.ds1.server',
+    'plugins.kings_field3.server',
     'plugins.ds1.script_worker',
 
     'plugins.bannerlord.server', 'plugins.blank.server', 'plugins.ff7.server', 'plugins.ff7r.server', 'plugins.ff7r.themed_server',

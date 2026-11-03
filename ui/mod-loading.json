@@ -100,6 +100,11 @@
       "loader": "Lexeditor exports standard Chrono Trigger .ctp packages and has an unverified author-test Mod Library adapter for an already-installed CTExt. Lexeditor does not bundle or install CTExt because the audited upstream repository has no clear top-level redistribution license; in-game loading remains unproved.",
       "structure": "Editable projects and imported CTPs live outside the installed game as Game/... and Localize/... overrides. Export creates a replacement-only CTP. Author-test activation stages selected packages under <Chrono Trigger>/mods/LexeditorLibrary/ and updates only Lexeditor-owned CTExt load-order entries; resources.bin remains read-only.",
       "overriding": "CTExt CTPs are ordered low to high; later selected Lexeditor packages win whole-resource conflicts. Lexeditor reports overlapping resource paths, preserves external CTExt load-order entries, appends its owned entries in the selected order, and does not claim semantic merging across separate CTP packages."
+    },
+    "kings-field3": {
+      "loader": "Verdite3 / RecompOne's built-in C# source-mod compiler and runtime hook loader.",
+      "structure": "One folder per source mod with mod.json and C# source. Lexeditor deploys owned copies into the port's native mods folder.",
+      "overriding": "Native dependencies and hooks govern runtime composition. Lexeditor preserves external mods and does not infer hook compatibility from filenames."
     }
   }
 }

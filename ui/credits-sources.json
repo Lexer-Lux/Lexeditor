@@ -960,6 +960,27 @@
           "sourcePath": "plugins/chrono_trigger/credits.md"
         }
       ]
+    },
+    "kings-field3": {
+      "contributions": [
+        {
+          "name": "Andrew / Voicedrew11 and Verdite3 contributors",
+          "role": "Native port, settings schema and source-mod integration.",
+          "url": "https://github.com/Voicedrew11/verdite3"
+        },
+        {
+          "name": "flaffy / RecompOne contributors",
+          "role": "Native C# source-mod compiler, hooks and player configuration interfaces.",
+          "url": "https://github.com/BlackLabelHQ/RecompOne"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Verdite3 and RecompOne — MIT",
+          "sourcePath": "plugins/kings_field3/credits.md"
+        }
+      ]
     }
   }
 }
