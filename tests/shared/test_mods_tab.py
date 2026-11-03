@@ -134,6 +134,36 @@ def calls(page, name):
     return [args for call, args in page.evaluate("window.calls") if call == name]
 
 
+def test_manage_repository_sources_from_mods(page):
+    mount(page)
+    page.evaluate("""() => {
+      const api = window.pywebview.api;
+      const overview = api.mods_overview;
+      let sources = [{repository: 'Built/In', builtIn: true, version: 'v1'}];
+      api.mods_overview = async (...args) => {
+        window.calls.push(['mods_overview', args]);
+        return {...await overview(), repositories: sources};
+      };
+      api.set_mod_repository = async (plugin, source, add) => {
+        sources = add ? [...sources, {repository: source, version: 'v2'}]
+                      : sources.filter(item => item.repository !== source);
+      };
+    }""")
+    page.locator('[data-tab="mods"]').click()
+    page.get_by_role("button", name="Repositories", exact=True).click()
+    page.get_by_text("Built/In", exact=True).wait_for()
+    page.get_by_role("button", name="Add repository").click()
+    page.get_by_role("textbox", name="GitHub URL or owner/name").fill("Other/Mods")
+    page.get_by_role("button", name="Add", exact=True).click()
+    page.get_by_text("Other/Mods", exact=True).wait_for()
+    page.get_by_role("button", name="Refresh", exact=True).click()
+    page.wait_for_function("window.calls.some(([name, args]) => name === 'mods_overview' && args[1] === true)")
+    page.get_by_role("button", name="Remove Other/Mods").click()
+    page.get_by_text("Other/Mods", exact=True).wait_for(state="detached")
+    page.get_by_role("button", name="Back to mod").click()
+    page.get_by_role("button", name="Repositories", exact=True).wait_for()
+
+
 def test_mods_is_the_leftmost_tab_and_looks_like_tweaks(page):
     mount(page)
     tabs = page.locator("[data-tab]").evaluate_all("nodes => nodes.map(n => n.dataset.tab)")
