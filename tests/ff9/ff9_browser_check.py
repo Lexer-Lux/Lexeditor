@@ -366,7 +366,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             # many items the shop holds, and the panel must name them.
             page.evaluate("navigate('shops')")
             page.wait_for_function("state.datasets.shops?.rows?.length===2")
-            shop_rows = page.locator(".ff9-table .lex-column-list-row")
+            shop_rows = page.locator(".ff9-table .lex-column-list-row:not(.lex-filler-row)")
             expect(shop_rows).to_have_count(2)
             expect(shop_rows.filter(has_text="Test Shop")).to_contain_text("3 items")
             expect(shop_rows.filter(has_text="Closed Shop")).to_contain_text("Nothing")
