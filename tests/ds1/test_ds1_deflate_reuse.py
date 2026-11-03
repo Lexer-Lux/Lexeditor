@@ -113,7 +113,7 @@ def test_broken_optional_sources_do_not_fail_compression(monkeypatch):
 @pytest.mark.parametrize('kind', ['item', 'menu'])
 def test_text_exports_reuse_shared_compression(kind, tmp_path, monkeypatch):
     from ds1_fixture import make_text_archive, make_menu_archive
-    from plugins.ds1 import texts
+    from plugins.ds1 import texts, mod_loader
     monkeypatch.setattr(composition_cache, 'user_root', lambda: tmp_path/'cache')
     original = make_text_archive() if kind == 'item' else make_menu_archive()
     def edited():
@@ -126,3 +126,6 @@ def test_text_exports_reuse_shared_compression(kind, tmp_path, monkeypatch):
     monkeypatch.setattr(formats.zlib, 'compress', no_compression)
     assert edited().export() == expected
     assert formats.inflate(expected) != formats.inflate(original)
+    document = texts.TextDocument if kind == 'item' else texts.MenuDocument
+    merged, conflicts = mod_loader._compose_texts(original, [('Mod', expected)], document=document)
+    assert merged == expected and not conflicts
