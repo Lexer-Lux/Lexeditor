@@ -10,7 +10,7 @@ from pathlib import Path
 import threading
 from urllib.parse import parse_qs, urlparse
 
-from core import mod_watch
+from core import mod_watch, operation_progress
 from core.plugin_http import PluginRequestHandler
 from . import assets, deployment, data_map, fsb, icons, scripts, shops, theme, record_edits
 from . import anim
@@ -248,6 +248,7 @@ def _rebuild_tweaks_on_save() -> dict:
     Save finishes it.
     """
     try:
+        operation_progress.report('Checking installed build')
         if not _tweaks_flag():
             return {"tweaksNeedRebuild": False}
         if not tweak_mods.game_closed():
@@ -259,6 +260,7 @@ def _rebuild_tweaks_on_save() -> dict:
         adapter.attach_context(library_root=library, game_root=STORE.game_root)
         mods = [library / folder for folder in adapter.active_mod_ids(STORE.game_root)]
         result = activate_with_recovery(adapter, mods, STORE.game_root)
+        operation_progress.report('Verifying installed mods')
         pending = _tweaks_flag()
     except Exception as error:
         return {"tweaksNeedRebuild": True, "tweaksError": str(error)}
@@ -288,6 +290,8 @@ def theme_status() -> dict:
 
 class Handler(PluginRequestHandler):
     def do_GET(self):
+        if self.send_operation_progress():
+            return
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
@@ -829,7 +833,7 @@ class Handler(PluginRequestHandler):
                 raise ValueError('Invalid request size')
             payload = json.loads(self.rfile.read(length))
             if not isinstance(payload, dict): raise ValueError('Expected an object')
-            with LOCK:
+            with operation_progress.operation(payload.get('operationId')), LOCK:
                 if path == '/api/project-refresh':
                     self.send_json(_refresh_project(payload.get('files'),payload.get('checkOnly',False)))
                     return
@@ -969,6 +973,7 @@ class Handler(PluginRequestHandler):
                     result = {'row': RULES.band_action(action, payload['id'], revision=payload['revision'],
                               at=payload.get('at'), neighbour=payload.get('neighbour'), keep=payload.get('keep'))}
                 elif path == '/api/save':
+                    operation_progress.report('Saving project changes')
                     RULES.validate_save()
                     SKILLS.validate_save()
                     STORE.validate_save()

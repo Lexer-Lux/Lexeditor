@@ -3456,17 +3456,33 @@
   const editorBusyOwners = new Map();
   let editorActivity = null;
   const setEditorBusy = (owner, label) => {
+    if (label && editorBusyOwners.get(owner) === label) return;
     if (label) editorBusyOwners.set(owner, label);
     else editorBusyOwners.delete(owner);
     const busy = editorBusyOwners.size > 0;
     document.body.classList.toggle("lex-save-busy", busy);
-    document.body.inert = busy;
+    if (document.body.inert !== busy) document.body.inert = busy;
     if (!busy) { editorActivity?.remove(); editorActivity = null; return; }
     if (!editorActivity) {
       editorActivity = element("div", {class:"lex-editor-activity"});
       document.body.append(editorActivity);
     }
     editorActivity.replaceChildren(loadingStatus([...editorBusyOwners.values()].at(-1)));
+  };
+  const observeOperation = async ({run, read, progress}) => {
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(16)),
+      byte => byte.toString(16).padStart(2, '0')).join('');
+    let active = true, timer = null;
+    const poll = async () => {
+      try {
+        const status = await read(id);
+        if (active && typeof status?.label === 'string' && status.label) progress?.(status.label);
+      } catch (_error) { /* Activity is optional; the operation response owns errors. */ }
+      if (active) timer = setTimeout(poll, 200);
+    };
+    timer = setTimeout(poll, 150);
+    try { return await run(id); }
+    finally { active = false; clearTimeout(timer); }
   };
   const detailText = text => element("p", {class: "lex-detail-text"}, text);
 
@@ -11093,7 +11109,12 @@ ${contents.path}`});
       // Saving rebuilds the installed tweaks, which is what the Mods tab
       // alert marks describe: re-read them so a rebuilt mod clears its
       // mark at once instead of waiting for Play.
-      try { await options.save?.(); playThemeSound("save"); await mods.refresh(); }
+      try {
+        await options.save?.();
+        playThemeSound("save");
+        setEditorBusy(save, "Refreshing mod library");
+        await mods.refresh();
+      }
       catch (error) { if (!error?.reported) showAlert({title:"Save failed",message:error?.message || "Save failed."}); }
       finally { setSaveBusy(false); }
     };
@@ -16198,6 +16219,12 @@ ${contents.path}`});
     const switchMod = async (row, event) => {
       const control = event.target, enabled = control.checked;
       let confirmed = !!(row.enabled ?? row.on);
+      const clearPending = () => {
+        control.indeterminate = false;
+        control.checked = confirmed;
+        control.removeAttribute("aria-busy");
+        setEditorBusy(control, null);
+      };
       control.checked = confirmed;
       if (document.body.inert) return;
       try {
@@ -16205,19 +16232,22 @@ ${contents.path}`});
         control.indeterminate = true;
         control.setAttribute("aria-busy", "true");
         setEditorBusy(control, "Building and applying mods");
-        const result = await callWindow("set_mod_enabled", pluginId, row.path, enabled);
+        const result = await observeOperation({
+          run: id => callWindow("set_mod_enabled", pluginId, row.path, enabled, id),
+          read: id => callWindow("operation_progress", id),
+          progress: label => setEditorBusy(control, label),
+        });
         confirmed = typeof result?.enabled === "boolean" ? result.enabled : enabled;
+        setEditorBusy(control, "Refreshing mod library");
         await load(); draw();
         if (result?.disabledMods?.length) showAlert({title:"Some mods could not be enabled",
           message:result.disabledMods.map(mod => `${mod.name} was switched off: ${mod.error}`).join("\n")});
       } catch (error) {
-        try { await load(); draw(); } catch (_refreshError) {}
+        clearPending();
         failure("Could not switch the mod", error);
+        try { await load(); draw(); } catch (_refreshError) {}
       } finally {
-        control.indeterminate = false;
-        control.checked = confirmed;
-        control.removeAttribute("aria-busy");
-        setEditorBusy(control, null);
+        clearPending();
       }
     };
     const rows = () => [...(data?.rows || []), ...(data?.remote || []).map(row => ({...row, path: `remote:${row.folder}`}))];
@@ -16869,7 +16899,7 @@ ${contents.path}`});
     if (info.available && (info.features || []).length) decide(); else mods();
   };
 
-window.LexeditorUI = {compareRecords, sortValueOf, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, tagBar, controlGroup, stack, bitmapText, modelStage, modelViewModes, modelViewModeIcon, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, addIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, nextHistoryTick, undoNewest, redoNewest, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
+window.LexeditorUI = {compareRecords, sortValueOf, observeOperation, tweaksPage, tweakPanel, tweakModPanels, panelIcon, noImage, noThumbnail, registerNoThumbnail, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, conflictMark, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, applyFieldTabOverrides, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, tagBar, controlGroup, stack, bitmapText, modelStage, modelViewModes, modelViewModeIcon, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, loadingStatus, badge, showToast, copyText, copyIcon, removeIcon, addIcon, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, fileLocationButton, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, thingFinderButton, thingFinderField, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, soundPreview, audioColumn, clone, applyTheme, EditHistory, NavigationHistory, nextHistoryTick, undoNewest, redoNewest, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, compactPager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation, hoverActions, collapsiblePanel, padBarrelTable, promptText, tabStrip, typeGlyph, animationViewer};
 window.LexeditorUI.exactIntegerInput = exactIntegerInput;
 window.LexeditorUI.setEditorBusy = setEditorBusy;
 window.LexeditorUI.attachPreviewPin = attachPreviewPin;

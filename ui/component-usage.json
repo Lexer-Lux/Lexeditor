@@ -27,6 +27,27 @@
       "terraria",
       "warband"
     ],
+    "addIcon": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
     "animationViewer": [
       "blank",
       "ds1"
@@ -57,7 +78,6 @@
     ],
     "audioColumn": [
       "blank",
-      "ds1",
       "ff8"
     ],
     "autoFitControlText": [
@@ -201,10 +221,25 @@
       "rdr2"
     ],
     "choicePopover": [
+      "bannerlord",
       "blank",
+      "chrono_trigger",
       "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
       "ff8",
-      "ff9"
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
     ],
     "clone": [
       "bannerlord",
@@ -1111,6 +1146,7 @@
     "logView": [
       "bannerlord",
       "blank",
+      "ds1",
       "terraria",
       "warband"
     ],
@@ -1148,6 +1184,7 @@
     ],
     "mathFormula": [
       "blank",
+      "ds1",
       "ff8"
     ],
     "matrixTable": [
@@ -1175,6 +1212,12 @@
       "warband"
     ],
     "modelStage": [
+      "blank",
+      "ds1",
+      "rdr2",
+      "warband"
+    ],
+    "modelViewModeIcon": [
       "blank",
       "ds1",
       "rdr2",
@@ -1236,6 +1279,27 @@
       "terraria",
       "warband"
     ],
+    "nextHistoryTick": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
     "noImage": [
       "blank",
       "ds1",
@@ -1268,6 +1332,27 @@
       "warband"
     ],
     "numberValue": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
+    "observeOperation": [
       "bannerlord",
       "blank",
       "chrono_trigger",
@@ -1560,6 +1645,27 @@
       "warband"
     ],
     "recordSource": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
+    "redoNewest": [
       "bannerlord",
       "blank",
       "chrono_trigger",
@@ -1937,6 +2043,9 @@
       "terraria",
       "warband"
     ],
+    "tagBar": [
+      "ds1"
+    ],
     "textArea": [
       "bannerlord",
       "blank",
@@ -1945,6 +2054,7 @@
       "ff7",
       "ff7r",
       "ff8",
+      "ff9",
       "palworld",
       "project_zomboid",
       "rdr",
@@ -2081,6 +2191,27 @@
       "terraria",
       "warband"
     ],
+    "undoNewest": [
+      "bannerlord",
+      "blank",
+      "chrono_trigger",
+      "ds1",
+      "ds3",
+      "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "ffx_x2",
+      "palworld",
+      "project_zomboid",
+      "rdr",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
+    ],
     "unitField": [
       "bannerlord",
       "blank",
@@ -2107,6 +2238,7 @@
     "EditHistory",
     "NavigationHistory",
     "actionRow",
+    "addIcon",
     "applyTheme",
     "autoFitControlText",
     "badge",
@@ -2116,6 +2248,7 @@
     "bottomSearch",
     "callWindow",
     "choiceField",
+    "choicePopover",
     "clone",
     "closeButton",
     "columnList",
@@ -2129,6 +2262,7 @@
     "createModProject",
     "createWindowActions",
     "creditsPanel",
+    "dataMap",
     "detailField",
     "detailNote",
     "detailPanel",
@@ -2157,11 +2291,14 @@
     "magnifyIcon",
     "magnitudeValue",
     "mapMagnifier",
+    "modelViewModeIcon",
     "modelViewModes",
     "newButton",
+    "nextHistoryTick",
     "noImage",
     "notice",
     "numberValue",
+    "observeOperation",
     "padBarrelTable",
     "pagedListDetail",
     "pagedPane",
@@ -2175,6 +2312,7 @@
     "readonlyField",
     "recordId",
     "recordSource",
+    "redoNewest",
     "referenceDisplay",
     "refreshReferences",
     "removeIcon",
@@ -2199,6 +2337,7 @@
     "tweakPanel",
     "typeGlyph",
     "uiScaleControl",
+    "undoNewest",
     "unitField"
   ]
 }

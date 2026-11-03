@@ -616,15 +616,23 @@ function reportTweakRebuild(result){
 }
 async function save(){
   await edits;
+  const progressOwner = {};
+  LexeditorUI.setEditorBusy(progressOwner, 'Saving changes');
   try{
-    const result=await api("/api/save",{});
+    const result=await LexeditorUI.observeOperation({
+      run: operationId => api('/api/save', {operationId}),
+      read: id => api('/api/operation-progress?id=' + encodeURIComponent(id)),
+      progress: label => LexeditorUI.setEditorBusy(progressOwner, label),
+    });
     if(result.tweaksError)reportTweakRebuild(result);
+    LexeditorUI.setEditorBusy(progressOwner, 'Refreshing editor');
     attackPreviews.clear();await refreshState();
     if(state.tab==='maps'&&state.mapTab==='collision')await refreshCollision();
     if(state.tab==="tweaks"){await loadTweaks();render();}else shell.refresh();
     if(!reportTweakRebuild(result))LexeditorUI.showToast("Changes saved to the mod project.");
   }
   catch(error){notify(error);throw error;}
+  finally{LexeditorUI.setEditorBusy(progressOwner, null);}
 }
 async function discard(){
   await edits;state.bandForm=null;state.taeForm=null;

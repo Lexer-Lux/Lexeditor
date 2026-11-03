@@ -46,6 +46,16 @@ READ_ONLY_MANAGED_MESSAGE = ("This mod updates automatically, so direct edits wo
 class PluginRequestHandler(BaseHTTPRequestHandler):
     """A plugin service's replies: JSON, a file, and a quiet log."""
 
+    def send_operation_progress(self) -> bool:
+        """Read activity outside the plugin's data lock, while a write runs."""
+        from urllib.parse import parse_qs, urlparse
+        query = urlparse(self.path)
+        if query.path != '/api/operation-progress':
+            return False
+        from core.operation_progress import snapshot
+        self.send_json(snapshot(parse_qs(query.query).get('id', [''])[0]))
+        return True
+
     def refuse_write_when_read_only(self, path: str) -> bool:
         """Refuse a write in a read-only session; True when it was refused.
 
@@ -76,6 +86,7 @@ class PluginRequestHandler(BaseHTTPRequestHandler):
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", NO_STORE)
             self.end_headers()
             self.wfile.write(data)
         except ConnectionError:

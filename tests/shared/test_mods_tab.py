@@ -656,17 +656,50 @@ def test_mod_header_shows_pending_until_switch_succeeds(page, tmp_path):
     page.evaluate("""() => {
       const apply = pywebview.api.set_mod_enabled;
       pywebview.api.set_mod_enabled = (...args) => new Promise(resolve => {
+        window.switchOperation = args[3];
         window.finishSwitch = () => resolve(apply(...args));
       });
+      pywebview.api.operation_progress = async id => {
+        if (id !== window.switchOperation) throw Error('Wrong operation');
+        return {running:true,label:'Building Test mod (1/2)'};
+      };
     }""")
     control.click()
     page.locator('.lex-header-switch-pending').wait_for(state="visible")
     assert control.is_checked()  # The requested off state is not confirmed yet.
+    page.get_by_text('Building Test mod (1/2)', exact=True).wait_for()
+    assert page.evaluate('document.body.inert')
     page.screenshot(path=str(tmp_path / "mod-switch-applying.png"))
     page.evaluate("window.finishSwitch()")
     page.locator('.lex-header-switch-off').wait_for(state="visible")
     assert not page.get_by_role("checkbox", name="Mine enabled").is_checked()
     page.screenshot(path=str(tmp_path / "mod-switch-off.png"))
+
+
+def test_switch_error_is_immediate_even_when_library_refresh_is_slow(page, tmp_path):
+    mount(page)
+    page.locator('[data-tab="mods"]').click()
+    control = page.get_by_role('checkbox', name='Mine enabled')
+    control.wait_for()
+    page.evaluate('''()=>{
+      const overview=pywebview.api.mods_overview;
+      pywebview.api.mods_overview=(...args)=>new Promise(resolve=>{
+        window.finishRefresh=()=>resolve(overview(...args));
+      });
+      pywebview.api.set_mod_enabled=async()=>{throw Error('Deployment failed')};
+    }''')
+    control.click()
+    dialog = page.get_by_role('alertdialog')
+    dialog.get_by_text('Deployment failed', exact=True).wait_for()
+    assert not page.evaluate('document.body.inert')
+    assert page.evaluate('typeof finishRefresh') == 'function'
+    page.locator('.lex-header-switch-pending').wait_for(state='hidden')
+    assert control.is_checked()
+    page.screenshot(path=str(tmp_path / 'switch-error-before-refresh.png'))
+    dialog.get_by_role('button', name='Close', exact=True).click()
+    page.evaluate('finishRefresh();void 0')
+    page.locator('.lex-header-switch-pending').wait_for(state='hidden')
+    assert page.get_by_role('checkbox', name='Mine enabled').is_checked()
 
 
 def test_dropdown_unavailable_rows_show_lock_and_buttons(page, tmp_path):

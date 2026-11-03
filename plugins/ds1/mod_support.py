@@ -13,7 +13,7 @@ import hashlib
 import json
 from time import perf_counter
 
-from core import memory_conflicts, mod_requires, script_mods
+from core import memory_conflicts, mod_requires, script_mods, operation_progress
 from core.mod_conflicts import merge_marks
 from core.plugin_files import read_bounded
 
@@ -178,8 +178,10 @@ class Ds1ModAdapter:
         library = self._library()
         tweak_mods.ensure_game_closed()
         started = perf_counter()
+        operation_progress.report('Preparing enabled mods')
         with tweak_mods.locked(game_root):
             plan = tweak_mods.prepare(game_root, library, cache_root=self._cache_root())
+            operation_progress.report('Combining enabled mods')
             mod_loader.invalidate_discovery()
             data_recipe = tweak_mods.data_recipe(library)
             prepared = perf_counter()
@@ -224,6 +226,7 @@ class Ds1ModAdapter:
                                                            menu_files=plan['files'])
                 conflicts, names = composition.conflicts, [mod.name for mod in data]
                 layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
+                operation_progress.report('Updating menu textures')
                 mod_loader.align_menu_textures(game_root,composition,layout)
             layout = tweak_mods.prepared_menu_layout(game_root,plan['files'])
             menu_order = (hashlib.sha256(json.dumps(texture_packs.menu_texture_names(layout)).encode()).hexdigest()
@@ -233,8 +236,10 @@ class Ds1ModAdapter:
             # refreshes cannot erase it or claim that later data edits are
             # already installed merely because native script inputs match.
             plan['runtime']['dataRecipe'] = data_recipe
+            operation_progress.report('Installing loader changes')
             tweak_mods.commit(game_root, plan)
             try:
+                operation_progress.report('Installing game data')
                 if not reused and composition.files:
                     # The last data mod in load order owns the deployment record.
                     owner = data[-1].folder if data else Path(mods[-1]) if mods else None
@@ -250,6 +255,7 @@ class Ds1ModAdapter:
         timings = {'prepareSeconds': prepared - started, 'compositionSeconds': composed - prepared,
                    'deploymentSeconds': finished - composed, 'activationSeconds': finished - started,
                    'reusedInstalledData': reused, 'scripts': plan.get('scripts', []), 'menus': plan.get('menus', [])}
+        operation_progress.report('Updating conflict report')
         self._save_report(game_root, ordered, conflicts, installed=True, expected_content=content, timings=timings,
                           menu_order=menu_order, menu_inputs=menu_inputs)
         return {"activated": [Path(path).name for path in mods],

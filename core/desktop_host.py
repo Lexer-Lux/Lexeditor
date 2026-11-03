@@ -1972,10 +1972,14 @@ class HostApi:
             return next(row for row in self._mod_rows(plugin_id) if Path(row["path"]).resolve() == folder)
         return mods_service.mod_row(folder)
 
-    def set_mod_enabled(self, plugin_id: str, path: str, enabled: bool) -> dict:
+    def operation_progress(self, operation_id: str) -> dict:
+        from core.operation_progress import snapshot
+        return snapshot(operation_id)
+
+    def set_mod_enabled(self, plugin_id: str, path: str, enabled: bool, operation_id: str | None = None) -> dict:
         """Switch one mod, then let the game's loader take the new set."""
-        from core import mod_requires, mods_service
-        with self._mod_library_lock:
+        from core import mod_requires, mods_service, operation_progress
+        with operation_progress.operation(operation_id, 'Applying mod changes'), self._mod_library_lock:
             root = self._game_mods(plugin_id)
             folder = mods_service.checked_mod(root, path)
             state = self._mod_state(plugin_id)

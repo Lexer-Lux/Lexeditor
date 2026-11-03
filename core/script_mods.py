@@ -587,9 +587,11 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
             raise error(f"{row['name']} conflicts with {', '.join(conflicts)}", folders=[row['path']])
     built = []
     try:
-        for row in rows:
+        for index, row in enumerate(rows):
             if row.get('prebuilt'):
                 continue
+            from core.operation_progress import report
+            report(f"Checking/building {row['name']} ({index + 1}/{len(rows)})")
             context.current = row["name"]
             started = perf_counter()
             result = build(Path(row["path"]), context, allowed_roots=allowed_roots,
