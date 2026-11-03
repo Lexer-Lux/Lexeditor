@@ -179,7 +179,8 @@ def _stamp(location):
 
 
 def _texture_stamp(stamp, kind, location, game_root, project):
-    """Shared human texture edits invalidate both memory and disk geometry."""
+    """Shared textures and material edits invalidate memory and disk geometry."""
+    stamp = (*stamp, _material_sources(game_root, project))
     if kind != 'member' or not str(location).lower().endswith(('.chrbnd.dcx','.partsbnd.dcx')):
         return stamp
     sources=[]
@@ -187,6 +188,40 @@ def _texture_stamp(stamp, kind, location, game_root, project):
         path=_overlay(project,relative) or (Path(game_root)/relative if game_root else None)
         sources.append((str(path),_stamp(path)) if path is not None else None)
     return (*stamp,tuple(sources))
+
+
+def _material_sources(game_root, project):
+    sources = []
+    # The game's patch binder replaces named definitions from its base binder.
+    for name in ('MtdPatch.mtdbnd.dcx', 'Mtd.mtdbnd.dcx'):
+        relative = Path('mtd')/name
+        path = _overlay(project, relative) or (Path(game_root)/relative if game_root else None)
+        if path is not None:
+            sources.append((str(path), _stamp(path)))
+    return tuple(sources)
+
+
+def _water_definitions(encoded, game_root, project):
+    from . import mtd
+    sources = _material_sources(game_root, project)
+    for mesh in encoded['meshes']:
+        if '[we]' not in mesh['mat_def'].lower():
+            continue
+        try:
+            for path, stamp in sources:
+                if stamp is None:
+                    continue
+                definition = mtd.definition(path, stamp, mesh['mat_def'])
+                if definition is not None:
+                    params = definition['parameters']
+                    color = params.get('g_WaterColor')
+                    if color is not None and len(color) == 4:
+                        mesh['water'] = {'color': color,
+                            'waveHeight': params.get('g_WaterWaveHeight', [1])[0],
+                            'specularPower': params.get('g_SpecularPower', [100])[0]}
+                    break
+        except (OSError, FormatError, ValueError) as error:
+            encoded['notes'].append(f"{mesh['mat_def']}: cannot read water material ({error})")
 
 
 @functools.lru_cache(maxsize=8)
@@ -632,7 +667,7 @@ def map_cache_root():
     return Path(base) / 'Lexeditor' / 'cache' / 'ds1-mapgeom'
 
 
-_PIPELINE_FILES = ('viewport.py', 'flver.py', 'assets.py', 'bhf.py', 'formats.py')
+_PIPELINE_FILES = ('viewport.py', 'flver.py', 'assets.py', 'bhf.py', 'formats.py', 'mtd.py')
 _pipeline_digest = None
 _pruned = False
 _disk_size = None
@@ -806,6 +841,7 @@ def _textured(kind, location, member, stamp, skin, game_root, project, cap, area
     if hit is not None:
         return hit
     encoded = _encode(FlverDocument(_read_flver(kind, location, member)), skin, True)
+    _water_definitions(encoded, game_root, project)
     needed = sorted({name for mesh in encoded['meshes']
                      for name in (mesh.get('map'), mesh.get('light'), mesh.get('normal')) if name})
     if not needed:

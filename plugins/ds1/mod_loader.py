@@ -482,7 +482,7 @@ def _composition_revision(include_menu=True):
     unrelated = {'server.py', 'script_worker.py', 'plugin.py', 'mod_support.py', 'deployment.py',
                  'tweak_mods.py', 'composition_cache.py', 'project_refresh.py', 'mod_usage.py',
                  'map_store.py', 'collision_store.py', 'runtime_package.py',
-                 'viewport.py', 'flver.py'}
+                 'viewport.py', 'flver.py', 'mtd.py'}
     if not include_menu:
         # These consume menu declarations or texture packs, never a map,
         # character/talk binder, event archive or parameter contribution.

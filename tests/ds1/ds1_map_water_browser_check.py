@@ -11,15 +11,13 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive
-from flver_fixture import build_flver
+from flver_fixture import build_flver, make_chrbnd
+from mtd_fixture import build_mtd
 from msb_fixture import build_msb
 from tpf_fixture import make_dds_rgba, make_tpf
 from plugins.ds1.store import RELATIVE
 from plugins.ds1.plugin import DS1Session
 from playwright.sync_api import sync_playwright
-
-WATER = 0x2F6F9E
-
 
 def main():
     output = Path(sys.argv[1]) if len(sys.argv) > 1 else None
@@ -40,6 +38,11 @@ def main():
         textures.mkdir()
         pixels=[(80,80,80,255),(160,160,160,255)]*8
         (textures/'ripple.tpf').write_bytes(make_tpf([('tex0',make_dds_rgba(4,4,pixels))]))
+        definitions=game/'mtd'
+        definitions.mkdir()
+        definition=bytearray(make_chrbnd(b'',extra=[('A10_Water_sewer[We].mtd',build_mtd())],dcx=False))
+        definition[12]=0x54
+        (definitions/'Mtd.mtdbnd.dcx').write_bytes(definition)
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_NO_MOD': '1',
                               'LEXEDITOR_MOD_READ_ONLY': '1'})
         errors = []
@@ -53,6 +56,7 @@ def main():
             assert data['meshes'][0]['map'] is None
             assert data['meshes'][0]['normal'] == 'tex0'
             assert 'tex0' in data['textures'], data.get('notes')
+            assert abs(data['meshes'][0]['water']['color'][3]-0.4)<0.00001
             with sync_playwright() as play:
                 browser = play.chromium.launch(headless=True)
                 try:
@@ -73,21 +77,23 @@ def main():
                             '[data-viewport-host]')._viewportScene;
                             const wet = [];
                             scene.traverse(obj => {
-                              if (obj.isMesh && obj.material && obj.material.transparent &&
-                                  obj.material.color &&
-                                  obj.material.color.getHex() === %d)
+                              if (obj.isMesh && obj.material?.transparent && obj.material.bumpMap)
                                 wet.push({opacity: obj.material.opacity,
                                           depthWrite: obj.material.depthWrite,
                                           bump:!!obj.material.bumpMap,
                                           channel:obj.material.bumpMap?.channel,
-                                          colorSpace:obj.material.bumpMap?.colorSpace}); });
-                            return wet; }""" % WATER)
-                    assert found, 'no translucent blue water material in the scene'
+                                          colorSpace:obj.material.bumpMap?.colorSpace,
+                                          color:obj.material.color.toArray(),
+                                          waveHeight:obj.material.bumpScale}); });
+                            return wet; }""")
+                    assert found, 'no material-defined water surface in the scene'
                     for entry in found:
-                        assert entry['opacity'] == 0.65, entry
+                        assert abs(entry['opacity']-0.4)<0.00001, entry
                         assert entry['depthWrite'] is False, entry
                         assert entry['bump'] and entry['channel']==0, entry
                         assert entry['colorSpace']=='', entry
+                        assert all(abs(a-b)<0.00001 for a,b in zip(entry['color'],[0.2,0.3,0.1])), entry
+                        assert entry['waveHeight']==2, entry
                     if output:
                         page.locator('[data-viewport-host]').screenshot(
                             path=str(output / 'map-water.png'))
