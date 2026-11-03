@@ -70,7 +70,7 @@ class PluginManifestTests(unittest.TestCase):
                 install, declared = plugin.installation, data.get("installation")
                 if declared:
                     self.assertEqual(install.executable, declared["executable"])
-                    self.assertEqual(install.steam_app_id, declared["steamAppId"])
+                    self.assertEqual(install.steam_app_id, declared.get("steamAppId", ""))
                     self.assertEqual(list(install.install_dir_names), declared["installDirNames"])
                     self.assertEqual([str(path) for path in install.default_roots],
                                      declared["defaultRoots"])

@@ -1,0 +1,27 @@
+{
+  "id": "kings-field3",
+  "name": "King's Field III",
+  "accent": "#a3aebe",
+  "processNames": ["Verdite3.exe"],
+  "installation": {
+    "rootEnv": "LEXEDITOR_KF3_ROOT",
+    "requiredPaths": ["bin/Verdite3.exe", "bin/RecompOne.Runtime.dll", "content/config/kf3.json"],
+    "executable": "bin/Verdite3.exe",
+    "launchPath": "Verdite3.exe",
+    "steamAppId": "",
+    "installDirNames": ["Verdite3"],
+    "defaultRoots": ["D:/Programs/Verdite3"]
+  },
+  "nativePort": {
+    "booleanEncoding": "integer",
+    "dataEnv": "LEXEDITOR_KF3_DATA",
+    "dataDirectory": "Verdite3",
+    "configPath": "content/config/kf3.json",
+    "configIdentity": ["SLUS-00255", "KingsField3"],
+    "gameIdentity": "Japanese King's Field III / US King's Field II, SLUS-00255",
+    "modLoading": {
+      "launch": "Play starts the installed Verdite3 launcher. First launch compiles from the player's SLUS-00255 disc.",
+      "removal": "Disable a mod in the shared Mods tab while the game is closed. Lexeditor removes its deployed copy and restores the previous native enable flag and priority."
+    }
+  }
+}

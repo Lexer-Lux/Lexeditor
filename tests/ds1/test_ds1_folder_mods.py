@@ -684,6 +684,14 @@ def test_packaged_merger_runs_without_an_editor_or_python_installation(tmp_path)
     from plugins.ds1 import tae_merge
     supplied = os.environ.get('LEXEDITOR_TEST_LOADER_PACKAGE')
     package = Path(supplied) if supplied else runtime_package.package(tmp_path/'Loader package')
+    if not supplied:
+        import zipfile
+        from plugins.ds1.runtime import build
+        with zipfile.ZipFile(package/'Loader-source.zip') as source:
+            for name in build.ONLINE_SOURCES:
+                assert source.read('plugins/ds1/runtime/'+name) == (build.HERE/name).read_bytes()
+            assert source.read('plugins/ds1/runtime/build.py') == (build.HERE/'build.py').read_bytes()
+            assert source.read('plugins/ds1/credits.md') == (runtime_package.ROOT/'plugins/ds1/credits.md').read_bytes()
     game = tmp_path/'standalone game'
     library = game/'mods'
     (game/RELATIVE).parent.mkdir(parents=True)

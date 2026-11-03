@@ -52,6 +52,11 @@ def check_service(name: str) -> list[str]:
     module = importlib.import_module(SERVERS.get(name, f"plugins.{name}.server"))
     handler = getattr(module, "Handler", None)
     if handler is None:
+        from core import native_port_http
+        # Thin native-port services register a schema with the shared factory.
+        if getattr(module, "serve", None) is native_port_http.serve:
+            handler = native_port_http.handler(module.MODEL, module.__file__)
+    if handler is None:
         return [f"{name}: no request handler"]
     class Quiet(HTTPServer):
         # Closing the browser mid-request aborts the connection, and the default

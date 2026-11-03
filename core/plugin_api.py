@@ -68,7 +68,7 @@ class GameInstallSpec:
 
     root_env: str
     required_paths: tuple[str, ...]
-    steam_app_id: str
+    steam_app_id: str  # Empty for games distributed outside Steam.
     install_dir_names: tuple[str, ...]
     default_roots: tuple[Path, ...]
     data_env: str | None = None

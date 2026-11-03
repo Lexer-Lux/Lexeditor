@@ -176,6 +176,8 @@ def main():
                     # Bones: the child follows its Havok parent, skipping the
                     # model-only SFX anchor (frame 0, paused). The fixture's
                     # root reference scale is 2, doubling child offsets.
+                    # _animBones reports viewer-world coordinates: game +Z
+                    # becomes viewer -Z at the left/right-handed boundary.
                     page.locator('[data-anim-chars] .lex-list-row', has_text='c1200').click()
                     page.wait_for_function(
                         '!document.querySelector("[data-anim-host]").hasAttribute("data-ready")',
@@ -194,7 +196,7 @@ def main():
                     root = by_name['root']
                     close_enough(root, (0.0, 1.0, 0.0))
                     close_enough([by_name['child'][axis] - root[axis] for axis in range(3)],
-                                 (0.0, 10.0, 12.0))
+                                 (0.0, 10.0, -12.0))
                     close_enough([by_name['sfx'][axis] - root[axis] for axis in range(3)],
                                  (0.0, 18.0, 0.0))
                     for pane, last in (('[data-anim-chars]', "[data-anim-chars] .lex-pager"

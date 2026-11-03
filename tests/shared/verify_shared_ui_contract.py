@@ -9,8 +9,10 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import re
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
 
 def text(path: str) -> str:
@@ -27,6 +29,9 @@ def require(condition: bool, message: str) -> None:
 # so page-level contracts read the served page (shell plus local modules).
 def page_source(plugin):
     parts = [(ROOT / plugin).joinpath('editor.html').read_text(encoding='utf-8')]
+    for module in re.findall(r'<script src="/shared/([A-Za-z0-9_./-]+\.js)"></script>', parts[0]):
+        if module != 'framework.js':
+            parts.append((ROOT / 'ui' / module).read_text(encoding='utf-8'))
     for module in sorted((ROOT / plugin).glob('*.js')):
         parts.append(module.read_text(encoding='utf-8'))
     return chr(10).join(parts)
@@ -139,9 +144,18 @@ for plugin in sorted((ROOT / "plugins").iterdir()):
     editor = page_source(plugin)
     require("modLoaderSection(" in editor,
             f"{plugin.name} does not render the shared MOD LOADER section")
-    for field in ("loader:", "output:", "order:", "safety:", "removal:"):
-        require(field in editor,
-                f"{plugin.name} mod loader section is missing {field.rstrip(':')}")
+    if "modLoaderSection(plugin.modLoading)" in editor:
+        from core.native_port_http import loader_details
+        import importlib
+        model = importlib.import_module(f"plugins.{plugin.name}.model").MODEL
+        details = loader_details(model, ROOT)
+        for field in ("loader", "output", "order", "safety", "removal"):
+            require(isinstance(details.get(field), str) and bool(details[field].strip()),
+                    f"{plugin.name} shared mod loader payload is missing {field}")
+    else:
+        for field in ("loader:", "output:", "order:", "safety:", "removal:"):
+            require(field in editor,
+                    f"{plugin.name} mod loader section is missing {field.rstrip(':')}")
 require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
         "the shared mod loader section is not defined in the framework")
 
