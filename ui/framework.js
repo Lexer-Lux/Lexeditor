@@ -15109,14 +15109,16 @@ ${contents.path}`});
     const refresh = () => {
       const value = currentValue(), locked = readOnly();
       const same = options.same || ((a,b)=>JSON.stringify(a)===JSON.stringify(b));
-      const referenceState = JSON.stringify([value, locked, sources,
+      const referenceState = JSON.stringify([locked, sources,
         sources.map(source => [painted(source), same(value, source.value)])]);
-      // Shell refreshes visit every control. Preserve unchanged strips so one
-      // edit does not replace hundreds of nodes and invalidate their layout.
+      root.classList.toggle("lex-value-modified", options.vanilla !== undefined && !same(value,options.vanilla));
+      // The rail paints sources and which of them differ, not the edited
+      // value itself. Preserve it while those comparisons stay the same:
+      // replacing its nodes made every keystroke invalidate ancestor :has()
+      // selectors and recalculate styles across the entire detail panel.
       if (referenceState === lastReferenceState && root.querySelector(
           ":scope > :is(.lex-reference-values,.lex-reference-placeholder)")) return;
       lastReferenceState = referenceState;
-      root.classList.toggle("lex-value-modified", options.vanilla !== undefined && !same(value,options.vanilla));
       root.querySelector(":scope > :is(.lex-reference-values,.lex-reference-placeholder)")?.remove();
       const reference = referenceDisplay({
         current: value, sources, format: options.format, same: options.same, readOnly: locked,
