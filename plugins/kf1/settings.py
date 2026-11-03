@@ -42,7 +42,7 @@ def read_file(root: Path, name: str) -> bytes:
 
 def verify_port(root: Path) -> None:
     marker = json.loads(read_file(root, "lexeditor-port.json"))
-    if marker.get("game") != "kf1" or marker.get("settingsVersion") != 1:
+    if not isinstance(marker, dict) or marker.get("game") != "kf1" or marker.get("settingsVersion") != 1:
         raise ValueError("Install the supported Lexer-owned King's Field I port")
     assembly = root / "KingsField1.dll"
     if is_link(assembly) or sha256(assembly.read_bytes()).hexdigest() != marker.get("assemblySha256"):
@@ -98,6 +98,8 @@ def write_settings(root: Path, changes: dict[str, str], *, expected: str | None 
     if controls:
         data = read_file(root, "settings.json")
         config = json.loads(data)
+        if not isinstance(config, dict) or any(not isinstance(config.get(name, {}), dict) for name in ("Keys", "Pad", "PadAnalog")):
+            raise ValueError("The port's input settings are invalid; repair them in its F1 menu")
         # Native pad configuration plus the port's Western face permutation.
         config.setdefault("Keys", {}).update(Circle="E", R3="ShiftLeft")
         for name in ("Pad", "PadAnalog"):
@@ -139,6 +141,8 @@ def payload(root: Path | None = None) -> dict:
 
 
 def save(body: dict) -> dict:
+    if not isinstance(body.get("values"), dict):
+        raise ValueError("Settings values must be an object")
     changes = {}
     for field in FIELDS:
         value = body.get("values", {}).get(field["id"])
@@ -153,5 +157,11 @@ def save(body: dict) -> dict:
     if not isinstance(body.get("sha256"), str):
         raise ValueError("Reload the port settings before saving")
     with LOCK:
-        write_settings(game_root(), changes, expected=body["sha256"])
+        root = game_root()
+        if body["values"]["kf1.renderdistance.fade"]:
+            existing = parse_ini(read_file(root, "interface.ini")).get("kf1.renderdistance.fade", "0")
+            band = float(existing)
+            if math.isfinite(band) and band > 0:
+                changes["kf1.renderdistance.fade"] = existing
+        write_settings(root, changes, expected=body["sha256"])
         return payload()

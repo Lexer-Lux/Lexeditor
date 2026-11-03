@@ -57,6 +57,15 @@ def test_stale_saves_and_live_game_are_refused(port, monkeypatch):
     assert (port / "interface.ini").read_bytes() == before
 
 
+def test_changing_distance_keeps_the_existing_native_fade_band(port):
+    (port / "interface.ini").write_text("[RecompOne]\nkf1.renderdistance=16\nkf1.renderdistance.fade=1.5\n")
+    state = settings.payload()
+    values = {field["id"]: field["value"] for field in state["sections"][0]["fields"]}
+    values["kf1.renderdistance"] = 24
+    settings.save({"sha256": state["sha256"], "values": values})
+    assert settings.parse_ini((port / "interface.ini").read_bytes())["kf1.renderdistance.fade"] == "1.5"
+
+
 @pytest.mark.parametrize("distance", [-1, 1, 7.9, 31, float("nan"), True])
 def test_invalid_distance_is_rejected(port, distance):
     state = settings.payload()

@@ -1,5 +1,5 @@
 "use strict";
-const {el,detailPanel,detailField,actionRow,stack,notice}=LexeditorUI;
+const {el,detailPanel,actionRow,stack,notice}=LexeditorUI;
 let tab="settings",config=null,saved=null,error="",mapRows=[],query="";
 const mapState={page:0,query:"",status:"",sort:["filename",1]};
 async function request(path,body){
