@@ -525,7 +525,7 @@ def exercise_typed_data(page, project: Path, label: str, new_value: int) -> None
     take(page, f"crops-{label}.png")
 
     # The record's sections flow into pages; turn to the one that has it.
-    override = reveal(page, page.get_by_role("checkbox", name="Override Regrow days", exact=True))
+    override = reveal(page, page.get_by_role("checkbox", name="Override Regrow days", exact=True, include_hidden=True))
     if not override.is_checked():
         override.click()
     value = page.locator('input[aria-label="Regrow days"]')
@@ -580,7 +580,7 @@ def exercise_info(page, label: str, height: int) -> None:
     body = page.locator(".lex-information-panel .lex-detail-panel-body")
     body.evaluate("node => { node.scrollTop = node.scrollHeight; }")
     # Info's sections flow into pages; the last action is reached by paging.
-    final = reveal(page, page.get_by_role("button", name="Verify Acceptance Evidence", exact=True))
+    final = reveal(page, page.get_by_role("button", name="Verify Acceptance Evidence", exact=True, include_hidden=True))
     final.scroll_into_view_if_needed()
     box = final.bounding_box()
     assert box and box["y"] < height and box["y"] + box["height"] > 0, (label, box)
