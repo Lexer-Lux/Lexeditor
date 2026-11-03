@@ -105,7 +105,7 @@ def main():
                     # Read parent and children in one DOM snapshot, after the
                     # enemy rows arrive, instead of measuring a removed pager.
                     geometry = page.wait_for_function('''() => {
-                        if (!state.dirRows.length || !state.dirRows.every(isDirectoryFoe)) return false;
+                        if (!state.dirRows.length || !state.dirRows.every(row=>directoryCategory(row)==='enemies')) return false;
                         const node=document.querySelector('[data-maps-dir] .lex-compact-pager-bottom');
                         if (!node) return false;
                         const rect=part=>{const box=part.getBoundingClientRect();
