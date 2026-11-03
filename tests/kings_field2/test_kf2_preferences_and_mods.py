@@ -83,6 +83,20 @@ def test_duplicate_ini_facts_are_rejected():
             model.ini_values(text)
 
 
+def test_distance_and_smooth_fade_persist_independently(setup):
+    _, data, _ = setup
+    prefs = model.preferences(data)
+    prefs = model.save_preferences(data, {"kf2.renderdistance": 14.5}, prefs["fingerprint"])
+    prefs = model.save_preferences(data, {"kf2.distancefade.on": True}, prefs["fingerprint"])
+    values = {field["key"]: field["value"] for field in prefs["fields"]}
+    assert values["kf2.renderdistance"] == 14.5 and values["kf2.distancefade.on"] is True
+    prefs = model.save_preferences(data, {"kf2.distancefade.on": False}, prefs["fingerprint"])
+    values = {field["key"]: field["value"] for field in prefs["fields"]}
+    assert values["kf2.renderdistance"] == 14.5 and values["kf2.distancefade.on"] is False
+    with pytest.raises(ValueError, match="between"):
+        model.save_preferences(data, {"kf2.renderdistance": 16}, prefs["fingerprint"])
+
+
 def test_running_game_is_never_modified(setup, monkeypatch):
     game, data, library = setup
     source = mod(library)

@@ -60,7 +60,7 @@
       values[spec.key] = spec.kind === "boolean" ? control.checked : control.valueAsNumber;
       shell.refresh();
     });
-    return UI.detailField({label: spec.label, control});
+    return UI.detailField({label: spec.label, description: spec.help, control});
   }
 
   function settings() {
@@ -68,10 +68,8 @@
     if (problem) notices.push(UI.notice({tone: "error", title: "Could not save settings", message: problem}));
     if (!state.game.supported) notices.push(UI.notice({tone: "warning", title: "Locate Verdite2", message: "Choose the Verdite2 installation for King's Field II on the main menu."}));
     else if (state.game.running) notices.push(UI.notice({tone: "warning", title: "Verdite2 is running", message: "Close the game, then refresh this page before changing settings."}));
-    const body = [
-      UI.detailSection({title: "Mouse", body: state.preferences.fields.filter(spec => spec.key.startsWith("kf2.mouse.")).map(field)}),
-      UI.detailSection({title: "Controller", body: state.preferences.fields.filter(spec => spec.key.startsWith("kf2.analog.")).map(field)})
-    ];
+    const body = [...new Set(state.preferences.fields.map(spec => spec.section))].map(section =>
+      UI.detailSection({title: section, body: state.preferences.fields.filter(spec => spec.section === section).map(field)}));
     const button = document.createElement("button");
     button.type = "button"; button.textContent = "Refresh";
     button.disabled = busy || dirty(); button.addEventListener("click", () => refresh().catch(showError));
