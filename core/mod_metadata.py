@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from core.plugin_files import read_bounded
 
 FILE = "mod.json"
 FIELDS = ("name", "author", "description", "credits")
@@ -39,7 +40,7 @@ def _stored(root: Path) -> dict:
         if path.is_symlink() or getattr(path.lstat(), 'st_file_attributes', 0) & 0x400:
             raise ValueError('mod metadata must not be a link')
         with path.open('rb') as stream:
-            raw = stream.read(MAX_BYTES+1)
+            raw = read_bounded(stream, MAX_BYTES+1)
         if len(raw)>MAX_BYTES:
             raise ValueError('exceeds the 8 MiB metadata limit')
         value = json.loads(raw.decode('utf-8-sig'))

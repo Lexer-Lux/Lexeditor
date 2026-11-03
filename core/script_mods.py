@@ -31,7 +31,7 @@ import threading
 from time import perf_counter
 from typing import Any, Callable
 
-from core.plugin_files import atomic_write, is_link
+from core.plugin_files import atomic_write, is_link, read_bounded
 from core.mod_builds import ModBuildError
 
 SCRIPT_VERSION = 1
@@ -75,7 +75,7 @@ class ScriptModInfrastructureError(ScriptModError):
 def _read_json(path: Path) -> Any:
     try:
         with path.open('rb') as stream:
-            data = stream.read(MAX_METADATA_BYTES + 1)
+            data = read_bounded(stream, MAX_METADATA_BYTES + 1)
         if len(data) > MAX_METADATA_BYTES:
             raise ValueError('exceeds the 8 MiB metadata limit')
         return json.loads(data.decode('utf-8-sig'))
@@ -419,7 +419,7 @@ def source_fingerprint(root: Path) -> str:
             raise ScriptModError(f'{path.name}: build source must not be a link')
         if path.is_file():
             with path.open('rb') as stream:
-                data = stream.read(min(limit, MAX_SOURCE_TOTAL-total) + 1)
+                data = read_bounded(stream, min(limit, MAX_SOURCE_TOTAL-total) + 1)
         else:
             data = b''
         total += len(data)

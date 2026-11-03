@@ -19,6 +19,23 @@ Progress = Callable[[int, int, str], None]
 USER_AGENT = "Lexeditor/1.0"
 
 
+def read_bounded(stream, limit: int) -> bytes:
+    """Read at most limit bytes without allocating the whole limit up front.
+
+    Callers detecting oversized input request their cap plus one byte. Keep
+    reading after short reads so the bound still holds for streamed input.
+    """
+    parts = []
+    remaining = limit
+    while remaining > 0:
+        block = stream.read(min(remaining, 64 * 1024))
+        if not block:
+            break
+        parts.append(block)
+        remaining -= len(block)
+    return b''.join(parts)
+
+
 def is_link(path: Path) -> bool:
     """Recognize symlinks and Windows reparse points on supported Python versions."""
     try:
