@@ -2,6 +2,8 @@
 from contextlib import contextmanager
 from hashlib import sha256
 from pathlib import Path
+import os
+import shutil
 import sqlite3
 import time
 
@@ -9,6 +11,8 @@ LIMIT = 512 * 1024 * 1024
 ENTRIES = 512
 _DATABASE_OVERHEAD = 16 * 1024 * 1024
 _COLUMNS = [('key','BLOB'),('data','BLOB'),('checksum','BLOB'),('touched','INTEGER')]
+_LRU_INDEX = 'CREATE INDEX outputs_lru ON outputs(touched, length(data))'
+CACHE_FILE = 'composed-v2.sqlite3'
 
 
 class _BadCache(ValueError):
@@ -21,7 +25,7 @@ def user_root():
 
 
 def _files(root):
-    path = root/'composed.sqlite3'
+    path = root/CACHE_FILE
     return [path,*(root/(path.name+suffix) for suffix in ('-journal','-wal','-shm'))]
 
 
@@ -36,24 +40,82 @@ def _reset(root):
 
 
 def _open(root):
-    connection = sqlite3.connect(root/'composed.sqlite3',timeout=0.1)
+    connection = sqlite3.connect(root/CACHE_FILE,timeout=0.1)
     try:
         # Reuse evicted pages instead of moving every remaining large BLOB
         # at each commit. A hard page cap bounds the physical file too.
         connection.execute('PRAGMA auto_vacuum = INCREMENTAL')
         page_size = connection.execute('PRAGMA page_size').fetchone()[0]
         connection.execute(f'PRAGMA max_page_count = {max(1,(LIMIT+_DATABASE_OVERHEAD)//page_size)}')
-        objects = connection.execute("SELECT type,name FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 2").fetchall()
-        if any(row != ('table','outputs') for row in objects):
+        objects = connection.execute("SELECT type,name FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 3").fetchall()
+        if any(row not in (('table','outputs'), ('index','outputs_lru')) for row in objects):
             raise _BadCache('The disposable cache contains an unexpected schema object')
         connection.execute('CREATE TABLE IF NOT EXISTS outputs '
                            '(key BLOB PRIMARY KEY, data BLOB, checksum BLOB, touched INTEGER)')
         if [(row[1],row[2]) for row in connection.execute('PRAGMA table_info(outputs)')] != _COLUMNS:
             raise _BadCache('The disposable cache schema is invalid')
+        connection.execute(_LRU_INDEX.replace('CREATE INDEX', 'CREATE INDEX IF NOT EXISTS', 1))
+        definition = connection.execute("SELECT sql FROM sqlite_master WHERE name='outputs_lru'").fetchone()
+        if (not definition or not isinstance(definition[0], str)
+                or ''.join(definition[0].casefold().split()).replace('ifnotexists','') != ''.join(_LRU_INDEX.casefold().split())):
+            raise _BadCache('The disposable cache LRU index is invalid')
         return connection
     except Exception:
         connection.close()
         raise
+
+
+def _migrate_previous(root):
+    """Copy one bounded legacy cache; older running hosts keep their own schema.
+
+    SQLite's read-only backup takes a consistent snapshot, including a live
+    journal. It cannot wait indefinitely on another host or an unreadable cache.
+    The old file remains untouched; at most the previous and current cache exist.
+    """
+    from core.file_lock import exclusive
+    from .tweak_paths import checked
+    previous, current = root/'composed.sqlite3', root/CACHE_FILE
+    stage = root/('.'+CACHE_FILE+'.migrate')
+    try:
+        if current.exists() or not previous.is_file():
+            return
+        for path in (previous, *(root/('composed.sqlite3'+suffix) for suffix in ('-journal','-wal','-shm'))):
+            checked(path)
+            if path.is_file() and path.stat().st_size > LIMIT+_DATABASE_OVERHEAD:
+                return
+        lock = checked(root/'.composed-migration.lock')
+        with exclusive(lock):
+            if current.exists():
+                return
+            try:
+                checked(stage)
+                stage.unlink(missing_ok=True)
+                source = sqlite3.connect(previous.resolve().as_uri()+'?mode=ro', uri=True, timeout=0.1)
+                try:
+                    size = source.execute('PRAGMA page_count').fetchone()[0]*source.execute('PRAGMA page_size').fetchone()[0]
+                    if size > LIMIT+_DATABASE_OVERHEAD or shutil.disk_usage(root).free < size:
+                        return
+                    deadline = time.monotonic()+2
+                    def progress(*_):
+                        if time.monotonic() > deadline:
+                            raise TimeoutError('Disposable cache migration took too long')
+                    destination = sqlite3.connect(stage, timeout=0.1)
+                    try:
+                        source.backup(destination, pages=256, progress=progress, sleep=0.01)
+                    finally:
+                        destination.close()
+                finally:
+                    source.close()
+                if not current.exists():
+                    os.replace(stage, current)
+            finally:
+                for path in (stage, stage.with_name(stage.name+'-journal')):
+                    try:
+                        checked(path).unlink(missing_ok=True)
+                    except (OSError, ValueError):
+                        pass
+    except (OSError, RuntimeError, ValueError, sqlite3.Error):
+        pass  # Migration is optional; ordinary composition remains available.
 
 
 def _corrupt(error):
@@ -77,6 +139,7 @@ def _database(root):
     if any(path.is_file() and path.stat().st_size>LIMIT+_DATABASE_OVERHEAD for path in _files(root)):
         _reset(root)
     root.mkdir(parents=True, exist_ok=True)
+    _migrate_previous(root)
     try:
         connection = _open(root)
     except (sqlite3.DatabaseError,_BadCache) as error:

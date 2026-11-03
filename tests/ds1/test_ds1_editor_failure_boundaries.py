@@ -778,7 +778,7 @@ def test_full_activation_recovers_broken_script_and_corrupt_caches(game, tmp_pat
     cache = tmp_path / 'cache'
     cache.mkdir()
     (cache / 'conflicts.json').write_text('{broken', encoding='utf-8')
-    (cache / 'composed.sqlite3').write_bytes(b'broken database')
+    (cache / composition_cache.CACHE_FILE).write_bytes(b'broken database')
     monkeypatch.setattr(Ds1ModAdapter, '_report_path', staticmethod(lambda: cache / 'conflicts.json'))
     adapter = Ds1ModAdapter()
     adapter.attach_context(library_root=library, game_root=game)

@@ -3,6 +3,7 @@ from collections import OrderedDict
 from dataclasses import replace
 from pathlib import Path
 import sqlite3
+from hashlib import sha256
 
 import pytest
 
@@ -175,7 +176,7 @@ def test_non_menu_outputs_survive_menu_code_changes_but_not_their_own_codec(inpu
 
 @pytest.mark.parametrize('damage',['not-a-database','wrong-columns','extra-trigger'])
 def test_damaged_disposable_cache_is_rebuilt_without_disabling_mods(tmp_path,damage):
-    path = tmp_path/'composed.sqlite3'
+    path = tmp_path/composition_cache.CACHE_FILE
     if damage=='not-a-database':
         path.write_bytes(b'broken cache bytes')
     elif damage=='wrong-columns':
@@ -194,16 +195,19 @@ def test_damaged_disposable_cache_is_rebuilt_without_disabling_mods(tmp_path,dam
 
 def test_oversized_cache_is_discarded_before_sqlite_reads_it(tmp_path,monkeypatch):
     monkeypatch.setattr(composition_cache,'LIMIT',64)
-    monkeypatch.setattr(composition_cache,'_DATABASE_OVERHEAD',16384)
-    (tmp_path/'composed.sqlite3').write_bytes(b'not sqlite'+bytes(32768))
+    # The table, primary key, LRU index and incremental-vacuum metadata need
+    # more than four SQLite pages even for a one-byte archive.
+    overhead = 6*4096
+    monkeypatch.setattr(composition_cache,'_DATABASE_OVERHEAD',overhead)
+    (tmp_path/composition_cache.CACHE_FILE).write_bytes(b'not sqlite'+bytes(32768))
     composition_cache.store(tmp_path,b'key',b'value')
     assert composition_cache.load(tmp_path,b'key') == b'value'
-    assert (tmp_path/'composed.sqlite3').stat().st_size <= 64+16384
+    assert (tmp_path/composition_cache.CACHE_FILE).stat().st_size <= 64+overhead
 
 
 def test_busy_cache_is_not_mistaken_for_corruption(tmp_path):
     composition_cache.store(tmp_path,b'old',b'old output')
-    with sqlite3.connect(tmp_path/'composed.sqlite3') as connection:
+    with sqlite3.connect(tmp_path/composition_cache.CACHE_FILE) as connection:
         connection.execute('BEGIN EXCLUSIVE')
         composition_cache.store(tmp_path,b'new',b'new output')
     connection.close()
@@ -219,16 +223,78 @@ def test_large_cache_entry_evicts_only_the_oldest_outputs(tmp_path, monkeypatch)
     assert composition_cache.load(tmp_path, b'large') == b'new'*800
     assert composition_cache.load(tmp_path, b'0') is None
     assert composition_cache.load(tmp_path, b'63') == bytes([63])*48
-    with sqlite3.connect(tmp_path/'composed.sqlite3') as connection:
+    with sqlite3.connect(tmp_path/composition_cache.CACHE_FILE) as connection:
         count, size = connection.execute('SELECT count(*),sum(length(data)) FROM outputs').fetchone()
     connection.close()
     assert count == 36 and size <= 4096
 
 
+def test_eviction_index_avoids_scanning_archive_blob_rows(tmp_path):
+    composition_cache.store(tmp_path, b'one', b'archive')
+    with composition_cache._database(tmp_path) as connection:
+        plan = connection.execute('EXPLAIN QUERY PLAN SELECT rowid,length(data) FROM outputs ORDER BY touched LIMIT 513').fetchall()
+    assert any('outputs_lru' in row[-1] for row in plan), plan
+    assert not any('TEMP B-TREE' in row[-1] for row in plan), plan
+
+
+def previous_cache(root):
+    path = root/'composed.sqlite3'
+    with sqlite3.connect(path) as connection:
+        connection.execute('CREATE TABLE outputs (key BLOB PRIMARY KEY,data BLOB,checksum BLOB,touched INTEGER)')
+        connection.execute('INSERT INTO outputs VALUES (?,?,?,?)',
+                           (b'previous', b'compiled archive', sha256(b'compiled archive').digest(), 1))
+    connection.close()
+    return path
+
+
+def test_schema_upgrade_reuses_outputs_without_changing_the_older_hosts_cache(tmp_path):
+    previous = previous_cache(tmp_path)
+    original = previous.read_bytes()
+    assert composition_cache.load(tmp_path, b'previous') == b'compiled archive'
+    assert previous.read_bytes() == original
+    assert (tmp_path/composition_cache.CACHE_FILE).is_file()
+    assert not (tmp_path/('.'+composition_cache.CACHE_FILE+'.migrate')).exists()
+    # A new write has a separate schema, rather than teaching an older
+    # running host to accept a cache it would otherwise delete as corrupt.
+    composition_cache.store(tmp_path, b'new', b'new archive')
+    assert previous.read_bytes() == original
+
+
+def test_damaged_previous_cache_cannot_prevent_new_outputs(tmp_path):
+    previous = tmp_path/'composed.sqlite3'
+    previous.write_bytes(b'broken legacy cache')
+    composition_cache.store(tmp_path, b'new', b'valid archive')
+    assert composition_cache.load(tmp_path, b'new') == b'valid archive'
+    assert previous.read_bytes() == b'broken legacy cache'
+
+
+def test_locked_previous_cache_does_not_block_the_current_cache(tmp_path):
+    previous = previous_cache(tmp_path)
+    connection = sqlite3.connect(previous)
+    try:
+        connection.execute('BEGIN EXCLUSIVE')
+        composition_cache.store(tmp_path, b'new', b'valid archive')
+        assert composition_cache.load(tmp_path, b'new') == b'valid archive'
+    finally:
+        connection.close()
+
+
+def test_previous_cache_copy_has_a_deadline_and_removes_its_partial_file(tmp_path, monkeypatch):
+    previous = previous_cache(tmp_path)
+    original = previous.read_bytes()
+    readings = iter((0., 3.))
+    monkeypatch.setattr(composition_cache.time, 'monotonic', lambda: next(readings))
+    assert composition_cache.load(tmp_path, b'previous') is None
+    assert previous.read_bytes() == original
+    assert not (tmp_path/('.'+composition_cache.CACHE_FILE+'.migrate')).exists()
+    composition_cache.store(tmp_path, b'new', b'valid archive')
+    assert composition_cache.load(tmp_path, b'new') == b'valid archive'
+
+
 def test_excess_cache_entry_count_is_discarded_without_an_unbounded_eviction_loop(tmp_path, monkeypatch):
     composition_cache.store(tmp_path, b'initial', b'output')
     monkeypatch.setattr(composition_cache, 'ENTRIES', 3)
-    with sqlite3.connect(tmp_path/'composed.sqlite3') as connection:
+    with sqlite3.connect(tmp_path/composition_cache.CACHE_FILE) as connection:
         connection.executemany('INSERT INTO outputs VALUES (?,?,?,?)',
                               [(str(n).encode(), b'output', b'checksum', n) for n in range(5)])
     connection.close()
@@ -242,7 +308,7 @@ def test_eviction_reuses_pages_with_a_physical_disk_cap(tmp_path,monkeypatch):
     monkeypatch.setattr(composition_cache,'_DATABASE_OVERHEAD',16*1024)
     # Exercise migration from the old full-vacuum database as well as repeated
     # bounded evictions. Payloads differ so no content reuse can hide writes.
-    path=tmp_path/'composed.sqlite3'
+    path=tmp_path/composition_cache.CACHE_FILE
     with sqlite3.connect(path) as database:
         database.execute('PRAGMA auto_vacuum = FULL')
         database.execute('CREATE TABLE outputs (key BLOB PRIMARY KEY, data BLOB, checksum BLOB, touched INTEGER)')
