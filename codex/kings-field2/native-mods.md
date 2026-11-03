@@ -33,10 +33,12 @@ DrawSettings add cleanup and a gear panel. Do not provide an empty DrawSettings
 override: it creates an empty gear panel. Dependencies load first; other entries
 use native ID order. The library's presentation order does not control this.
 
-Lexeditor deploys owned source folders prefixed lexeditor-. It preserves other
-native mods, refuses replacement of externally edited deployed source, and
-journals native flags and copies for recovery. The adapter requires a closed
-game. It does not edit settings.json, memory cards, disc data or game binaries.
+Lexeditor edits the native writable mods directory in place through the shared
+NativeSourceModAdapter. There is no second Documents library or prefixed deployed
+copy. Native loader flags remain the single enablement store. Mutations require
+a closed game; settings.json, memory cards, disc data and game binaries are not
+mod deployment targets. The native content/mods directory only seeds bundled
+mods; it is not the player library.
 
 ## Extended scenery range
 
