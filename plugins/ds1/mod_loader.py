@@ -479,11 +479,14 @@ def _composition_revision(include_menu=True):
     digest = sha256()
     # Request handling, script transport, cache I/O and native tweak planning
     # cannot change an archive composed from these already-built input bytes.
-    # Read-only model previews and cosmetic theme extraction cannot change
-    # them either: UI fixes must not recompose every game archive on Save.
+    # Standalone startup/recovery chooses the inputs, which are hashed below;
+    # it does not merge their bytes. Read-only model previews and cosmetic
+    # theme extraction cannot change them either: unrelated fixes must not
+    # recompose every game archive on Save.
     unrelated = {'server.py', 'script_worker.py', 'plugin.py', 'mod_support.py', 'deployment.py',
                  'tweak_mods.py', 'composition_cache.py', 'project_refresh.py', 'mod_usage.py',
                  'map_store.py', 'collision_store.py', 'runtime_package.py',
+                 'standalone_runtime.py', 'standalone_entry.py',
                  'viewport.py', 'flver.py', 'mtd.py', 'theme.py'}
     if not include_menu:
         # These consume menu declarations or texture packs, never a map,
