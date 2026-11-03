@@ -212,7 +212,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             # Right-clicking a property puts back the value its record shipped
             # with. The shared Detail owns the reset and the reference entry;
             # the plugin supplies the vanilla value and the way to write one.
-            price.fill("333")
+            numeric_field(page, "BUY PRICE").fill("333")
             expect(save).to_be_enabled()
             expect(page.locator(".lex-source-control.lex-value-modified")).to_have_count(1)
             page.screenshot(path=str(OUT / "ff9-items-modified.png"), full_page=True)
@@ -222,14 +222,14 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             expect(page.locator(".lex-source-control.lex-value-modified")).to_have_count(0)
             page.screenshot(path=str(OUT / "ff9-items-restored.png"), full_page=True)
 
-            price.fill("333")
+            numeric_field(page, "BUY PRICE").fill("333")
             expect(save).to_be_enabled()
             save.click(button="right")
             page.get_by_role("button", name="Discard Changes", exact=True).click()
             expect(price).to_have_value("250")
             expect(save).to_be_disabled()
 
-            price.fill("333")
+            numeric_field(page, "BUY PRICE").fill("333")
             save.click()
             page.wait_for_function("dirtyCount()===0")
             overlay = project / "StreamingAssets/Data/Items/Items.csv"
