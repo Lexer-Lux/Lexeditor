@@ -345,3 +345,32 @@ def test_eviction_reuses_pages_with_a_physical_disk_cap(tmp_path,monkeypatch):
         assert database.execute('PRAGMA auto_vacuum').fetchone()[0]==2
         assert database.execute('SELECT sum(length(data)) FROM outputs').fetchone()[0]<=32*1024
         assert database.execute('PRAGMA max_page_count').fetchone()[0]*database.execute('PRAGMA page_size').fetchone()[0]<=48*1024
+
+
+@pytest.mark.parametrize('failure', ['update-full', 'update-locked', 'commit'])
+@pytest.mark.parametrize('corrupt', [False, True])
+def test_optional_recency_failure_keeps_only_checksum_verified_bytes(tmp_path, monkeypatch, failure, corrupt):
+    from contextlib import contextmanager
+    payload = b'verified compiled archive'
+    composition_cache.store(tmp_path, b'key', payload)
+    database = composition_cache._database
+    with database(tmp_path) as connection:
+        connection.execute('UPDATE outputs SET touched=0')
+        if corrupt:
+            connection.execute('UPDATE outputs SET checksum=?', (b'wrong checksum',))
+    class FailRecency:
+        def __init__(self, connection):
+            self.connection = connection
+        def execute(self, sql, parameters=()):
+            if sql.startswith('UPDATE outputs SET touched') and failure.startswith('update-'):
+                reason = 'database or disk is full' if failure == 'update-full' else 'database is locked'
+                raise sqlite3.OperationalError(reason)
+            return self.connection.execute(sql, parameters)
+    @contextmanager
+    def failing_database(root):
+        with database(root) as connection:
+            yield FailRecency(connection)
+            if failure == 'commit':
+                raise sqlite3.OperationalError('optional recency commit failed')
+    monkeypatch.setattr(composition_cache, '_database', failing_database)
+    assert composition_cache.load(tmp_path, b'key') == (None if corrupt else payload)
