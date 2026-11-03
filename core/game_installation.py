@@ -478,7 +478,8 @@ class GameInstallationManager:
         override = os.environ.get(spec.root_env)
         if override:
             candidates.append(Path(override))
-        candidates.extend(self._steam_candidates(spec.steam_app_id, spec.install_dir_names))
+        if spec.steam_app_id:
+            candidates.extend(self._steam_candidates(spec.steam_app_id, spec.install_dir_names))
         candidates.extend(spec.default_roots)
         candidates.extend(self._uninstall_candidates(plugin.name))
         candidates.extend(self._epic_candidates(plugin.name))

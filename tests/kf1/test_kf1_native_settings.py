@@ -9,6 +9,18 @@ from plugins.kf1 import settings
 from plugins.kf1.mod_support import Kf1ModAdapter
 
 
+def test_standalone_port_is_a_valid_shared_installation(tmp_path):
+    from core.cover_art import CoverArtCache
+    from core.plugin_api import validate_plugin
+    from plugins.kf1.plugin import PLUGIN
+    validate_plugin(PLUGIN)
+    assert PLUGIN.installation.steam_app_id == ""
+    downloads = []
+    cache = CoverArtCache({"kf1": PLUGIN}, root=tmp_path / "covers", steam_roots=(), fetcher=lambda url: downloads.append(url))
+    assert cache.snapshot("kf1")["state"] == "unavailable"
+    assert not downloads
+
+
 @pytest.fixture
 def port(tmp_path, monkeypatch):
     root = tmp_path / "port"

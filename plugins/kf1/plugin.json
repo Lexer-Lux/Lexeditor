@@ -8,7 +8,6 @@
     "requiredPaths": ["KingsField1.exe", "KingsField1.dll", "lexeditor-port.json"],
     "executable": "KingsField1.exe",
     "launchPath": "KingsField1.exe",
-    "steamAppId": null,
     "installDirNames": ["Verdite1"],
     "defaultRoots": ["D:/Programs/Verdite1"],
     "reshadeRenderer": "opengl32"

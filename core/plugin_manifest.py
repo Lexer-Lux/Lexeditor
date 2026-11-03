@@ -95,7 +95,7 @@ def install_spec(plugin_file: str | Path, **overrides) -> GameInstallSpec | None
         "root_env": data["rootEnv"],
         "required_paths": tuple(data["requiredPaths"]),
         "executable": data["executable"],
-        "steam_app_id": data["steamAppId"],
+        "steam_app_id": data.get("steamAppId", ""),
         "install_dir_names": tuple(data["installDirNames"]),
         "default_roots": tuple(Path(root) for root in data["defaultRoots"]),
     }

@@ -187,6 +187,9 @@ class CoverArtCache:
                 self._states[plugin_id] = self._state("unavailable", "", "")
                 continue
             app_id = specification.art_app_id or specification.steam_app_id
+            if not app_id:
+                self._states[plugin_id] = self._state("unavailable", "", "")
+                continue
             target = self.root / f"{plugin_id}-{app_id}.jpg"
             dimensions = _valid_file(target)
             if dimensions:
