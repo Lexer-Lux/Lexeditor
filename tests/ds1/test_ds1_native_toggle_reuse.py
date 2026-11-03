@@ -7,6 +7,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from test_ds1_tweak_save_rebuild import game, library  # noqa: F401
 
 
+def test_deployment_code_does_not_invalidate_composed_archive_bytes(monkeypatch):
+    from plugins.ds1 import mod_loader
+    original = Path.read_bytes
+    changed = {'file': None}
+    def read(path):
+        data = original(path)
+        return data+b'\n# changed implementation\n' if path.name == changed['file'] else data
+    monkeypatch.setattr(Path, 'read_bytes', read)
+    def revision():
+        mod_loader._composition_revision.cache_clear()
+        return mod_loader._composition_revision()
+    try:
+        baseline = revision()
+        changed['file'] = 'deployment.py'
+        assert revision() == baseline
+        changed['file'] = 'formats.py'
+        assert revision() != baseline
+    finally:
+        mod_loader._composition_revision.cache_clear()
+
+
 def test_direct_data_edit_stays_pending_until_its_bytes_are_installed(game, library, monkeypatch):
     from plugins.ds1 import tweak_mods
     from plugins.ds1.mod_support import Ds1ModAdapter
