@@ -25,11 +25,13 @@ import importlib.util
 import json
 import math
 import os
+import shutil
 from pathlib import Path, PurePosixPath
 import sys
 import threading
+import tempfile
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any, BinaryIO, Callable
 
 from core.plugin_files import atomic_write, is_link, read_bounded
 from core.mod_builds import ModBuildError
@@ -335,20 +337,53 @@ def _generated_files(root: Path, allowed_roots: tuple[str, ...] | None) -> dict[
     return previous
 
 
-def _snapshot(root: Path, keys) -> dict[str, bytes | None]:
+def _close_snapshot(snapshot):
+    for stream in snapshot.values():
+        if stream is not None:
+            try:
+                stream.close()
+            except OSError:
+                pass  # Discarding a temporary copy cannot mask the build failure.
+
+
+def _snapshot(root: Path, keys) -> dict[str, BinaryIO | None]:
     result = {}
     try:
         for key in keys:
             target = _contained_target(root, PurePosixPath(key))
-            result[key] = target.read_bytes() if target.is_file() else None
-    except OSError as error:
-        raise ScriptModInfrastructureError(f'Could not preserve generated mod files: {error}') from error
+            result[key] = None
+            if target.is_file():
+                saved = result[key] = tempfile.TemporaryFile()
+                with target.open('rb') as source:
+                    shutil.copyfileobj(source, saved, 64 * 1024)
+                saved.seek(0)
+    except BaseException as error:
+        _close_snapshot(result)
+        if isinstance(error, OSError):
+            raise ScriptModInfrastructureError(f'Could not preserve generated mod files: {error}') from error
+        raise
     return result
 
 
-def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
+def _matches_snapshot(target: Path, saved: BinaryIO) -> bool:
+    saved.seek(0)
+    try:
+        if not target.is_file():
+            return False
+        with target.open('rb') as current:
+            while True:
+                before = saved.read(64 * 1024)
+                if current.read(len(before) or 1) != before:
+                    return False
+                if not before:
+                    return True
+    finally:
+        saved.seek(0)
+
+
+def restore_generated(root: Path, snapshot: dict[str, BinaryIO | None], *,
                       allowed_roots: tuple[str, ...]) -> None:
-    """Undo one build using its in-memory snapshot, reporting every failure."""
+    """Undo one build from temporary files, reporting every failure."""
     errors = []
     for key, contents in snapshot.items():
         try:
@@ -356,7 +391,7 @@ def restore_generated(root: Path, snapshot: dict[str, bytes | None], *,
             target = _contained_target(Path(root), path)
             if contents is None:
                 target.unlink(missing_ok=True)
-            elif not target.is_file() or target.read_bytes() != contents:
+            elif not _matches_snapshot(target, contents):
                 atomic_write(target, contents)
         except Exception as error:
             errors.append(f"{key}: {error}")
@@ -480,7 +515,11 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...],
         for key, contents in planned.items():
             target = root / Path(*PurePosixPath(key).parts)
             target.parent.mkdir(parents=True, exist_ok=True)
-            if not target.is_file() or target.read_bytes() != contents:
+            matches = False
+            if target.is_file():
+                with target.open('rb') as stream:
+                    matches = read_bounded(stream, len(contents) + 1) == contents
+            if not matches:
                 atomic_write(target, contents)
                 written.append(key)
         for key in sorted(set(previous) - set(planned)):
@@ -499,6 +538,8 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...],
             except Exception:
                 pass  # Cache metadata must not roll back a valid mod build.
         atomic_write(manifest_path, (json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
+        if rollback is not None:
+            rollback[root] = snapshot
     except Exception as error:
         try:
             restore_generated(root, snapshot, allowed_roots=allowed_roots)
@@ -507,8 +548,9 @@ def build(root: Path, context: Any, *, allowed_roots: tuple[str, ...],
         if isinstance(error, OSError):
             raise ScriptModInfrastructureError(f'Could not save generated mod files: {error}') from error
         raise
-    if rollback is not None:
-        rollback[root] = snapshot
+    finally:
+        if rollback is None or rollback.get(root) is not snapshot:
+            _close_snapshot(snapshot)
     return {"files": sorted(planned), "written": written, "removed": removed}
 
 
@@ -567,6 +609,9 @@ def build_batch(rows: list[dict], context: Any, *, allowed_roots: tuple[str, ...
         folders = [] if failures or isinstance(failure, (ScriptModRollbackError, ScriptModInfrastructureError)) else (
             failure.folders if isinstance(failure, ModBuildError) and failure.folders else [row['path']])
         raise error(f"{context.current}: {failure}{suffix}", folders=folders) from failure
+    finally:
+        for snapshot in snapshots.values():
+            _close_snapshot(snapshot)
     return built
 
 
