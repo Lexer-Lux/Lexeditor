@@ -3,6 +3,7 @@
   "name": "King's Field II",
   "accent": "#b5a05d",
   "processNames": ["Verdite2.exe"],
+  "lexmod": "Lexer-Lux/Lexers-Mod-For-KF2",
   "installation": {
     "rootEnv": "LEXEDITOR_KF2_ROOT",
     "requiredPaths": ["bin/Verdite2.exe", "bin/RecompOne.Runtime.dll", "content/config/kf2.json"],

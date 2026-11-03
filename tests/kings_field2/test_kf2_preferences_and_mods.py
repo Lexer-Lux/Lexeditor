@@ -19,16 +19,20 @@ def test_service_is_registered_for_normal_and_frozen_launches():
     assert "plugins.kings_field2.server" in service_command("plugins.kings_field2.server", owned=True)
 
 
-def test_non_steam_game_validates_without_steam_discovery_or_art_requests(tmp_path):
+def test_non_steam_game_validates_without_steam_discovery_or_art_requests(tmp_path, monkeypatch):
     from core.plugin_api import validate_plugin
     from core.game_installation import GameInstallationManager
     from core.cover_art import CoverArtCache
     from plugins.kings_field2.plugin import PLUGIN
     validate_plugin(PLUGIN)
-    assert GameInstallationManager._steam_candidates("", ("Verdite2",)) == []
-
     def unexpected_fetch(*args, **kwargs):
         raise AssertionError("A non-Steam port must not request a Steam cover")
+
+    manager = object.__new__(GameInstallationManager)
+    monkeypatch.setattr(manager, "_steam_candidates", unexpected_fetch)
+    monkeypatch.setattr(manager, "_uninstall_candidates", lambda _: [])
+    monkeypatch.setattr(manager, "_epic_candidates", lambda _: [])
+    assert list(PLUGIN.installation.default_roots) == manager._discover(PLUGIN)
 
     covers = CoverArtCache({PLUGIN.plugin_id: PLUGIN}, root=tmp_path,
                           fetcher=unexpected_fetch, steam_roots=())
@@ -230,6 +234,30 @@ def pinned_archive(game, temporary, monkeypatch):
     monkeypatch.setattr(port, "PIN", pin)
     monkeypatch.setattr(port, "fetch_file", lambda url, target, **kwargs: shutil.copy2(archive, target))
     return archive
+
+
+@pytest.mark.parametrize("edited", ["mods/lexeditor-first/Mod.cs", "interface.before", "personal-note.txt"])
+def test_committed_recovery_never_deletes_edited_backup(setup, monkeypatch, edited):
+    game, data, library = setup
+    first, second = mod(library, "first"), mod(library, "second")
+    adapter = VerditeModAdapter()
+    adapter.activate([first], game)
+    original_remove = shutil.rmtree
+
+    def interrupt_cleanup(path, *args, **kwargs):
+        if Path(path) == data / RECOVERY:
+            (Path(path) / edited).write_text("player changes to preserve")
+            raise OSError("synthetic interruption after commit")
+        return original_remove(path, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "rmtree", interrupt_cleanup)
+    with pytest.raises(OSError, match="after commit"):
+        adapter.activate([second], game)
+    monkeypatch.setattr(shutil, "rmtree", original_remove)
+    with pytest.raises(ValueError, match="Recovery copy"):
+        adapter.recover(game)
+    assert (data / RECOVERY / edited).read_text() == "player changes to preserve"
+    assert (data / "mods/lexeditor-second/Mod.cs").is_file()
 
 
 def test_fork_download_install_is_separate_and_hash_verified(setup, tmp_path, monkeypatch):

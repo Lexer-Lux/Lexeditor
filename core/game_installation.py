@@ -478,7 +478,8 @@ class GameInstallationManager:
         override = os.environ.get(spec.root_env)
         if override:
             candidates.append(Path(override))
-        candidates.extend(self._steam_candidates(spec.steam_app_id, spec.install_dir_names))
+        if spec.steam_app_id:
+            candidates.extend(self._steam_candidates(spec.steam_app_id, spec.install_dir_names))
         candidates.extend(spec.default_roots)
         candidates.extend(self._uninstall_candidates(plugin.name))
         candidates.extend(self._epic_candidates(plugin.name))
@@ -486,8 +487,6 @@ class GameInstallationManager:
 
     @staticmethod
     def _steam_candidates(app_id: str, install_names: tuple[str, ...]) -> list[Path]:
-        if not app_id:
-            return []
         steam_roots: list[Path] = []
         for hive, key_name, value_name in (() if winreg is None else (
             (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath"),

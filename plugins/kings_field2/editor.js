@@ -82,14 +82,14 @@
       UI.detailSection({title: "Installation", body: [
         UI.detailField({label: "Game", control: UI.readonlyField("Japanese King's Field II / US King's Field, SLUS-00158")}),
         UI.detailField({label: "Port", control: UI.readonlyField(state.game.root)}),
-        UI.detailField({label: "Port version", control: UI.readonlyField(state.game.fork.version || "Not installed")}),
+        UI.detailField({label: "Port version", control: UI.readonlyField(state.game.fork.installed ? state.game.fork.pinned : "Not installed")}),
         UI.detailField({label: "Settings and saves", control: UI.readonlyField(state.game.dataRoot)})
       ]}),
-      UI.modLoaderSection({loader: "Verdite2 / RecompOne's built-in C# source-mod compiler and hook loader.",
-        structure: "One folder per source mod with mod.json and C# source. Lexeditor deploys owned copies to the port's native mods folder.",
-        overriding: "Native dependencies and hooks govern runtime composition. Lexeditor preserves separately installed mods and does not infer hook conflicts from filenames.",
-        launch: "Play starts the installed Verdite2 launcher. A first launch builds the game from the player's US disc.",
-        removal: "Disable a mod in the shared Mods tab while the game is closed. Only Lexeditor-owned deployment folders and active ids are removed."})
+      UI.modLoaderSection({loader: "Verdite2 / RecompOne compiles source mods and attaches their native hooks. Play starts the pinned fork launcher.",
+        output: "Each mod has a folder with mod.json and C# source. Enabled mods receive owned copies in the port's mods folder.",
+        order: "Native dependencies and IDs decide mod load order. The library list order does not change it.",
+        safety: "Mod deployment preserves game binaries, discs, memory cards and separately installed native mods.",
+        removal: "Disable it in Mods with the game closed. Lexeditor removes its deployed copy and switches off its native flag."})
     ]}));
   }
 

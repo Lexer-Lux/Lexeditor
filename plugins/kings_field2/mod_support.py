@@ -70,7 +70,23 @@ class VerditeModAdapter:
             return
         model.ensure_closed()
         state = model.read_json(recovery / "transaction.json")
+        expected = {"transaction.json", "interface.before", "ledger.before", "mods"}
+        if {path.name for path in recovery.iterdir()} != expected:
+            raise ValueError("Recovery copy was edited; preserve its added or missing files before continuing")
+        for name, before in (("interface.ini", "interface.before"), (LEDGER, "ledger.before")):
+            if model.fingerprint(model.read_bytes(recovery / before)) != state["before"][name]:
+                raise ValueError(f"Recovery copy {before} was edited; recovery was preserved")
+        backups = recovery / "mods"
+        names = {path.name for path in backups.iterdir()}
+        if names - state["old"].keys():
+            raise ValueError("Recovery copy contains unrecognized mod files; recovery was preserved")
+        for name in names:
+            folder = backups / _folder(name)
+            if not folder.is_dir() or _tree(folder) != state["old"][name]["files"]:
+                raise ValueError(f"Recovery copy {name} was edited; recovery was preserved")
         if state.get("phase") == "committed":
+            if names != state["old"].keys():
+                raise ValueError("Recovery copy is incomplete; recovery was preserved")
             shutil.rmtree(recovery)
             return
         old, new = state["old"], state["new"]
@@ -156,8 +172,10 @@ class VerditeModAdapter:
                 recovery.mkdir()
                 (recovery / "mods").mkdir()
                 model.atomic_write(recovery / "interface.before", raw_settings)
-                model.atomic_write(recovery / "ledger.before", model.read_bytes(data / LEDGER))
+                raw_ledger = model.read_bytes(data / LEDGER)
+                model.atomic_write(recovery / "ledger.before", raw_ledger)
                 transaction = {"phase": "applying", "old": old, "new": new,
+                               "before": {"interface.ini": model.fingerprint(raw_settings), LEDGER: model.fingerprint(raw_ledger)},
                                "after": {"interface.ini": model.fingerprint(after_settings), LEDGER: model.fingerprint(after_ledger)}}
                 model.atomic_write(recovery / "transaction.json", _json(transaction))
                 try:
@@ -172,7 +190,7 @@ class VerditeModAdapter:
                 except BaseException:
                     self.recover(game_root)
                     raise
-                shutil.rmtree(recovery)
+                self.recover(game_root)
             return {"activated": [folder.name for folder in mods], "mods": self.active_mod_ids(game_root), "dataRoot": str(data)}
 
     def active_mod_ids(self, game_root: Path) -> list[str]:

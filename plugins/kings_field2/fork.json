@@ -1,11 +1,11 @@
 {
   "repository": "Lexer-Lux/verdite2",
-  "tag": "v0.5.3-lexer.1",
+  "tag": "v0.5.3-lexer.2",
   "version": "0.5.3",
-  "sourceRevision": "064f6b57b6408f9f9828df360a5e654c12addfb7",
+  "sourceRevision": "833f8efe5c68d0a69704d5b3f73100cd92f0a5ce",
   "serial": "SLUS-00158",
-  "asset": "Verdite2-0.5.3-lexer.1-win-x64.zip",
-  "bytes": 47224530,
-  "sha256": "f327d8343eabbb599e486c008acd066011b46efd6fcec7429c2291854d33a139",
+  "asset": "Verdite2-0.5.3-lexer.2-win-x64.zip",
+  "bytes": 47289855,
+  "sha256": "c7975ed2242a3cf20e7c17e0a432fe3bf8cdf74328aa61b3a441d028be1c57bc",
   "unpackedLimit": 160000000
 }
