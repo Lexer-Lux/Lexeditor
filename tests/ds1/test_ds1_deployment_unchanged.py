@@ -91,3 +91,33 @@ def test_transformed_payload_keeps_distinct_source_and_installed_identities(tmp_
     assert marker['activeHash'] == hashlib.sha256(transformed).hexdigest()
     assert (game / RELATIVE).read_bytes() == transformed
     assert result['enabled'] and not result['stale']
+
+
+@pytest.mark.parametrize('operation', ['restore', 'apply_without_mod'])
+def test_repeated_restore_validates_without_rewriting_originals(tmp_path, monkeypatch, operation):
+    game, mod = project(tmp_path)
+    payload = make_archive(field_values={'EquipParamGoods': {100: {'basicPrice': 17}}})
+    deployment.apply(game, mod, composed={RELATIVE: payload})
+    deployment.disable(game)
+    writes = []
+    original = deployment.atomic_write
+    def write(path, data):
+        writes.append(path)
+        return original(path, data)
+    monkeypatch.setattr(deployment, 'atomic_write', write)
+    def repeat():
+        return (deployment.disable(game) if operation == 'restore'
+                else deployment.apply(game, mod, composed={}))
+    result = repeat()
+    assert result['matchesOriginal'] and not result['enabled']
+    assert not writes
+    # An already disabled receipt still cannot authorize overwriting a later
+    # external edit or trusting a damaged preserved original.
+    for target in (game/RELATIVE, deployment._backup_path(game, RELATIVE)):
+        before = target.read_bytes()
+        target.write_bytes(b'external edit')
+        with pytest.raises(RuntimeError):
+            repeat()
+        assert target.read_bytes() == b'external edit'
+        assert not writes
+        target.write_bytes(before)

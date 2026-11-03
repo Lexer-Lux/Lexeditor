@@ -868,6 +868,11 @@ def _restore_file(game_root: Path, relative: Path) -> None:
     # marker already says "disabled": a second Disable after something else
     # wrote to the live file must refuse, not blindly restore over it.
     marker = _reconcile(marker, marker_path, live)
+    # A disabled receipt with no active hash has just verified the original
+    # bytes. Keep this operation idempotent instead of copying the archive and
+    # rewriting its journal again on every later Restore or removed-mod Save.
+    if not marker.get('enabled') and marker.get('activeHash') is None and marker.get('activeProjectRoot') is None:
+        return
 
     marker.update({"pendingHash": marker["originalHash"], "pendingKind": "disable"})
     _write_marker(marker_path, marker)
