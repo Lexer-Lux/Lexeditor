@@ -274,6 +274,7 @@ def test_convex_browser_edits_vertices_and_explains_derived_faces(convex_source,
                 assert page.evaluate('state.row.table')=='EquipParamGoods'
                 page.unroute('**/api/map/collision?**')
                 page.evaluate('navigate("maps")')
+                assert page.evaluate('state.mapTab') == 'collision'
                 page.evaluate('chooseCollision({kind:"vertices"})')
                 page.wait_for_function('state.row?.id.startsWith("v:")')
                 held_states=[]
