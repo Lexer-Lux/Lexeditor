@@ -11,6 +11,13 @@ format, so popular mods keep working as they ship.
   (`core/mod_metadata.py`):
   - `name`: required, at most 120 characters.
   - `author`, `description`, `credits`: optional text, may be blank.
+  - `licenseFiles`: optional list of document paths relative to the mod folder.
+    The shared license reader also recognizes root `LICENSE`, `LICENCE`,
+    `COPYING`, and `NOTICE` documents (with optional extensions), and documents
+    under `licenses/`. These are ordinary files, not game contributions. The
+    DS1 release exporter preserves their bytes and paths. Missing declared files,
+    links, paths outside the mod, more than 128 documents or over 16 MiB total
+    are errors. Credits stay short; full license text belongs in these files.
   Credits travel with the mod they credit.
 - `requires`: optional list of mod ids that must be installed and switched
   on. A mod's id is its `mod.json` `id`, or its folder name when it has

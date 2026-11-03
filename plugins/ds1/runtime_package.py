@@ -71,6 +71,15 @@ def package(destination: Path) -> Path:
         shutil.copy2(license_file,runtime/'Python-LICENSE.txt')
     (destination/'dinput8.dll').write_bytes(tweak_mods.loader_bytes(online=True))
     shutil.copy2(ROOT/'plugins/ds1/credits.md',destination/'Loader-credits.txt')
+    # Ship the exact editable native sources with every DLL distribution.
+    # A link to upstream alone does not include our modified adapter/build.
+    with zipfile.ZipFile(destination/'Loader-source.zip','w',compression=zipfile.ZIP_DEFLATED) as archive:
+        for name in (*build.ONLINE_SOURCES, 'build.py', 'ONLINE.md', 'STANDALONE.md', 'SEAMLESS.md'):
+            archive.write(build.HERE/name, 'plugins/ds1/runtime/'+name)
+        for name in ('credits.md', 'exe_patches.py'):
+            archive.write(ROOT/'plugins/ds1'/name, 'plugins/ds1/'+name)
+        archive.write(build.ONLINE_PACKAGE/'runtime-manifest.json',
+                      'plugins/ds1/runtime/package/online/runtime-manifest.json')
     (destination/'README.txt').write_text(
         'Extract these files beside DarkSoulsRemastered.exe.\n'
         'If another mod already supplies dinput8.dll, preserve it as dinput8.chain.dll before extracting.\n'
@@ -79,5 +88,6 @@ def package(destination: Path) -> Path:
         'Start the game through Steam. Prebuilt data mods combine automatically.\n'
         'Lexeditor, Python installations and compilers are not required.\n'
         'Lexeditor can later offer to move these mods into your shared mod library.\n'
-        'See Loader-credits.txt for licenses and source references.\n',encoding='utf-8')
+        'The online DLL is AGPL-3.0-only; see Loader-credits.txt for notices and licenses.\n'
+        'Loader-source.zip contains its modified source and build instructions.\n',encoding='utf-8')
     return destination

@@ -16388,6 +16388,8 @@ ${contents.path}`});
           detailField({label: "AUTHOR", property: "author", control: textControl(row, "author", "Author")}),
           detailField({label: "DESCRIPTION", control: textControl(row, "description", "Description", true)}),
           detailField({label: "CREDITS", control: textControl(row, "credits", "Credits", true)})]}),
+        ...((row.licenseFiles?.length) ? [detailSection({title: "LICENSE FILES", body:
+          row.licenseFiles.map(path => detailField({label: "FILE", control: readonlyField(path)}))})] : []),
         ...((row.requirements?.length || row.requirementsError) ? [detailSection({title: "REQUIRES", body: [
           ...(row.requirementsError ? [detailNote(row.requirementsError)] : []),
           ...(row.requirements || []).map(need => detailField({label: need.name || need.id,

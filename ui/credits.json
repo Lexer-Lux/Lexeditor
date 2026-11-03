@@ -82,6 +82,14 @@
     ]
   },
   "plugins": {
+    "kf1": {
+      "contributions": [
+        {"name": "Andrew / Verdite1 contributors", "role": "Existing King's Field I archive/recomp source port, native rendering and input research (MIT).", "url": "https://github.com/Voicedrew11/verdite1/tree/archive/recomp"},
+        {"name": "RecompOne contributors", "role": "Existing recompilation runtime and source-mod loader (MIT). No disc bytes or generated recompilation source is distributed by Lexeditor.", "url": "https://github.com/BlackLabelHQ/RecompOne"}
+      ],
+      "thanks": [],
+      "licenses": []
+    },
     "blank": {
       "contributions": [
         {

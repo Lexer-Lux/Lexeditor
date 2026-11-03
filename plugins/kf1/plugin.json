@@ -1,0 +1,15 @@
+{
+  "id": "kf1",
+  "name": "King's Field I",
+  "accent": "#887455",
+  "processNames": ["KingsField1.exe"],
+  "installation": {
+    "rootEnv": "LEXEDITOR_KF1_ROOT",
+    "requiredPaths": ["KingsField1.exe", "KingsField1.dll", "lexeditor-port.json"],
+    "executable": "KingsField1.exe",
+    "launchPath": "KingsField1.exe",
+    "installDirNames": ["Verdite1"],
+    "defaultRoots": ["D:\\Programs\\Verdite1"],
+    "reshadeRenderer": "opengl32"
+  }
+}

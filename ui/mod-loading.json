@@ -1,6 +1,11 @@
 {
   "schema": 1,
   "plugins": {
+    "kf1": {
+      "loader": "Verdite1's native Roslyn source-mod loader, pinned to the Lexer-owned archive/recomp fork. The port reads the shared library directly through its saved mods.root setting.",
+      "structure": "One folder per native C# source mod with a root mod.json containing its id and name. Settings stay in the port's interface.ini and settings.json, outside mods.",
+      "overriding": "Native hooks and declared dependencies compose through the port loader. Duplicate native ids are rejected. Arbitrary source hooks can conflict; record-level compatibility must be proved per mod. No whole disc files are copied."
+    },
     "blank": {
       "loader": "Template only — not implemented.",
       "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
