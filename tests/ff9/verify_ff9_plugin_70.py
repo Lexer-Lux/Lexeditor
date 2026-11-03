@@ -70,7 +70,7 @@ def main() -> int:
         assert len(document.rows) == 2
         assert fields["Price"] == {
             "key": "Price", "label": "Price", "declaredType": "UInt32",
-            "editable": True, "kind": "integer", "min": 0, "max": 4294967295,
+            "editable": True, "icon": None, "kind": "integer", "min": 0, "max": 4294967295,
         }
         assert fields["Usable"]["kind"] == "boolean" and fields["Usable"]["editable"]
         # An Int32[] column is an editable list now, not an opaque stored blob.
