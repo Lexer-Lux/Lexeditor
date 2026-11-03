@@ -25,6 +25,13 @@ new post-hit HP and that hit's actual loss; pulses do not add or saturate.
 Healing and zero damage do not start a pulse. Linked body parts resolve to the
 native owner. Restore all lighting/color state after each affected draw.
 
+Red strength mixes the final textured, lit and fogged RGB toward pure red
+`(255, 0, 0)` before the renderer's output quantization. Preserve texture holes,
+alpha, blending and depth. Multiplying a texture's lighting colour is insufficient:
+a green texel with no red channel stays non-red under multiplication. Keep the
+HP/timer policy in the mod; any required renderer API only carries the captured
+per-model colour and strength. Per-game renderer support must be explicit.
+
 For sprint, holding a controller button or keyboard key across exhaustion must
 behave identically. Stationary frames do not charge movement-based drain. Death,
 load, New Game, menu transitions and disable clear owned transient work without
