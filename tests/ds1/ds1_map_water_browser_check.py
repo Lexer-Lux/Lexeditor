@@ -1,8 +1,4 @@
-"""Map viewport draws shader water translucent blue, not gray.
-
-A [We] water material names no diffuse (only a bump map), so the old
-fallback gray lit by the scene rig rendered the Depths sewer channel
-as flat white. Water materials now get a translucent blue instead.
+"""Shader water uses its normal map even when it has no diffuse texture.
 Synthetic fixtures only; read-only with no mod.
 """
 import json
@@ -17,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ds1_fixture import make_archive
 from flver_fixture import build_flver
 from msb_fixture import build_msb
+from tpf_fixture import make_dds_rgba, make_tpf
 from plugins.ds1.store import RELATIVE
 from plugins.ds1.plugin import DS1Session
 from playwright.sync_api import sync_playwright
@@ -36,8 +33,13 @@ def main():
         (game / 'map' / 'MapStudio' / 'm10_00_00_00.msb').write_bytes(build_msb())
         piece_dir = game / 'map' / 'm10_00_00_00'
         piece_dir.mkdir(parents=True)
-        (piece_dir / 'm10piece.flver.dcx').write_bytes(build_flver(
-            mtd_name='A10_Water_sewer[We].mtd'))
+        model = build_flver(mtd_name='A10_Water_sewer[We].mtd')
+        assert b'g_Diffuse\0' in model
+        (piece_dir / 'm10piece.flver.dcx').write_bytes(model.replace(b'g_Diffuse\0', b'g_Bumpmap\0'))
+        textures=game/'map'/'m10'
+        textures.mkdir()
+        pixels=[(80,80,80,255),(160,160,160,255)]*8
+        (textures/'ripple.tpf').write_bytes(make_tpf([('tex0',make_dds_rgba(4,4,pixels))]))
         session = DS1Session({'LEXEDITOR_DS1_ROOT': str(game), 'LEXEDITOR_NO_MOD': '1',
                               'LEXEDITOR_MOD_READ_ONLY': '1'})
         errors = []
@@ -48,7 +50,9 @@ def main():
                     timeout=60) as response:
                 data = json.load(response)
             assert 'Water' in data['meshes'][0]['mat_def'], data['meshes'][0].get('mat_def')
-            assert 'tex0' not in data['textures'], sorted(data['textures'])
+            assert data['meshes'][0]['map'] is None
+            assert data['meshes'][0]['normal'] == 'tex0'
+            assert 'tex0' in data['textures'], data.get('notes')
             with sync_playwright() as play:
                 browser = play.chromium.launch(headless=True)
                 try:
@@ -73,12 +77,17 @@ def main():
                                   obj.material.color &&
                                   obj.material.color.getHex() === %d)
                                 wet.push({opacity: obj.material.opacity,
-                                          depthWrite: obj.material.depthWrite}); });
+                                          depthWrite: obj.material.depthWrite,
+                                          bump:!!obj.material.bumpMap,
+                                          channel:obj.material.bumpMap?.channel,
+                                          colorSpace:obj.material.bumpMap?.colorSpace}); });
                             return wet; }""" % WATER)
                     assert found, 'no translucent blue water material in the scene'
                     for entry in found:
                         assert entry['opacity'] == 0.65, entry
                         assert entry['depthWrite'] is False, entry
+                        assert entry['bump'] and entry['channel']==0, entry
+                        assert entry['colorSpace']=='', entry
                     if output:
                         page.locator('[data-viewport-host]').screenshot(
                             path=str(output / 'map-water.png'))

@@ -46,10 +46,12 @@ def unpack(entry):
 
 def test_encode_ships_light_name_and_uv1():
     doc = StubDoc([{'type': 'g_Diffuse', 'path': 'm10_wall.tga'},
+                   {'type': 'g_Bumpmap', 'path': 'N:\\FRPG\\m10_wall_n.tga'},
                    {'type': 'g_Lightmap', 'path': 'm10_01_00_lit_B1m2000.tga'}])
     entry = _encode(doc, textured=True)['meshes'][0]
     assert entry['map'] == 'm10_wall'
     assert entry['light'] == 'm10_01_00_lit_B1m2000'
+    assert entry['normal'] == 'm10_wall_n'
     assert unpack(entry['uv1']) == (0.5, 0.5, 0.5, 0.5)
 
 
