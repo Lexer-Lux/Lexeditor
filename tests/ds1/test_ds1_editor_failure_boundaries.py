@@ -974,6 +974,43 @@ def test_rollback_never_puts_a_legacy_patched_executable_back(tmp_path, monkeypa
                                'after': b'vanilla', 'previous': {}}])
 
 
+@pytest.mark.parametrize('failed', [False, True])
+def test_save_uses_live_stage_feedback_and_does_not_refresh_after_failure(page, tmp_path, failed):
+    mount(page)
+    source = (ROOT / 'plugins/ds1/editor.js').read_text('utf-8')
+    start = source.index('function reportTweakRebuild(')
+    end = source.index('\nasync function discard()', start)
+    page.add_script_tag(content=source[start:end])
+    page.evaluate('''()=>{
+      window.edits=Promise.resolve();window.refreshes=0;
+      window.state={tab:'items'};window.attackPreviews={clear:()=>{}};
+      window.refreshState=async()=>{refreshes++};window.shell={refresh:()=>{}};
+      window.notify=error=>LexeditorUI.showAlert({title:error.title,message:error.message});
+      window.api=(path,body)=>{
+        if(path==='/api/save'){
+          window.operationId=body.operationId;
+          return new Promise(resolve=>window.finishSave=resolve);
+        }
+        if(new URL(path,location.href).searchParams.get('id')!==operationId)
+          throw Error('Progress did not follow this save');
+        return Promise.resolve({running:true,label:'Combining enabled mods'});
+      };
+      window.saveResult=save().catch(error=>window.saveError=error.message);
+    }''')
+    page.get_by_text('Combining enabled mods', exact=True).wait_for()
+    assert page.evaluate('document.body.inert')
+    assert len(page.evaluate('operationId')) == 32
+    page.screenshot(path=str(tmp_path / 'save-stage.png'))
+    page.evaluate('(failed)=>finishSave(failed?{tweaksError:"Fixture disk failure"}:{tweaksRebuilt:true})', failed)
+    page.wait_for_function('!document.body.inert')
+    assert page.evaluate('refreshes') == (0 if failed else 1)
+    if failed:
+        page.get_by_role('alertdialog', name='Changes saved, but deployment failed').wait_for()
+        assert 'Fixture disk failure' in page.evaluate('saveError')
+    else:
+        assert page.locator('[role="alertdialog"]').count() == 0
+
+
 def test_deployment_failure_stops_save_and_stays_in_a_modal(page, tmp_path):
     mount(page)
     source = (ROOT / 'plugins/ds1/editor.js').read_text('utf-8')
