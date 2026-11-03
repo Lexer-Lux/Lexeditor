@@ -586,7 +586,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         page.wait_for_function("""() => {
           const mod=document.querySelector(".lex-plugin-mod-loading");
           const credits=document.querySelector(".lex-plugin-credits");
-          return mod?.querySelectorAll("li").length>=3
+          return mod?.querySelectorAll("li, .lex-detail-field").length>=3
             && credits?.querySelectorAll(".lex-credit-entry").length>0
             && !mod.querySelector('[role="alert"]')
             && !credits.querySelector('[role="alert"]');
@@ -600,14 +600,14 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         reveal(page, shared.locator('.lex-plugin-credits'))
         page.wait_for_timeout(100)
         page.screenshot(path=str(output / "info-shared-sections-1200.png"), full_page=True)
-        remove = page.get_by_role("button", name="Remove deployed PAK", exact=True)
+        remove = page.get_by_role("button", name="Remove deployed PAK", exact=True, include_hidden=True)
         page.locator('.lex-information-panel .lex-tweaks-pages').get_by_role('button', name='First page', exact=True).click()
         reveal(page, remove)
         expect(remove).to_be_enabled()
         remove.click()
         page.wait_for_function("state.info.projectDeployment.state==='absent'")
         reveal(page, remove)
-        expect(page.get_by_role("button", name="Remove deployed PAK", exact=True)).to_be_disabled()
+        expect(page.get_by_role("button", name="Remove deployed PAK", exact=True, include_hidden=True)).to_be_disabled()
         assert "Removed Lexeditor's deployed PAK" in page.locator("#main").inner_text()
         page.screenshot(path=str(output / "info-remove-1200.png"), full_page=True)
 
