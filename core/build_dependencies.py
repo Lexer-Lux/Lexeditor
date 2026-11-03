@@ -10,6 +10,7 @@ import builtins
 import hashlib
 import importlib
 import importlib.util
+import os
 from pathlib import Path
 import sys
 import threading
@@ -49,7 +50,8 @@ def _audit(event, args):
 class BuildDependencies:
     def __init__(self, script_roots, *, root=ROOT):
         self.root = Path(root).resolve()
-        self.scripts = tuple(Path(path).resolve() for path in script_roots)
+        self.scripts = tuple(os.path.normcase(str(Path(path).resolve())).rstrip(os.sep)+os.sep
+                             for path in script_roots)
         self.edges, self.roots, self.sources = {}, set(), {}
         self.complete, self.bytes = True, 0
         self.lock = threading.RLock()
@@ -68,8 +70,11 @@ class BuildDependencies:
 
     def _script(self, name):
         try:
-            path = Path(name).resolve()
-            return any(path.is_relative_to(root) for root in self.scripts)
+            # Resolve afresh, retaining link/alias handling, then compare all
+            # directory prefixes in C instead of constructing Path parents
+            # separately for every enabled mod on every observed import.
+            path = os.path.normcase(str(Path(name).resolve())).rstrip(os.sep)+os.sep
+            return path.startswith(self.scripts)
         except (OSError, ValueError, TypeError, RuntimeError):
             return False
 
@@ -107,8 +112,10 @@ class BuildDependencies:
             self.local.reading = False
 
     def _modules(self, owner, modules):
+        seen = set()
         for module in modules:
-            if isinstance(module, types.ModuleType):
+            if isinstance(module, types.ModuleType) and id(module) not in seen:
+                seen.add(id(module))
                 self._edge(owner,vars(module).get('__file__'))
 
     def _import(self, name, globals=None, locals=None, fromlist=(), level=0):

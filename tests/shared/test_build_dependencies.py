@@ -114,3 +114,23 @@ def test_python_package_inference_still_works_when_observation_cannot_resolve_it
         module = builtins.__import__('base',{'__name__':'dependency_fixture.helper','__file__':str(script)},None,('VALUE',),1)
         assert module.VALUE == 17
     assert not observed.complete
+
+
+def test_script_directory_prefixes_preserve_path_boundaries(engine):
+    root,script,_package = engine
+    observed = build_dependencies.BuildDependencies([script.parent], root=root)
+    assert observed._script(str(script))
+    assert observed._script(str(script.parent))
+    assert observed._script(str(script.parent/'nested'/'helper.py'))
+    assert not observed._script(str(script.parent.with_name('script-extra')/'helper.py'))
+    assert not observed._script(str(root/'dependency_fixture'/'helper.py'))
+
+
+def test_repeated_module_objects_are_observed_once_per_import(engine, monkeypatch):
+    root,script,_package = engine
+    module = importlib.import_module('dependency_fixture.base')
+    observed = build_dependencies.BuildDependencies([script.parent], root=root)
+    edges=[]
+    monkeypatch.setattr(observed, '_edge', lambda owner,dependency: edges.append((owner,dependency)))
+    observed._modules(str(script), [module,module,module,object()])
+    assert edges == [(str(script),module.__file__)]

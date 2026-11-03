@@ -161,13 +161,15 @@ def _build(request, dependencies):
     params_path = Path(request['params'])
     if params_path.is_file():
         context._params = _read_payload(params_path, 'parameter snapshot')
-    _seed_compression(Path(request['root']))
+    sources = _seed_compression(Path(request['root']))
     # Startup failures must not be confused with a crash in author code.
     # Atomic publication keeps this acknowledgement if a crash interrupts
     # the final response, using the same temporary transport file.
     atomic_write(Path(request['result']), b'{"building":true}')
     try:
-        outputs = script_mods.execute_script(Path(request['root']), request['settings'], context)
+        from .formats import compression_sources
+        with compression_sources(sources):
+            outputs = script_mods.execute_script(Path(request['root']), request['settings'], context)
         if not isinstance(outputs, dict):
             raise script_mods.ScriptModError('build() must return {path: contents}')
         encoded = {}
@@ -199,7 +201,7 @@ def _build(request, dependencies):
 
 
 def _seed_compression(root):
-    """Reuse this mod's owned outputs even after the disposable cache evicts them."""
+    """Yield verified owned archives only when a build misses compression reuse."""
     from .tweak_mods import ALLOWED_ROOTS, checked
     try:
         outputs = script_mods._generated_files(root, ALLOWED_ROOTS)
@@ -216,8 +218,7 @@ def _seed_compression(root):
             remaining -= len(data)
             if len(data) != size or hashlib.sha256(data).hexdigest() != digest:
                 continue
-            from .formats import remember_compression
-            remember_compression(data)
+            yield data
     except Exception:
         pass  # Ownership validation in the parent still guards actual writes.
 
